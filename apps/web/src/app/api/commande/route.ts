@@ -1,7 +1,9 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
 import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
+import { limiterDebit } from "@/lib/auth/rate-limit";
 import type {
   CanalPublic,
   CreerCommandePubliquePayload,
@@ -11,6 +13,17 @@ import type { LigneCommande } from "@/lib/caisse/types";
 
 const CANAUX_PUBLICS = ["sur_place", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
+
+// Anti-spam : cette route est publique, sans authentification. Limite large
+// (pas un login) pour ne pas gêner un client qui corrige une erreur de
+// formulaire, mais bloque un script qui inonderait la table `commandes`.
+const MAX_COMMANDES_PAR_FENETRE = 10;
+const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+
+// Anti-abus sur le contenu du panier : un panier "normal" ne dépasse jamais
+// ça ; au-delà, ça ne peut venir que d'une requête trafiquée.
+const MAX_LIGNES_PAR_COMMANDE = 30;
+const MAX_QUANTITE_PAR_LIGNE = 20;
 
 /**
  * Création d'une commande depuis le site public (client anonyme, sans
@@ -23,12 +36,25 @@ const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
  * retrait, jamais en ligne pour cette itération.
  */
 export async function POST(request: Request) {
+  const headersList = await headers();
+  const ip = headersList.get("x-forwarded-for") ?? "local";
+
+  if (limiterDebit(`commande:${ip}`, MAX_COMMANDES_PAR_FENETRE, FENETRE_RATE_LIMIT_MS)) {
+    return NextResponse.json(
+      { error: "Trop de commandes envoyées depuis cette connexion. Réessaie dans quelques minutes." },
+      { status: 429 }
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as CreerCommandePubliquePayload | null;
   if (!body || !Array.isArray(body.lignes) || body.lignes.length === 0) {
     return NextResponse.json(
       { error: "Requête invalide : au moins une ligne de commande est requise." },
       { status: 400 }
     );
+  }
+  if (body.lignes.length > MAX_LIGNES_PAR_COMMANDE) {
+    return NextResponse.json({ error: "Panier trop volumineux." }, { status: 400 });
   }
 
   if (!CANAUX_PUBLICS.includes(body.canal as CanalPublic)) {
@@ -124,7 +150,7 @@ export async function POST(request: Request) {
     }
 
     const quantite = Number(ligneBrute.quantite);
-    if (!Number.isInteger(quantite) || quantite < 1) {
+    if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
       return NextResponse.json({ error: `Quantité invalide pour ${produit.nom}.` }, { status: 400 });
     }
 
@@ -196,10 +222,8 @@ export async function POST(request: Request) {
     .upsert({ telephone }, { onConflict: "telephone", ignoreDuplicates: true });
 
   if (erreurUpsertClient) {
-    return NextResponse.json(
-      { error: `Erreur serveur (création client) : ${erreurUpsertClient.message}` },
-      { status: 500 }
-    );
+    console.error("[/api/commande] échec upsert client :", erreurUpsertClient.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
   const { data: commande, error: erreurCommande } = await supabase
@@ -224,10 +248,8 @@ export async function POST(request: Request) {
     .single();
 
   if (erreurCommande || !commande) {
-    return NextResponse.json(
-      { error: `Échec de l'enregistrement de la commande : ${erreurCommande?.message ?? "inconnu"}` },
-      { status: 500 }
-    );
+    console.error("[/api/commande] échec insertion commande :", erreurCommande?.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
   return NextResponse.json({

@@ -168,10 +168,8 @@ export async function POST(request: Request) {
       .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
 
     if (erreurUpsertClient) {
-      return NextResponse.json(
-        { error: `Erreur serveur (création client) : ${erreurUpsertClient.message}` },
-        { status: 500 }
-      );
+      console.error("[/api/caisse/commandes] échec upsert client :", erreurUpsertClient.message);
+      return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
     }
   }
 
@@ -192,10 +190,8 @@ export async function POST(request: Request) {
     .single();
 
   if (erreurCommande || !commande) {
-    return NextResponse.json(
-      { error: `Échec de l'enregistrement de la commande : ${erreurCommande?.message ?? "inconnu"}` },
-      { status: 500 }
-    );
+    console.error("[/api/caisse/commandes] échec insertion commande :", erreurCommande?.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
   const { error: erreurPaiement } = await supabase.from("paiements").insert({
@@ -205,9 +201,10 @@ export async function POST(request: Request) {
   });
 
   if (erreurPaiement) {
+    console.error("[/api/caisse/commandes] échec insertion paiement :", erreurPaiement.message);
     return NextResponse.json(
       {
-        error: `Commande enregistrée mais échec de l'enregistrement du paiement : ${erreurPaiement.message}`,
+        error: "Commande enregistrée mais échec de l'enregistrement du paiement. Préviens le patron.",
         commandeId: commande.id,
       },
       { status: 500 }
