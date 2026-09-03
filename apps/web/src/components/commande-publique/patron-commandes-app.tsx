@@ -118,6 +118,7 @@ export function PatronCommandesApp({ commandesInitiales }: PatronCommandesAppPro
                 <li key={i}>
                   {l.quantite}× {l.nom}
                   {l.viandes.length > 0 ? ` (${l.viandes.join(", ")})` : ""}
+                  {l.sauces.length > 0 ? ` — sauces : ${l.sauces.join(", ")}` : ""}
                 </li>
               ))}
             </ul>

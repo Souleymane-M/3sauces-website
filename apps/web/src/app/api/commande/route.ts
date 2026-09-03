@@ -9,6 +9,7 @@ import type {
   CreerCommandePubliquePayload,
   LigneCommandePubliquePayload,
 } from "@/lib/commande-publique/types";
+import { NB_SAUCES_MAX, CATEGORIES_AVEC_SAUCES } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 
 const CANAUX_PUBLICS = ["sur_place", "livraison"] as const;
@@ -134,6 +135,16 @@ export async function POST(request: Request) {
   }
   const nomsViandesValides = new Set((viandesActives ?? []).map((v) => v.nom));
 
+  const { data: saucesActives, error: erreurSauces } = await supabase
+    .from("sauces")
+    .select("nom")
+    .eq("actif", true);
+
+  if (erreurSauces) {
+    return NextResponse.json({ error: "Erreur serveur (sauces)." }, { status: 500 });
+  }
+  const nomsSaucesValides = new Set((saucesActives ?? []).map((s) => s.nom));
+
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
 
@@ -167,6 +178,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Viande invalide sur la ligne ${produit.nom}.` }, { status: 400 });
     }
 
+    // Sauces incluses, sans supplément : jusqu'à 3, optionnel, uniquement sur
+    // les catégories éligibles (snacking). Sur les autres catégories, tout
+    // envoi de sauce ne peut venir que d'une requête trafiquée (rejet strict).
+    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
+    const categorieEligibleSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie);
+    if (!categorieEligibleSauces && sauces.length > 0) {
+      return NextResponse.json({ error: `Sauces non disponibles sur ${produit.nom}.` }, { status: 400 });
+    }
+    if (sauces.length > NB_SAUCES_MAX) {
+      return NextResponse.json(
+        { error: `Maximum ${NB_SAUCES_MAX} sauces sur ${produit.nom}.` },
+        { status: 400 }
+      );
+    }
+    if (new Set(sauces).size !== sauces.length) {
+      return NextResponse.json({ error: `Sauce en double sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+    if (sauces.some((s) => !nomsSaucesValides.has(s))) {
+      return NextResponse.json({ error: `Sauce invalide sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -175,6 +207,7 @@ export async function POST(request: Request) {
       prixUnitaire: produit.prix,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
+      sauces,
       canetteIncluse: false,
     });
   }

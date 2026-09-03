@@ -1,25 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitPublic, ViandePublique } from "@/lib/commande-publique/types";
+import type { ProduitPublic, ViandePublique, SaucePublique } from "@/lib/commande-publique/types";
+import { NB_SAUCES_MAX, CATEGORIES_AVEC_SAUCES } from "@/lib/commande-publique/types";
 
 interface ViandeModalPubliqueProps {
   produit: ProduitPublic;
   viandes: ViandePublique[];
-  onValider: (viandes: string[]) => void;
+  sauces: SaucePublique[];
+  onValider: (viandes: string[], sauces: string[]) => void;
   onAnnuler: () => void;
 }
 
 /**
  * Équivalent public de `caisse/viande-modal.tsx`, sans la case "prix libre"
  * (le menu public exclut déjà les produits à prix null — cf. commande-publique/types.ts).
+ *
+ * Étendu pour inclure la sélection de sauces (jusqu'à 3, incluses, sans
+ * supplément) sur les produits snacking (Tacos/Barquette/Bowl) — cf.
+ * CATEGORIES_AVEC_SAUCES.
  */
-export function ViandeModalPublique({ produit, viandes, onValider, onAnnuler }: ViandeModalPubliqueProps) {
+export function ViandeModalPublique({ produit, viandes, sauces, onValider, onAnnuler }: ViandeModalPubliqueProps) {
   const [choix, setChoix] = useState<string[]>(
     Array.from({ length: produit.nbViandesMax }, () => "")
   );
+  const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
 
   const toutSelectionne = choix.every((v) => v !== "");
+  const proposeSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie) && sauces.length > 0;
+
+  function basculerSauce(nom: string) {
+    setSaucesChoisies((precedent) => {
+      if (precedent.includes(nom)) {
+        return precedent.filter((s) => s !== nom);
+      }
+      if (precedent.length >= NB_SAUCES_MAX) {
+        return precedent;
+      }
+      return [...precedent, nom];
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -51,6 +71,35 @@ export function ViandeModalPublique({ produit, viandes, onValider, onAnnuler }: 
           ))}
         </div>
 
+        {proposeSauces && (
+          <div className="mt-5">
+            <p className="text-sm text-gray-400">
+              Sauces incluses (jusqu&apos;à {NB_SAUCES_MAX}, optionnel) — {saucesChoisies.length}/{NB_SAUCES_MAX}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {sauces.map((s) => {
+                const selectionnee = saucesChoisies.includes(s.nom);
+                const desactivee = !selectionnee && saucesChoisies.length >= NB_SAUCES_MAX;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={desactivee}
+                    onClick={() => basculerSauce(s.nom)}
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      selectionnee
+                        ? "border-white bg-white text-black"
+                        : "border-gray-600 text-gray-300 hover:bg-gray-900"
+                    } disabled:opacity-30`}
+                  >
+                    {s.nom}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-5 flex gap-2">
           <button
             onClick={onAnnuler}
@@ -60,7 +109,7 @@ export function ViandeModalPublique({ produit, viandes, onValider, onAnnuler }: 
           </button>
           <button
             disabled={!toutSelectionne}
-            onClick={() => onValider(choix)}
+            onClick={() => onValider(choix, saucesChoisies)}
             className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
           >
             Ajouter

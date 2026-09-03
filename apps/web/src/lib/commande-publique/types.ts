@@ -23,6 +23,17 @@ export interface ViandePublique {
   nom: string;
 }
 
+export interface SaucePublique {
+  id: string;
+  nom: string;
+}
+
+/** Nombre max de sauces incluses, sans supplément (règle métier fixe). */
+export const NB_SAUCES_MAX = 3;
+
+/** Catégories de produits éligibles à la sélection de sauces (configurateurs Tacos/Barquette/Bowl). */
+export const CATEGORIES_AVEC_SAUCES: Categorie[] = ["snacking"];
+
 export interface ParametresLivraisonPublic {
   heureDebut: string; // "HH:MM:SS"
   heureFin: string;
@@ -34,6 +45,7 @@ export interface LigneCommandePubliquePayload {
   produitId: string;
   quantite: number;
   viandes: string[];
+  sauces: string[];
 }
 
 export type CanalPublic = Extract<Canal, "sur_place" | "livraison">;
@@ -64,6 +76,7 @@ export interface LigneCommandeAdmin {
   quantite: number;
   prixUnitaire: number;
   viandes: string[];
+  sauces: string[];
 }
 
 export interface CommandeAdmin {

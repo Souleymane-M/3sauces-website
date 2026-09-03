@@ -92,6 +92,20 @@ export interface Database {
         Relationships: [];
       };
 
+      sauces: {
+        Row: {
+          id: string;
+          nom: string;
+          actif: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["sauces"]["Row"]> & {
+          nom: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["sauces"]["Row"]>;
+        Relationships: [];
+      };
+
       articles_stock: {
         Row: {
           id: string;

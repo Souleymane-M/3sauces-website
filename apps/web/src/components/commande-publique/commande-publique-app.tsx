@@ -8,6 +8,7 @@ import type {
   ParametresLivraisonPublic,
   ProduitPublic,
   ViandePublique,
+  SaucePublique,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "./viande-modal-publique";
@@ -18,11 +19,13 @@ interface LignePanierPublique {
   produit: ProduitPublic;
   quantite: number;
   viandes: string[];
+  sauces: string[];
 }
 
 interface CommandePubliqueAppProps {
   produits: ProduitPublic[];
   viandes: ViandePublique[];
+  sauces: SaucePublique[];
   parametres: ParametresLivraisonPublic;
 }
 
@@ -35,7 +38,7 @@ const LIBELLES_CATEGORIES: Record<string, string> = {
   supplement: "Suppléments",
 };
 
-export function CommandePubliqueApp({ produits, viandes, parametres }: CommandePubliqueAppProps) {
+export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: CommandePubliqueAppProps) {
   const router = useRouter();
 
   const creneauxValides = useMemo(
@@ -70,11 +73,12 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
 
-  function ajouterAuPanier(produit: ProduitPublic, viandesChoisies: string[]) {
+  function ajouterAuPanier(produit: ProduitPublic, viandesChoisies: string[], saucesChoisies: string[] = []) {
     setPanier((precedent) => {
       const cle = (l: LignePanierPublique) =>
         l.produit.id === produit.id &&
-        JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort());
+        JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
+        JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort());
 
       const existante = precedent.find(cle);
       if (existante) {
@@ -82,7 +86,13 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
       }
       return [
         ...precedent,
-        { id: `${produit.id}-${Date.now()}-${Math.random()}`, produit, quantite: 1, viandes: viandesChoisies },
+        {
+          id: `${produit.id}-${Date.now()}-${Math.random()}`,
+          produit,
+          quantite: 1,
+          viandes: viandesChoisies,
+          sauces: saucesChoisies,
+        },
       ];
     });
   }
@@ -152,6 +162,7 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
             produitId: l.produit.id,
             quantite: l.quantite,
             viandes: l.viandes,
+            sauces: l.sauces,
           })),
         }),
       });
@@ -208,6 +219,9 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
                 </button>
               </div>
               {l.viandes.length > 0 && <div className="text-xs text-gray-400">{l.viandes.join(", ")}</div>}
+              {l.sauces.length > 0 && (
+                <div className="text-xs text-gray-500">Sauces : {l.sauces.join(", ")}</div>
+              )}
               <div className="mt-1 flex items-center gap-2">
                 <button onClick={() => modifierQuantite(l.id, -1)} className="rounded border border-gray-600 px-3 py-1">
                   -
@@ -329,9 +343,10 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
         <ViandeModalPublique
           produit={produitEnSelection}
           viandes={viandes}
+          sauces={sauces}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies);
+          onValider={(viandesChoisies, saucesChoisies) => {
+            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies);
             setProduitEnSelection(null);
           }}
         />

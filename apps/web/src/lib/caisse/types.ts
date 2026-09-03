@@ -13,6 +13,8 @@ export interface LigneCommande {
   prixUnitaire: number;
   coutMatiereUnitaire: number | null;
   viandes: string[];
+  /** Sauces incluses (site public uniquement pour l'instant — cf. commande-publique). Absent/vide côté caisse. */
+  sauces?: string[];
   canetteIncluse: boolean;
 }
 
