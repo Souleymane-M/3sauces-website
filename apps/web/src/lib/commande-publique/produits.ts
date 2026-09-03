@@ -14,7 +14,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, description, nb_viandes_max")
+    .select("id, nom, categorie, prix, description, nb_viandes_max, viande_imposee")
     .eq("actif", true)
     .not("prix", "is", null)
     .order("categorie", { ascending: true })
@@ -33,6 +33,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
       prix: p.prix,
       description: p.description,
       nbViandesMax: p.nb_viandes_max,
+      viandeImposee: p.viande_imposee,
     }));
 }
 

@@ -65,6 +65,7 @@ export interface Database {
           actif: boolean;
           est_plat_du_jour: boolean;
           est_desactivable: boolean;
+          viande_imposee: string | null;
           created_at: string;
           updated_at: string;
         };

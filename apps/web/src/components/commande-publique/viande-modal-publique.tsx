@@ -4,11 +4,20 @@ import { useState } from "react";
 import type { ProduitPublic, ViandePublique, SaucePublique } from "@/lib/commande-publique/types";
 import { NB_SAUCES_MAX, CATEGORIES_AVEC_SAUCES } from "@/lib/commande-publique/types";
 
+export interface ExtrasChoisis {
+  viandeSupplementaire: string | null;
+  sauceSupplementaire: string | null;
+}
+
 interface ViandeModalPubliqueProps {
   produit: ProduitPublic;
   viandes: ViandePublique[];
   sauces: SaucePublique[];
-  onValider: (viandes: string[], sauces: string[]) => void;
+  /** Produit "Viande supplémentaire" (prix affiché dynamiquement), null si indisponible. */
+  produitViandeSupplementaire: ProduitPublic | null;
+  /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
+  produitSauceSupplementaire: ProduitPublic | null;
+  onValider: (viandes: string[], sauces: string[], extras: ExtrasChoisis) => void;
   onAnnuler: () => void;
 }
 
@@ -16,18 +25,35 @@ interface ViandeModalPubliqueProps {
  * Équivalent public de `caisse/viande-modal.tsx`, sans la case "prix libre"
  * (le menu public exclut déjà les produits à prix null — cf. commande-publique/types.ts).
  *
- * Étendu pour inclure la sélection de sauces (jusqu'à 3, incluses, sans
- * supplément) sur les produits snacking (Tacos/Barquette/Bowl) — cf.
- * CATEGORIES_AVEC_SAUCES.
+ * Étendu pour inclure :
+ *  - la sélection de sauces incluses (jusqu'à 3, sans supplément) ;
+ *  - des ajouts optionnels payants (viande/sauce supplémentaire) ;
+ * sur les produits snacking (Tacos/Barquette/Bowl) — cf. CATEGORIES_AVEC_SAUCES.
+ *
+ * Ce composant n'est jamais ouvert pour un produit "verrouillé"
+ * (produit.viandeImposee renseigné, ex: Menu Collégien) : ce cas est géré en
+ * amont dans commande-publique-app.tsx, qui ajoute directement au panier sans
+ * passer par cette modale.
  */
-export function ViandeModalPublique({ produit, viandes, sauces, onValider, onAnnuler }: ViandeModalPubliqueProps) {
+export function ViandeModalPublique({
+  produit,
+  viandes,
+  sauces,
+  produitViandeSupplementaire,
+  produitSauceSupplementaire,
+  onValider,
+  onAnnuler,
+}: ViandeModalPubliqueProps) {
   const [choix, setChoix] = useState<string[]>(
     Array.from({ length: produit.nbViandesMax }, () => "")
   );
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
+  const [viandeSupp, setViandeSupp] = useState("");
+  const [sauceSupp, setSauceSupp] = useState("");
 
   const toutSelectionne = choix.every((v) => v !== "");
-  const proposeSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie) && sauces.length > 0;
+  const proposeExtras = CATEGORIES_AVEC_SAUCES.includes(produit.categorie);
+  const proposeSauces = proposeExtras && sauces.length > 0;
 
   function basculerSauce(nom: string) {
     setSaucesChoisies((precedent) => {
@@ -100,6 +126,46 @@ export function ViandeModalPublique({ produit, viandes, sauces, onValider, onAnn
           </div>
         )}
 
+        {proposeExtras && produitViandeSupplementaire && (
+          <div className="mt-5">
+            <label className="text-sm text-gray-400">
+              Ajouter une viande supplémentaire (+{produitViandeSupplementaire.prix.toFixed(2)} €)
+            </label>
+            <select
+              value={viandeSupp}
+              onChange={(e) => setViandeSupp(e.target.value)}
+              className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
+            >
+              <option value="">Aucune</option>
+              {viandes.map((v) => (
+                <option key={v.id} value={v.nom}>
+                  {v.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {proposeExtras && produitSauceSupplementaire && sauces.length > 0 && (
+          <div className="mt-3">
+            <label className="text-sm text-gray-400">
+              Ajouter une sauce supplémentaire (+{produitSauceSupplementaire.prix.toFixed(2)} €)
+            </label>
+            <select
+              value={sauceSupp}
+              onChange={(e) => setSauceSupp(e.target.value)}
+              className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
+            >
+              <option value="">Aucune</option>
+              {sauces.map((s) => (
+                <option key={s.id} value={s.nom}>
+                  {s.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="mt-5 flex gap-2">
           <button
             onClick={onAnnuler}
@@ -109,7 +175,12 @@ export function ViandeModalPublique({ produit, viandes, sauces, onValider, onAnn
           </button>
           <button
             disabled={!toutSelectionne}
-            onClick={() => onValider(choix, saucesChoisies)}
+            onClick={() =>
+              onValider(choix, saucesChoisies, {
+                viandeSupplementaire: viandeSupp || null,
+                sauceSupplementaire: sauceSupp || null,
+              })
+            }
             className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
           >
             Ajouter

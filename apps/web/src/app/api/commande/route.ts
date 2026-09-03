@@ -9,7 +9,11 @@ import type {
   CreerCommandePubliquePayload,
   LigneCommandePubliquePayload,
 } from "@/lib/commande-publique/types";
-import { NB_SAUCES_MAX, CATEGORIES_AVEC_SAUCES } from "@/lib/commande-publique/types";
+import {
+  NB_SAUCES_MAX,
+  CATEGORIES_AVEC_SAUCES,
+  NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+} from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 
 const CANAUX_PUBLICS = ["sur_place", "livraison"] as const;
@@ -118,7 +122,7 @@ export async function POST(request: Request) {
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, nb_viandes_max, actif")
+    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee")
     .in("id", produitIds);
 
   if (erreurProduits) {
@@ -178,19 +182,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Viande invalide sur la ligne ${produit.nom}.` }, { status: 400 });
     }
 
-    // Sauces incluses, sans supplément : jusqu'à 3, optionnel, uniquement sur
-    // les catégories éligibles (snacking). Sur les autres catégories, tout
-    // envoi de sauce ne peut venir que d'une requête trafiquée (rejet strict).
-    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
-    const categorieEligibleSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie);
-    if (!categorieEligibleSauces && sauces.length > 0) {
-      return NextResponse.json({ error: `Sauces non disponibles sur ${produit.nom}.` }, { status: 400 });
-    }
-    if (sauces.length > NB_SAUCES_MAX) {
+    // Produit "verrouillé" (ex: Menu Collégien) : la viande envoyée doit
+    // impérativement correspondre à la viande imposée en base — toute autre
+    // valeur ne peut venir que d'une requête trafiquée.
+    if (produit.viande_imposee && viandes[0] !== produit.viande_imposee) {
       return NextResponse.json(
-        { error: `Maximum ${NB_SAUCES_MAX} sauces sur ${produit.nom}.` },
+        { error: `${produit.nom} est disponible uniquement en ${produit.viande_imposee}.` },
         { status: 400 }
       );
+    }
+
+    // Sauces : deux régimes distincts.
+    //  - "Sauce supplémentaire" (produit dédié, +0,50€) : exactement 1 sauce.
+    //  - Sinon, sauces incluses sans supplément : jusqu'à 3, optionnel,
+    //    uniquement sur les catégories éligibles (snacking). Sur les autres
+    //    catégories, tout envoi de sauce ne peut venir que d'une requête
+    //    trafiquée (rejet strict).
+    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
+    const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
+    if (estSauceSupplementaire) {
+      if (sauces.length !== 1) {
+        return NextResponse.json(
+          { error: "Sélectionne exactement une sauce supplémentaire." },
+          { status: 400 }
+        );
+      }
+    } else {
+      const categorieEligibleSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie);
+      if (!categorieEligibleSauces && sauces.length > 0) {
+        return NextResponse.json({ error: `Sauces non disponibles sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (sauces.length > NB_SAUCES_MAX) {
+        return NextResponse.json(
+          { error: `Maximum ${NB_SAUCES_MAX} sauces sur ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
     }
     if (new Set(sauces).size !== sauces.length) {
       return NextResponse.json({ error: `Sauce en double sur la ligne ${produit.nom}.` }, { status: 400 });

@@ -16,6 +16,8 @@ export interface ProduitPublic {
   prix: number;
   description: string | null;
   nbViandesMax: number;
+  /** Si renseigné, produit "verrouillé" : viande fixe, pas de configurateur (ex: Menu Collégien). */
+  viandeImposee: string | null;
 }
 
 export interface ViandePublique {
@@ -33,6 +35,15 @@ export const NB_SAUCES_MAX = 3;
 
 /** Catégories de produits éligibles à la sélection de sauces (configurateurs Tacos/Barquette/Bowl). */
 export const CATEGORIES_AVEC_SAUCES: Categorie[] = ["snacking"];
+
+/**
+ * Produits "supplément" utilisés à l'intérieur du configurateur
+ * Tacos/Barquette/Bowl (viande et sauce en plus, avec supplément de prix),
+ * jamais affichés comme catégorie autonome sur la page principale — cf.
+ * commande-publique-app.tsx qui filtre `categorie === "supplement"`.
+ */
+export const NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE = "Viande supplémentaire";
+export const NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE = "Sauce supplémentaire";
 
 export interface ParametresLivraisonPublic {
   heureDebut: string; // "HH:MM:SS"

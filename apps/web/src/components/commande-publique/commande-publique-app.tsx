@@ -10,6 +10,10 @@ import type {
   ViandePublique,
   SaucePublique,
 } from "@/lib/commande-publique/types";
+import {
+  NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
+  NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+} from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
@@ -61,12 +65,24 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
   const categories = useMemo(() => {
     const parCategorie = new Map<string, ProduitPublic[]>();
     for (const p of produits) {
+      // "supplement" (viande/sauce en plus) n'existe que dans le configurateur
+      // Tacos/Barquette/Bowl, jamais comme catégorie autonome sur la page.
+      if (p.categorie === "supplement") continue;
       const liste = parCategorie.get(p.categorie) ?? [];
       liste.push(p);
       parCategorie.set(p.categorie, liste);
     }
     return parCategorie;
   }, [produits]);
+
+  const produitViandeSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
+  const produitSauceSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
 
   const total = panier.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
 
@@ -98,6 +114,12 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
   }
 
   function surClicProduit(produit: ProduitPublic) {
+    // Produit "verrouillé" (ex: Menu Collégien = Poulet imposé) : pas de
+    // configurateur, ajout direct avec la viande fixe.
+    if (produit.viandeImposee) {
+      ajouterAuPanier(produit, [produit.viandeImposee], []);
+      return;
+    }
     if (produit.nbViandesMax > 0) {
       setProduitEnSelection(produit);
     } else {
@@ -344,9 +366,17 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}
+          produitViandeSupplementaire={produitViandeSupplementaire}
+          produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies) => {
+          onValider={(viandesChoisies, saucesChoisies, extras) => {
             ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies);
+            if (extras.viandeSupplementaire && produitViandeSupplementaire) {
+              ajouterAuPanier(produitViandeSupplementaire, [extras.viandeSupplementaire], []);
+            }
+            if (extras.sauceSupplementaire && produitSauceSupplementaire) {
+              ajouterAuPanier(produitSauceSupplementaire, [], [extras.sauceSupplementaire]);
+            }
             setProduitEnSelection(null);
           }}
         />
