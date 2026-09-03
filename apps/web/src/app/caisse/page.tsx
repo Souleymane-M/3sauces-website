@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { CaisseApp } from "@/components/caisse/caisse-app";
 import { listerProduitsActifs, listerViandesActives } from "@/lib/caisse/produits";
+
+export const metadata: Metadata = {
+  title: "Caisse — 3 Sauces",
+};
 
 export default async function CaissePage() {
   const session = await requireRole(["employe"]);

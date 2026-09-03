@@ -9,7 +9,7 @@ import type {
   ProduitPublic,
   ViandePublique,
 } from "@/lib/commande-publique/types";
-import { genererCreneaux } from "@/lib/commande-publique/creneau";
+import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 
@@ -50,7 +50,7 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
-  const [creneauHeure, setCreneauHeure] = useState(creneauxValides[0] ?? "");
+  const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -184,6 +184,9 @@ export function CommandePubliqueApp({ produits, viandes, parametres }: CommandeP
                   className="rounded border border-gray-700 p-3 text-left text-sm active:bg-gray-900"
                 >
                   <div className="font-medium">{produit.nom}</div>
+                  {produit.description && (
+                    <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
+                  )}
                   <div className="text-gray-400">{produit.prix.toFixed(2)} €</div>
                 </button>
               ))}

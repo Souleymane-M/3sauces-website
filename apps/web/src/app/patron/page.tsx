@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/get-session";
 import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -5,6 +6,10 @@ import { PatronCommandesApp } from "@/components/commande-publique/patron-comman
 import { listerCommandesAdmin } from "@/lib/commande-publique/admin";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Patron — 3 Sauces",
+};
 
 export default async function PatronPage() {
   const session = await requireRole(["patron"]);

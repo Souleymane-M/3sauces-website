@@ -57,6 +57,7 @@ export interface Database {
           nom: string;
           categorie: Categorie;
           prix: number | null;
+          description: string | null;
           cout_matiere: number | null;
           canette_incluse: boolean;
           nb_viandes_max: number;

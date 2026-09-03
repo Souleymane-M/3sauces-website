@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
+
+export const metadata: Metadata = {
+  title: "Livreur — 3 Sauces",
+};
 
 export default async function LivreurPage() {
   const session = await requireRole(["livreur"]);

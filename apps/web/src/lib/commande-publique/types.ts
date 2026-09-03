@@ -14,6 +14,7 @@ export interface ProduitPublic {
   nom: string;
   categorie: Categorie;
   prix: number;
+  description: string | null;
   nbViandesMax: number;
 }
 

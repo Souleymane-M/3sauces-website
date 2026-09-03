@@ -74,3 +74,31 @@ export function genererCreneaux(heureDebut: string, heureFin: string, pasMinutes
   }
   return creneaux;
 }
+
+/**
+ * Détermine le créneau à présélectionner par défaut dans le sélecteur.
+ *
+ * On ne présélectionne jamais le tout premier créneau de la liste (l'heure
+ * d'ouverture) : si le client n'a pas encore choisi d'heure, il n'y a aucune
+ * raison de le faire démarrer sur l'heure d'ouverture, où seule une partie
+ * des minutes (ex: 30/40/50 si l'ouverture est à 10h30) est disponible — ça
+ * peut donner l'impression trompeuse que les autres minutes n'existent pas.
+ * On présélectionne plutôt le premier créneau à venir (>= heure actuelle à
+ * Mayotte), pour que la plage complète de minutes soit visible dès l'ouverture
+ * du sélecteur. Si l'heure actuelle dépasse la fermeture, ou si aucun
+ * créneau n'est disponible, on retombe sur le premier créneau de la liste.
+ */
+export function prochainCreneauValide(creneauxValides: string[]): string {
+  if (creneauxValides.length === 0) return "";
+
+  const maintenantMayotte = new Date(Date.now() + DECALAGE_MAYOTTE_HEURES * 60 * 60 * 1000);
+  const minutesActuelles = maintenantMayotte.getUTCHours() * 60 + maintenantMayotte.getUTCMinutes();
+
+  const versMinutes = (creneau: string) => {
+    const [hh, mm] = creneau.split(":").map(Number);
+    return hh * 60 + mm;
+  };
+
+  const prochain = creneauxValides.find((c) => versMinutes(c) >= minutesActuelles);
+  return prochain ?? creneauxValides[0];
+}
