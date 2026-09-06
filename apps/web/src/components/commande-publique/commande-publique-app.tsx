@@ -27,6 +27,7 @@ interface LignePanierPublique {
   viandes: string[];
   sauces: string[];
   saveurs: string[];
+  boissonIncluse: string | null;
 }
 
 interface CommandePubliqueAppProps {
@@ -128,7 +129,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     produit: ProduitPublic,
     viandesChoisies: string[],
     saucesChoisies: string[] = [],
-    saveursChoisies: string[] = []
+    saveursChoisies: string[] = [],
+    boissonIncluse: string | null = null
   ) {
     declencherPulse();
     setPanier((precedent) => {
@@ -136,7 +138,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         l.produit.id === produit.id &&
         JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
         JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
-        JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort());
+        JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
+        l.boissonIncluse === boissonIncluse;
 
       const existante = precedent.find(cle);
       if (existante) {
@@ -151,6 +154,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           viandes: viandesChoisies,
           sauces: saucesChoisies,
           saveurs: saveursChoisies,
+          boissonIncluse,
         },
       ];
     });
@@ -237,6 +241,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             viandes: l.viandes,
             sauces: l.sauces,
             saveurs: l.saveurs,
+            boissonIncluse: l.boissonIncluse,
           })),
         }),
       });
@@ -324,6 +329,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
                 {l.sauces.length > 0 && (
                   <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>
+                )}
+                {l.boissonIncluse && (
+                  <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>
                 )}
                 <div className="mt-1 flex items-center gap-2">
                   <button
@@ -488,8 +496,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           produit={produitEnSelection}
           saveurs={saveurs}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(saveurChoisie) => {
-            ajouterAuPanier(produitEnSelection, [], [], [saveurChoisie]);
+          onValider={(saveursChoisies) => {
+            for (const nom of saveursChoisies) {
+              ajouterAuPanier(produitEnSelection, [], [], [nom]);
+            }
             setProduitEnSelection(null);
           }}
         />
@@ -500,11 +510,12 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}
+          saveurs={saveurs}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies, extras) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies);
+          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse) => {
+            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse);
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);

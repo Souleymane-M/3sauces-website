@@ -118,7 +118,9 @@ export async function POST(request: Request) {
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max")
+    .select(
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse"
+    )
     .in("id", produitIds);
 
   if (erreurProduits) {
@@ -256,6 +258,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Saveur invalide sur la ligne ${produit.nom}.` }, { status: 400 });
     }
 
+    // Boisson incluse (Tacos/Barquette/Bowl/Menu Étudiant) : la saveur de la
+    // canette comprise dans le prix, choisie dans le même configurateur que
+    // la/les viande(s) et sauce(s) — jamais une ligne de panier séparée.
+    // N'a de sens que si le produit inclut effectivement une canette.
+    const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
+    if (boissonIncluse !== null) {
+      if (!produit.canette_incluse) {
+        return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (!nomsSaveursValides.has(boissonIncluse)) {
+        return NextResponse.json(
+          { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
+    }
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -266,7 +285,8 @@ export async function POST(request: Request) {
       viandes,
       sauces,
       saveurs,
-      canetteIncluse: false,
+      boissonIncluse,
+      canetteIncluse: produit.canette_incluse,
     });
   }
 
