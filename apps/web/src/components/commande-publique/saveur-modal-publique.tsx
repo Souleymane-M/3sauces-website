@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitPublic, SaveurPublique } from "@/lib/commande-publique/types";
+import type { ProduitConfigurable, SaveurPublique } from "@/lib/commande-publique/types";
 
 interface SaveurModalPubliqueProps {
-  produit: ProduitPublic;
+  produit: ProduitConfigurable;
   saveurs: SaveurPublique[];
   onValider: (saveurs: string[]) => void;
   onAnnuler: () => void;
@@ -90,7 +90,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
                 </span>
               ))}
               <span className="text-base font-extrabold text-[#C2540C]">
-                = {(saveursChoisies.length * produit.prix).toFixed(2)} €
+                = {(saveursChoisies.length * (produit.prix ?? 0)).toFixed(2)} €
               </span>
             </div>
           )}

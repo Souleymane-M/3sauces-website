@@ -28,6 +28,17 @@ export interface ProduitPublic {
   canetteIncluse: boolean;
 }
 
+/**
+ * Sous-ensemble des champs de `ProduitPublic` réellement utilisés par les
+ * configurateurs (ViandeModalPublique, SaveurModalPublique,
+ * QuantiteModalPublique) — `prix` y est nullable pour permettre la
+ * réutilisation telle quelle de ces mêmes fenêtres à la caisse (produits à
+ * prix libre du jour, ex: "Plat du jour"), jamais le cas côté site public
+ * (déjà exclus de `listerProduitsPublics`). `ProduitPublic` (prix non
+ * nullable) satisfait ce type sans aucune adaptation.
+ */
+export type ProduitConfigurable = Omit<ProduitPublic, "prix"> & { prix: number | null };
+
 export interface ViandePublique {
   id: string;
   nom: string;

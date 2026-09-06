@@ -2,16 +2,27 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
-import type { CreerCommandePayload, LigneCommande } from "@/lib/caisse/types";
+import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
+import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
 const MONTANT_RECOMPENSE = 10;
 
+// Même plafonds anti-abus que le site public (cf. /api/commande) — un
+// panier caisse "normal" ne les dépasse jamais.
+const MAX_LIGNES_PAR_COMMANDE = 30;
+const MAX_QUANTITE_PAR_LIGNE = 20;
+
 /**
- * Crée une commande caisse (Module 1) : recalcule prix/coût matière côté
+ * Crée une commande caisse (Module 1) : mêmes règles de validation que le
+ * site public (/api/commande) — viandes/sauces à choix multiples, extras
+ * illimités, choix de saveur de boisson, canette incluse — recalculées côté
  * serveur à partir de la carte en base (jamais de confiance aveugle dans ce
- * qu'envoie le navigateur), enregistre le paiement, et laisse le trigger DB
+ * qu'envoie le navigateur). Seule différence : un produit à prix libre
+ * (`prix IS NULL`, ex: "Plat du jour") est ici autorisé, avec un prix du
+ * jour saisi par l'employé (`prixSaisi`) au lieu d'être rejeté comme côté
+ * public. Enregistre le paiement, et laisse le trigger DB
  * `commandes_appliquer_fidelite` gérer l'accumulation/récompense fidélité
  * (déclenché automatiquement à l'insertion si paiement_statut = 'paye').
  *
@@ -32,6 +43,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (body.lignes.length > MAX_LIGNES_PAR_COMMANDE) {
+    return NextResponse.json({ error: "Panier trop volumineux." }, { status: 400 });
+  }
 
   if (!CANAUX_CAISSE.includes(body.canal as (typeof CANAUX_CAISSE)[number])) {
     return NextResponse.json({ error: "Canal invalide." }, { status: 400 });
@@ -46,7 +60,9 @@ export async function POST(request: Request) {
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, actif")
+    .select(
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif"
+    )
     .in("id", produitIds);
 
   if (erreurProduits) {
@@ -63,50 +79,131 @@ export async function POST(request: Request) {
   }
   const nomsViandesValides = new Set((viandesActives ?? []).map((v) => v.nom));
 
+  const { data: saucesActives, error: erreurSauces } = await supabase
+    .from("sauces")
+    .select("nom")
+    .eq("actif", true);
+
+  if (erreurSauces) {
+    return NextResponse.json({ error: "Erreur serveur (sauces)." }, { status: 500 });
+  }
+  const nomsSaucesValides = new Set((saucesActives ?? []).map((s) => s.nom));
+
+  const { data: saveursActives, error: erreurSaveurs } = await supabase
+    .from("saveurs")
+    .select("nom")
+    .eq("actif", true);
+
+  if (erreurSaveurs) {
+    return NextResponse.json({ error: "Erreur serveur (saveurs)." }, { status: 500 });
+  }
+  const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
+
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
 
-  for (const ligneBrute of body.lignes) {
+  for (const ligneBrute of body.lignes as LigneCommandePayload[]) {
     const produit = produitParId.get(ligneBrute.produitId);
     if (!produit || !produit.actif) {
-      return NextResponse.json(
-        { error: `Produit introuvable ou inactif : ${ligneBrute.produitId}` },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: `Produit introuvable ou inactif : ${ligneBrute.produitId}` }, { status: 400 });
     }
 
     const quantite = Number(ligneBrute.quantite);
-    if (!Number.isInteger(quantite) || quantite < 1) {
-      return NextResponse.json(
-        { error: `Quantité invalide pour ${produit.nom}.` },
-        { status: 400 }
-      );
+    if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
+      return NextResponse.json({ error: `Quantité invalide pour ${produit.nom}.` }, { status: 400 });
     }
 
     const viandes = Array.isArray(ligneBrute.viandes) ? ligneBrute.viandes : [];
     if (viandes.length !== produit.nb_viandes_max) {
       return NextResponse.json(
-        {
-          error: `${produit.nom} nécessite exactement ${produit.nb_viandes_max} viande(s) sélectionnée(s).`,
-        },
+        { error: `${produit.nom} nécessite exactement ${produit.nb_viandes_max} viande(s) sélectionnée(s).` },
         { status: 400 }
       );
     }
     if (viandes.some((v) => !nomsViandesValides.has(v))) {
+      return NextResponse.json({ error: `Viande invalide sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+
+    // Produit "verrouillé" (ex: Menu Collégien) : la viande envoyée doit
+    // correspondre à la viande imposée en base.
+    if (produit.viande_imposee && viandes[0] !== produit.viande_imposee) {
       return NextResponse.json(
-        { error: `Viande invalide sur la ligne ${produit.nom}.` },
+        { error: `${produit.nom} est disponible uniquement en ${produit.viande_imposee}.` },
         { status: 400 }
       );
     }
 
+    // Sauces : même double régime que /api/commande — "Sauce supplémentaire"
+    // exige exactement 1 sauce par ligne, sinon le maximum vient de
+    // `nb_sauces_incluses` du produit lui-même.
+    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
+    const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
+    if (estSauceSupplementaire) {
+      if (sauces.length !== 1) {
+        return NextResponse.json({ error: "Sélectionne exactement une sauce supplémentaire." }, { status: 400 });
+      }
+    } else {
+      const maxSaucesIncluses = produit.nb_sauces_incluses ?? 0;
+      if (sauces.length > maxSaucesIncluses) {
+        return NextResponse.json(
+          {
+            error:
+              maxSaucesIncluses === 0
+                ? `Sauces non disponibles sur ${produit.nom}.`
+                : `Maximum ${maxSaucesIncluses} sauces sur ${produit.nom}.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+    if (new Set(sauces).size !== sauces.length) {
+      return NextResponse.json({ error: `Sauce en double sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+    if (sauces.some((s) => !nomsSaucesValides.has(s))) {
+      return NextResponse.json({ error: `Sauce invalide sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+
+    // Saveur (produit vendu directement à la saveur, ex: Canette 33cl) : un
+    // choix exact et obligatoire dès que `nb_saveurs_max > 0`.
+    const saveurs = Array.isArray(ligneBrute.saveurs) ? ligneBrute.saveurs : [];
+    if (saveurs.length !== produit.nb_saveurs_max) {
+      return NextResponse.json(
+        {
+          error:
+            produit.nb_saveurs_max === 0
+              ? `Pas de choix de saveur sur ${produit.nom}.`
+              : `${produit.nom} nécessite exactement ${produit.nb_saveurs_max} saveur(s) sélectionnée(s).`,
+        },
+        { status: 400 }
+      );
+    }
+    if (saveurs.some((s) => !nomsSaveursValides.has(s))) {
+      return NextResponse.json({ error: `Saveur invalide sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+
+    // Boisson incluse (Tacos/Barquette/Bowl/Menu Étudiant) : n'a de sens que
+    // si le produit inclut effectivement une canette.
+    const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
+    if (boissonIncluse !== null) {
+      if (!produit.canette_incluse) {
+        return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (!nomsSaveursValides.has(boissonIncluse)) {
+        return NextResponse.json(
+          { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Différence caisse : un produit à prix libre (ex: "Plat du jour") est
+    // autorisé ici (jamais côté public), avec un prix du jour saisi par
+    // l'employé plutôt qu'un rejet.
     let prixUnitaire = produit.prix;
     if (prixUnitaire === null) {
       const prixSaisi = Number(ligneBrute.prixSaisi);
       if (!Number.isFinite(prixSaisi) || prixSaisi <= 0) {
-        return NextResponse.json(
-          { error: `${produit.nom} est à prix libre : indique un prix du jour.` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: `${produit.nom} est à prix libre : indique un prix du jour.` }, { status: 400 });
       }
       prixUnitaire = prixSaisi;
     }
@@ -119,6 +216,9 @@ export async function POST(request: Request) {
       prixUnitaire,
       coutMatiereUnitaire: produit.cout_matiere,
       viandes,
+      sauces,
+      saveurs,
+      boissonIncluse,
       canetteIncluse: produit.canette_incluse,
     });
   }
@@ -126,10 +226,7 @@ export async function POST(request: Request) {
   const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
 
   const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
-  const coutMatiereTotal = lignes.reduce(
-    (total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite,
-    0
-  );
+  const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
 
   let clientTelephone: string | null = null;
   let recompenseAppliquee = false;
@@ -150,10 +247,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (!client?.recompense_disponible) {
-        return NextResponse.json(
-          { error: "Ce client n'a pas de récompense disponible." },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Ce client n'a pas de récompense disponible." }, { status: 400 });
       }
       recompenseAppliquee = true;
       montant = Math.max(0, Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100);

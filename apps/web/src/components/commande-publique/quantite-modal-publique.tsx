@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitPublic } from "@/lib/commande-publique/types";
+import type { ProduitConfigurable } from "@/lib/commande-publique/types";
 
 interface QuantiteModalPubliqueProps {
-  produit: ProduitPublic;
-  onValider: (quantite: number) => void;
+  produit: ProduitConfigurable;
+  onValider: (quantite: number, prixSaisi?: number) => void;
   onAnnuler: () => void;
 }
 
@@ -17,9 +17,19 @@ const QUANTITE_MAX = 20;
  * quantité, avec le total en € bien visible pendant l'ajustement — pour
  * que le client vise un montant précis (ex: "10€ de brochettes") au lieu
  * de cliquer à l'aveugle plusieurs fois sur la carte produit.
+ *
+ * `produit.prix === null` (caisse uniquement — ex: "Plat du jour" à prix
+ * saisi chaque jour ; jamais le cas côté site public, déjà exclu de
+ * `listerProduitsPublics`) : demande un prix avant d'activer "Ajouter",
+ * utilisé à la place de `produit.prix` pour le total affiché.
  */
 export function QuantiteModalPublique({ produit, onValider, onAnnuler }: QuantiteModalPubliqueProps) {
   const [quantite, setQuantite] = useState(1);
+  const [prixSaisi, setPrixSaisi] = useState("");
+
+  const demandePrixLibre = produit.prix === null;
+  const prixUnitaire = produit.prix ?? Number(prixSaisi.replace(",", "."));
+  const prixValide = !demandePrixLibre || (Number.isFinite(prixUnitaire) && prixUnitaire > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
@@ -35,7 +45,21 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
           </button>
         </div>
         {produit.description && <p className="text-sm text-gray-500">{produit.description}</p>}
-        <p className="mt-1 text-sm text-gray-500">{produit.prix.toFixed(2)} € / unité</p>
+
+        {demandePrixLibre ? (
+          <div className="mt-3">
+            <label className="text-sm font-bold text-[#8B2020]">Prix du jour (€)</label>
+            <input
+              value={prixSaisi}
+              onChange={(e) => setPrixSaisi(e.target.value)}
+              placeholder="0.00"
+              inputMode="decimal"
+              className="mt-1 w-full rounded border border-gray-300 p-2 text-base text-gray-900"
+            />
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-gray-500">{prixUnitaire.toFixed(2)} € / unité</p>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-5">
           <button
@@ -60,7 +84,7 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
         </div>
 
         <p className="mt-6 text-center text-4xl font-extrabold text-[#8B2020]">
-          {(produit.prix * quantite).toFixed(2)} €
+          {(prixValide ? prixUnitaire * quantite : 0).toFixed(2)} €
         </p>
 
         <div className="mt-6 flex gap-2">
@@ -71,8 +95,9 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
             Annuler
           </button>
           <button
-            onClick={() => onValider(quantite)}
-            className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white"
+            disabled={!prixValide}
+            onClick={() => onValider(quantite, demandePrixLibre ? prixUnitaire : undefined)}
+            className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
             Ajouter
           </button>

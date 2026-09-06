@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitPublic, ViandePublique, SaucePublique, SaveurPublique } from "@/lib/commande-publique/types";
+import type {
+  ProduitConfigurable,
+  ViandePublique,
+  SaucePublique,
+  SaveurPublique,
+} from "@/lib/commande-publique/types";
 
 export interface ExtrasChoisis {
   /** Une entrée par unité de viande supplémentaire choisie (doublons autorisés, illimité). */
@@ -11,14 +16,14 @@ export interface ExtrasChoisis {
 }
 
 interface ViandeModalPubliqueProps {
-  produit: ProduitPublic;
+  produit: ProduitConfigurable;
   viandes: ViandePublique[];
   sauces: SaucePublique[];
   saveurs: SaveurPublique[];
   /** Produit "Viande supplémentaire" (prix affiché dynamiquement), null si indisponible. */
-  produitViandeSupplementaire: ProduitPublic | null;
+  produitViandeSupplementaire: ProduitConfigurable | null;
   /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
-  produitSauceSupplementaire: ProduitPublic | null;
+  produitSauceSupplementaire: ProduitConfigurable | null;
   onValider: (viandes: string[], sauces: string[], extras: ExtrasChoisis, boissonIncluse: string | null) => void;
   onAnnuler: () => void;
 }
@@ -203,7 +208,7 @@ export function ViandeModalPublique({
         {produit.autoriseExtras && produitViandeSupplementaire && (
           <div className="mt-5 border-t border-gray-100 pt-4">
             <p className="text-sm font-bold text-[#8B2020]">
-              Ajouter une viande supplémentaire (+{produitViandeSupplementaire.prix.toFixed(2)} € / viande)
+              Ajouter une viande supplémentaire (+{(produitViandeSupplementaire.prix ?? 0).toFixed(2)} € / viande)
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {viandes.map((v) => {
@@ -244,7 +249,7 @@ export function ViandeModalPublique({
                   </span>
                 ))}
                 <span className="text-base font-extrabold text-[#8B2020]">
-                  = {(extraViandes.length * produitViandeSupplementaire.prix).toFixed(2)} €
+                  = {(extraViandes.length * (produitViandeSupplementaire.prix ?? 0)).toFixed(2)} €
                 </span>
               </div>
             )}
@@ -254,7 +259,7 @@ export function ViandeModalPublique({
         {produit.autoriseExtras && produitSauceSupplementaire && sauces.length > 0 && (
           <div className="mt-4">
             <p className="text-sm font-bold text-[#2D5A27]">
-              Ajouter une sauce supplémentaire (+{produitSauceSupplementaire.prix.toFixed(2)} € / sauce)
+              Ajouter une sauce supplémentaire (+{(produitSauceSupplementaire.prix ?? 0).toFixed(2)} € / sauce)
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {sauces.map((s) => {
@@ -295,7 +300,7 @@ export function ViandeModalPublique({
                   </span>
                 ))}
                 <span className="text-base font-extrabold text-[#2D5A27]">
-                  = {(extraSauces.length * produitSauceSupplementaire.prix).toFixed(2)} €
+                  = {(extraSauces.length * (produitSauceSupplementaire.prix ?? 0)).toFixed(2)} €
                 </span>
               </div>
             )}

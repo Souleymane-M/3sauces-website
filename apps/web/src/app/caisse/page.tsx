@@ -3,7 +3,12 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { CaisseApp } from "@/components/caisse/caisse-app";
-import { listerProduitsActifs, listerViandesActives } from "@/lib/caisse/produits";
+import {
+  listerProduitsActifs,
+  listerViandesActives,
+  listerSaucesActives,
+  listerSaveursActives,
+} from "@/lib/caisse/produits";
 
 export const metadata: Metadata = {
   title: "Caisse — 3 Sauces",
@@ -20,9 +25,11 @@ export default async function CaissePage() {
     );
   }
 
-  const [produits, viandes] = await Promise.all([
+  const [produits, viandes, sauces, saveurs] = await Promise.all([
     listerProduitsActifs(),
     listerViandesActives(),
+    listerSaucesActives(),
+    listerSaveursActives(),
   ]);
 
   return (
@@ -34,7 +41,7 @@ export default async function CaissePage() {
       <p className="mt-1 mb-6 text-sm text-gray-500">
         Prise de commande. Le stock/approvisionnement arrive avec le Module 3.
       </p>
-      <CaisseApp produits={produits} viandes={viandes} nomEmploye={session.nom} />
+      <CaisseApp produits={produits} viandes={viandes} sauces={sauces} saveurs={saveurs} nomEmploye={session.nom} />
     </main>
   );
 }

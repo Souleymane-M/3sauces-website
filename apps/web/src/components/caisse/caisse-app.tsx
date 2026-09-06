@@ -2,31 +2,44 @@
 
 import { useMemo, useState } from "react";
 import type { Canal, ModePaiement } from "@3sauces/supabase";
-import type { ProduitCaisse, ViandeCaisse } from "@/lib/caisse/types";
-import { ViandeModal } from "./viande-modal";
+import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse } from "@/lib/caisse/types";
+import {
+  NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
+  NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+} from "@/lib/commande-publique/types";
+import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
+import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
+import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 
 interface LignePanier {
   id: string;
   produit: ProduitCaisse;
   quantite: number;
   viandes: string[];
+  sauces: string[];
+  saveurs: string[];
+  boissonIncluse: string | null;
   prixSaisi?: number;
 }
 
 interface CaisseAppProps {
   produits: ProduitCaisse[];
   viandes: ViandeCaisse[];
+  sauces: SauceCaisse[];
+  saveurs: SaveurCaisse[];
   nomEmploye: string;
 }
 
-const LIBELLES_CATEGORIES: Record<string, string> = {
-  menu_special: "Menus spéciaux",
-  snacking: "Snacking",
-  grillade: "Grillades",
-  cuisine_locale: "Cuisine locale",
-  boisson: "Boissons",
-  supplement: "Suppléments",
-};
+interface Section {
+  key: string;
+  titre: string;
+  couleur: "rouge" | "vert";
+  discret?: boolean;
+  produits: ProduitCaisse[];
+}
+
+const ROUGE = "#8B2020";
+const VERT = "#2D5A27";
 
 interface ClientInfo {
   existe: boolean;
@@ -35,9 +48,20 @@ interface ClientInfo {
   recompense_disponible?: boolean;
 }
 
-export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
+/**
+ * Prise de commande caisse (Module 1) : mêmes règles et mêmes fenêtres de
+ * configuration que le site public (/commander) — viandes/sauces à choix
+ * multiples, extras illimités, choix de saveur de boisson, canette incluse —
+ * réutilisées telles quelles (ViandeModalPublique/SaveurModalPublique/
+ * QuantiteModalPublique) pour garantir un comportement identique, jamais une
+ * copie parallèle qui pourrait diverger. Seule différence caisse : un
+ * produit à prix libre (`prix === null`, ex: "Plat du jour") demande un prix
+ * du jour dans QuantiteModalPublique, cas qui n'existe jamais côté public.
+ */
+export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: CaisseAppProps) {
   const [panier, setPanier] = useState<LignePanier[]>([]);
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
+  const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
   const [canal, setCanal] = useState<Canal>("sur_place");
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [telephone, setTelephone] = useState("");
@@ -46,43 +70,87 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
   const [appliquerRecompense, setAppliquerRecompense] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number } | null>(
-    null
-  );
+  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number } | null>(null);
 
-  const categories = useMemo(() => {
-    const parCategorie = new Map<string, ProduitCaisse[]>();
-    for (const p of produits) {
-      const liste = parCategorie.get(p.categorie) ?? [];
-      liste.push(p);
-      parCategorie.set(p.categorie, liste);
-    }
-    return parCategorie;
+  // Même construction de sections que commande-publique-app.tsx (Tacos vs
+  // Barquettes/Bowls distingués par nom, alternance rouge/vert par position,
+  // "supplement" jamais affiché comme catégorie autonome — uniquement
+  // accessible via les extras du configurateur).
+  const sections = useMemo<Section[]>(() => {
+    const snacking = produits.filter((p) => p.categorie === "snacking");
+    const tacos = snacking.filter((p) => p.nom.includes("Tacos") && !p.nom.includes("Bowl"));
+    const barquettesBowls = snacking.filter((p) => p.nom.includes("Barquette") || p.nom.includes("Bowl"));
+
+    const liste: Omit<Section, "couleur">[] = [
+      { key: "menus", titre: "Menus spéciaux", produits: produits.filter((p) => p.categorie === "menu_special") },
+      {
+        key: "plat_du_jour",
+        titre: "Plats du jour",
+        produits: produits.filter((p) => p.categorie === "plat_du_jour"),
+      },
+      { key: "tacos", titre: "Tacos", produits: tacos },
+      { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
+      { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
+      {
+        key: "accompagnement",
+        titre: "Accompagnements",
+        produits: produits.filter((p) => p.categorie === "accompagnement"),
+      },
+      {
+        key: "cuisine_locale",
+        titre: "Cuisine locale",
+        produits: produits.filter((p) => p.categorie === "cuisine_locale"),
+      },
+      { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
+    ];
+    return liste
+      .filter((s) => s.produits.length > 0)
+      .map((s, i) => ({ ...s, couleur: i % 2 === 0 ? "rouge" : "vert" }));
   }, [produits]);
 
-  const total = panier.reduce((acc, l) => {
-    const prix = l.produit.prix ?? l.prixSaisi ?? 0;
-    return acc + prix * l.quantite;
-  }, 0);
+  const produitViandeSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
+  const produitSauceSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
 
-  function ajouterAuPanier(produit: ProduitCaisse, viandesChoisies: string[], prixSaisi?: number) {
+  const total = panier.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
+
+  function ajouterAuPanier(
+    produit: ProduitCaisse,
+    viandesChoisies: string[],
+    saucesChoisies: string[] = [],
+    saveursChoisies: string[] = [],
+    boissonIncluse: string | null = null,
+    quantite: number = 1,
+    prixSaisi?: number
+  ) {
     setPanier((precedent) => {
       const cle = (l: LignePanier) =>
         l.produit.id === produit.id &&
         l.prixSaisi === prixSaisi &&
-        JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort());
+        JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
+        JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
+        JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
+        l.boissonIncluse === boissonIncluse;
 
       const existante = precedent.find(cle);
       if (existante) {
-        return precedent.map((l) => (l === existante ? { ...l, quantite: l.quantite + 1 } : l));
+        return precedent.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l));
       }
       return [
         ...precedent,
         {
           id: `${produit.id}-${Date.now()}-${Math.random()}`,
           produit,
-          quantite: 1,
+          quantite,
           viandes: viandesChoisies,
+          sauces: saucesChoisies,
+          saveurs: saveursChoisies,
+          boissonIncluse,
           prixSaisi,
         },
       ];
@@ -90,18 +158,25 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
   }
 
   function surClicProduit(produit: ProduitCaisse) {
-    if (produit.nbViandesMax > 0 || produit.prix === null) {
+    const besoinConfigurateur =
+      (!produit.viandeImposee && produit.nbViandesMax > 0) ||
+      produit.nbSaucesIncluses > 0 ||
+      produit.autoriseExtras ||
+      produit.nbSaveursMax > 0;
+
+    if (besoinConfigurateur) {
       setProduitEnSelection(produit);
-    } else {
-      ajouterAuPanier(produit, []);
+      return;
     }
+    // Sinon (Grillades, Accompagnements, boisson à choix unique, "Plat du
+    // jour" à prix libre) : QuantiteModalPublique demande le prix du jour
+    // si besoin et laisse choisir la quantité, jamais d'ajout direct.
+    setProduitEnQuantite(produit);
   }
 
   function modifierQuantite(id: string, delta: number) {
     setPanier((precedent) =>
-      precedent
-        .map((l) => (l.id === id ? { ...l, quantite: l.quantite + delta } : l))
-        .filter((l) => l.quantite > 0)
+      precedent.map((l) => (l.id === id ? { ...l, quantite: l.quantite + delta } : l)).filter((l) => l.quantite > 0)
     );
   }
 
@@ -145,6 +220,9 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
             produitId: l.produit.id,
             quantite: l.quantite,
             viandes: l.viandes,
+            sauces: l.sauces,
+            saveurs: l.saveurs,
+            boissonIncluse: l.boissonIncluse,
             prixSaisi: l.prixSaisi,
           })),
         }),
@@ -184,25 +262,47 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
-        {[...categories.entries()].map(([categorie, liste]) => (
-          <div key={categorie}>
-            <h2 className="mb-2 text-sm font-semibold uppercase text-gray-400">
-              {LIBELLES_CATEGORIES[categorie] ?? categorie}
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {liste.map((produit) => (
-                <button
-                  key={produit.id}
-                  onClick={() => surClicProduit(produit)}
-                  className="rounded border border-gray-700 p-3 text-left text-sm hover:bg-gray-900"
-                >
-                  <div className="font-medium">{produit.nom}</div>
-                  <div className="text-gray-400">
-                    {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
-                  </div>
-                </button>
-              ))}
+        {sections.map((section) => (
+          <div key={section.key}>
+            <div
+              className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+              style={{ backgroundColor: section.couleur === "rouge" ? ROUGE : VERT }}
+            >
+              {section.titre}
             </div>
+
+            {section.discret ? (
+              <div className="space-y-1.5">
+                {section.produits.map((produit) => (
+                  <button
+                    key={produit.id}
+                    onClick={() => surClicProduit(produit)}
+                    className="flex w-full items-center justify-between rounded border border-gray-700 px-3 py-2 text-left text-sm hover:bg-gray-900"
+                  >
+                    <span>{produit.nom}</span>
+                    <span className="text-gray-400">
+                      {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {section.produits.map((produit) => (
+                  <button
+                    key={produit.id}
+                    onClick={() => surClicProduit(produit)}
+                    className="rounded border border-gray-700 p-3 text-left text-sm hover:bg-gray-900"
+                  >
+                    <div className="font-medium">{produit.nom}</div>
+                    {produit.description && <div className="text-xs text-gray-500">{produit.description}</div>}
+                    <div className="text-gray-400">
+                      {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -222,21 +322,20 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
                     ✕
                   </button>
                 </div>
-                {l.viandes.length > 0 && (
-                  <div className="text-xs text-gray-400">{l.viandes.join(", ")}</div>
+                {l.viandes.length > 0 && <div className="text-xs text-gray-400">{l.viandes.join(", ")}</div>}
+                {l.saveurs.length > 0 && <div className="text-xs text-gray-400">{l.saveurs.join(", ")}</div>}
+                {l.sauces.length > 0 && (
+                  <div className="text-xs text-gray-500">Sauces : {l.sauces.join(", ")}</div>
+                )}
+                {l.boissonIncluse && (
+                  <div className="text-xs text-gray-500">Boisson incluse : {l.boissonIncluse}</div>
                 )}
                 <div className="mt-1 flex items-center gap-2">
-                  <button
-                    onClick={() => modifierQuantite(l.id, -1)}
-                    className="rounded border border-gray-600 px-2"
-                  >
+                  <button onClick={() => modifierQuantite(l.id, -1)} className="rounded border border-gray-600 px-2">
                     -
                   </button>
                   <span>{l.quantite}</span>
-                  <button
-                    onClick={() => modifierQuantite(l.id, 1)}
-                    className="rounded border border-gray-600 px-2"
-                  >
+                  <button onClick={() => modifierQuantite(l.id, 1)} className="rounded border border-gray-600 px-2">
                     +
                   </button>
                   <span className="ml-auto">
@@ -290,15 +389,32 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
 
         <div className="border-t border-gray-700 pt-3">
           <label className="text-xs text-gray-400">Canal</label>
-          <select
-            value={canal}
-            onChange={(e) => setCanal(e.target.value as Canal)}
-            className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
-          >
-            <option value="sur_place">Sur place</option>
-            <option value="emporter">À emporter</option>
-            <option value="livraison">Livraison</option>
-          </select>
+          <div className="mt-1 grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setCanal("sur_place")}
+              className={`rounded border py-2 text-xs font-bold uppercase ${
+                canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-600 text-gray-300"
+              }`}
+            >
+              Sur place
+            </button>
+            <button
+              onClick={() => setCanal("emporter")}
+              className={`rounded border py-2 text-xs font-bold uppercase ${
+                canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-600 text-gray-300"
+              }`}
+            >
+              À emporter
+            </button>
+            <button
+              onClick={() => setCanal("livraison")}
+              className={`rounded border py-2 text-xs font-bold uppercase ${
+                canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-600 text-gray-300"
+              }`}
+            >
+              Livraison
+            </button>
+          </div>
         </div>
 
         <div>
@@ -315,11 +431,7 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
 
         <div className="border-t border-gray-700 pt-3 text-lg font-bold">
           Total :{" "}
-          {(appliquerRecompense && clientInfo?.recompense_disponible
-            ? Math.max(0, total - 10)
-            : total
-          ).toFixed(2)}{" "}
-          €
+          {(appliquerRecompense && clientInfo?.recompense_disponible ? Math.max(0, total - 10) : total).toFixed(2)} €
         </div>
 
         {erreur && <p className="text-sm text-red-400">{erreur}</p>}
@@ -333,14 +445,61 @@ export function CaisseApp({ produits, viandes, nomEmploye }: CaisseAppProps) {
         </button>
       </div>
 
-      {produitEnSelection && (
-        <ViandeModal
+      {produitEnSelection && produitEnSelection.nbSaveursMax > 0 && (
+        <SaveurModalPublique
+          produit={produitEnSelection}
+          saveurs={saveurs}
+          onAnnuler={() => setProduitEnSelection(null)}
+          onValider={(saveursChoisies) => {
+            for (const nom of saveursChoisies) {
+              ajouterAuPanier(produitEnSelection, [], [], [nom]);
+            }
+            setProduitEnSelection(null);
+          }}
+        />
+      )}
+
+      {produitEnSelection && produitEnSelection.nbSaveursMax === 0 && (
+        <ViandeModalPublique
           produit={produitEnSelection}
           viandes={viandes}
+          sauces={sauces}
+          saveurs={saveurs}
+          produitViandeSupplementaire={produitViandeSupplementaire}
+          produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, prixSaisi) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, prixSaisi);
+          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse) => {
+            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse);
+            if (produitViandeSupplementaire) {
+              for (const nomViande of extras.viandesSupplementaires) {
+                ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
+              }
+            }
+            if (produitSauceSupplementaire) {
+              for (const nomSauce of extras.saucesSupplementaires) {
+                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
+              }
+            }
             setProduitEnSelection(null);
+          }}
+        />
+      )}
+
+      {produitEnQuantite && (
+        <QuantiteModalPublique
+          produit={produitEnQuantite}
+          onAnnuler={() => setProduitEnQuantite(null)}
+          onValider={(quantite, prixSaisi) => {
+            ajouterAuPanier(
+              produitEnQuantite,
+              produitEnQuantite.viandeImposee ? [produitEnQuantite.viandeImposee] : [],
+              [],
+              [],
+              null,
+              quantite,
+              prixSaisi
+            );
+            setProduitEnQuantite(null);
           }}
         />
       )}
