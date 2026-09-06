@@ -95,6 +95,11 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
     const liste: Omit<Section, "couleur">[] = [
       { key: "menus", titre: "Menus spéciaux", produits: produits.filter((p) => p.categorie === "menu_special") },
+      {
+        key: "plat_du_jour",
+        titre: "Plats du jour",
+        produits: produits.filter((p) => p.categorie === "plat_du_jour"),
+      },
       { key: "tacos", titre: "Tacos", produits: tacos },
       { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },

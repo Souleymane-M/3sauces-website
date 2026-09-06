@@ -16,7 +16,8 @@ export type Categorie =
   | "cuisine_locale"
   | "boisson"
   | "supplement"
-  | "accompagnement";
+  | "accompagnement"
+  | "plat_du_jour";
 
 export type Canal = "sur_place" | "emporter" | "livraison" | "en_ligne";
 

@@ -3,7 +3,9 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { PatronCommandesApp } from "@/components/commande-publique/patron-commandes-app";
+import { PlatsDuJourApp } from "@/components/patron/plats-du-jour-app";
 import { listerCommandesAdmin } from "@/lib/commande-publique/admin";
+import { listerPlatsDuJourAdmin } from "@/lib/patron/plats-du-jour";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ export default async function PatronPage() {
     );
   }
 
-  const commandes = await listerCommandesAdmin();
+  const [commandes, plats] = await Promise.all([listerCommandesAdmin(), listerPlatsDuJourAdmin()]);
 
   return (
     <main className="min-h-screen p-8">
@@ -31,10 +33,11 @@ export default async function PatronPage() {
         <LogoutButton />
       </div>
       <p className="mt-2 mb-4 text-sm text-gray-500">
-        Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne
-        ci-dessous.
+        Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne et
+        gestion des plats du jour ci-dessous.
       </p>
       <PatronCommandesApp commandesInitiales={commandes} />
+      <PlatsDuJourApp platsInitiaux={plats} />
     </main>
   );
 }
