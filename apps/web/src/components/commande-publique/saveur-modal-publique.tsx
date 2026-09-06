@@ -89,7 +89,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
                   </button>
                 </span>
               ))}
-              <span className="text-xs font-medium text-gray-600">
+              <span className="text-base font-extrabold text-[#C2540C]">
                 = {(saveursChoisies.length * produit.prix).toFixed(2)} €
               </span>
             </div>

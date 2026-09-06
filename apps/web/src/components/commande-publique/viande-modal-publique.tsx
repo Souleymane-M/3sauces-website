@@ -243,7 +243,7 @@ export function ViandeModalPublique({
                     </button>
                   </span>
                 ))}
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-base font-extrabold text-[#8B2020]">
                   = {(extraViandes.length * produitViandeSupplementaire.prix).toFixed(2)} €
                 </span>
               </div>
@@ -294,7 +294,7 @@ export function ViandeModalPublique({
                     </button>
                   </span>
                 ))}
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-base font-extrabold text-[#2D5A27]">
                   = {(extraSauces.length * produitSauceSupplementaire.prix).toFixed(2)} €
                 </span>
               </div>
