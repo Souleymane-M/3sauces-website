@@ -17,6 +17,8 @@ export interface LigneCommande {
   sauces?: string[];
   /** Saveur de boisson choisie (site public uniquement, ex: Canette 33cl). Absent/vide côté caisse. */
   saveurs?: string[];
+  /** Saveur de la canette incluse dans la formule (Tacos/Barquette/Bowl/Menu Étudiant, site public uniquement). */
+  boissonIncluse?: string | null;
   canetteIncluse: boolean;
 }
 

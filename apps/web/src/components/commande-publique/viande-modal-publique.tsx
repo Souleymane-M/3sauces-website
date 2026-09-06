@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitPublic, ViandePublique, SaucePublique } from "@/lib/commande-publique/types";
+import type { ProduitPublic, ViandePublique, SaucePublique, SaveurPublique } from "@/lib/commande-publique/types";
 
 export interface ExtrasChoisis {
   /** Une entrée par unité de viande supplémentaire choisie (doublons autorisés, illimité). */
@@ -14,11 +14,12 @@ interface ViandeModalPubliqueProps {
   produit: ProduitPublic;
   viandes: ViandePublique[];
   sauces: SaucePublique[];
+  saveurs: SaveurPublique[];
   /** Produit "Viande supplémentaire" (prix affiché dynamiquement), null si indisponible. */
   produitViandeSupplementaire: ProduitPublic | null;
   /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
   produitSauceSupplementaire: ProduitPublic | null;
-  onValider: (viandes: string[], sauces: string[], extras: ExtrasChoisis) => void;
+  onValider: (viandes: string[], sauces: string[], extras: ExtrasChoisis, boissonIncluse: string | null) => void;
   onAnnuler: () => void;
 }
 
@@ -32,11 +33,17 @@ interface ViandeModalPubliqueProps {
  *    (pastilles à cocher, sans doublon).
  *  - `autoriseExtras` : propose des ajouts payants illimités (viande/sauce
  *    supplémentaire), rendus comme lignes de panier distinctes par le parent.
+ *  - `canetteIncluse` : une canette est incluse dans le prix (ex: Tacos,
+ *    Barquette, Bowl, Menu Étudiant) — si plusieurs saveurs existent, le
+ *    client choisit celle de sa canette incluse ici même (jamais dans une
+ *    fenêtre séparée). S'il n'existe qu'une seule saveur (ou aucune), elle
+ *    est retenue automatiquement sans rien demander au client.
  */
 export function ViandeModalPublique({
   produit,
   viandes,
   sauces,
+  saveurs,
   produitViandeSupplementaire,
   produitSauceSupplementaire,
   onValider,
@@ -46,9 +53,14 @@ export function ViandeModalPublique({
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
+  const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
-  const toutSelectionne = !demandeViande || viandesChoisies.length === produit.nbViandesMax;
+  const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
+  const boissonRetenue = !produit.canetteIncluse ? null : demandeChoixBoisson ? boissonChoisie : (saveurs[0]?.nom ?? null);
+  const toutSelectionne =
+    (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
+    (!demandeChoixBoisson || boissonChoisie !== null);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
     setter((precedent) => {
@@ -166,6 +178,28 @@ export function ViandeModalPublique({
           </div>
         )}
 
+        {demandeChoixBoisson && (
+          <div className="mt-5">
+            <p className="text-sm font-medium text-gray-700">Choisis ta canette incluse</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {saveurs.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setBoissonChoisie(s.nom)}
+                  className={`rounded-full border px-3 py-1.5 text-sm ${
+                    boissonChoisie === s.nom
+                      ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {s.nom}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {produit.autoriseExtras && produitViandeSupplementaire && (
           <div className="mt-5 border-t border-gray-100 pt-4">
             <p className="text-sm font-medium text-gray-700">
@@ -278,10 +312,15 @@ export function ViandeModalPublique({
           <button
             disabled={!toutSelectionne}
             onClick={() =>
-              onValider(viandesChoisies, saucesChoisies, {
-                viandesSupplementaires: extraViandes,
-                saucesSupplementaires: extraSauces,
-              })
+              onValider(
+                viandesChoisies,
+                saucesChoisies,
+                {
+                  viandesSupplementaires: extraViandes,
+                  saucesSupplementaires: extraSauces,
+                },
+                boissonRetenue
+              )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >

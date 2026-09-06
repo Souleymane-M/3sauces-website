@@ -24,6 +24,8 @@ export interface ProduitPublic {
   autoriseExtras: boolean;
   /** Nombre de saveurs à choisir avant ajout au panier (0 = ajout direct, 1 = choix obligatoire, ex: Canette 33cl). */
   nbSaveursMax: number;
+  /** Si vrai, une canette est incluse dans le prix (ex: Tacos, Barquette, Bowl, Menu Étudiant) : le configurateur propose alors le choix de sa saveur. */
+  canetteIncluse: boolean;
 }
 
 export interface ViandePublique {
@@ -63,6 +65,8 @@ export interface LigneCommandePubliquePayload {
   viandes: string[];
   sauces: string[];
   saveurs: string[];
+  /** Saveur choisie pour la canette incluse dans la formule (Tacos/Barquette/Bowl/Menu Étudiant), null si sans objet. */
+  boissonIncluse: string | null;
 }
 
 export type CanalPublic = Extract<Canal, "sur_place" | "livraison">;
@@ -95,6 +99,7 @@ export interface LigneCommandeAdmin {
   viandes: string[];
   sauces: string[];
   saveurs: string[];
+  boissonIncluse: string | null;
 }
 
 export interface CommandeAdmin {

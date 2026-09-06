@@ -120,6 +120,7 @@ export function PatronCommandesApp({ commandesInitiales }: PatronCommandesAppPro
                   {l.viandes.length > 0 ? ` (${l.viandes.join(", ")})` : ""}
                   {l.saveurs.length > 0 ? ` (${l.saveurs.join(", ")})` : ""}
                   {l.sauces.length > 0 ? ` — sauces : ${l.sauces.join(", ")}` : ""}
+                  {l.boissonIncluse ? ` — boisson : ${l.boissonIncluse}` : ""}
                 </li>
               ))}
             </ul>

@@ -49,6 +49,7 @@ export async function listerCommandesAdmin(): Promise<CommandeAdmin[]> {
       viandes: l.viandes,
       sauces: l.sauces ?? [],
       saveurs: l.saveurs ?? [],
+      boissonIncluse: l.boissonIncluse ?? null,
     })),
   }));
 }
