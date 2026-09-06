@@ -3,9 +3,11 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { PatronCommandesApp } from "@/components/commande-publique/patron-commandes-app";
-import { PlatsDuJourApp } from "@/components/patron/plats-du-jour-app";
+import { ProduitsApp } from "@/components/patron/produits-app";
+import { OptionsApp } from "@/components/patron/options-app";
 import { listerCommandesAdmin } from "@/lib/commande-publique/admin";
-import { listerPlatsDuJourAdmin } from "@/lib/patron/plats-du-jour";
+import { listerProduitsAdmin } from "@/lib/patron/produits";
+import { listerOptionsAdmin } from "@/lib/patron/options";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,13 @@ export default async function PatronPage() {
     );
   }
 
-  const [commandes, plats] = await Promise.all([listerCommandesAdmin(), listerPlatsDuJourAdmin()]);
+  const [commandes, produits, viandes, sauces, saveurs] = await Promise.all([
+    listerCommandesAdmin(),
+    listerProduitsAdmin(),
+    listerOptionsAdmin("viandes"),
+    listerOptionsAdmin("sauces"),
+    listerOptionsAdmin("saveurs"),
+  ]);
 
   return (
     <main className="min-h-screen p-8">
@@ -33,11 +41,12 @@ export default async function PatronPage() {
         <LogoutButton />
       </div>
       <p className="mt-2 mb-4 text-sm text-gray-500">
-        Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne et
-        gestion des plats du jour ci-dessous.
+        Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
+        gestion complète de la carte et des options ci-dessous.
       </p>
       <PatronCommandesApp commandesInitiales={commandes} />
-      <PlatsDuJourApp platsInitiaux={plats} />
+      <ProduitsApp produitsInitiaux={produits} />
+      <OptionsApp viandesInitiales={viandes} saucesInitiales={sauces} saveursInitiales={saveurs} />
     </main>
   );
 }
