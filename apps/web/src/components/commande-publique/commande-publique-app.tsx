@@ -18,6 +18,7 @@ import {
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
+import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 
 interface LignePanierPublique {
@@ -62,6 +63,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
   const [panier, setPanier] = useState<LignePanierPublique[]>([]);
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
+  const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
   const [canal, setCanal] = useState<CanalPublic>("sur_place");
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
@@ -144,7 +146,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     viandesChoisies: string[],
     saucesChoisies: string[] = [],
     saveursChoisies: string[] = [],
-    boissonIncluse: string | null = null
+    boissonIncluse: string | null = null,
+    quantite: number = 1
   ) {
     declencherPulse();
     setPanier((precedent) => {
@@ -157,14 +160,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
       const existante = precedent.find(cle);
       if (existante) {
-        return precedent.map((l) => (l === existante ? { ...l, quantite: l.quantite + 1 } : l));
+        return precedent.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l));
       }
       return [
         ...precedent,
         {
           id: `${produit.id}-${Date.now()}-${Math.random()}`,
           produit,
-          quantite: 1,
+          quantite,
           viandes: viandesChoisies,
           sauces: saucesChoisies,
           saveurs: saveursChoisies,
@@ -177,8 +180,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   function surClicProduit(produit: ProduitPublic) {
     // Un configurateur s'ouvre dès qu'il y a une vraie décision à prendre :
     // viande à choisir, sauces incluses à cocher, saveur à choisir, ou
-    // extras disponibles. Sinon (ex: boisson à choix unique, grillade
-    // simple), ajout direct.
+    // extras disponibles. Sinon (ex: boisson à choix unique, grillade,
+    // accompagnement), la seule décision qui reste est la quantité — on
+    // ouvre quand même une petite fenêtre dédiée (jamais d'ajout direct et
+    // silencieux) pour que le client voie le total en € avant de valider.
     const besoinConfigurateur =
       (!produit.viandeImposee && produit.nbViandesMax > 0) ||
       produit.nbSaucesIncluses > 0 ||
@@ -189,7 +194,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       setProduitEnSelection(produit);
       return;
     }
-    ajouterAuPanier(produit, produit.viandeImposee ? [produit.viandeImposee] : [], []);
+    setProduitEnQuantite(produit);
   }
 
   function modifierQuantite(id: string, delta: number) {
@@ -533,6 +538,24 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               }
             }
             setProduitEnSelection(null);
+          }}
+        />
+      )}
+
+      {produitEnQuantite && (
+        <QuantiteModalPublique
+          produit={produitEnQuantite}
+          onAnnuler={() => setProduitEnQuantite(null)}
+          onValider={(quantite) => {
+            ajouterAuPanier(
+              produitEnQuantite,
+              produitEnQuantite.viandeImposee ? [produitEnQuantite.viandeImposee] : [],
+              [],
+              [],
+              null,
+              quantite
+            );
+            setProduitEnQuantite(null);
           }}
         />
       )}
