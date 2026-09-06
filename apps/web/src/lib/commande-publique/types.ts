@@ -22,6 +22,8 @@ export interface ProduitPublic {
   nbSaucesIncluses: number;
   /** Si vrai, le configurateur propose des ajouts payants illimités (viande/sauce supplémentaire). */
   autoriseExtras: boolean;
+  /** Nombre de saveurs à choisir avant ajout au panier (0 = ajout direct, 1 = choix obligatoire, ex: Canette 33cl). */
+  nbSaveursMax: number;
 }
 
 export interface ViandePublique {
@@ -30,6 +32,11 @@ export interface ViandePublique {
 }
 
 export interface SaucePublique {
+  id: string;
+  nom: string;
+}
+
+export interface SaveurPublique {
   id: string;
   nom: string;
 }
@@ -55,6 +62,7 @@ export interface LigneCommandePubliquePayload {
   quantite: number;
   viandes: string[];
   sauces: string[];
+  saveurs: string[];
 }
 
 export type CanalPublic = Extract<Canal, "sur_place" | "livraison">;
@@ -86,6 +94,7 @@ export interface LigneCommandeAdmin {
   prixUnitaire: number;
   viandes: string[];
   sauces: string[];
+  saveurs: string[];
 }
 
 export interface CommandeAdmin {

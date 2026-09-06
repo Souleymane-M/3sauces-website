@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses")
+    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max")
     .in("id", produitIds);
 
   if (erreurProduits) {
@@ -144,6 +144,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur (sauces)." }, { status: 500 });
   }
   const nomsSaucesValides = new Set((saucesActives ?? []).map((s) => s.nom));
+
+  const { data: saveursActives, error: erreurSaveurs } = await supabase
+    .from("saveurs")
+    .select("nom")
+    .eq("actif", true);
+
+  if (erreurSaveurs) {
+    return NextResponse.json({ error: "Erreur serveur (saveurs)." }, { status: 500 });
+  }
+  const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
 
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
@@ -228,6 +238,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Sauce invalide sur la ligne ${produit.nom}.` }, { status: 400 });
     }
 
+    // Saveur (site public uniquement, ex: Canette 33cl) : même régime que les
+    // viandes, un choix exact et obligatoire dès que `nb_saveurs_max > 0`.
+    const saveurs = Array.isArray(ligneBrute.saveurs) ? ligneBrute.saveurs : [];
+    if (saveurs.length !== produit.nb_saveurs_max) {
+      return NextResponse.json(
+        {
+          error:
+            produit.nb_saveurs_max === 0
+              ? `Pas de choix de saveur sur ${produit.nom}.`
+              : `${produit.nom} nécessite exactement ${produit.nb_saveurs_max} saveur(s) sélectionnée(s).`,
+        },
+        { status: 400 }
+      );
+    }
+    if (saveurs.some((s) => !nomsSaveursValides.has(s))) {
+      return NextResponse.json({ error: `Saveur invalide sur la ligne ${produit.nom}.` }, { status: 400 });
+    }
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -237,6 +265,7 @@ export async function POST(request: Request) {
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
       sauces,
+      saveurs,
       canetteIncluse: false,
     });
   }
