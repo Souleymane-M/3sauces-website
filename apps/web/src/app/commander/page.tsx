@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { CommandePubliqueApp } from "@/components/commande-publique/commande-publique-app";
 import {
   listerProduitsPublics,
@@ -26,9 +27,20 @@ export default async function CommanderPage() {
 
   return (
     <main className="min-h-screen bg-[#F5F0E8]">
+      <div className="flex justify-center bg-[#8B2020] py-4">
+        <h1>
+          <Image
+            src="/logo-3sauces.png"
+            alt="3 Sauces"
+            width={1600}
+            height={800}
+            priority
+            className="h-auto w-44"
+          />
+        </h1>
+      </div>
       <div className="mx-auto max-w-lg px-4 pt-6">
-        <h1 className="text-2xl font-bold text-gray-900">3 Sauces</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="text-sm text-gray-600">
           Retrait sur place, ou livraison à Dembéni (min. {parametres.minimumCommande.toFixed(2)} €). Paiement en
           espèces ou carte, sur place ou à la livraison.
         </p>
