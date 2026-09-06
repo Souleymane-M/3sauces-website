@@ -27,7 +27,7 @@ export default async function CommanderPage() {
 
   return (
     <main className="min-h-screen bg-[#F5F0E8]">
-      <div className="flex justify-center bg-[#8B2020] py-4">
+      <div className="flex flex-col items-center gap-2 bg-[#8B2020] py-4">
         <h1>
           <Image
             src="/logo-3sauces.png"
@@ -38,6 +38,9 @@ export default async function CommanderPage() {
             className="h-auto w-44"
           />
         </h1>
+        <p className="text-center text-sm font-bold tracking-wide text-white">
+          GRILLADES · TACOS · CUISINE LOCALE
+        </p>
       </div>
       <div className="mx-auto max-w-lg px-4 pt-6">
         <p className="text-sm text-gray-600">
