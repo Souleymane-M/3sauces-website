@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import type { ProduitPublic, ViandePublique, SaucePublique } from "./types";
+import type { ProduitPublic, ViandePublique, SaucePublique, SaveurPublique } from "./types";
 
 /**
  * Carte publique (site de commande en ligne, client anonyme).
@@ -15,7 +15,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
   const { data, error } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras"
+      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max"
     )
     .eq("actif", true)
     .not("prix", "is", null)
@@ -38,6 +38,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
       viandeImposee: p.viande_imposee,
       nbSaucesIncluses: p.nb_sauces_incluses,
       autoriseExtras: p.autorise_extras,
+      nbSaveursMax: p.nb_saveurs_max,
     }));
 }
 
@@ -66,6 +67,21 @@ export async function listerSaucesPubliques(): Promise<SaucePublique[]> {
 
   if (error) {
     throw new Error(`Impossible de charger les sauces : ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
+export async function listerSaveursPubliques(): Promise<SaveurPublique[]> {
+  const supabase = createServiceSupabaseClient();
+  const { data, error } = await supabase
+    .from("saveurs")
+    .select("id, nom")
+    .eq("actif", true)
+    .order("nom", { ascending: true });
+
+  if (error) {
+    throw new Error(`Impossible de charger les saveurs : ${error.message}`);
   }
 
   return data ?? [];

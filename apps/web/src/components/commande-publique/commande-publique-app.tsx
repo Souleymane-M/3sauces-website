@@ -9,6 +9,7 @@ import type {
   ProduitPublic,
   ViandePublique,
   SaucePublique,
+  SaveurPublique,
 } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "./viande-modal-publique";
+import { SaveurModalPublique } from "./saveur-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 
 interface LignePanierPublique {
@@ -24,12 +26,14 @@ interface LignePanierPublique {
   quantite: number;
   viandes: string[];
   sauces: string[];
+  saveurs: string[];
 }
 
 interface CommandePubliqueAppProps {
   produits: ProduitPublic[];
   viandes: ViandePublique[];
   sauces: SaucePublique[];
+  saveurs: SaveurPublique[];
   parametres: ParametresLivraisonPublic;
 }
 
@@ -47,7 +51,7 @@ const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 const FOND_PAGE = "#F5F0E8";
 
-export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: CommandePubliqueAppProps) {
+export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parametres }: CommandePubliqueAppProps) {
   const router = useRouter();
 
   const creneauxValides = useMemo(
@@ -120,13 +124,19 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
     pulseTimeout.current = setTimeout(() => setPulse(false), 250);
   }
 
-  function ajouterAuPanier(produit: ProduitPublic, viandesChoisies: string[], saucesChoisies: string[] = []) {
+  function ajouterAuPanier(
+    produit: ProduitPublic,
+    viandesChoisies: string[],
+    saucesChoisies: string[] = [],
+    saveursChoisies: string[] = []
+  ) {
     declencherPulse();
     setPanier((precedent) => {
       const cle = (l: LignePanierPublique) =>
         l.produit.id === produit.id &&
         JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
-        JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort());
+        JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
+        JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort());
 
       const existante = precedent.find(cle);
       if (existante) {
@@ -140,6 +150,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
           quantite: 1,
           viandes: viandesChoisies,
           sauces: saucesChoisies,
+          saveurs: saveursChoisies,
         },
       ];
     });
@@ -147,12 +158,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
 
   function surClicProduit(produit: ProduitPublic) {
     // Un configurateur s'ouvre dès qu'il y a une vraie décision à prendre :
-    // viande à choisir, sauces incluses à cocher, ou extras disponibles.
-    // Sinon (ex: boisson à choix unique, grillade simple), ajout direct.
+    // viande à choisir, sauces incluses à cocher, saveur à choisir, ou
+    // extras disponibles. Sinon (ex: boisson à choix unique, grillade
+    // simple), ajout direct.
     const besoinConfigurateur =
       (!produit.viandeImposee && produit.nbViandesMax > 0) ||
       produit.nbSaucesIncluses > 0 ||
-      produit.autoriseExtras;
+      produit.autoriseExtras ||
+      produit.nbSaveursMax > 0;
 
     if (besoinConfigurateur) {
       setProduitEnSelection(produit);
@@ -223,6 +236,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
             quantite: l.quantite,
             viandes: l.viandes,
             sauces: l.sauces,
+            saveurs: l.saveurs,
           })),
         }),
       });
@@ -307,6 +321,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
                   </button>
                 </div>
                 {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
+                {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
                 {l.sauces.length > 0 && (
                   <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>
                 )}
@@ -468,7 +483,19 @@ export function CommandePubliqueApp({ produits, viandes, sauces, parametres }: C
         </div>
       </div>
 
-      {produitEnSelection && (
+      {produitEnSelection && produitEnSelection.nbSaveursMax > 0 && (
+        <SaveurModalPublique
+          produit={produitEnSelection}
+          saveurs={saveurs}
+          onAnnuler={() => setProduitEnSelection(null)}
+          onValider={(saveurChoisie) => {
+            ajouterAuPanier(produitEnSelection, [], [], [saveurChoisie]);
+            setProduitEnSelection(null);
+          }}
+        />
+      )}
+
+      {produitEnSelection && produitEnSelection.nbSaveursMax === 0 && (
         <ViandeModalPublique
           produit={produitEnSelection}
           viandes={viandes}

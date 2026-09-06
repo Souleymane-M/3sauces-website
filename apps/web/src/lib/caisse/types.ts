@@ -15,6 +15,8 @@ export interface LigneCommande {
   viandes: string[];
   /** Sauces incluses (site public uniquement pour l'instant — cf. commande-publique). Absent/vide côté caisse. */
   sauces?: string[];
+  /** Saveur de boisson choisie (site public uniquement, ex: Canette 33cl). Absent/vide côté caisse. */
+  saveurs?: string[];
   canetteIncluse: boolean;
 }
 

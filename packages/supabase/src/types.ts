@@ -68,6 +68,7 @@ export interface Database {
           viande_imposee: string | null;
           nb_sauces_incluses: number;
           autorise_extras: boolean;
+          nb_saveurs_max: number;
           created_at: string;
           updated_at: string;
         };
@@ -106,6 +107,20 @@ export interface Database {
           nom: string;
         };
         Update: Partial<Database["public"]["Tables"]["sauces"]["Row"]>;
+        Relationships: [];
+      };
+
+      saveurs: {
+        Row: {
+          id: string;
+          nom: string;
+          actif: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["saveurs"]["Row"]> & {
+          nom: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["saveurs"]["Row"]>;
         Relationships: [];
       };
 
