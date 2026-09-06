@@ -41,9 +41,9 @@ interface CommandePubliqueAppProps {
 interface Section {
   key: string;
   titre: string;
-  /** Bandeau de couleur pour distinguer Tacos (rouge) de Barquettes & Bowls (vert). */
-  couleur?: "rouge" | "vert";
-  /** Style compact, sans carte proéminente (Boissons, en fin de page). */
+  /** Bandeau de titre pleine largeur, alterné rouge/vert d'une section à l'autre — jamais de section sans bandeau. */
+  couleur: "rouge" | "vert";
+  /** Style compact, sans carte proéminente (Boissons, en fin de page) — indépendant de la couleur du bandeau. */
   discret?: boolean;
   produits: ProduitPublic[];
 }
@@ -79,15 +79,22 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   // on les distingue ici par le nom du produit plutôt que par une nouvelle
   // catégorie, pour ne pas complexifier le back-office pour un simple
   // regroupement d'affichage.
+  //
+  // Chaque section a désormais son bandeau de titre, en alternance stricte
+  // rouge/vert d'une section à la suivante (jamais deux bandeaux de la même
+  // couleur côte à côte) — couleur fixée à la position dans la liste plutôt
+  // que par section elle-même, pour que l'alternance reste correcte même si
+  // une section est absente (aucun produit actif dedans, ex: pas de plat en
+  // "cuisine_locale" ce jour-là).
   const sections = useMemo<Section[]>(() => {
     const snacking = produits.filter((p) => p.categorie === "snacking");
     const tacos = snacking.filter((p) => p.nom.includes("Tacos") && !p.nom.includes("Bowl"));
     const barquettesBowls = snacking.filter((p) => p.nom.includes("Barquette") || p.nom.includes("Bowl"));
 
-    const liste: Section[] = [
+    const liste: Omit<Section, "couleur">[] = [
       { key: "menus", titre: "Menus spéciaux", produits: produits.filter((p) => p.categorie === "menu_special") },
-      { key: "tacos", titre: "Tacos", couleur: "rouge", produits: tacos },
-      { key: "barquettes_bowls", titre: "Barquettes & Bowls", couleur: "vert", produits: barquettesBowls },
+      { key: "tacos", titre: "Tacos", produits: tacos },
+      { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
       {
         key: "cuisine_locale",
@@ -96,7 +103,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       },
       { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
     ];
-    return liste.filter((s) => s.produits.length > 0);
+    return liste
+      .filter((s) => s.produits.length > 0)
+      .map((s, i) => ({ ...s, couleur: i % 2 === 0 ? "rouge" : "vert" }));
   }, [produits]);
 
   const produitViandeSupplementaire = useMemo(
@@ -264,20 +273,12 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         <div className="space-y-6">
           {sections.map((section) => (
             <div key={section.key}>
-              {section.couleur ? (
-                <div
-                  className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
-                  style={{ backgroundColor: section.couleur === "rouge" ? ROUGE : VERT }}
-                >
-                  {section.titre}
-                </div>
-              ) : (
-                <h2
-                  className={`mb-2 font-semibold uppercase text-gray-500 ${section.discret ? "text-xs" : "text-sm"}`}
-                >
-                  {section.titre}
-                </h2>
-              )}
+              <div
+                className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+                style={{ backgroundColor: section.couleur === "rouge" ? ROUGE : VERT }}
+              >
+                {section.titre}
+              </div>
 
               {section.discret ? (
                 <div className="space-y-1.5">

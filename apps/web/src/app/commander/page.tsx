@@ -42,12 +42,6 @@ export default async function CommanderPage() {
           GRILLADES · TACOS · CUISINE LOCALE
         </p>
       </div>
-      <div className="mx-auto max-w-lg px-4 pt-6">
-        <p className="text-sm text-gray-600">
-          Retrait sur place, ou livraison à Dembéni (min. {parametres.minimumCommande.toFixed(2)} €). Paiement en
-          espèces ou carte, sur place ou à la livraison.
-        </p>
-      </div>
       <CommandePubliqueApp
         produits={produits}
         viandes={viandes}
