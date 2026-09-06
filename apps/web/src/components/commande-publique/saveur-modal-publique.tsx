@@ -49,7 +49,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
         </div>
 
         <div className="mt-4">
-          <p className="text-sm font-medium text-gray-700">Choisis tes saveurs (autant que tu veux)</p>
+          <p className="text-sm font-bold text-[#C2540C]">Choisis tes saveurs (autant que tu veux)</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {saveurs.map((s) => {
               const count = saveursChoisies.filter((c) => c === s.nom).length;
@@ -60,7 +60,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
                   onClick={() => ajouterOccurrence(s.nom)}
                   className={`rounded-full border px-3 py-1.5 text-sm ${
                     count > 0
-                      ? "border-[#8B2020] bg-[#8B2020] text-white"
+                      ? "border-[#C2540C] bg-[#C2540C] text-white"
                       : "border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
                 >

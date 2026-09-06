@@ -110,7 +110,7 @@ export function ViandeModalPublique({
 
         {demandeViande && (
           <div className="mt-4">
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-bold text-[#8B2020]">
               Choisis {produit.nbViandesMax} viande{produit.nbViandesMax > 1 ? "s" : ""} — {viandesChoisies.length}/
               {produit.nbViandesMax}
             </p>
@@ -150,7 +150,7 @@ export function ViandeModalPublique({
 
         {produit.nbSaucesIncluses > 0 && sauces.length > 0 && (
           <div className="mt-5">
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-bold text-[#2D5A27]">
               Sauces incluses (jusqu&apos;à {produit.nbSaucesIncluses}, optionnel) — {saucesChoisies.length}/
               {produit.nbSaucesIncluses}
             </p>
@@ -180,7 +180,7 @@ export function ViandeModalPublique({
 
         {demandeChoixBoisson && (
           <div className="mt-5">
-            <p className="text-sm font-medium text-gray-700">Choisis ta canette incluse</p>
+            <p className="text-sm font-bold text-[#C2540C]">Choisis ta canette incluse</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {saveurs.map((s) => (
                 <button
@@ -189,7 +189,7 @@ export function ViandeModalPublique({
                   onClick={() => setBoissonChoisie(s.nom)}
                   className={`rounded-full border px-3 py-1.5 text-sm ${
                     boissonChoisie === s.nom
-                      ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                      ? "border-[#C2540C] bg-[#C2540C] text-white"
                       : "border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
                 >
@@ -202,7 +202,7 @@ export function ViandeModalPublique({
 
         {produit.autoriseExtras && produitViandeSupplementaire && (
           <div className="mt-5 border-t border-gray-100 pt-4">
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-bold text-[#8B2020]">
               Ajouter une viande supplémentaire (+{produitViandeSupplementaire.prix.toFixed(2)} € / viande)
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -253,7 +253,7 @@ export function ViandeModalPublique({
 
         {produit.autoriseExtras && produitSauceSupplementaire && sauces.length > 0 && (
           <div className="mt-4">
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-bold text-[#2D5A27]">
               Ajouter une sauce supplémentaire (+{produitSauceSupplementaire.prix.toFixed(2)} € / sauce)
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
