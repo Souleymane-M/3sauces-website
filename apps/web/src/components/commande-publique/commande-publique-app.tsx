@@ -394,7 +394,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             <div className="mt-1 grid grid-cols-3 gap-2">
               <button
                 onClick={() => setCanal("sur_place")}
-                className={`rounded border py-2 text-sm ${
+                className={`rounded border py-2 text-sm font-bold uppercase ${
                   canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                 }`}
               >
@@ -402,7 +402,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               </button>
               <button
                 onClick={() => setCanal("emporter")}
-                className={`rounded border py-2 text-sm ${
+                className={`rounded border py-2 text-sm font-bold uppercase ${
                   canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                 }`}
               >
@@ -411,7 +411,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               <button
                 onClick={() => setCanal("livraison")}
                 disabled={!livraisonPossible}
-                className={`rounded border py-2 text-sm disabled:opacity-30 ${
+                className={`rounded border py-2 text-sm font-bold uppercase disabled:opacity-30 ${
                   canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                 }`}
               >
