@@ -12,7 +12,7 @@ import type {
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 
-const CANAUX_PUBLICS = ["sur_place", "livraison"] as const;
+const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
 
 // Anti-spam : cette route est publique, sans authentification. Limite large

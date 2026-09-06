@@ -391,7 +391,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
           <div>
             <label className="text-xs text-gray-500">Comment récupérer ta commande ?</label>
-            <div className="mt-1 grid grid-cols-2 gap-2">
+            <div className="mt-1 grid grid-cols-3 gap-2">
               <button
                 onClick={() => setCanal("sur_place")}
                 className={`rounded border py-2 text-sm ${
@@ -399,6 +399,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 }`}
               >
                 Sur place
+              </button>
+              <button
+                onClick={() => setCanal("emporter")}
+                className={`rounded border py-2 text-sm ${
+                  canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
+                }`}
+              >
+                À emporter
               </button>
               <button
                 onClick={() => setCanal("livraison")}

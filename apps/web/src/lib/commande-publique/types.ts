@@ -69,7 +69,7 @@ export interface LigneCommandePubliquePayload {
   boissonIncluse: string | null;
 }
 
-export type CanalPublic = Extract<Canal, "sur_place" | "livraison">;
+export type CanalPublic = Extract<Canal, "sur_place" | "emporter" | "livraison">;
 
 export interface CreerCommandePubliquePayload {
   canal: CanalPublic;
