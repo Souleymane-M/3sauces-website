@@ -97,6 +97,11 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
       {
+        key: "accompagnement",
+        titre: "Accompagnements",
+        produits: produits.filter((p) => p.categorie === "accompagnement"),
+      },
+      {
         key: "cuisine_locale",
         titre: "Cuisine locale",
         produits: produits.filter((p) => p.categorie === "cuisine_locale"),

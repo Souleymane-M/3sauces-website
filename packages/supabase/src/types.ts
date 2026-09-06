@@ -15,7 +15,8 @@ export type Categorie =
   | "grillade"
   | "cuisine_locale"
   | "boisson"
-  | "supplement";
+  | "supplement"
+  | "accompagnement";
 
 export type Canal = "sur_place" | "emporter" | "livraison" | "en_ligne";
 
