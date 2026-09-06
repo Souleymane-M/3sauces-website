@@ -66,6 +66,8 @@ export interface Database {
           est_plat_du_jour: boolean;
           est_desactivable: boolean;
           viande_imposee: string | null;
+          nb_sauces_incluses: number;
+          autorise_extras: boolean;
           created_at: string;
           updated_at: string;
         };

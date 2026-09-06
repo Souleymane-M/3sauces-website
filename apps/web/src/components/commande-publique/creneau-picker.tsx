@@ -47,12 +47,12 @@ export function CreneauPicker({ creneauxValides, valeur, onChange, label }: Cren
 
   return (
     <div>
-      <label className="text-xs text-gray-400">{label}</label>
+      <label className="text-xs text-gray-500">{label}</label>
       <div className="mt-1 flex gap-2">
         <select
           value={heureActuelle}
           onChange={(e) => changerHeure(e.target.value)}
-          className="w-1/2 rounded border border-gray-600 bg-black p-3 text-base"
+          className="w-1/2 rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
         >
           {heures.map((h) => (
             <option key={h} value={h}>
@@ -63,7 +63,7 @@ export function CreneauPicker({ creneauxValides, valeur, onChange, label }: Cren
         <select
           value={minuteActuelle ?? minutesPourHeure[0]}
           onChange={(e) => changerMinute(e.target.value)}
-          className="w-1/2 rounded border border-gray-600 bg-black p-3 text-base"
+          className="w-1/2 rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
         >
           {minutesPourHeure.map((m) => (
             <option key={m} value={m}>

@@ -16,8 +16,12 @@ export interface ProduitPublic {
   prix: number;
   description: string | null;
   nbViandesMax: number;
-  /** Si renseigné, produit "verrouillé" : viande fixe, pas de configurateur (ex: Menu Collégien). */
+  /** Si renseigné, viande fixe imposée (ex: Menu Collégien = Poulet) : pas de sélecteur de viande. */
   viandeImposee: string | null;
+  /** Nombre max de sauces incluses sans supplément dans le configurateur (0 = pas de sauces proposées). */
+  nbSaucesIncluses: number;
+  /** Si vrai, le configurateur propose des ajouts payants illimités (viande/sauce supplémentaire). */
+  autoriseExtras: boolean;
 }
 
 export interface ViandePublique {
@@ -29,12 +33,6 @@ export interface SaucePublique {
   id: string;
   nom: string;
 }
-
-/** Nombre max de sauces incluses, sans supplément (règle métier fixe). */
-export const NB_SAUCES_MAX = 3;
-
-/** Catégories de produits éligibles à la sélection de sauces (configurateurs Tacos/Barquette/Bowl). */
-export const CATEGORIES_AVEC_SAUCES: Categorie[] = ["snacking"];
 
 /**
  * Produits "supplément" utilisés à l'intérieur du configurateur

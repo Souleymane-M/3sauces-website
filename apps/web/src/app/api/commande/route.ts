@@ -9,11 +9,7 @@ import type {
   CreerCommandePubliquePayload,
   LigneCommandePubliquePayload,
 } from "@/lib/commande-publique/types";
-import {
-  NB_SAUCES_MAX,
-  CATEGORIES_AVEC_SAUCES,
-  NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-} from "@/lib/commande-publique/types";
+import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 
 const CANAUX_PUBLICS = ["sur_place", "livraison"] as const;
@@ -122,7 +118,7 @@ export async function POST(request: Request) {
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
-    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee")
+    .select("id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses")
     .in("id", produitIds);
 
   if (erreurProduits) {
@@ -193,11 +189,15 @@ export async function POST(request: Request) {
     }
 
     // Sauces : deux régimes distincts.
-    //  - "Sauce supplémentaire" (produit dédié, +0,50€) : exactement 1 sauce.
-    //  - Sinon, sauces incluses sans supplément : jusqu'à 3, optionnel,
-    //    uniquement sur les catégories éligibles (snacking). Sur les autres
-    //    catégories, tout envoi de sauce ne peut venir que d'une requête
-    //    trafiquée (rejet strict).
+    //  - "Sauce supplémentaire" (produit dédié, +0,50€/unité) : exactement 1
+    //    sauce par ligne (le client en ajoute plusieurs lignes pour plusieurs
+    //    unités — cf. commande-publique-app.tsx).
+    //  - Sinon, sauces incluses sans supplément : le maximum vient du produit
+    //    lui-même (`nb_sauces_incluses`, en base) — 0 pour un produit qui n'en
+    //    propose pas (rejet strict de toute sauce envoyée), 2 pour le Menu
+    //    Collégien, 3 pour le Menu Étudiant et les Tacos/Barquette/Bowl. Ça
+    //    évite de coder en dur une liste de catégories : chaque produit porte
+    //    sa propre règle.
     const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
     const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
     if (estSauceSupplementaire) {
@@ -208,13 +208,15 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      const categorieEligibleSauces = CATEGORIES_AVEC_SAUCES.includes(produit.categorie);
-      if (!categorieEligibleSauces && sauces.length > 0) {
-        return NextResponse.json({ error: `Sauces non disponibles sur ${produit.nom}.` }, { status: 400 });
-      }
-      if (sauces.length > NB_SAUCES_MAX) {
+      const maxSaucesIncluses = produit.nb_sauces_incluses ?? 0;
+      if (sauces.length > maxSaucesIncluses) {
         return NextResponse.json(
-          { error: `Maximum ${NB_SAUCES_MAX} sauces sur ${produit.nom}.` },
+          {
+            error:
+              maxSaucesIncluses === 0
+                ? `Sauces non disponibles sur ${produit.nom}.`
+                : `Maximum ${maxSaucesIncluses} sauces sur ${produit.nom}.`,
+          },
           { status: 400 }
         );
       }

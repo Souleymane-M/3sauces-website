@@ -19,10 +19,10 @@ export default async function CommanderPage() {
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-[#F5F0E8]">
       <div className="mx-auto max-w-lg px-4 pt-6">
-        <h1 className="text-2xl font-bold">3 Sauces</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-gray-900">3 Sauces</h1>
+        <p className="mt-1 text-sm text-gray-600">
           Retrait sur place, ou livraison à Dembéni (min. {parametres.minimumCommande.toFixed(2)} €). Paiement en
           espèces ou carte, sur place ou à la livraison.
         </p>
