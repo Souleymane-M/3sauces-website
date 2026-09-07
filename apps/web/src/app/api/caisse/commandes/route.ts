@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
+import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
@@ -17,12 +18,25 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
 /**
  * Crée une commande caisse (Module 1) : mêmes règles de validation que le
  * site public (/api/commande) — viandes/sauces à choix multiples, extras
- * illimités, choix de saveur de boisson, canette incluse — recalculées côté
- * serveur à partir de la carte en base (jamais de confiance aveugle dans ce
- * qu'envoie le navigateur). Seule différence : un produit à prix libre
- * (`prix IS NULL`, ex: "Plat du jour") est ici autorisé, avec un prix du
- * jour saisi par l'employé (`prixSaisi`) au lieu d'être rejeté comme côté
- * public. Enregistre le paiement, et laisse le trigger DB
+ * illimités, choix de saveur de boisson, canette incluse, et désormais les
+ * mêmes règles de livraison (adresse/zone/minimum de commande/créneau) pour
+ * une livraison prise au téléphone par la caisse — recalculées côté serveur
+ * à partir de la carte en base (jamais de confiance aveugle dans ce qu'envoie
+ * le navigateur). Deux différences volontaires avec le site public :
+ *  - un produit à prix libre (`prix IS NULL`, ex: "Plat du jour") est ici
+ *    autorisé, avec un prix du jour saisi par l'employé (`prixSaisi`) au
+ *    lieu d'être rejeté ;
+ *  - le créneau n'est demandé qu'en livraison (un client au comptoir ou au
+ *    téléphone pour du sur place/à emporter n'a pas besoin de planifier une
+ *    heure, contrairement au site public qui le demande systématiquement).
+ *
+ * Une commande caisse en livraison renseigne donc désormais `heure_souhaitee`
+ * comme une commande publique : elle apparaît naturellement dans le flux de
+ * suivi du patron (`listerCommandesAdmin`, filtré sur ce champ) au même titre
+ * qu'une commande passée en ligne — une livraison prise par téléphone a
+ * besoin du même suivi recue/en_préparation/livrée.
+ *
+ * Enregistre le paiement, et laisse le trigger DB
  * `commandes_appliquer_fidelite` gérer l'accumulation/récompense fidélité
  * (déclenché automatiquement à l'insertion si paiement_statut = 'paye').
  *
@@ -56,6 +70,45 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
+
+  // --- Paramètres de livraison (mêmes règles que le site public, cf.
+  // /api/commande) : une livraison prise au téléphone par la caisse a
+  // besoin des mêmes informations qu'une livraison passée en ligne. ---
+  const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
+    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande").eq("id", true).single(),
+    supabase.from("zones_livraison").select("commune").eq("actif", true),
+  ]);
+
+  if (erreurParametres || !parametres) {
+    return NextResponse.json({ error: "Erreur serveur (paramètres livraison)." }, { status: 500 });
+  }
+  if (erreurZones) {
+    return NextResponse.json({ error: "Erreur serveur (zones livraison)." }, { status: 500 });
+  }
+  const communesActives = new Set((zones ?? []).map((z) => z.commune));
+
+  // Contrairement au site public, le créneau n'est demandé qu'en livraison
+  // (un client au comptoir ou au téléphone pour du sur place/à emporter n'a
+  // pas besoin de planifier une heure).
+  let heureSouhaitee: Date | null = null;
+  if (body.canal === "livraison") {
+    const creneauHeure = body.creneauHeure;
+    if (typeof creneauHeure !== "string" || !creneauHeure) {
+      return NextResponse.json({ error: "Créneau de livraison requis." }, { status: 400 });
+    }
+    if (!creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
+      return NextResponse.json(
+        {
+          error: `Créneau invalide : choisis une heure entre ${parametres.heure_debut.slice(0, 5)} et ${parametres.heure_fin.slice(0, 5)}.`,
+        },
+        { status: 400 }
+      );
+    }
+    heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+    if (!heureSouhaitee) {
+      return NextResponse.json({ error: "Créneau de livraison invalide." }, { status: 400 });
+    }
+  }
 
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
   const { data: produits, error: erreurProduits } = await supabase
@@ -232,6 +285,32 @@ export async function POST(request: Request) {
   let recompenseAppliquee = false;
   let montant = Math.round(montantBrut * 100) / 100;
 
+  // --- Règles spécifiques à la livraison (mêmes que /api/commande) ---
+  let nomLivraison: string | null = null;
+  let adresse: string | null = null;
+  let zone: string | null = null;
+
+  if (body.canal === "livraison") {
+    nomLivraison = (body.nom ?? "").trim() || null;
+    adresse = (body.adresse ?? "").trim();
+    zone = (body.zone ?? "").trim();
+
+    if (!adresse) {
+      return NextResponse.json({ error: "Adresse de livraison requise." }, { status: 400 });
+    }
+    if (!zone || !communesActives.has(zone)) {
+      return NextResponse.json({ error: "Zone de livraison invalide." }, { status: 400 });
+    }
+    if (montant < parametres.minimum_commande) {
+      return NextResponse.json(
+        {
+          error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} €.`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   if (body.clientTelephone) {
     const telephoneNormalise = normaliserTelephone(body.clientTelephone);
     if (!telephoneNormalise) {
@@ -279,6 +358,10 @@ export async function POST(request: Request) {
       commande_par: session.profilId,
       cout_matiere_total: coutMatiereTotal,
       recompense_appliquee: recompenseAppliquee,
+      nom_livraison: nomLivraison,
+      adresse_livraison: adresse,
+      zone_livraison: zone,
+      heure_souhaitee: heureSouhaitee ? heureSouhaitee.toISOString() : null,
     })
     .select("id")
     .single();

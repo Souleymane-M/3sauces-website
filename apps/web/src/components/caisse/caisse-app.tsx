@@ -3,13 +3,16 @@
 import { useMemo, useState } from "react";
 import type { Canal, ModePaiement } from "@3sauces/supabase";
 import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse } from "@/lib/caisse/types";
+import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
+import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
+import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
 
 interface LignePanier {
   id: string;
@@ -27,6 +30,7 @@ interface CaisseAppProps {
   viandes: ViandeCaisse[];
   sauces: SauceCaisse[];
   saveurs: SaveurCaisse[];
+  parametres: ParametresLivraisonPublic;
   nomEmploye: string;
 }
 
@@ -58,7 +62,7 @@ interface ClientInfo {
  * produit à prix libre (`prix === null`, ex: "Plat du jour") demande un prix
  * du jour dans QuantiteModalPublique, cas qui n'existe jamais côté public.
  */
-export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: CaisseAppProps) {
+export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomEmploye }: CaisseAppProps) {
   const [panier, setPanier] = useState<LignePanier[]>([]);
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
@@ -71,6 +75,19 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number } | null>(null);
+
+  // Livraison uniquement — mêmes champs que le site public (nom du
+  // destinataire, adresse, zone, créneau souhaité) : la caisse encaisse
+  // aussi des livraisons prises par téléphone, qui ont besoin des mêmes
+  // informations pour être préparées et livrées.
+  const creneauxValides = useMemo(
+    () => genererCreneaux(parametres.heureDebut, parametres.heureFin),
+    [parametres.heureDebut, parametres.heureFin]
+  );
+  const [nomLivraison, setNomLivraison] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
+  const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
 
   // Même construction de sections que commande-publique-app.tsx (Tacos vs
   // Barquettes/Bowls distingués par nom, alternance rouge/vert par position,
@@ -118,6 +135,9 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
   );
 
   const total = panier.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
+  const livraisonPossible = parametres.zonesActives.length > 0;
+  const minimumAtteint = total >= parametres.minimumCommande;
+  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   function ajouterAuPanier(
     produit: ProduitCaisse,
@@ -216,6 +236,10 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
           modePaiement,
           clientTelephone: telephone.trim() || undefined,
           recompenseAppliquee: appliquerRecompense,
+          nom: canal === "livraison" ? nomLivraison.trim() || undefined : undefined,
+          adresse: canal === "livraison" ? adresse.trim() : undefined,
+          zone: canal === "livraison" ? zone : undefined,
+          creneauHeure: canal === "livraison" ? creneauHeure : undefined,
           lignes: panier.map((l) => ({
             produitId: l.produit.id,
             quantite: l.quantite,
@@ -237,6 +261,8 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
       setTelephone("");
       setClientInfo(null);
       setAppliquerRecompense(false);
+      setNomLivraison("");
+      setAdresse("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -408,14 +434,62 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
             </button>
             <button
               onClick={() => setCanal("livraison")}
-              className={`rounded border py-2 text-xs font-bold uppercase ${
+              disabled={!livraisonPossible}
+              className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-30 ${
                 canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-600 text-gray-300"
               }`}
             >
               Livraison
             </button>
           </div>
+          {canal === "livraison" && !minimumAtteint && (
+            <p className="mt-2 text-xs text-orange-400">
+              Minimum {parametres.minimumCommande.toFixed(2)} € pour la livraison — ajoute des articles ou choisis un
+              autre canal.
+            </p>
+          )}
         </div>
+
+        {canal === "livraison" && (
+          <div className="space-y-3 border-t border-gray-700 pt-3">
+            <div>
+              <label className="text-xs text-gray-400">Nom du destinataire</label>
+              <input
+                value={nomLivraison}
+                onChange={(e) => setNomLivraison(e.target.value)}
+                className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Adresse</label>
+              <input
+                value={adresse}
+                onChange={(e) => setAdresse(e.target.value)}
+                className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Zone</label>
+              <select
+                value={zone}
+                onChange={(e) => setZone(e.target.value)}
+                className="mt-1 w-full rounded border border-gray-600 bg-black p-2 text-sm"
+              >
+                {parametres.zonesActives.map((z) => (
+                  <option key={z} value={z}>
+                    {z}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <CreneauPicker
+              creneauxValides={creneauxValides}
+              valeur={creneauHeure}
+              onChange={setCreneauHeure}
+              label="Créneau de livraison souhaité"
+            />
+          </div>
+        )}
 
         <div>
           <label className="text-xs text-gray-400">Paiement</label>
@@ -438,7 +512,7 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, nomEmploye }: Ca
 
         <button
           onClick={encaisser}
-          disabled={panier.length === 0 || envoiEnCours}
+          disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque}
           className="w-full rounded bg-white py-3 font-semibold text-black disabled:opacity-40"
         >
           {envoiEnCours ? "Encaissement…" : "Encaisser"}

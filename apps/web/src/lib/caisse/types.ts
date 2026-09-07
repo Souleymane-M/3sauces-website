@@ -70,4 +70,9 @@ export interface CreerCommandePayload {
   lignes: LigneCommandePayload[];
   clientTelephone?: string;
   recompenseAppliquee?: boolean;
+  // Livraison uniquement (même règles que le site public, cf. /api/commande) :
+  nom?: string;
+  adresse?: string;
+  zone?: string;
+  creneauHeure?: string;
 }
