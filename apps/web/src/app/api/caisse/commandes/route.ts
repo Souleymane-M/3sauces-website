@@ -34,6 +34,9 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  * (`listerCommandesAdmin`, filtré sur ce champ) — contrairement à une
  * livraison, qui en a besoin au même titre qu'une commande passée en ligne.
  *
+ * Nom et téléphone sont obligatoires pour tous les canaux (même règle que
+ * /api/commande) : jamais de vente anonyme, y compris au comptoir.
+ *
  * Enregistre le paiement, et laisse le trigger DB
  * `commandes_appliquer_fidelite` gérer l'accumulation/récompense fidélité
  * (déclenché automatiquement à l'insertion si paiement_statut = 'paye').
@@ -65,6 +68,18 @@ export async function POST(request: Request) {
 
   if (!MODES_PAIEMENT_CAISSE.includes(body.modePaiement as (typeof MODES_PAIEMENT_CAISSE)[number])) {
     return NextResponse.json({ error: "Mode de paiement invalide." }, { status: 400 });
+  }
+
+  // Nom et téléphone sont obligatoires pour tous les canaux, comme sur le
+  // site public (/api/commande) : jamais de vente anonyme, y compris au
+  // comptoir.
+  const nom = (body.nom ?? "").trim();
+  if (!nom) {
+    return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
+  }
+  const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
+  if (!clientTelephone) {
+    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
   }
 
   const supabase = createServiceSupabaseClient();
@@ -285,17 +300,14 @@ export async function POST(request: Request) {
   const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
   const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
 
-  let clientTelephone: string | null = null;
   let recompenseAppliquee = false;
   let montant = Math.round(montantBrut * 100) / 100;
 
   // --- Règles spécifiques à la livraison (mêmes que /api/commande) ---
-  let nomLivraison: string | null = null;
   let adresse: string | null = null;
   let zone: string | null = null;
 
   if (body.canal === "livraison") {
-    nomLivraison = (body.nom ?? "").trim() || null;
     adresse = (body.adresse ?? "").trim();
     zone = (body.zone ?? "").trim();
 
@@ -315,41 +327,36 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.clientTelephone) {
-    const telephoneNormalise = normaliserTelephone(body.clientTelephone);
-    if (!telephoneNormalise) {
-      return NextResponse.json({ error: "Numéro de téléphone client invalide." }, { status: 400 });
-    }
-    clientTelephone = telephoneNormalise;
-
-    if (body.recompenseAppliquee) {
-      const { data: client } = await supabase
-        .from("clients")
-        .select("recompense_disponible")
-        .eq("telephone", clientTelephone)
-        .maybeSingle();
-
-      if (!client?.recompense_disponible) {
-        return NextResponse.json({ error: "Ce client n'a pas de récompense disponible." }, { status: 400 });
-      }
-      recompenseAppliquee = true;
-      montant = Math.max(0, Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100);
-    }
-
-    // Le trigger DB `commandes_appliquer_fidelite` crée le client automatiquement,
-    // mais seulement après l'insertion de la commande (AFTER INSERT) — trop tard
-    // pour satisfaire la contrainte de clé étrangère `commandes_client_telephone_fkey`
-    // au moment de l'insert. On s'assure donc ici que le client existe déjà.
-    const { error: erreurUpsertClient } = await supabase
+  if (body.recompenseAppliquee) {
+    const { data: client } = await supabase
       .from("clients")
-      .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
+      .select("recompense_disponible")
+      .eq("telephone", clientTelephone)
+      .maybeSingle();
 
-    if (erreurUpsertClient) {
-      console.error("[/api/caisse/commandes] échec upsert client :", erreurUpsertClient.message);
-      return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+    if (!client?.recompense_disponible) {
+      return NextResponse.json({ error: "Ce client n'a pas de récompense disponible." }, { status: 400 });
     }
+    recompenseAppliquee = true;
+    montant = Math.max(0, Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100);
   }
 
+  // Le trigger DB `commandes_appliquer_fidelite` crée le client automatiquement,
+  // mais seulement après l'insertion de la commande (AFTER INSERT) — trop tard
+  // pour satisfaire la contrainte de clé étrangère `commandes_client_telephone_fkey`
+  // au moment de l'insert. On s'assure donc ici que le client existe déjà.
+  const { error: erreurUpsertClient } = await supabase
+    .from("clients")
+    .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
+
+  if (erreurUpsertClient) {
+    console.error("[/api/caisse/commandes] échec upsert client :", erreurUpsertClient.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // `nom_livraison` sert désormais de nom client pour tous les canaux (nom
+  // et téléphone sont obligatoires partout) et pas seulement pour la
+  // livraison — même convention que /api/commande.
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
@@ -362,7 +369,7 @@ export async function POST(request: Request) {
       commande_par: session.profilId,
       cout_matiere_total: coutMatiereTotal,
       recompense_appliquee: recompenseAppliquee,
-      nom_livraison: nomLivraison,
+      nom_livraison: nom,
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee ? heureSouhaitee.toISOString() : null,

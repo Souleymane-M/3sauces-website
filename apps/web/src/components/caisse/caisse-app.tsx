@@ -63,6 +63,10 @@ interface ClientInfo {
  * différence caisse : un produit à prix libre (`prix === null`, ex: "Plat du
  * jour") demande un prix du jour dans QuantiteModalPublique, cas qui
  * n'existe jamais côté public.
+ *
+ * Nom et téléphone sont obligatoires pour encaisser (comme nom/téléphone le
+ * sont pour commander sur le site public), quel que soit le canal —
+ * l'adresse ne l'est que pour la livraison.
  */
 export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomEmploye }: CaisseAppProps) {
   const [panier, setPanier] = useState<LignePanier[]>([]);
@@ -80,14 +84,15 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
 
   // Créneau souhaité pour tous les canaux (comme le site public : "Heure de
   // passage souhaitée" pour sur place/à emporter, "Créneau de livraison
-  // souhaité" pour la livraison) ; nom/adresse/zone restent propres à la
-  // livraison.
+  // souhaité" pour la livraison) ; adresse/zone restent propres à la
+  // livraison. Nom et téléphone sont obligatoires pour tous les canaux,
+  // comme sur le site public.
   const creneauxValides = useMemo(
     () => genererCreneaux(parametres.heureDebut, parametres.heureFin),
     [parametres.heureDebut, parametres.heureFin]
   );
   const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
-  const [nomLivraison, setNomLivraison] = useState("");
+  const [nom, setNom] = useState("");
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
 
@@ -140,6 +145,7 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
+  const infosClientIncompletes = !nom.trim() || !telephone.trim();
 
   function ajouterAuPanier(
     produit: ProduitCaisse,
@@ -236,10 +242,10 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
         body: JSON.stringify({
           canal,
           modePaiement,
-          clientTelephone: telephone.trim() || undefined,
+          clientTelephone: telephone.trim(),
           recompenseAppliquee: appliquerRecompense,
           creneauHeure,
-          nom: canal === "livraison" ? nomLivraison.trim() || undefined : undefined,
+          nom: nom.trim(),
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: panier.map((l) => ({
@@ -263,7 +269,7 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
       setTelephone("");
       setClientInfo(null);
       setAppliquerRecompense(false);
-      setNomLivraison("");
+      setNom("");
       setAdresse("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
@@ -382,7 +388,16 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
         </div>
 
         <div className="border-t border-gray-200 pt-3">
-          <label className="text-xs text-gray-500">Téléphone client (fidélité, optionnel)</label>
+          <label className="text-xs text-gray-500">Nom</label>
+          <input
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500">Téléphone</label>
           <div className="mt-1 flex gap-2">
             <input
               value={telephone}
@@ -461,14 +476,6 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
         {canal === "livraison" && (
           <div className="space-y-3 border-t border-gray-200 pt-3">
             <div>
-              <label className="text-xs text-gray-500">Nom du destinataire</label>
-              <input
-                value={nomLivraison}
-                onChange={(e) => setNomLivraison(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
-              />
-            </div>
-            <div>
               <label className="text-xs text-gray-500">Adresse</label>
               <input
                 value={adresse}
@@ -521,7 +528,7 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
 
         <button
           onClick={encaisser}
-          disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque}
+          disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque || infosClientIncompletes}
           className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
         >
           {envoiEnCours ? "Encaissement…" : "Encaisser"}

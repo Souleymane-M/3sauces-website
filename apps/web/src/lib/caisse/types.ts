@@ -68,10 +68,13 @@ export interface CreerCommandePayload {
   canal: Canal;
   modePaiement: ModePaiement;
   lignes: LigneCommandePayload[];
+  // Obligatoires pour tous les canaux (comme nom/téléphone sur le site
+  // public, cf. /api/commande) ; optionnels ici uniquement pour laisser le
+  // serveur renvoyer une erreur 400 propre plutôt qu'un crash si absents.
   clientTelephone?: string;
+  nom?: string;
   recompenseAppliquee?: boolean;
   // Livraison uniquement (même règles que le site public, cf. /api/commande) :
-  nom?: string;
   adresse?: string;
   zone?: string;
   creneauHeure?: string;
