@@ -18,23 +18,21 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
 /**
  * Crée une commande caisse (Module 1) : mêmes règles de validation que le
  * site public (/api/commande) — viandes/sauces à choix multiples, extras
- * illimités, choix de saveur de boisson, canette incluse, et désormais les
- * mêmes règles de livraison (adresse/zone/minimum de commande/créneau) pour
- * une livraison prise au téléphone par la caisse — recalculées côté serveur
- * à partir de la carte en base (jamais de confiance aveugle dans ce qu'envoie
- * le navigateur). Deux différences volontaires avec le site public :
- *  - un produit à prix libre (`prix IS NULL`, ex: "Plat du jour") est ici
- *    autorisé, avec un prix du jour saisi par l'employé (`prixSaisi`) au
- *    lieu d'être rejeté ;
- *  - le créneau n'est demandé qu'en livraison (un client au comptoir ou au
- *    téléphone pour du sur place/à emporter n'a pas besoin de planifier une
- *    heure, contrairement au site public qui le demande systématiquement).
+ * illimités, choix de saveur de boisson, canette incluse, créneau souhaité
+ * pour tous les canaux, et les mêmes règles de livraison (adresse/zone/
+ * minimum de commande) pour une livraison prise au téléphone par la caisse —
+ * recalculées côté serveur à partir de la carte en base (jamais de confiance
+ * aveugle dans ce qu'envoie le navigateur). Une différence volontaire avec
+ * le site public : un produit à prix libre (`prix IS NULL`, ex: "Plat du
+ * jour") est ici autorisé, avec un prix du jour saisi par l'employé
+ * (`prixSaisi`) au lieu d'être rejeté.
  *
- * Une commande caisse en livraison renseigne donc désormais `heure_souhaitee`
- * comme une commande publique : elle apparaît naturellement dans le flux de
- * suivi du patron (`listerCommandesAdmin`, filtré sur ce champ) au même titre
- * qu'une commande passée en ligne — une livraison prise par téléphone a
- * besoin du même suivi recue/en_préparation/livrée.
+ * Le créneau est demandé et validé pour tous les canaux, mais seule une
+ * livraison l'enregistre dans `heure_souhaitee` : une vente sur place/à
+ * emporter est payée et remise immédiatement, elle n'a pas besoin du suivi
+ * recue/en_préparation/livrée du flux de commandes en attente
+ * (`listerCommandesAdmin`, filtré sur ce champ) — contrairement à une
+ * livraison, qui en a besoin au même titre qu'une commande passée en ligne.
  *
  * Enregistre le paiement, et laisse le trigger DB
  * `commandes_appliquer_fidelite` gérer l'accumulation/récompense fidélité
@@ -87,23 +85,29 @@ export async function POST(request: Request) {
   }
   const communesActives = new Set((zones ?? []).map((z) => z.commune));
 
-  // Contrairement au site public, le créneau n'est demandé qu'en livraison
-  // (un client au comptoir ou au téléphone pour du sur place/à emporter n'a
-  // pas besoin de planifier une heure).
+  // Le créneau est désormais demandé pour tous les canaux (comme le site
+  // public : "Heure de passage souhaitée" pour sur place/à emporter,
+  // "Créneau de livraison souhaité" pour la livraison) et validé dans tous
+  // les cas. En revanche, seule une livraison l'enregistre dans
+  // `heure_souhaitee` : une vente sur place/à emporter est payée et remise
+  // immédiatement, elle n'a pas besoin du suivi recue/en_préparation/livrée
+  // du flux de commandes en attente — contrairement à une livraison, qui en
+  // a besoin au même titre qu'une commande passée en ligne.
+  const creneauHeure = body.creneauHeure;
+  if (typeof creneauHeure !== "string" || !creneauHeure) {
+    return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
+  }
+  if (!creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
+    return NextResponse.json(
+      {
+        error: `Créneau invalide : choisis une heure entre ${parametres.heure_debut.slice(0, 5)} et ${parametres.heure_fin.slice(0, 5)}.`,
+      },
+      { status: 400 }
+    );
+  }
+
   let heureSouhaitee: Date | null = null;
   if (body.canal === "livraison") {
-    const creneauHeure = body.creneauHeure;
-    if (typeof creneauHeure !== "string" || !creneauHeure) {
-      return NextResponse.json({ error: "Créneau de livraison requis." }, { status: 400 });
-    }
-    if (!creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
-      return NextResponse.json(
-        {
-          error: `Créneau invalide : choisis une heure entre ${parametres.heure_debut.slice(0, 5)} et ${parametres.heure_fin.slice(0, 5)}.`,
-        },
-        { status: 400 }
-      );
-    }
     heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
     if (!heureSouhaitee) {
       return NextResponse.json({ error: "Créneau de livraison invalide." }, { status: 400 });
