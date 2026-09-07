@@ -355,7 +355,7 @@ export async function POST(request: Request) {
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
     })
-    .select("id")
+    .select("id, numero")
     .single();
 
   if (erreurCommande || !commande) {
@@ -363,10 +363,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // QR de suivi livreur (Module 2, flash départ cuisine / flash arrivée
+  // client — cf. supabase/migrations/20260830100600_livraisons.sql) : posé
+  // ici pour que le ticket imprimé côté caisse ait un vrai QR, jamais un
+  // jeton décoratif sans lendemain. Un échec ici ne doit jamais faire
+  // échouer une commande déjà enregistrée — même philosophie que
+  // l'impression, qui ne bloque jamais non plus.
+  let qrCode: string | null = null;
+  if (body.canal === "livraison") {
+    const { data: livraison, error: erreurLivraison } = await supabase
+      .from("livraisons")
+      .insert({ commande_id: commande.id, heure_souhaitee: heureSouhaitee.toISOString() })
+      .select("qr_code")
+      .single();
+
+    if (erreurLivraison) {
+      console.error("[/api/commande] échec insertion livraison :", erreurLivraison.message);
+    } else {
+      qrCode = livraison.qr_code;
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     commandeId: commande.id,
+    numero: commande.numero,
     montant,
     creneauHeure,
+    qrCode,
   });
 }

@@ -44,6 +44,10 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  * Hors scope volontaire de cette itération : déduction du stock (lots /
  * lot_mouvements) — la carte n'a pas encore de table de "recette" reliant un
  * produit à ses articles de stock consommés, ça viendra avec le Module 3.
+ *
+ * Renvoie `numero` (numéro de commande lisible) et `qrCode` (uniquement en
+ * livraison, cf. table `livraisons`) pour que /caisse imprime le ticket
+ * immédiatement après un "Encaisser" réussi, sans requête supplémentaire.
  */
 export async function POST(request: Request) {
   const session = await requireRole(["employe"]);
@@ -374,12 +378,31 @@ export async function POST(request: Request) {
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee ? heureSouhaitee.toISOString() : null,
     })
-    .select("id")
+    .select("id, numero")
     .single();
 
   if (erreurCommande || !commande) {
     console.error("[/api/caisse/commandes] échec insertion commande :", erreurCommande?.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // QR de suivi livreur (Module 2) : même logique que /api/commande — posé
+  // ici pour que le ticket imprimé ait un vrai QR pour une livraison prise
+  // au téléphone par la caisse, jamais un jeton décoratif. Un échec ici ne
+  // doit jamais faire échouer une commande déjà enregistrée.
+  let qrCode: string | null = null;
+  if (body.canal === "livraison" && heureSouhaitee) {
+    const { data: livraison, error: erreurLivraison } = await supabase
+      .from("livraisons")
+      .insert({ commande_id: commande.id, heure_souhaitee: heureSouhaitee.toISOString() })
+      .select("qr_code")
+      .single();
+
+    if (erreurLivraison) {
+      console.error("[/api/caisse/commandes] échec insertion livraison :", erreurLivraison.message);
+    } else {
+      qrCode = livraison.qr_code;
+    }
   }
 
   const { error: erreurPaiement } = await supabase.from("paiements").insert({
@@ -402,8 +425,10 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     commandeId: commande.id,
+    numero: commande.numero,
     montant,
     coutMatiereTotal,
     coutIncomplet,
+    qrCode,
   });
 }

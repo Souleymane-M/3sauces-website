@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Canal, ModePaiement } from "@3sauces/supabase";
-import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse } from "@/lib/caisse/types";
+import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse, LigneCommande } from "@/lib/caisse/types";
 import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
-import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
+import { genererCreneaux, prochainCreneauValide, construireHeureSouhaiteeUtc } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
+import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
+import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
+import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
+import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 
 interface LignePanier {
   id: string;
@@ -31,7 +35,25 @@ interface CaisseAppProps {
   sauces: SauceCaisse[];
   saveurs: SaveurCaisse[];
   parametres: ParametresLivraisonPublic;
+  imprimantesInitiales: ImprimanteAdmin[];
   nomEmploye: string;
+}
+
+// Clés localStorage du polling des commandes en ligne : persistées pour que
+// le fil ne se coupe pas à chaque rechargement/veille de l'iPad (sinon soit
+// on republierait tout l'historique du matin, soit on raterait les
+// commandes arrivées pendant la coupure).
+const CLE_CURSEUR = "caisse_impression_depuis";
+const CLE_IMPRIMES = "caisse_impression_imprimes";
+const MAX_IDS_MEMORISES = 200;
+const INTERVALLE_POLLING_MS = 7000;
+
+function versConfigImprimantes(liste: ImprimanteAdmin[]): ConfigImprimantes {
+  const comptoir = liste.find((i) => i.role === "comptoir");
+  const cuisine = liste.find((i) => i.role === "cuisine");
+  const config = (i: ImprimanteAdmin | undefined): ConfigImprimante | null =>
+    i?.adresseIp ? { adresseIp: i.adresseIp, port: i.port } : null;
+  return { comptoir: config(comptoir), cuisine: config(cuisine) };
 }
 
 interface Section {
@@ -68,7 +90,15 @@ interface ClientInfo {
  * sont pour commander sur le site public), quel que soit le canal —
  * l'adresse ne l'est que pour la livraison.
  */
-export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomEmploye }: CaisseAppProps) {
+export function CaisseApp({
+  produits,
+  viandes,
+  sauces,
+  saveurs,
+  parametres,
+  imprimantesInitiales,
+  nomEmploye,
+}: CaisseAppProps) {
   const [panier, setPanier] = useState<LignePanier[]>([]);
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
@@ -95,6 +125,107 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
   const [nom, setNom] = useState("");
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
+
+  // Impression thermique (comptoir + cuisine) : la config réseau est
+  // re-récupérée juste avant chaque impression (pas seulement au chargement)
+  // pour qu'un changement d'IP fait depuis /patron en plein service prenne
+  // effet sans recharger l'onglet.
+  const [imprimantes, setImprimantes] = useState<ImprimanteAdmin[]>(imprimantesInitiales);
+  const [avertissementImpression, setAvertissementImpression] = useState<string | null>(null);
+  const depuisRef = useRef<string | null>(null);
+  const idsImprimesRef = useRef<Set<string>>(new Set());
+
+  async function recupererImprimantes(): Promise<ImprimanteAdmin[]> {
+    try {
+      const reponse = await fetch("/api/caisse/imprimantes", { cache: "no-store" });
+      if (!reponse.ok) return imprimantes;
+      const data = await reponse.json();
+      const liste: ImprimanteAdmin[] = data.imprimantes ?? imprimantes;
+      setImprimantes(liste);
+      return liste;
+    } catch {
+      return imprimantes;
+    }
+  }
+
+  async function imprimerEtSignaler(commande: CommandePourImpression) {
+    const liste = await recupererImprimantes();
+    const resultat = await imprimerCommande(commande, versConfigImprimantes(liste));
+    const messages: string[] = [];
+    if (resultat.comptoir && !resultat.comptoir.ok) messages.push(`Comptoir : ${resultat.comptoir.erreur}`);
+    if (resultat.cuisine && !resultat.cuisine.ok) messages.push(`Cuisine : ${resultat.cuisine.erreur}`);
+    setAvertissementImpression(messages.length > 0 ? messages.join(" · ") : null);
+  }
+
+  // Détecte les commandes reçues depuis le site public (jamais celles
+  // prises au comptoir, cf. lib/caisse/nouvelles-commandes.ts) pour les
+  // imprimer + jouer une alerte sonore, sans que l'employé ait à faire quoi
+  // que ce soit. Curseur + ids déjà imprimés persistés en localStorage :
+  // seul le tout premier chargement (rien en localStorage) démarre le
+  // curseur à "maintenant", pour ne jamais imprimer en rafale l'historique
+  // du matin ; un rechargement/veille reprend ensuite exactement où il en
+  // était, sans trou ni doublon.
+  useEffect(() => {
+    try {
+      depuisRef.current = localStorage.getItem(CLE_CURSEUR);
+      const imprimesStockes = localStorage.getItem(CLE_IMPRIMES);
+      if (imprimesStockes) idsImprimesRef.current = new Set(JSON.parse(imprimesStockes));
+    } catch {
+      // localStorage indisponible (navigation privée, etc.) : on continue
+      // sans persistance, juste avec le comportement "démarre à maintenant".
+    }
+
+    let annule = false;
+
+    async function verifier() {
+      try {
+        const params = depuisRef.current ? `?depuis=${encodeURIComponent(depuisRef.current)}` : "";
+        const reponse = await fetch(`/api/caisse/nouvelles-commandes${params}`, { cache: "no-store" });
+        if (!reponse.ok || annule) return;
+        const data = await reponse.json();
+        const nouvelles: CommandePourImpression[] = (data.commandes ?? []).filter(
+          (c: CommandePourImpression) => !idsImprimesRef.current.has(c.id)
+        );
+
+        depuisRef.current = data.curseurSuivant;
+        try {
+          localStorage.setItem(CLE_CURSEUR, data.curseurSuivant);
+        } catch {
+          // ignore
+        }
+
+        if (nouvelles.length === 0 || annule) return;
+
+        jouerAlerteSonore();
+        // Séquentiel plutôt qu'en parallèle : évite de saturer les deux
+        // imprimantes si plusieurs commandes en ligne arrivent groupées.
+        for (const commande of nouvelles) {
+          if (annule) return;
+          idsImprimesRef.current.add(commande.id);
+          await imprimerEtSignaler(commande);
+        }
+
+        try {
+          const ids = [...idsImprimesRef.current].slice(-MAX_IDS_MEMORISES);
+          idsImprimesRef.current = new Set(ids);
+          localStorage.setItem(CLE_IMPRIMES, JSON.stringify(ids));
+        } catch {
+          // ignore
+        }
+      } catch {
+        // Erreur réseau ponctuelle : sans conséquence, le prochain passage
+        // de polling réessaiera.
+      }
+    }
+
+    verifier();
+    const intervalle = setInterval(verifier, INTERVALLE_POLLING_MS);
+    return () => {
+      annule = true;
+      clearInterval(intervalle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Même construction de sections que commande-publique-app.tsx (Tacos vs
   // Barquettes/Bowls distingués par nom, alternance rouge/vert par position,
@@ -265,6 +396,38 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
         return;
       }
       setConfirmation({ commandeId: data.commandeId, montant: data.montant });
+
+      // Impression immédiate, sans bloquer l'écran de confirmation : une
+      // imprimante non configurée ou hors ligne n'empêche jamais
+      // l'encaissement (déjà enregistré à ce stade), juste un avertissement
+      // discret (cf. imprimerEtSignaler).
+      const lignesPourImpression: LigneCommande[] = panier.map((l) => ({
+        produitId: l.produit.id,
+        nom: l.produit.nom,
+        categorie: l.produit.categorie,
+        quantite: l.quantite,
+        prixUnitaire: l.produit.prix ?? l.prixSaisi ?? 0,
+        coutMatiereUnitaire: l.produit.coutMatiere,
+        viandes: l.viandes,
+        sauces: l.sauces,
+        saveurs: l.saveurs,
+        boissonIncluse: l.boissonIncluse,
+        canetteIncluse: l.produit.canetteIncluse,
+      }));
+      imprimerEtSignaler({
+        id: data.commandeId,
+        numero: data.numero,
+        canal,
+        lignes: lignesPourImpression,
+        montant: data.montant,
+        modePaiement,
+        nom: nom.trim(),
+        adresse: canal === "livraison" ? adresse.trim() : null,
+        heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure)?.toISOString() ?? null,
+        creeLe: new Date().toISOString(),
+        qrCode: canal === "livraison" ? (data.qrCode ?? null) : null,
+      });
+
       setPanier([]);
       setTelephone("");
       setClientInfo(null);
@@ -343,6 +506,13 @@ export function CaisseApp({ produits, viandes, sauces, saveurs, parametres, nomE
 
       <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <p className="text-sm text-gray-500">Caissier·e : {nomEmploye}</p>
+        <p className="text-xs text-gray-400">
+          🖨️{" "}
+          {imprimantes
+            .map((i) => `${i.role === "comptoir" ? "Comptoir" : "Cuisine"} ${i.adresseIp ? "configurée" : "non configurée"}`)
+            .join(" · ")}
+        </p>
+        {avertissementImpression && <p className="text-xs text-orange-600">⚠️ {avertissementImpression}</p>}
 
         <div>
           <h3 className="font-semibold text-gray-900">Panier</h3>

@@ -5,9 +5,11 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { PatronCommandesApp } from "@/components/commande-publique/patron-commandes-app";
 import { ProduitsApp } from "@/components/patron/produits-app";
 import { OptionsApp } from "@/components/patron/options-app";
+import { ImprimantesApp } from "@/components/patron/imprimantes-app";
 import { listerCommandesAdmin } from "@/lib/commande-publique/admin";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { listerOptionsAdmin } from "@/lib/patron/options";
+import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +28,13 @@ export default async function PatronPage() {
     );
   }
 
-  const [commandes, produits, viandes, sauces, saveurs] = await Promise.all([
+  const [commandes, produits, viandes, sauces, saveurs, imprimantes] = await Promise.all([
     listerCommandesAdmin(),
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
     listerOptionsAdmin("sauces"),
     listerOptionsAdmin("saveurs"),
+    listerImprimantesAdmin(),
   ]);
 
   return (
@@ -47,6 +50,7 @@ export default async function PatronPage() {
       <PatronCommandesApp commandesInitiales={commandes} />
       <ProduitsApp produitsInitiaux={produits} />
       <OptionsApp viandesInitiales={viandes} saucesInitiales={sauces} saveursInitiales={saveurs} />
+      <ImprimantesApp imprimantesInitiales={imprimantes} />
     </main>
   );
 }

@@ -245,6 +245,7 @@ export interface Database {
           nom_livraison: string | null;
           adresse_livraison: string | null;
           heure_souhaitee: string | null;
+          numero: number;
         };
         Insert: {
           id?: string;
@@ -263,6 +264,7 @@ export interface Database {
           nom_livraison?: string | null;
           adresse_livraison?: string | null;
           heure_souhaitee?: string | null;
+          numero?: number;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];
@@ -323,6 +325,52 @@ export interface Database {
           actif?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["zones_livraison"]["Insert"]>;
+        Relationships: [];
+      };
+
+      imprimantes: {
+        Row: {
+          id: string;
+          role: "comptoir" | "cuisine";
+          nom: string;
+          adresse_ip: string | null;
+          port: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          role: "comptoir" | "cuisine";
+          nom: string;
+          adresse_ip?: string | null;
+          port?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["imprimantes"]["Insert"]>;
+        Relationships: [];
+      };
+
+      livraisons: {
+        Row: {
+          id: string;
+          commande_id: string;
+          livreur_id: string | null;
+          qr_code: string;
+          heure_commande: string;
+          heure_souhaitee: string | null;
+          heure_depart_cuisine: string | null;
+          heure_livraison_effective: string | null;
+          statut: "en_attente" | "en_livraison" | "livre";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          commande_id: string;
+          livreur_id?: string | null;
+          qr_code?: string;
+          heure_souhaitee?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["livraisons"]["Insert"]>;
         Relationships: [];
       };
     };

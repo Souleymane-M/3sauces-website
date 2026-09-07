@@ -10,6 +10,7 @@ import {
   listerSaveursActives,
 } from "@/lib/caisse/produits";
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
+import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 
 export const metadata: Metadata = {
   title: "Caisse — 3 Sauces",
@@ -26,12 +27,13 @@ export default async function CaissePage() {
     );
   }
 
-  const [produits, viandes, sauces, saveurs, parametres] = await Promise.all([
+  const [produits, viandes, sauces, saveurs, parametres, imprimantes] = await Promise.all([
     listerProduitsActifs(),
     listerViandesActives(),
     listerSaucesActives(),
     listerSaveursActives(),
     chargerParametresLivraisonPublics(),
+    listerImprimantesAdmin(),
   ]);
 
   return (
@@ -49,6 +51,7 @@ export default async function CaissePage() {
         sauces={sauces}
         saveurs={saveurs}
         parametres={parametres}
+        imprimantesInitiales={imprimantes}
         nomEmploye={session.nom}
       />
     </main>
