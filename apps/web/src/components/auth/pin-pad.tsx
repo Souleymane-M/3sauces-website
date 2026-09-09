@@ -48,7 +48,7 @@ export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: st
 
   return (
     <div className="mx-auto flex w-full max-w-xs flex-col items-center gap-6">
-      <h1 className="text-xl font-bold">{titre}</h1>
+      <h1 className="text-xl font-bold text-gray-900">{titre}</h1>
 
       <div className="flex gap-3" aria-live="polite">
         {Array.from({ length: LONGUEUR_MAX }).map((_, i) => (
@@ -70,7 +70,7 @@ export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: st
             type="button"
             onClick={() => appuyer(chiffre)}
             disabled={enCours}
-            className="h-16 w-16 rounded-full border text-xl font-semibold active:bg-gray-100 disabled:opacity-50"
+            className="h-16 w-16 rounded-full border border-gray-300 text-xl font-semibold text-gray-900 active:bg-gray-100 disabled:opacity-50"
           >
             {chiffre}
           </button>
@@ -87,7 +87,7 @@ export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: st
           type="button"
           onClick={() => appuyer("0")}
           disabled={enCours}
-          className="h-16 w-16 rounded-full border text-xl font-semibold active:bg-gray-100 disabled:opacity-50"
+          className="h-16 w-16 rounded-full border border-gray-300 text-xl font-semibold text-gray-900 active:bg-gray-100 disabled:opacity-50"
         >
           0
         </button>
