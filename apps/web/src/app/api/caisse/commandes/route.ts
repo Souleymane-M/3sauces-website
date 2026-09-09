@@ -27,12 +27,10 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  * jour") est ici autorisé, avec un prix du jour saisi par l'employé
  * (`prixSaisi`) au lieu d'être rejeté.
  *
- * Le créneau est demandé et validé pour tous les canaux, mais seule une
- * livraison l'enregistre dans `heure_souhaitee` : une vente sur place/à
- * emporter est payée et remise immédiatement, elle n'a pas besoin du suivi
- * recue/en_préparation/livrée du flux de commandes en attente
- * (`listerCommandesAdmin`, filtré sur ce champ) — contrairement à une
- * livraison, qui en a besoin au même titre qu'une commande passée en ligne.
+ * Le créneau est demandé, validé et enregistré dans `heure_souhaitee` pour
+ * tous les canaux : la page cuisine /commandes (suivi
+ * en_attente/en_préparation/prêt/remise) en a besoin quel que soit le
+ * canal, pas seulement pour une livraison.
  *
  * Nom et téléphone sont obligatoires pour tous les canaux (même règle que
  * /api/commande) : jamais de vente anonyme, y compris au comptoir.
@@ -104,14 +102,12 @@ export async function POST(request: Request) {
   }
   const communesActives = new Set((zones ?? []).map((z) => z.commune));
 
-  // Le créneau est désormais demandé pour tous les canaux (comme le site
-  // public : "Heure de passage souhaitée" pour sur place/à emporter,
-  // "Créneau de livraison souhaité" pour la livraison) et validé dans tous
-  // les cas. En revanche, seule une livraison l'enregistre dans
-  // `heure_souhaitee` : une vente sur place/à emporter est payée et remise
-  // immédiatement, elle n'a pas besoin du suivi recue/en_préparation/livrée
-  // du flux de commandes en attente — contrairement à une livraison, qui en
-  // a besoin au même titre qu'une commande passée en ligne.
+  // Le créneau est demandé et enregistré pour tous les canaux (comme le
+  // site public : "Heure de passage souhaitée" pour sur place/à emporter,
+  // "Créneau de livraison souhaité" pour la livraison) — la page cuisine
+  // /commandes en a besoin pour toutes les commandes, pas seulement les
+  // livraisons (suivi recue/en_préparation/prêt/remise, quel que soit le
+  // canal).
   const creneauHeure = body.creneauHeure;
   if (typeof creneauHeure !== "string" || !creneauHeure) {
     return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
@@ -125,12 +121,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let heureSouhaitee: Date | null = null;
-  if (body.canal === "livraison") {
-    heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
-    if (!heureSouhaitee) {
-      return NextResponse.json({ error: "Créneau de livraison invalide." }, { status: 400 });
-    }
+  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+  if (!heureSouhaitee) {
+    return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
 
   const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
@@ -376,7 +369,7 @@ export async function POST(request: Request) {
       nom_livraison: nom,
       adresse_livraison: adresse,
       zone_livraison: zone,
-      heure_souhaitee: heureSouhaitee ? heureSouhaitee.toISOString() : null,
+      heure_souhaitee: heureSouhaitee.toISOString(),
     })
     .select("id, numero")
     .single();
@@ -391,7 +384,7 @@ export async function POST(request: Request) {
   // au téléphone par la caisse, jamais un jeton décoratif. Un échec ici ne
   // doit jamais faire échouer une commande déjà enregistrée.
   let qrCode: string | null = null;
-  if (body.canal === "livraison" && heureSouhaitee) {
+  if (body.canal === "livraison") {
     const { data: livraison, error: erreurLivraison } = await supabase
       .from("livraisons")
       .insert({ commande_id: commande.id, heure_souhaitee: heureSouhaitee.toISOString() })

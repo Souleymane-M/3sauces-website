@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/get-session";
 import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
-import { PatronCommandesApp } from "@/components/commande-publique/patron-commandes-app";
 import { ProduitsApp } from "@/components/patron/produits-app";
 import { OptionsApp } from "@/components/patron/options-app";
 import { ImprimantesApp } from "@/components/patron/imprimantes-app";
-import { listerCommandesAdmin } from "@/lib/commande-publique/admin";
+import { CommandesHistoriqueApp } from "@/components/patron/commandes-historique-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
+import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +28,14 @@ export default async function PatronPage() {
     );
   }
 
-  const [commandes, produits, viandes, sauces, saveurs, imprimantes] = await Promise.all([
-    listerCommandesAdmin(),
+  const [produits, viandes, sauces, saveurs, imprimantes, historique, tempsMoyenParEmploye] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
     listerOptionsAdmin("sauces"),
     listerOptionsAdmin("saveurs"),
     listerImprimantesAdmin(),
+    listerHistoriqueCommandes(),
+    calculerTempsPreparationMoyenParEmploye(),
   ]);
 
   return (
@@ -47,7 +48,7 @@ export default async function PatronPage() {
         Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
         gestion complète de la carte et des options ci-dessous.
       </p>
-      <PatronCommandesApp commandesInitiales={commandes} />
+      <CommandesHistoriqueApp historiqueInitial={historique} tempsMoyenParEmploye={tempsMoyenParEmploye} />
       <ProduitsApp produitsInitiaux={produits} />
       <OptionsApp viandesInitiales={viandes} saucesInitiales={sauces} saveursInitiales={saveurs} />
       <ImprimantesApp imprimantesInitiales={imprimantes} />

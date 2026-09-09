@@ -27,6 +27,12 @@ export type Canal = "sur_place" | "emporter" | "livraison" | "en_ligne";
 // quand les paiements en ligne (Stripe) seront ajoutés.
 export type ModePaiement = "especes" | "cb";
 
+// Contrainte CHECK `commandes_statut_check` (migration
+// 20260908090000_tracabilite_commandes.sql) : flux complet en_attente ->
+// en_preparation -> pret -> remis_au_client (sur place/à emporter) ou
+// pris_par_livreur -> livre (livraison, flash QR du livreur - Module 2).
+export type StatutCommande = "en_attente" | "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+
 export interface Database {
   public: {
     Tables: {
@@ -233,7 +239,7 @@ export interface Database {
           session_table_id: string | null;
           contenu: unknown;
           montant: number;
-          statut: string;
+          statut: StatutCommande;
           paiement_statut: "non_paye" | "paye" | "remboursee" | string;
           mode_paiement: ModePaiement | null;
           zone_livraison: string | null;
@@ -253,7 +259,7 @@ export interface Database {
           session_table_id?: string | null;
           contenu: unknown;
           montant: number;
-          statut?: string;
+          statut?: StatutCommande;
           paiement_statut?: "non_paye" | "paye" | "remboursee" | string;
           mode_paiement?: ModePaiement | null;
           zone_livraison?: string | null;
@@ -346,6 +352,24 @@ export interface Database {
           port?: number;
         };
         Update: Partial<Database["public"]["Tables"]["imprimantes"]["Insert"]>;
+        Relationships: [];
+      };
+
+      commandes_evenements: {
+        Row: {
+          id: string;
+          commande_id: string;
+          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+          profil_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          commande_id: string;
+          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+          profil_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["commandes_evenements"]["Insert"]>;
         Relationships: [];
       };
 

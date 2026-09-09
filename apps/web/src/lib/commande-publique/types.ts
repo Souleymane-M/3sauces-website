@@ -94,36 +94,3 @@ export interface CreerCommandePubliquePayload {
   // Créneau souhaité (heure de passage ou de livraison), "HH:MM".
   creneauHeure: string;
 }
-
-/**
- * Statuts de suivi affichés côté admin (Page 3). Distinct du statut plus
- * riche de la table `livraisons` (Module 2, QR code livreur) — volontairement
- * pas utilisée ici, trop complexe pour le besoin MVP de cette page.
- */
-export type StatutCommandePublique = "recue" | "en_preparation" | "livree";
-
-export interface LigneCommandeAdmin {
-  produitId: string;
-  nom: string;
-  quantite: number;
-  prixUnitaire: number;
-  viandes: string[];
-  sauces: string[];
-  saveurs: string[];
-  boissonIncluse: string | null;
-}
-
-export interface CommandeAdmin {
-  id: string;
-  canal: CanalPublic;
-  statut: StatutCommandePublique;
-  montant: number;
-  modePaiement: ModePaiement | null;
-  nom: string | null;
-  telephone: string | null;
-  adresse: string | null;
-  zone: string | null;
-  heureSouhaitee: string; // ISO 8601
-  lignes: LigneCommandeAdmin[];
-  creeLe: string; // ISO 8601
-}
