@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -43,7 +44,10 @@ export default async function CaissePage() {
         <LogoutButton />
       </div>
       <p className="mt-1 mb-6 text-sm text-gray-600">
-        Prise de commande. Le stock/approvisionnement arrive avec le Module 3.
+        Prise de commande. Le stock/approvisionnement arrive avec le Module 3.{" "}
+        <Link href="/caisse/encaissements" className="underline">
+          Encaissements livraison →
+        </Link>
       </p>
       <CaisseApp
         produits={produits}

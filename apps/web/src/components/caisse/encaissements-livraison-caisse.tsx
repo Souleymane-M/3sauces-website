@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { LivraisonAEncaisser } from "@/lib/encaissements-livraison-types";
 
-interface EncaissementsLivraisonAppProps {
+interface EncaissementsLivraisonCaisseProps {
   livraisonsInitiales: LivraisonAEncaisser[];
 }
 
@@ -18,12 +18,11 @@ function formaterDateHeure(iso: string): string {
 }
 
 /**
- * Une livraison prise au téléphone par la caisse est enregistrée
- * "non_paye" (le client paie le livreur à la remise, pas la caisse à la
- * prise de commande) — cette liste régularise ça au retour du livreur,
- * commande par commande.
+ * Même donnée et même API que components/patron/encaissements-livraison-app.tsx
+ * (contrôle à distance) — ici en thème clair pour le responsable de caisse
+ * qui valide sur place, après contrôle, au retour du livreur.
  */
-export function EncaissementsLivraisonApp({ livraisonsInitiales }: EncaissementsLivraisonAppProps) {
+export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: EncaissementsLivraisonCaisseProps) {
   const [livraisons, setLivraisons] = useState<LivraisonAEncaisser[]>(livraisonsInitiales);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -51,33 +50,34 @@ export function EncaissementsLivraisonApp({ livraisonsInitiales }: Encaissements
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4">
-      <h2 className="text-lg font-bold">Encaissements livraison</h2>
-      <p className="text-xs text-gray-500">
-        Une livraison prise par téléphone n&apos;est payée qu&apos;à la remise, pas à la prise de commande. Coche
-        chaque livraison une fois l&apos;argent récupéré au retour du livreur.
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Coche chaque livraison une fois l&apos;argent récupéré et vérifié au retour du livreur.
       </p>
-      {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
+      {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
-      {livraisons.length === 0 && <p className="text-sm text-gray-500">Aucune livraison en attente d&apos;encaissement.</p>}
+      {livraisons.length === 0 && <p className="text-lg text-gray-400">Aucune livraison en attente d&apos;encaissement.</p>}
 
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {livraisons.map((l) => (
-          <li key={l.id} className="flex items-center justify-between gap-3 rounded border border-gray-700 p-3">
+          <li
+            key={l.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
             <div>
-              <p className="text-sm font-semibold">
+              <p className="font-semibold text-gray-900">
                 Commande #{l.numero} — {l.nom || "?"}
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-sm text-gray-500">
                 {l.adresse} — {formaterDateHeure(l.creeLe)} — {l.modePaiement === "cb" ? "Carte" : "Espèces"} prévu(e)
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold">{l.montant.toFixed(2)} €</span>
+              <span className="text-lg font-bold text-gray-900">{l.montant.toFixed(2)} €</span>
               <button
                 onClick={() => marquerEncaissee(l)}
                 disabled={enCours === l.id}
-                className="rounded bg-white px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"
+                className="rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >
                 Encaissée
               </button>

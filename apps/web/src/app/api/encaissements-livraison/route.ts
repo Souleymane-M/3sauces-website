@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { listerLivraisonsAEncaisser, marquerLivraisonEncaissee } from "@/lib/patron/encaissements-livraison";
+import { listerLivraisonsAEncaisser, marquerLivraisonEncaissee } from "@/lib/encaissements-livraison";
+
+// Accessible au patron (contrôle à distance, /patron) ET au responsable de
+// caisse (contrôle sur place au retour du livreur, /caisse/encaissements) —
+// le patron n'a pas vocation à être présent en permanence pour valider ça.
 
 export async function GET() {
-  const session = await requireRole(["patron"]);
+  const session = await requireRole(["patron", "employe"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
@@ -18,7 +22,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const session = await requireRole(["patron"]);
+  const session = await requireRole(["patron", "employe"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }

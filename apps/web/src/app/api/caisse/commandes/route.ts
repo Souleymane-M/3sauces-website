@@ -39,8 +39,8 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  * = 'paye' et paiement enregistré tout de suite. Livraison : le client
  * paie le livreur à la remise, pas la caisse à la prise de commande —
  * `paiement_statut` reste 'non_paye' (comme une livraison passée sur le
- * site public) jusqu'à être régularisée depuis /patron
- * ("Encaissements livraison", cf. lib/patron/encaissements-livraison.ts)
+ * site public) jusqu'à être régularisée depuis /caisse/encaissements ou
+ * /patron ("Encaissements livraison", cf. lib/encaissements-livraison.ts)
  * au retour du livreur. Dans les deux cas, c'est le trigger DB
  * `commandes_appliquer_fidelite` (déclenché sur INSERT ou sur passage de
  * `paiement_statut` à 'paye') qui gère l'accumulation/récompense fidélité
@@ -367,7 +367,7 @@ export async function POST(request: Request) {
   // commande (contrairement à sur place/à emporter, payés immédiatement au
   // comptoir). `paiement_statut` reste donc "non_paye" ici, exactement
   // comme une livraison passée sur le site public — elle est régularisée
-  // plus tard depuis /patron ("Encaissements livraison") au retour du
+  // plus tard depuis /caisse/encaissements ou /patron au retour du
   // livreur, ce qui déclenche alors le trigger de fidélité au bon moment.
   const paiementStatut = body.canal === "livraison" ? "non_paye" : "paye";
 

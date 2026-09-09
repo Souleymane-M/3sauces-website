@@ -5,10 +5,15 @@ import type { LivraisonAEncaisser } from "./encaissements-livraison-types";
 /**
  * Une livraison prise au téléphone par la caisse est enregistrée
  * "non_paye" (cf. /api/caisse/commandes) : le client paie le livreur à la
- * remise, pas la caisse à la prise de commande. Cet écran régularise ça au
- * retour du livreur — une fois "Encaissée", le trigger DB
- * `commandes_appliquer_fidelite` (déclenché sur passage à 'paye')
- * accumule/consomme la fidélité au bon moment.
+ * remise, pas la caisse à la prise de commande. Cette régularisation au
+ * retour du livreur est accessible à la fois côté caisse
+ * (components/caisse/encaissements-livraison-caisse.tsx, contrôle sur
+ * place par le responsable de caisse) et côté patron
+ * (components/patron/encaissements-livraison-app.tsx, contrôle à
+ * distance) — le patron n'a pas vocation à être présent en permanence.
+ * Une fois "Encaissée", le trigger DB `commandes_appliquer_fidelite`
+ * (déclenché sur passage à 'paye') accumule/consomme la fidélité au bon
+ * moment.
  */
 export async function listerLivraisonsAEncaisser(): Promise<LivraisonAEncaisser[]> {
   const supabase = createServiceSupabaseClient();

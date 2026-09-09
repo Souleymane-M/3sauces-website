@@ -11,7 +11,7 @@ import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
-import { listerLivraisonsAEncaisser } from "@/lib/patron/encaissements-livraison";
+import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
 
 export const dynamic = "force-dynamic";
 
