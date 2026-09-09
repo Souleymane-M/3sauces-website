@@ -33,18 +33,25 @@ export interface LivreurActif {
 }
 
 /**
- * Statut suivant valide selon le canal, à partir du statut actuel — jamais
- * "livre" ici : le flash QR du livreur (Module 2) n'est pas encore
- * construit, "pris_par_livreur" reste donc terminal pour cette itération.
+ * Statut suivant valide selon le canal, à partir du statut actuel.
+ * "pris_par_livreur" -> "livre" est déclenché depuis /livreur (déclaration
+ * de paiement à la livraison), pas depuis /commandes — même fonction
+ * `changerStatutCommande` réutilisée dans les deux cas, cf.
+ * lib/livreur/commandes.ts.
  */
 export const TRANSITIONS_PAR_CANAL: Record<Canal, Partial<Record<StatutCommande, StatutCommande>>> = {
   sur_place: { en_attente: "en_preparation", en_preparation: "pret", pret: "remis_au_client" },
   emporter: { en_attente: "en_preparation", en_preparation: "pret", pret: "remis_au_client" },
-  livraison: { en_attente: "en_preparation", en_preparation: "pret", pret: "pris_par_livreur" },
+  livraison: { en_attente: "en_preparation", en_preparation: "pret", pret: "pris_par_livreur", pris_par_livreur: "livre" },
   en_ligne: {},
 };
 
-/** Statuts au-delà desquels une commande n'apparaît plus sur /commandes. */
+/**
+ * Statuts au-delà desquels une commande n'apparaît plus sur /commandes
+ * (écran cuisine) — "pris_par_livreur" y reste terminal : une fois remise
+ * au livreur, la cuisine n'a plus rien à faire dessus, même si elle n'est
+ * pas encore réellement livrée (ça, c'est le rôle de /livreur).
+ */
 export const STATUTS_TERMINAUX: StatutCommande[] = ["remis_au_client", "pris_par_livreur", "livre"];
 
 export const LIBELLES_STATUT: Record<StatutCommande, string> = {
