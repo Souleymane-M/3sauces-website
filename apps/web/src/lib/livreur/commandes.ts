@@ -111,12 +111,17 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     throw new Error(`Impossible d'enregistrer les paiements : ${erreurPaiements.message}`);
   }
 
+  // Contrairement aux effets de bord "best effort" du reste du code (QR,
+  // impression...), un échec ici est critique : la commande resterait
+  // indéfiniment invisible pour la validation caisse/patron alors que
+  // l'argent a déjà été récupéré. On fait donc échouer toute la
+  // déclaration plutôt que de continuer silencieusement.
   const { error: erreurStatutPaiement } = await supabase
     .from("commandes")
     .update({ paiement_statut: "declare" })
     .eq("id", commandeId);
   if (erreurStatutPaiement) {
-    console.error("[livreur/commandes] échec passage à 'declare' :", erreurStatutPaiement.message);
+    throw new Error(`Impossible d'enregistrer la déclaration : ${erreurStatutPaiement.message}`);
   }
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
