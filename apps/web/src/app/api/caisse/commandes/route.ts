@@ -35,9 +35,16 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  * Nom et téléphone sont obligatoires pour tous les canaux (même règle que
  * /api/commande) : jamais de vente anonyme, y compris au comptoir.
  *
- * Enregistre le paiement, et laisse le trigger DB
- * `commandes_appliquer_fidelite` gérer l'accumulation/récompense fidélité
- * (déclenché automatiquement à l'insertion si paiement_statut = 'paye').
+ * Sur place/à emporter : payé immédiatement au comptoir, `paiement_statut`
+ * = 'paye' et paiement enregistré tout de suite. Livraison : le client
+ * paie le livreur à la remise, pas la caisse à la prise de commande —
+ * `paiement_statut` reste 'non_paye' (comme une livraison passée sur le
+ * site public) jusqu'à être régularisée depuis /patron
+ * ("Encaissements livraison", cf. lib/patron/encaissements-livraison.ts)
+ * au retour du livreur. Dans les deux cas, c'est le trigger DB
+ * `commandes_appliquer_fidelite` (déclenché sur INSERT ou sur passage de
+ * `paiement_statut` à 'paye') qui gère l'accumulation/récompense fidélité
+ * au bon moment.
  *
  * Hors scope volontaire de cette itération : déduction du stock (lots /
  * lot_mouvements) — la carte n'a pas encore de table de "recette" reliant un
@@ -354,13 +361,23 @@ export async function POST(request: Request) {
   // `nom_livraison` sert désormais de nom client pour tous les canaux (nom
   // et téléphone sont obligatoires partout) et pas seulement pour la
   // livraison — même convention que /api/commande.
+  //
+  // Une livraison prise par téléphone n'est PAS payée à cet instant : le
+  // client paie le livreur à la remise, pas la caisse à la prise de
+  // commande (contrairement à sur place/à emporter, payés immédiatement au
+  // comptoir). `paiement_statut` reste donc "non_paye" ici, exactement
+  // comme une livraison passée sur le site public — elle est régularisée
+  // plus tard depuis /patron ("Encaissements livraison") au retour du
+  // livreur, ce qui déclenche alors le trigger de fidélité au bon moment.
+  const paiementStatut = body.canal === "livraison" ? "non_paye" : "paye";
+
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
       canal: body.canal,
       contenu: lignes,
       montant,
-      paiement_statut: "paye",
+      paiement_statut: paiementStatut,
       mode_paiement: body.modePaiement,
       client_telephone: clientTelephone,
       commande_par: session.profilId,
@@ -398,21 +415,26 @@ export async function POST(request: Request) {
     }
   }
 
-  const { error: erreurPaiement } = await supabase.from("paiements").insert({
-    commande_id: commande.id,
-    montant,
-    mode: body.modePaiement,
-  });
+  // Pas d'enregistrement de paiement ici pour une livraison : elle n'est pas
+  // encore payée (cf. plus haut) — le paiement sera inséré au moment de
+  // l'encaissement réel, depuis /patron.
+  if (paiementStatut === "paye") {
+    const { error: erreurPaiement } = await supabase.from("paiements").insert({
+      commande_id: commande.id,
+      montant,
+      mode: body.modePaiement,
+    });
 
-  if (erreurPaiement) {
-    console.error("[/api/caisse/commandes] échec insertion paiement :", erreurPaiement.message);
-    return NextResponse.json(
-      {
-        error: "Commande enregistrée mais échec de l'enregistrement du paiement. Préviens le patron.",
-        commandeId: commande.id,
-      },
-      { status: 500 }
-    );
+    if (erreurPaiement) {
+      console.error("[/api/caisse/commandes] échec insertion paiement :", erreurPaiement.message);
+      return NextResponse.json(
+        {
+          error: "Commande enregistrée mais échec de l'enregistrement du paiement. Préviens le patron.",
+          commandeId: commande.id,
+        },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({

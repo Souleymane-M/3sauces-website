@@ -110,7 +110,9 @@ export function CaisseApp({
   const [appliquerRecompense, setAppliquerRecompense] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal } | null>(
+    null
+  );
 
   // Créneau souhaité pour tous les canaux (comme le site public : "Heure de
   // passage souhaitée" pour sur place/à emporter, "Créneau de livraison
@@ -395,7 +397,7 @@ export function CaisseApp({
         setErreur(data.error ?? "Échec de l'encaissement.");
         return;
       }
-      setConfirmation({ commandeId: data.commandeId, montant: data.montant });
+      setConfirmation({ commandeId: data.commandeId, montant: data.montant, canal });
 
       // Impression immédiate, sans bloquer l'écran de confirmation : une
       // imprimante non configurée ou hors ligne n'empêche jamais
@@ -444,8 +446,14 @@ export function CaisseApp({
   if (confirmation) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <p className="text-2xl font-bold text-gray-900">Commande encaissée ✅</p>
-        <p className="text-gray-600">Montant : {confirmation.montant.toFixed(2)} €</p>
+        <p className="text-2xl font-bold text-gray-900">
+          {confirmation.canal === "livraison" ? "Commande enregistrée ✅" : "Commande encaissée ✅"}
+        </p>
+        <p className="text-gray-600">
+          {confirmation.canal === "livraison"
+            ? `À encaisser au retour du livreur : ${confirmation.montant.toFixed(2)} €`
+            : `Montant : ${confirmation.montant.toFixed(2)} €`}
+        </p>
         <button
           onClick={() => setConfirmation(null)}
           className="rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white"
@@ -701,7 +709,11 @@ export function CaisseApp({
           disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque || infosClientIncompletes}
           className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
         >
-          {envoiEnCours ? "Encaissement…" : "Encaisser"}
+          {envoiEnCours
+            ? "Envoi…"
+            : canal === "livraison"
+              ? "Valider la commande"
+              : "Encaisser"}
         </button>
       </div>
 
