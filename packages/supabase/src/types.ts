@@ -240,7 +240,7 @@ export interface Database {
           contenu: unknown;
           montant: number;
           statut: StatutCommande;
-          paiement_statut: "non_paye" | "paye" | "remboursee" | string;
+          paiement_statut: "non_paye" | "declare" | "paye" | "remboursee" | string;
           mode_paiement: ModePaiement | null;
           zone_livraison: string | null;
           created_at: string;
@@ -252,6 +252,10 @@ export interface Database {
           adresse_livraison: string | null;
           heure_souhaitee: string | null;
           numero: number;
+          alerte_signalee: boolean;
+          alerte_note: string | null;
+          alerte_signalee_par: string | null;
+          alerte_signalee_le: string | null;
         };
         Insert: {
           id?: string;
@@ -260,7 +264,7 @@ export interface Database {
           contenu: unknown;
           montant: number;
           statut?: StatutCommande;
-          paiement_statut?: "non_paye" | "paye" | "remboursee" | string;
+          paiement_statut?: "non_paye" | "declare" | "paye" | "remboursee" | string;
           mode_paiement?: ModePaiement | null;
           zone_livraison?: string | null;
           client_telephone?: string | null;
@@ -271,6 +275,10 @@ export interface Database {
           adresse_livraison?: string | null;
           heure_souhaitee?: string | null;
           numero?: number;
+          alerte_signalee?: boolean;
+          alerte_note?: string | null;
+          alerte_signalee_par?: string | null;
+          alerte_signalee_le?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];
@@ -285,6 +293,8 @@ export interface Database {
           mode: ModePaiement;
           stripe_payment_id: string | null;
           sumup_transaction_id: string | null;
+          declare_par_livreur_id: string | null;
+          payeur: string | null;
           created_at: string;
         };
         Insert: {
@@ -295,6 +305,8 @@ export interface Database {
           mode: ModePaiement;
           stripe_payment_id?: string | null;
           sumup_transaction_id?: string | null;
+          declare_par_livreur_id?: string | null;
+          payeur?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["paiements"]["Insert"]>;
         Relationships: [];
@@ -393,12 +405,23 @@ export interface Database {
           livreur_id?: string | null;
           qr_code?: string;
           heure_souhaitee?: string | null;
+          heure_depart_cuisine?: string | null;
+          heure_livraison_effective?: string | null;
+          statut?: "en_attente" | "en_livraison" | "livre";
         };
         Update: Partial<Database["public"]["Tables"]["livraisons"]["Insert"]>;
         Relationships: [];
       };
     };
-    Views: {};
+    Views: {
+      v_encaissements_jour: {
+        Row: {
+          mode: ModePaiement;
+          total: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {};
     Enums: {};
     CompositeTypes: {};

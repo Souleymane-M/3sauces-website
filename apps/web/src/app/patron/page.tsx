@@ -7,11 +7,16 @@ import { OptionsApp } from "@/components/patron/options-app";
 import { ImprimantesApp } from "@/components/patron/imprimantes-app";
 import { CommandesHistoriqueApp } from "@/components/patron/commandes-historique-app";
 import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-livraison-app";
+import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
-import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
+import {
+  listerLivraisonsAEncaisser,
+  calculerEncaissementsJour,
+  listerAlertesEncaissement,
+} from "@/lib/encaissements-livraison";
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +35,29 @@ export default async function PatronPage() {
     );
   }
 
-  const [produits, viandes, sauces, saveurs, imprimantes, historique, tempsMoyenParEmploye, livraisonsAEncaisser] =
-    await Promise.all([
-      listerProduitsAdmin(),
-      listerOptionsAdmin("viandes"),
-      listerOptionsAdmin("sauces"),
-      listerOptionsAdmin("saveurs"),
-      listerImprimantesAdmin(),
-      listerHistoriqueCommandes(),
-      calculerTempsPreparationMoyenParEmploye(),
-      listerLivraisonsAEncaisser(),
-    ]);
+  const [
+    produits,
+    viandes,
+    sauces,
+    saveurs,
+    imprimantes,
+    historique,
+    tempsMoyenParEmploye,
+    livraisonsAEncaisser,
+    encaissementsJour,
+    alertesEncaissement,
+  ] = await Promise.all([
+    listerProduitsAdmin(),
+    listerOptionsAdmin("viandes"),
+    listerOptionsAdmin("sauces"),
+    listerOptionsAdmin("saveurs"),
+    listerImprimantesAdmin(),
+    listerHistoriqueCommandes(),
+    calculerTempsPreparationMoyenParEmploye(),
+    listerLivraisonsAEncaisser(),
+    calculerEncaissementsJour(),
+    listerAlertesEncaissement(),
+  ]);
 
   return (
     <main className="min-h-screen p-8">
@@ -52,6 +69,7 @@ export default async function PatronPage() {
         Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
         gestion complète de la carte et des options ci-dessous.
       </p>
+      <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
       <CommandesHistoriqueApp historiqueInitial={historique} tempsMoyenParEmploye={tempsMoyenParEmploye} />
       <ProduitsApp produitsInitiaux={produits} />

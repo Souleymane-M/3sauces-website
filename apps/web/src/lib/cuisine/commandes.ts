@@ -67,10 +67,19 @@ interface ChangementStatut {
 
 /**
  * Valide la transition (contre le statut actuel et le canal de la
- * commande), met à jour `commandes.statut` (+ `livraisons.livreur_id` si
- * fourni), puis journalise l'évènement. L'échec de la journalisation
- * n'annule jamais le changement de statut déjà appliqué — même logique
- * "jamais de blocage" que le reste du code (impression, etc.).
+ * commande), met à jour `commandes.statut` (+ `livraisons.livreur_id`/
+ * `statut`/horodatages si pertinent), puis journalise l'évènement.
+ * L'échec de la journalisation n'annule jamais le changement de statut
+ * déjà appliqué — même logique "jamais de blocage" que le reste du code
+ * (impression, etc.).
+ *
+ * Réutilisée à la fois depuis /api/cuisine/commandes (un employé fait
+ * progresser une commande jusqu'à "pris_par_livreur") et depuis
+ * /api/livreur/declarer (le livreur déclare "livre" au moment de sa
+ * déclaration de paiement) — la garde de rôle correcte est déjà faite au
+ * niveau de chaque route (`requireRole(["employe"])` vs
+ * `requireRole(["livreur"])`), donc ici on vérifie juste que le profil
+ * existe et est actif, sans imposer un rôle unique.
  */
 export async function changerStatutCommande({
   commandeId,
@@ -84,11 +93,11 @@ export async function changerStatutCommande({
     .from("profils")
     .select("id")
     .eq("id", profilId)
-    .eq("role", "employe")
+    .in("role", ["employe", "livreur"])
     .eq("actif", true)
     .maybeSingle();
   if (erreurProfil || !profil) {
-    throw new Error("Identité employé invalide.");
+    throw new Error("Identité invalide.");
   }
 
   const { data: commande, error: erreurCommande } = await supabase
@@ -113,13 +122,25 @@ export async function changerStatutCommande({
     throw new Error(`Impossible de mettre à jour le statut : ${erreurMaj.message}`);
   }
 
+  // Effets de bord sur `livraisons` : alimentent les vues déjà présentes en
+  // base depuis la conception d'origine (v_recap_livreur_jour) qui
+  // attendaient déjà `statut`/`heure_depart_cuisine`/`heure_livraison_effective`,
+  // jamais renseignés jusqu'ici.
   if (statut === "pris_par_livreur" && livreurId) {
     const { error: erreurLivreur } = await supabase
       .from("livraisons")
-      .update({ livreur_id: livreurId })
+      .update({ livreur_id: livreurId, statut: "en_livraison", heure_depart_cuisine: new Date().toISOString() })
       .eq("commande_id", commandeId);
     if (erreurLivreur) {
       console.error("[cuisine/commandes] échec attribution livreur :", erreurLivreur.message);
+    }
+  } else if (statut === "livre") {
+    const { error: erreurLivraison } = await supabase
+      .from("livraisons")
+      .update({ statut: "livre", heure_livraison_effective: new Date().toISOString() })
+      .eq("commande_id", commandeId);
+    if (erreurLivraison) {
+      console.error("[cuisine/commandes] échec cloture livraison :", erreurLivraison.message);
     }
   }
 
