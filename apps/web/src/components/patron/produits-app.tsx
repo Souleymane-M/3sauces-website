@@ -36,32 +36,33 @@ function versBrouillon(p: ProduitAdmin): Brouillon {
   };
 }
 
-function estModifie(brouillon: Brouillon, p: ProduitAdmin): boolean {
-  const reference = versBrouillon(p);
-  return (Object.keys(brouillon) as (keyof Brouillon)[]).some((cle) => brouillon[cle] !== reference[cle]);
+function libelleDe(categorie: Categorie): string {
+  return CATEGORIES.find((c) => c.valeur === categorie)?.libelle ?? categorie;
 }
 
+const inputClasse = "w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white";
+
 /**
- * Gestion complète de la carte (Page 3 / Module 6) : remplace l'écran
- * "Plats du jour" (categorie unique) par un écran couvrant tous les
- * produits/catégories — cf. lib/patron/produits.ts.
+ * Gestion complète de la carte (Page 3 / Module 6), refonte du
+ * 2026-09-13 : la vue par défaut est sobre (nom/prix/interrupteur), un seul
+ * produit modifiable à la fois via "Modifier", et un changement de
+ * catégorie passe obligatoirement par une confirmation explicite — plus de
+ * menu déroulant catégorie librement modifiable à la volée.
  */
 export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   const [produits, setProduits] = useState<ProduitAdmin[]>(produitsInitiaux);
-  const [brouillons, setBrouillons] = useState<Record<string, Brouillon>>(() =>
-    Object.fromEntries(produitsInitiaux.map((p) => [p.id, versBrouillon(p)]))
-  );
   const [erreur, setErreur] = useState<string | null>(null);
-  const [enregistrementEnCours, setEnregistrementEnCours] = useState<string | null>(null);
 
-  const [nouveau, setNouveau] = useState({
-    nom: "",
-    categorie: "plat_du_jour" as Categorie,
-    description: "",
-    prix: "",
-  });
+  const [produitEnEdition, setProduitEnEdition] = useState<string | null>(null);
+  const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
+  const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
+
+  const [sectionAjout, setSectionAjout] = useState<Categorie | null>(null);
+  const [nouveau, setNouveau] = useState({ nom: "", description: "", prix: "" });
   const [ajoutEnCours, setAjoutEnCours] = useState(false);
 
+  // Les 8 sections s'affichent toujours, même vides — structure stable,
+  // jamais une catégorie qui "disparaît" parce qu'elle n'a plus de produit.
   const parCategorie = useMemo(() => {
     const groupes = new Map<Categorie, ProduitAdmin[]>();
     for (const p of produits) {
@@ -69,13 +70,25 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
       liste.push(p);
       groupes.set(p.categorie, liste);
     }
-    return CATEGORIES.map((c) => ({ ...c, produits: groupes.get(c.valeur) ?? [] })).filter(
-      (c) => c.produits.length > 0
-    );
+    return CATEGORIES.map((c) => ({
+      ...c,
+      produits: (groupes.get(c.valeur) ?? []).sort((a, b) => a.nom.localeCompare(b.nom)),
+    }));
   }, [produits]);
 
-  function modifierBrouillon<K extends keyof Brouillon>(id: string, champ: K, valeur: Brouillon[K]) {
-    setBrouillons((precedent) => ({ ...precedent, [id]: { ...precedent[id], [champ]: valeur } }));
+  function ouvrirEdition(produit: ProduitAdmin) {
+    setErreur(null);
+    setProduitEnEdition(produit.id);
+    setBrouillon(versBrouillon(produit));
+  }
+
+  function fermerEdition() {
+    setProduitEnEdition(null);
+    setBrouillon(null);
+  }
+
+  function modifierBrouillon<K extends keyof Brouillon>(champ: K, valeur: Brouillon[K]) {
+    setBrouillon((precedent) => (precedent ? { ...precedent, [champ]: valeur } : precedent));
   }
 
   async function basculerActif(produit: ProduitAdmin) {
@@ -95,9 +108,9 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
   }
 
-  async function enregistrer(produit: ProduitAdmin) {
-    const brouillon = brouillons[produit.id];
-    if (!brouillon) return;
+  async function enregistrer() {
+    const produit = produits.find((p) => p.id === produitEnEdition);
+    if (!produit || !brouillon) return;
 
     const nom = brouillon.nom.trim();
     if (!nom) {
@@ -121,7 +134,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
 
     setErreur(null);
-    setEnregistrementEnCours(produit.id);
+    setEnregistrementEnCours(true);
     try {
       const payload = {
         id: produit.id,
@@ -160,9 +173,9 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         canetteIncluse: brouillon.canetteIncluse,
       };
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? produitMisAJour : p)));
-      setBrouillons((precedent) => ({ ...precedent, [produit.id]: versBrouillon(produitMisAJour) }));
+      fermerEdition();
     } finally {
-      setEnregistrementEnCours(null);
+      setEnregistrementEnCours(false);
     }
   }
 
@@ -171,6 +184,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     setErreur(null);
     const precedents = produits;
     setProduits((precedent) => precedent.filter((p) => p.id !== produit.id));
+    if (produitEnEdition === produit.id) fermerEdition();
 
     const reponse = await fetch("/api/patron/produits", {
       method: "DELETE",
@@ -184,7 +198,14 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
   }
 
+  function ouvrirAjout(categorie: Categorie) {
+    setErreur(null);
+    setSectionAjout(categorie);
+    setNouveau({ nom: "", description: "", prix: "" });
+  }
+
   async function ajouter() {
+    if (!sectionAjout) return;
     const nom = nouveau.nom.trim();
     if (!nom) {
       setErreur("Indique un nom pour le nouveau produit.");
@@ -204,7 +225,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nom,
-          categorie: nouveau.categorie,
+          categorie: sectionAjout,
           description: nouveau.description.trim() || null,
           prix,
         }),
@@ -216,73 +237,56 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
       }
       const relecture = await fetch("/api/patron/produits", { cache: "no-store" });
       const relectureData = await relecture.json().catch(() => ({ produits: [] }));
-      const nouveauxProduits: ProduitAdmin[] = relectureData.produits ?? [];
-      setProduits(nouveauxProduits);
-      setBrouillons(Object.fromEntries(nouveauxProduits.map((p) => [p.id, versBrouillon(p)])));
-      setNouveau({ nom: "", categorie: nouveau.categorie, description: "", prix: "" });
+      setProduits(relectureData.produits ?? []);
+      setSectionAjout(null);
     } finally {
       setAjoutEnCours(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4">
+    <div className="mx-auto max-w-lg space-y-6 p-4">
       <h2 className="text-lg font-bold">Produits</h2>
       <p className="text-xs text-gray-500">
-        Tous les produits du site, groupés par catégorie. Coche/décoche pour activer ou désactiver, modifie les
-        champs puis clique &laquo; Enregistrer &raquo;. Un prix laissé vide = prix libre (saisi en caisse).
+        Les produits du site, groupés par catégorie. L&apos;interrupteur active/désactive immédiatement ; « Modifier
+        » ouvre la fiche complète d&apos;un produit.
       </p>
       {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
 
       {parCategorie.map((groupe) => (
         <div key={groupe.valeur} className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-400">{groupe.libelle}</h3>
+
+          {groupe.produits.length === 0 && <p className="text-xs text-gray-600">Aucun produit.</p>}
+
           <ul className="space-y-3">
-            {groupe.produits.map((produit) => {
-              const brouillon = brouillons[produit.id] ?? versBrouillon(produit);
-              const modifie = estModifie(brouillon, produit);
-
-              return (
-                <li key={produit.id} className="space-y-2 rounded border border-gray-700 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={produit.actif} onChange={() => basculerActif(produit)} />
-                      {produit.actif ? "Actif" : "Inactif"}
-                    </label>
-                    <button onClick={() => supprimer(produit)} className="text-xs text-red-400 hover:text-red-300">
-                      Supprimer
-                    </button>
-                  </div>
-
+            {groupe.produits.map((produit) =>
+              produitEnEdition === produit.id && brouillon ? (
+                <li key={produit.id} className="space-y-2 rounded border border-gray-600 bg-gray-800/50 p-3">
                   <input
                     value={brouillon.nom}
-                    onChange={(e) => modifierBrouillon(produit.id, "nom", e.target.value)}
+                    onChange={(e) => modifierBrouillon("nom", e.target.value)}
                     placeholder="Nom du produit"
-                    className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                    className={inputClasse}
                   />
-                  <select
-                    value={brouillon.categorie}
-                    onChange={(e) => modifierBrouillon(produit.id, "categorie", e.target.value as Categorie)}
-                    className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c.valeur} value={c.valeur}>
-                        {c.libelle}
-                      </option>
-                    ))}
-                  </select>
+
+                  <CategorieChamp
+                    categorieActuelle={brouillon.categorie}
+                    onConfirmer={(c) => modifierBrouillon("categorie", c)}
+                  />
+
                   <input
                     value={brouillon.description}
-                    onChange={(e) => modifierBrouillon(produit.id, "description", e.target.value)}
+                    onChange={(e) => modifierBrouillon("description", e.target.value)}
                     placeholder="Description courte (optionnel)"
-                    className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                    className={inputClasse}
                   />
                   <input
                     value={brouillon.prix}
-                    onChange={(e) => modifierBrouillon(produit.id, "prix", e.target.value)}
+                    onChange={(e) => modifierBrouillon("prix", e.target.value)}
                     placeholder="Prix en € (vide = prix libre)"
                     inputMode="decimal"
-                    className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                    className={inputClasse}
                   />
 
                   <details className="rounded border border-gray-700 p-2">
@@ -292,33 +296,33 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                         Viande imposée (ex: Poulet — laisser vide sinon)
                         <input
                           value={brouillon.viandeImposee}
-                          onChange={(e) => modifierBrouillon(produit.id, "viandeImposee", e.target.value)}
-                          className="mt-1 w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                          onChange={(e) => modifierBrouillon("viandeImposee", e.target.value)}
+                          className={`mt-1 ${inputClasse}`}
                         />
                       </label>
                       <label className="block text-xs text-gray-500">
                         Nombre de viandes à choisir (0 à 4)
                         <input
                           value={brouillon.nbViandesMax}
-                          onChange={(e) => modifierBrouillon(produit.id, "nbViandesMax", e.target.value)}
+                          onChange={(e) => modifierBrouillon("nbViandesMax", e.target.value)}
                           inputMode="numeric"
-                          className="mt-1 w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                          className={`mt-1 ${inputClasse}`}
                         />
                       </label>
                       <label className="block text-xs text-gray-500">
                         Nombre de sauces incluses
                         <input
                           value={brouillon.nbSaucesIncluses}
-                          onChange={(e) => modifierBrouillon(produit.id, "nbSaucesIncluses", e.target.value)}
+                          onChange={(e) => modifierBrouillon("nbSaucesIncluses", e.target.value)}
                           inputMode="numeric"
-                          className="mt-1 w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                          className={`mt-1 ${inputClasse}`}
                         />
                       </label>
                       <label className="flex items-center gap-2 text-xs text-gray-500">
                         <input
                           type="checkbox"
                           checked={brouillon.autoriseExtras}
-                          onChange={(e) => modifierBrouillon(produit.id, "autoriseExtras", e.target.checked)}
+                          onChange={(e) => modifierBrouillon("autoriseExtras", e.target.checked)}
                         />
                         Autorise les extras (viande/sauce supplémentaire)
                       </label>
@@ -326,7 +330,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                         <input
                           type="checkbox"
                           checked={brouillon.nbSaveursMax}
-                          onChange={(e) => modifierBrouillon(produit.id, "nbSaveursMax", e.target.checked)}
+                          onChange={(e) => modifierBrouillon("nbSaveursMax", e.target.checked)}
                         />
                         Propose un choix de saveur (boisson)
                       </label>
@@ -334,71 +338,197 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                         <input
                           type="checkbox"
                           checked={brouillon.canetteIncluse}
-                          onChange={(e) => modifierBrouillon(produit.id, "canetteIncluse", e.target.checked)}
+                          onChange={(e) => modifierBrouillon("canetteIncluse", e.target.checked)}
                         />
                         Canette incluse dans le prix
                       </label>
                     </div>
                   </details>
 
-                  {modifie && (
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => enregistrer(produit)}
-                      disabled={enregistrementEnCours === produit.id}
-                      className="w-full rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
+                      onClick={enregistrer}
+                      disabled={enregistrementEnCours}
+                      className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
                     >
-                      {enregistrementEnCours === produit.id ? "Enregistrement…" : "Enregistrer"}
+                      {enregistrementEnCours ? "Enregistrement…" : "Enregistrer"}
                     </button>
-                  )}
+                    <button
+                      onClick={fermerEdition}
+                      disabled={enregistrementEnCours}
+                      className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+                    >
+                      Annuler
+                    </button>
+                  </div>
                 </li>
-              );
-            })}
+              ) : (
+                <li key={produit.id} className="rounded border border-gray-700 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-white">{produit.nom}</div>
+                      {produit.description && <div className="text-xs text-gray-400">{produit.description}</div>}
+                      <div className="mt-0.5 text-sm text-gray-300">
+                        {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}
+                      </div>
+                    </div>
+                    <InterrupteurActif actif={produit.actif} onBasculer={() => basculerActif(produit)} />
+                  </div>
+                  <div className="mt-2 flex gap-3 text-xs">
+                    <button onClick={() => ouvrirEdition(produit)} className="text-blue-400 hover:text-blue-300">
+                      Modifier
+                    </button>
+                    <button onClick={() => supprimer(produit)} className="text-red-400 hover:text-red-300">
+                      Supprimer
+                    </button>
+                  </div>
+                </li>
+              )
+            )}
           </ul>
+
+          {sectionAjout === groupe.valeur ? (
+            <div className="space-y-2 rounded border border-dashed border-gray-700 p-3">
+              <input
+                value={nouveau.nom}
+                onChange={(e) => setNouveau((p) => ({ ...p, nom: e.target.value }))}
+                placeholder="Nom du produit"
+                className={inputClasse}
+              />
+              <input
+                value={nouveau.description}
+                onChange={(e) => setNouveau((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Description courte (optionnel)"
+                className={inputClasse}
+              />
+              <input
+                value={nouveau.prix}
+                onChange={(e) => setNouveau((p) => ({ ...p, prix: e.target.value }))}
+                placeholder="Prix en € (vide = prix libre)"
+                inputMode="decimal"
+                className={inputClasse}
+              />
+              <p className="text-xs text-gray-500">
+                Les options avancées (viandes, sauces, saveur, canette) se règlent après création, via « Modifier ».
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={ajouter}
+                  disabled={ajoutEnCours}
+                  className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
+                >
+                  {ajoutEnCours ? "Ajout…" : "Ajouter"}
+                </button>
+                <button
+                  onClick={() => setSectionAjout(null)}
+                  disabled={ajoutEnCours}
+                  className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => ouvrirAjout(groupe.valeur)}
+              className="w-full rounded border border-dashed border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300"
+            >
+              + Ajouter un produit
+            </button>
+          )}
         </div>
       ))}
+    </div>
+  );
+}
 
-      <div className="space-y-2 rounded border border-dashed border-gray-700 p-3">
-        <p className="text-sm font-semibold">Ajouter un nouveau produit</p>
-        <input
-          value={nouveau.nom}
-          onChange={(e) => setNouveau((p) => ({ ...p, nom: e.target.value }))}
-          placeholder="Nom du produit"
-          className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+function InterrupteurActif({ actif, onBasculer }: { actif: boolean; onBasculer: () => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={actif}
+        onClick={onBasculer}
+        className={`relative h-6 w-11 rounded-full transition-colors ${actif ? "bg-green-600" : "bg-gray-600"}`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+            actif ? "translate-x-5" : "translate-x-0"
+          }`}
         />
-        <select
-          value={nouveau.categorie}
-          onChange={(e) => setNouveau((p) => ({ ...p, categorie: e.target.value as Categorie }))}
-          className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.valeur} value={c.valeur}>
-              {c.libelle}
-            </option>
-          ))}
-        </select>
-        <input
-          value={nouveau.description}
-          onChange={(e) => setNouveau((p) => ({ ...p, description: e.target.value }))}
-          placeholder="Description courte (optionnel)"
-          className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-        />
-        <input
-          value={nouveau.prix}
-          onChange={(e) => setNouveau((p) => ({ ...p, prix: e.target.value }))}
-          placeholder="Prix en € (vide = prix libre)"
-          inputMode="decimal"
-          className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-        />
-        <p className="text-xs text-gray-500">
-          Les options avancées (viandes, sauces, saveur, canette) se règlent après création, dans « Options
-          avancées » de la fiche du produit.
-        </p>
+      </button>
+      <span className="text-xs text-gray-400">{actif ? "Actif" : "Inactif"}</span>
+    </div>
+  );
+}
+
+/**
+ * Catégorie affichée en lecture seule par défaut ("Menu spécial") avec un
+ * lien pour la changer — le changement n'est appliqué au brouillon qu'après
+ * confirmation explicite du message "passera de X à Y", jamais via un
+ * simple <select> qu'on peut modifier par inadvertance.
+ */
+function CategorieChamp({
+  categorieActuelle,
+  onConfirmer,
+}: {
+  categorieActuelle: Categorie;
+  onConfirmer: (c: Categorie) => void;
+}) {
+  const [enCours, setEnCours] = useState(false);
+  const [choix, setChoix] = useState<Categorie>(categorieActuelle);
+
+  if (!enCours) {
+    return (
+      <div className="text-xs text-gray-400">
+        Catégorie : <span className="text-white">{libelleDe(categorieActuelle)}</span>{" "}
         <button
-          onClick={ajouter}
-          disabled={ajoutEnCours}
-          className="w-full rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
+          type="button"
+          onClick={() => {
+            setChoix(categorieActuelle);
+            setEnCours(true);
+          }}
+          className="text-blue-400 underline hover:text-blue-300"
         >
-          {ajoutEnCours ? "Ajout…" : "Ajouter"}
+          Changer de catégorie
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded border border-orange-700 bg-orange-950/30 p-2">
+      <select value={choix} onChange={(e) => setChoix(e.target.value as Categorie)} className={inputClasse}>
+        {CATEGORIES.map((c) => (
+          <option key={c.valeur} value={c.valeur}>
+            {c.libelle}
+          </option>
+        ))}
+      </select>
+      {choix !== categorieActuelle && (
+        <p className="text-xs text-orange-300">
+          Ce produit passera de « {libelleDe(categorieActuelle)} » à « {libelleDe(choix)} ».
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            onConfirmer(choix);
+            setEnCours(false);
+          }}
+          disabled={choix === categorieActuelle}
+          className="flex-1 rounded bg-white py-1.5 text-xs font-semibold text-black disabled:opacity-40"
+        >
+          Confirmer
+        </button>
+        <button
+          type="button"
+          onClick={() => setEnCours(false)}
+          className="rounded border border-gray-600 px-3 py-1.5 text-xs text-gray-300"
+        >
+          Annuler
         </button>
       </div>
     </div>
