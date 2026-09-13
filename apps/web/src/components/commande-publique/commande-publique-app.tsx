@@ -54,6 +54,11 @@ const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 const FOND_PAGE = "#F5F0E8";
 
+// Pas de champ d'ordre d'affichage en base : ordre fixé ici par nom, comme
+// pour la distinction Tacos / Barquettes & Bowls plus bas. À ajuster si un
+// 3ᵉ menu spécial apparaît un jour.
+const ORDRE_MENUS_SPECIAUX = ["Menu Étudiant", "Menu Collégien"];
+
 export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parametres }: CommandePubliqueAppProps) {
   const router = useRouter();
 
@@ -90,18 +95,23 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   // que par section elle-même, pour que l'alternance reste correcte même si
   // une section est absente (aucun produit actif dedans, ex: pas de plat en
   // "cuisine_locale" ce jour-là).
+  // Menus spéciaux + Plats du jour : bloc à part, rendu côte à côte juste
+  // avant les autres sections (cf. JSX plus bas) — jamais dans la liste
+  // alternée rouge/vert générique ci-dessous.
+  const menusSpeciaux = useMemo(() => {
+    const menus = produits.filter((p) => p.categorie === "menu_special");
+    return [...menus].sort(
+      (a, b) => ORDRE_MENUS_SPECIAUX.indexOf(a.nom) - ORDRE_MENUS_SPECIAUX.indexOf(b.nom)
+    );
+  }, [produits]);
+  const platsDuJour = useMemo(() => produits.filter((p) => p.categorie === "plat_du_jour"), [produits]);
+
   const sections = useMemo<Section[]>(() => {
     const snacking = produits.filter((p) => p.categorie === "snacking");
     const tacos = snacking.filter((p) => p.nom.includes("Tacos") && !p.nom.includes("Bowl"));
     const barquettesBowls = snacking.filter((p) => p.nom.includes("Barquette") || p.nom.includes("Bowl"));
 
     const liste: Omit<Section, "couleur">[] = [
-      { key: "menus", titre: "Menus spéciaux", produits: produits.filter((p) => p.categorie === "menu_special") },
-      {
-        key: "plat_du_jour",
-        titre: "Plats du jour",
-        produits: produits.filter((p) => p.categorie === "plat_du_jour"),
-      },
       { key: "tacos", titre: "Tacos", produits: tacos },
       { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
@@ -117,10 +127,18 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       },
       { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
     ];
+    // Le bloc Menus/Plats du jour ci-dessus occupe déjà 1 bandeau (Menus
+    // seul) ou 2 (Menus + Plats du jour) — on décale la première couleur
+    // ici pour ne jamais avoir deux bandeaux de la même couleur qui se
+    // suivent visuellement.
+    const decalage = (menusSpeciaux.length > 0 ? 1 : 0) + (platsDuJour.length > 0 ? 1 : 0);
     return liste
       .filter((s) => s.produits.length > 0)
-      .map((s, i) => ({ ...s, couleur: i % 2 === 0 ? "rouge" : "vert" }));
-  }, [produits]);
+      .map((s, i) => ({ ...s, couleur: (i + decalage) % 2 === 0 ? "rouge" : "vert" }));
+  }, [produits, menusSpeciaux, platsDuJour]);
+
+  const couleurMenus = ROUGE;
+  const couleurPlatsDuJour = menusSpeciaux.length > 0 ? VERT : ROUGE;
 
   const produitViandeSupplementaire = useMemo(
     () => produits.find((p) => p.nom === NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE) ?? null,
@@ -293,6 +311,62 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
         <div className="space-y-6">
+          {(menusSpeciaux.length > 0 || platsDuJour.length > 0) && (
+            <div className={menusSpeciaux.length > 0 && platsDuJour.length > 0 ? "grid grid-cols-2 gap-3" : ""}>
+              {menusSpeciaux.length > 0 && (
+                <div>
+                  <div
+                    className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+                    style={{ backgroundColor: couleurMenus }}
+                  >
+                    Menus Spéciaux
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {menusSpeciaux.map((produit) => (
+                      <button
+                        key={produit.id}
+                        onClick={() => surClicProduit(produit)}
+                        className="rounded-lg border border-gray-200 bg-white p-3 text-left text-sm shadow-sm active:bg-gray-50"
+                      >
+                        <div className="font-medium text-gray-900">{produit.nom}</div>
+                        {produit.description && (
+                          <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
+                        )}
+                        <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {platsDuJour.length > 0 && (
+                <div>
+                  <div
+                    className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+                    style={{ backgroundColor: couleurPlatsDuJour }}
+                  >
+                    Plats du jour
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {platsDuJour.map((produit) => (
+                      <button
+                        key={produit.id}
+                        onClick={() => surClicProduit(produit)}
+                        className="rounded-lg border border-gray-200 bg-white p-3 text-left text-sm shadow-sm active:bg-gray-50"
+                      >
+                        <div className="font-medium text-gray-900">{produit.nom}</div>
+                        {produit.description && (
+                          <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
+                        )}
+                        <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {sections.map((section) => (
             <div key={section.key}>
               <div
