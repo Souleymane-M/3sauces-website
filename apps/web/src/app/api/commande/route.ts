@@ -80,6 +80,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
   }
 
+  // RGPD : consentement CGV/politique de confidentialité obligatoire avant
+  // toute commande — jamais de confiance dans le seul état du bouton
+  // désactivé côté client.
+  if (body.consentementCgv !== true) {
+    return NextResponse.json(
+      { error: "Tu dois accepter les CGV et la politique de confidentialité." },
+      { status: 400 }
+    );
+  }
+
   const supabase = createServiceSupabaseClient();
 
   // --- Paramètres de livraison (source de vérité : jamais codés en dur) ---
@@ -354,6 +364,7 @@ export async function POST(request: Request) {
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
+      consentement_cgv_le: new Date().toISOString(),
     })
     .select("id, numero")
     .single();

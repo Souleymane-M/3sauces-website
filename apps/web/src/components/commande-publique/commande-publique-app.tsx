@@ -16,6 +16,7 @@ import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
+import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
 import { QuantiteModalPublique } from "./quantite-modal-publique";
@@ -72,6 +73,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
 
@@ -245,6 +247,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         return;
       }
     }
+    if (!accepteCgv) {
+      setErreur("Tu dois accepter les CGV et la politique de confidentialité.");
+      return;
+    }
 
     setEnvoiEnCours(true);
     try {
@@ -259,6 +265,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           creneauHeure,
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
+          consentementCgv: accepteCgv,
           lignes: panier.map((l) => ({
             produitId: l.produit.id,
             quantite: l.quantite,
@@ -479,16 +486,38 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             </select>
           </div>
 
+          <label className="flex items-start gap-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={accepteCgv}
+              onChange={(e) => setAccepteCgv(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span>
+              J&apos;accepte les{" "}
+              <a href="/cgv" target="_blank" rel="noopener noreferrer" className="underline">
+                CGV
+              </a>{" "}
+              et la{" "}
+              <a href="/confidentialite" target="_blank" rel="noopener noreferrer" className="underline">
+                politique de confidentialité
+              </a>
+              .
+            </span>
+          </label>
+
           {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
           <button
             onClick={commander}
-            disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque}
+            disabled={panier.length === 0 || envoiEnCours || canalLivraisonBloque || !accepteCgv}
             className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
           >
             {envoiEnCours ? "Envoi…" : "Commander"}
           </button>
         </div>
+
+        <FooterLegal />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur">

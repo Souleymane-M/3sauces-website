@@ -93,4 +93,6 @@ export interface CreerCommandePubliquePayload {
   zone?: string;
   // Créneau souhaité (heure de passage ou de livraison), "HH:MM".
   creneauHeure: string;
+  /** Case "J'accepte les CGV et la politique de confidentialité" — obligatoire, revérifié serveur. */
+  consentementCgv: boolean;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FooterLegal } from "@/components/legal/footer-legal";
 
 interface CommandeConfirmeePageProps {
   searchParams: Promise<{ canal?: string; heure?: string }>;
@@ -21,6 +22,7 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
       <Link href="/commander" className="mt-4 rounded bg-white px-4 py-2 text-sm font-semibold text-black">
         Nouvelle commande
       </Link>
+      <FooterLegal />
     </main>
   );
 }
