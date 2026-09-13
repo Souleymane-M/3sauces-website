@@ -320,6 +320,7 @@ export interface Database {
           heure_debut: string; // "HH:MM:SS"
           heure_fin: string;
           minimum_commande: number;
+          site_ouvert: boolean;
           updated_at: string;
         };
         Insert: {
@@ -327,6 +328,7 @@ export interface Database {
           heure_debut?: string;
           heure_fin?: string;
           minimum_commande?: number;
+          site_ouvert?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["parametres_livraison"]["Insert"]>;
         Relationships: [];

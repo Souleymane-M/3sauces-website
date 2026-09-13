@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     await Promise.all([
       supabase
         .from("parametres_livraison")
-        .select("heure_debut, heure_fin, minimum_commande")
+        .select("heure_debut, heure_fin, minimum_commande, site_ouvert")
         .eq("id", true)
         .single(),
       supabase.from("zones_livraison").select("commune").eq("actif", true),
@@ -109,6 +109,13 @@ export async function POST(request: Request) {
   if (erreurZones) {
     return NextResponse.json({ error: "Erreur serveur (zones livraison)." }, { status: 500 });
   }
+
+  // Site en pause : rejet strict serveur, jamais une simple restriction
+  // visuelle côté client.
+  if (!parametres.site_ouvert) {
+    return NextResponse.json({ error: "Le site est actuellement fermé aux commandes." }, { status: 403 });
+  }
+
   const communesActives = new Set((zones ?? []).map((z) => z.commune));
 
   // On applique la même plage horaire d'ouverture (10h30–15h00) aux deux

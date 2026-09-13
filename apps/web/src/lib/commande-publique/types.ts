@@ -68,6 +68,7 @@ export interface ParametresLivraisonPublic {
   heureFin: string;
   minimumCommande: number;
   zonesActives: string[]; // communes autorisées, ex: ["Dembéni"]
+  siteOuvert: boolean;
 }
 
 export interface LigneCommandePubliquePayload {

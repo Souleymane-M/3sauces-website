@@ -12,7 +12,11 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
 
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] =
     await Promise.all([
-      supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande").eq("id", true).single(),
+      supabase
+        .from("parametres_livraison")
+        .select("heure_debut, heure_fin, minimum_commande, site_ouvert")
+        .eq("id", true)
+        .single(),
       supabase.from("zones_livraison").select("commune").eq("actif", true),
     ]);
 
@@ -30,5 +34,6 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
     heureFin: parametres.heure_fin,
     minimumCommande: parametres.minimum_commande,
     zonesActives: (zones ?? []).map((z) => z.commune),
+    siteOuvert: parametres.site_ouvert,
   };
 }

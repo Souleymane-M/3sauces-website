@@ -8,7 +8,9 @@ import { ImprimantesApp } from "@/components/patron/imprimantes-app";
 import { CommandesHistoriqueApp } from "@/components/patron/commandes-historique-app";
 import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-livraison-app";
 import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
+import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
+import { chargerEtatSite } from "@/lib/patron/parametres";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
@@ -46,6 +48,7 @@ export default async function PatronPage() {
     livraisonsAEncaisser,
     encaissementsJour,
     alertesEncaissement,
+    siteOuvert,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -57,6 +60,7 @@ export default async function PatronPage() {
     listerLivraisonsAEncaisser(),
     calculerEncaissementsJour(),
     listerAlertesEncaissement(),
+    chargerEtatSite(),
   ]);
 
   return (
@@ -69,6 +73,9 @@ export default async function PatronPage() {
         Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
         gestion complète de la carte et des options ci-dessous.
       </p>
+      <div className="mb-4">
+        <EtatSiteApp ouvertInitial={siteOuvert} />
+      </div>
       <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
       <CommandesHistoriqueApp historiqueInitial={historique} tempsMoyenParEmploye={tempsMoyenParEmploye} />
