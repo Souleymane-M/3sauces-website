@@ -7,6 +7,7 @@ import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+  NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide, construireHeureSouhaiteeUtc } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
@@ -27,6 +28,7 @@ interface LignePanier {
   saveurs: string[];
   boissonIncluse: string | null;
   prixSaisi?: number;
+  saladeIncluse: boolean | null;
 }
 
 interface CaisseAppProps {
@@ -268,6 +270,10 @@ export function CaisseApp({
     () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
+  const produitSaladeSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
 
   const total = panier.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
@@ -282,7 +288,8 @@ export function CaisseApp({
     saveursChoisies: string[] = [],
     boissonIncluse: string | null = null,
     quantite: number = 1,
-    prixSaisi?: number
+    prixSaisi?: number,
+    saladeIncluse: boolean | null = null
   ) {
     setPanier((precedent) => {
       const cle = (l: LignePanier) =>
@@ -291,7 +298,8 @@ export function CaisseApp({
         JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
         JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
         JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
-        l.boissonIncluse === boissonIncluse;
+        l.boissonIncluse === boissonIncluse &&
+        l.saladeIncluse === saladeIncluse;
 
       const existante = precedent.find(cle);
       if (existante) {
@@ -308,6 +316,7 @@ export function CaisseApp({
           saveurs: saveursChoisies,
           boissonIncluse,
           prixSaisi,
+          saladeIncluse,
         },
       ];
     });
@@ -384,6 +393,7 @@ export function CaisseApp({
             saveurs: l.saveurs,
             boissonIncluse: l.boissonIncluse,
             prixSaisi: l.prixSaisi,
+            saladeIncluse: l.saladeIncluse,
           })),
         }),
       });
@@ -410,6 +420,7 @@ export function CaisseApp({
         saveurs: l.saveurs,
         boissonIncluse: l.boissonIncluse,
         canetteIncluse: l.produit.canetteIncluse,
+        saladeIncluse: l.saladeIncluse,
       }));
       imprimerEtSignaler({
         id: data.commandeId,
@@ -536,6 +547,9 @@ export function CaisseApp({
                 )}
                 {l.boissonIncluse && (
                   <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>
+                )}
+                {l.saladeIncluse !== null && (
+                  <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
                 )}
                 <div className="mt-1 flex items-center gap-2">
                   <button
@@ -735,8 +749,17 @@ export function CaisseApp({
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse);
+          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
+            ajouterAuPanier(
+              produitEnSelection,
+              viandesChoisies,
+              saucesChoisies,
+              [],
+              boissonIncluse,
+              1,
+              undefined,
+              saladeIncluse
+            );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
@@ -746,6 +769,9 @@ export function CaisseApp({
               for (const nomSauce of extras.saucesSupplementaires) {
                 ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
               }
+            }
+            if (saladeOption && produitSaladeSupplementaire) {
+              ajouterAuPanier(produitSaladeSupplementaire, [], []);
             }
             setProduitEnSelection(null);
           }}

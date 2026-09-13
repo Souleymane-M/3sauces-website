@@ -21,6 +21,8 @@ export interface LigneCommande {
   /** Saveur de la canette incluse dans une formule (Tacos/Barquette/Bowl/Menu Étudiant). */
   boissonIncluse?: string | null;
   canetteIncluse: boolean;
+  /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
+  saladeIncluse?: boolean | null;
 }
 
 /**
@@ -62,6 +64,7 @@ export interface LigneCommandePayload {
   boissonIncluse: string | null;
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
+  saladeIncluse: boolean | null;
 }
 
 export interface CreerCommandePayload {

@@ -18,7 +18,7 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
   const { data, error } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, description, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, est_plat_du_jour, est_desactivable"
+      "id, nom, categorie, prix, description, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, est_plat_du_jour, est_desactivable, salade_incluse, salade_prix_option"
     )
     .eq("actif", true)
     .order("categorie", { ascending: true })
@@ -43,6 +43,8 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
     nbSaveursMax: p.nb_saveurs_max,
     estPlatDuJour: p.est_plat_du_jour,
     estDesactivable: p.est_desactivable,
+    saladeIncluse: p.salade_incluse,
+    saladePrixOption: p.salade_prix_option,
   }));
 }
 

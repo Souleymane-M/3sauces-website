@@ -15,7 +15,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
   const { data, error } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse"
+      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, salade_incluse, salade_prix_option"
     )
     .eq("actif", true)
     .not("prix", "is", null)
@@ -40,6 +40,8 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
       autoriseExtras: p.autorise_extras,
       nbSaveursMax: p.nb_saveurs_max,
       canetteIncluse: p.canette_incluse,
+      saladeIncluse: p.salade_incluse,
+      saladePrixOption: p.salade_prix_option,
     }));
 }
 

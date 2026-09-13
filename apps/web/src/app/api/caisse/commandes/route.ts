@@ -137,7 +137,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif"
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse"
     )
     .in("id", produitIds);
 
@@ -284,6 +284,19 @@ export async function POST(request: Request) {
       prixUnitaire = prixSaisi;
     }
 
+    // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle
+    // qu'au site public. La salade en option payante (Tacos/Bowl) est un
+    // produit "Salade supplémentaire" comme un autre, pas de champ dédié ici.
+    let saladeIncluse: boolean | null = null;
+    if (produit.salade_incluse) {
+      if (typeof ligneBrute.saladeIncluse !== "boolean") {
+        return NextResponse.json({ error: `Choix salade requis sur ${produit.nom}.` }, { status: 400 });
+      }
+      saladeIncluse = ligneBrute.saladeIncluse;
+    } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
+      return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
+    }
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -296,6 +309,7 @@ export async function POST(request: Request) {
       saveurs,
       boissonIncluse,
       canetteIncluse: produit.canette_incluse,
+      saladeIncluse,
     });
   }
 

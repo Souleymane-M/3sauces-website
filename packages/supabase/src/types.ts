@@ -77,6 +77,8 @@ export interface Database {
           autorise_extras: boolean;
           nb_saveurs_max: number;
           ordre: number;
+          salade_incluse: boolean;
+          salade_prix_option: number | null;
           created_at: string;
           updated_at: string;
         };

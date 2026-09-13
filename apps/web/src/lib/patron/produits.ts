@@ -20,7 +20,7 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option";
 
 function versProduitAdmin(p: {
   id: string;
@@ -36,6 +36,8 @@ function versProduitAdmin(p: {
   nb_saveurs_max: number;
   canette_incluse: boolean;
   ordre: number;
+  salade_incluse: boolean;
+  salade_prix_option: number | null;
 }): ProduitAdmin {
   return {
     id: p.id,
@@ -51,6 +53,8 @@ function versProduitAdmin(p: {
     nbSaveursMax: p.nb_saveurs_max,
     canetteIncluse: p.canette_incluse,
     ordre: p.ordre,
+    saladeIncluse: p.salade_incluse,
+    saladePrixOption: p.salade_prix_option,
   };
 }
 
@@ -98,6 +102,10 @@ export async function creerProduit(input: ProduitAdminInput): Promise<void> {
     nb_saveurs_max: input.nbSaveursMax ?? 0,
     canette_incluse: input.canetteIncluse ?? false,
     ordre,
+    // Réglable uniquement après création, via « Modifier » (comme les
+    // autres options avancées) — jamais au moment de l'ajout rapide.
+    salade_incluse: false,
+    salade_prix_option: null,
   });
 
   if (error) {
@@ -120,6 +128,8 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     nb_saveurs_max?: number;
     canette_incluse?: boolean;
     ordre?: number;
+    salade_incluse?: boolean;
+    salade_prix_option?: number | null;
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.categorie !== undefined) update.categorie = input.categorie;
@@ -133,6 +143,8 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.nbSaveursMax !== undefined) update.nb_saveurs_max = input.nbSaveursMax;
   if (input.canetteIncluse !== undefined) update.canette_incluse = input.canetteIncluse;
   if (input.ordre !== undefined) update.ordre = input.ordre;
+  if (input.saladeIncluse !== undefined) update.salade_incluse = input.saladeIncluse;
+  if (input.saladePrixOption !== undefined) update.salade_prix_option = input.saladePrixOption;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);
 

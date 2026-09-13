@@ -26,6 +26,10 @@ export interface ProduitPublic {
   nbSaveursMax: number;
   /** Si vrai, une canette est incluse dans le prix (ex: Tacos, Barquette, Bowl, Menu Étudiant) : le configurateur propose alors le choix de sa saveur. */
   canetteIncluse: boolean;
+  /** Si vrai, la salade est incluse dans la recette mais le client doit choisir explicitement de la garder ou non (ex: Barquettes). */
+  saladeIncluse: boolean;
+  /** Si renseigné, le configurateur propose une case "+ Salade (X€)" facultative (ex: Tacos, Tacos Bowl). Null = non proposée. */
+  saladePrixOption: number | null;
 }
 
 /**
@@ -62,6 +66,7 @@ export interface SaveurPublique {
  */
 export const NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE = "Viande supplémentaire";
 export const NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE = "Sauce supplémentaire";
+export const NOM_PRODUIT_SALADE_SUPPLEMENTAIRE = "Salade supplémentaire";
 
 export interface ParametresLivraisonPublic {
   heureDebut: string; // "HH:MM:SS"
@@ -79,6 +84,8 @@ export interface LigneCommandePubliquePayload {
   saveurs: string[];
   /** Saveur choisie pour la canette incluse dans la formule (Tacos/Barquette/Bowl/Menu Étudiant), null si sans objet. */
   boissonIncluse: string | null;
+  /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
+  saladeIncluse: boolean | null;
 }
 
 export type CanalPublic = Extract<Canal, "sur_place" | "emporter" | "livraison">;

@@ -19,6 +19,8 @@ interface Brouillon {
   autoriseExtras: boolean;
   nbSaveursMax: boolean;
   canetteIncluse: boolean;
+  saladeIncluse: boolean;
+  saladePrixOption: string;
 }
 
 function versBrouillon(p: ProduitAdmin): Brouillon {
@@ -33,6 +35,8 @@ function versBrouillon(p: ProduitAdmin): Brouillon {
     autoriseExtras: p.autoriseExtras,
     nbSaveursMax: p.nbSaveursMax > 0,
     canetteIncluse: p.canetteIncluse,
+    saladeIncluse: p.saladeIncluse,
+    saladePrixOption: p.saladePrixOption !== null ? String(p.saladePrixOption) : "",
   };
 }
 
@@ -188,6 +192,12 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
       setErreur("Nombre de sauces incluses invalide.");
       return;
     }
+    const saladePrixOption =
+      brouillon.saladePrixOption.trim() === "" ? null : Number(brouillon.saladePrixOption.replace(",", "."));
+    if (saladePrixOption !== null && (!Number.isFinite(saladePrixOption) || saladePrixOption < 0)) {
+      setErreur("Prix de l'option salade invalide.");
+      return;
+    }
 
     setErreur(null);
     setEnregistrementEnCours(true);
@@ -204,6 +214,8 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         autoriseExtras: brouillon.autoriseExtras,
         nbSaveursMax: brouillon.nbSaveursMax ? 1 : 0,
         canetteIncluse: brouillon.canetteIncluse,
+        saladeIncluse: brouillon.saladeIncluse,
+        saladePrixOption,
       };
       const reponse = await fetch("/api/patron/produits", {
         method: "PATCH",
@@ -227,6 +239,8 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         autoriseExtras: brouillon.autoriseExtras,
         nbSaveursMax: payload.nbSaveursMax,
         canetteIncluse: brouillon.canetteIncluse,
+        saladeIncluse: brouillon.saladeIncluse,
+        saladePrixOption,
       };
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? produitMisAJour : p)));
       fermerEdition();
@@ -389,6 +403,24 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                         onChange={(e) => modifierBrouillon("canetteIncluse", e.target.checked)}
                       />
                       Canette incluse dans le prix
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={brouillon.saladeIncluse}
+                        onChange={(e) => modifierBrouillon("saladeIncluse", e.target.checked)}
+                      />
+                      Salade incluse (le client doit choisir de la garder ou non)
+                    </label>
+                    <label className="block text-xs text-gray-500">
+                      Prix salade en option, en € (vide = non proposée)
+                      <input
+                        value={brouillon.saladePrixOption}
+                        onChange={(e) => modifierBrouillon("saladePrixOption", e.target.value)}
+                        placeholder="Vide = non proposée"
+                        inputMode="decimal"
+                        className={`mt-1 ${inputClasse}`}
+                      />
                     </label>
                   </div>
                 </details>

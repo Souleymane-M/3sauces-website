@@ -24,7 +24,14 @@ interface ViandeModalPubliqueProps {
   produitViandeSupplementaire: ProduitConfigurable | null;
   /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
   produitSauceSupplementaire: ProduitConfigurable | null;
-  onValider: (viandes: string[], sauces: string[], extras: ExtrasChoisis, boissonIncluse: string | null) => void;
+  onValider: (
+    viandes: string[],
+    sauces: string[],
+    extras: ExtrasChoisis,
+    boissonIncluse: string | null,
+    saladeIncluse: boolean | null,
+    saladeOption: boolean
+  ) => void;
   onAnnuler: () => void;
 }
 
@@ -59,13 +66,16 @@ export function ViandeModalPublique({
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
+  const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
+  const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
   const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
   const boissonRetenue = !produit.canetteIncluse ? null : demandeChoixBoisson ? boissonChoisie : (saveurs[0]?.nom ?? null);
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
-    (!demandeChoixBoisson || boissonChoisie !== null);
+    (!demandeChoixBoisson || boissonChoisie !== null) &&
+    (!produit.saladeIncluse || saladeGardee !== null);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
     setter((precedent) => {
@@ -181,6 +191,47 @@ export function ViandeModalPublique({
               })}
             </div>
           </div>
+        )}
+
+        {produit.saladeIncluse && (
+          <div className="mt-5">
+            <p className="text-sm font-bold text-[#2D5A27]">Salade incluse</p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSaladeGardee(true)}
+                className={`rounded-full border px-3 py-1.5 text-sm ${
+                  saladeGardee === true
+                    ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Avec salade
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaladeGardee(false)}
+                className={`rounded-full border px-3 py-1.5 text-sm ${
+                  saladeGardee === false
+                    ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Sans salade
+              </button>
+            </div>
+          </div>
+        )}
+
+        {produit.saladePrixOption !== null && (
+          <label className="mt-5 flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={saladeOptionCochee}
+              onChange={(e) => setSaladeOptionCochee(e.target.checked)}
+            />
+            + Salade ({produit.saladePrixOption.toFixed(2)} €)
+          </label>
         )}
 
         {demandeChoixBoisson && (
@@ -324,7 +375,9 @@ export function ViandeModalPublique({
                   viandesSupplementaires: extraViandes,
                   saucesSupplementaires: extraSauces,
                 },
-                boissonRetenue
+                boissonRetenue,
+                produit.saladeIncluse ? saladeGardee : null,
+                saladeOptionCochee
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

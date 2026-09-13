@@ -174,6 +174,14 @@ export async function PATCH(request: Request) {
     }
     patch.ordre = n;
   }
+  if (typeof body.saladeIncluse === "boolean") {
+    patch.saladeIncluse = body.saladeIncluse;
+  }
+  if (body.saladePrixOption !== undefined) {
+    const resultat = validerPrix(body.saladePrixOption);
+    if (!resultat.ok) return NextResponse.json({ error: "Prix de l'option salade invalide." }, { status: 400 });
+    patch.saladePrixOption = resultat.prix;
+  }
 
   try {
     await mettreAJourProduit(body.id, patch);

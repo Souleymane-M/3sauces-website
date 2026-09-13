@@ -31,6 +31,8 @@ export interface ProduitAdmin {
   nbSaveursMax: number;
   canetteIncluse: boolean;
   ordre: number;
+  saladeIncluse: boolean;
+  saladePrixOption: number | null;
 }
 
 export interface ProduitAdminInput {
@@ -59,4 +61,6 @@ export interface ProduitAdminPatch {
   nbSaveursMax?: number;
   canetteIncluse?: boolean;
   ordre?: number;
+  saladeIncluse?: boolean;
+  saladePrixOption?: number | null;
 }

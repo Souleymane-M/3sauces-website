@@ -14,6 +14,7 @@ import type {
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+  NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
 import { FooterLegal } from "@/components/legal/footer-legal";
@@ -30,6 +31,7 @@ interface LignePanierPublique {
   sauces: string[];
   saveurs: string[];
   boissonIncluse: string | null;
+  saladeIncluse: boolean | null;
 }
 
 interface CommandePubliqueAppProps {
@@ -135,6 +137,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
+  const produitSaladeSupplementaire = useMemo(
+    () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
+    [produits]
+  );
 
   const total = panier.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
@@ -159,7 +165,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     saucesChoisies: string[] = [],
     saveursChoisies: string[] = [],
     boissonIncluse: string | null = null,
-    quantite: number = 1
+    quantite: number = 1,
+    saladeIncluse: boolean | null = null
   ) {
     declencherPulse();
     setPanier((precedent) => {
@@ -168,7 +175,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         JSON.stringify([...l.viandes].sort()) === JSON.stringify([...viandesChoisies].sort()) &&
         JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
         JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
-        l.boissonIncluse === boissonIncluse;
+        l.boissonIncluse === boissonIncluse &&
+        l.saladeIncluse === saladeIncluse;
 
       const existante = precedent.find(cle);
       if (existante) {
@@ -184,6 +192,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           sauces: saucesChoisies,
           saveurs: saveursChoisies,
           boissonIncluse,
+          saladeIncluse,
         },
       ];
     });
@@ -278,6 +287,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             sauces: l.sauces,
             saveurs: l.saveurs,
             boissonIncluse: l.boissonIncluse,
+            saladeIncluse: l.saladeIncluse,
           })),
         }),
       });
@@ -416,6 +426,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 )}
                 {l.boissonIncluse && (
                   <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>
+                )}
+                {l.saladeIncluse !== null && (
+                  <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
                 )}
                 <div className="mt-1 flex items-center gap-2">
                   <button
@@ -628,8 +641,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse);
+          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
+            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse, 1, saladeIncluse);
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
@@ -639,6 +652,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               for (const nomSauce of extras.saucesSupplementaires) {
                 ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
               }
+            }
+            if (saladeOption && produitSaladeSupplementaire) {
+              ajouterAuPanier(produitSaladeSupplementaire, [], []);
             }
             setProduitEnSelection(null);
           }}
