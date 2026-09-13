@@ -20,7 +20,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
     .eq("actif", true)
     .not("prix", "is", null)
     .order("categorie", { ascending: true })
-    .order("nom", { ascending: true });
+    .order("ordre", { ascending: true });
 
   if (error) {
     throw new Error(`Impossible de charger la carte : ${error.message}`);

@@ -13,7 +13,6 @@ export const CATEGORIES: { valeur: Categorie; libelle: string }[] = [
   { valeur: "snacking", libelle: "Snacking" },
   { valeur: "grillade", libelle: "Grillade" },
   { valeur: "accompagnement", libelle: "Accompagnement" },
-  { valeur: "cuisine_locale", libelle: "Cuisine locale" },
   { valeur: "boisson", libelle: "Boisson" },
   { valeur: "supplement", libelle: "Supplément" },
 ];
@@ -31,6 +30,7 @@ export interface ProduitAdmin {
   autoriseExtras: boolean;
   nbSaveursMax: number;
   canetteIncluse: boolean;
+  ordre: number;
 }
 
 export interface ProduitAdminInput {
@@ -58,4 +58,5 @@ export interface ProduitAdminPatch {
   autoriseExtras?: boolean;
   nbSaveursMax?: number;
   canetteIncluse?: boolean;
+  ordre?: number;
 }

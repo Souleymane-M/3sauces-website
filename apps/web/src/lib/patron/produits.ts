@@ -12,13 +12,15 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * côté site public.
  *
  * `prix` reste `number | null` : un prix vide correspond à un produit à
- * prix libre (ex: l'ancien "Plat du jour" en catégorie cuisine_locale,
- * saisi manuellement en caisse) — le site public l'exclut déjà
+ * prix libre, saisi manuellement en caisse — le site public l'exclut déjà
  * automatiquement (`.not("prix", "is", null)`), aucune règle spéciale à
  * ajouter ici.
+ *
+ * `ordre` pilote l'affichage (ici, sur le site public, et en caisse) —
+ * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre";
 
 function versProduitAdmin(p: {
   id: string;
@@ -33,6 +35,7 @@ function versProduitAdmin(p: {
   autorise_extras: boolean;
   nb_saveurs_max: number;
   canette_incluse: boolean;
+  ordre: number;
 }): ProduitAdmin {
   return {
     id: p.id,
@@ -47,6 +50,7 @@ function versProduitAdmin(p: {
     autoriseExtras: p.autorise_extras,
     nbSaveursMax: p.nb_saveurs_max,
     canetteIncluse: p.canette_incluse,
+    ordre: p.ordre,
   };
 }
 
@@ -56,7 +60,7 @@ export async function listerProduitsAdmin(): Promise<ProduitAdmin[]> {
     .from("produits")
     .select(SELECT_ADMIN)
     .order("categorie", { ascending: true })
-    .order("nom", { ascending: true });
+    .order("ordre", { ascending: true });
 
   if (error) {
     throw new Error(`Impossible de charger les produits : ${error.message}`);
@@ -66,6 +70,21 @@ export async function listerProduitsAdmin(): Promise<ProduitAdmin[]> {
 
 export async function creerProduit(input: ProduitAdminInput): Promise<void> {
   const supabase = createServiceSupabaseClient();
+
+  // Toujours en fin de sa catégorie, jamais en conflit avec un ordre
+  // existant — le patron le repositionnera lui-même via ▲▼ si besoin.
+  const { data: dernier, error: erreurDernier } = await supabase
+    .from("produits")
+    .select("ordre")
+    .eq("categorie", input.categorie)
+    .order("ordre", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (erreurDernier) {
+    throw new Error(`Impossible de déterminer l'ordre d'affichage : ${erreurDernier.message}`);
+  }
+  const ordre = (dernier?.ordre ?? -1) + 1;
+
   const { error } = await supabase.from("produits").insert({
     nom: input.nom,
     categorie: input.categorie,
@@ -78,6 +97,7 @@ export async function creerProduit(input: ProduitAdminInput): Promise<void> {
     autorise_extras: input.autoriseExtras ?? false,
     nb_saveurs_max: input.nbSaveursMax ?? 0,
     canette_incluse: input.canetteIncluse ?? false,
+    ordre,
   });
 
   if (error) {
@@ -99,6 +119,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     autorise_extras?: boolean;
     nb_saveurs_max?: number;
     canette_incluse?: boolean;
+    ordre?: number;
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.categorie !== undefined) update.categorie = input.categorie;
@@ -111,6 +132,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.autoriseExtras !== undefined) update.autorise_extras = input.autoriseExtras;
   if (input.nbSaveursMax !== undefined) update.nb_saveurs_max = input.nbSaveursMax;
   if (input.canetteIncluse !== undefined) update.canette_incluse = input.canetteIncluse;
+  if (input.ordre !== undefined) update.ordre = input.ordre;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);
 

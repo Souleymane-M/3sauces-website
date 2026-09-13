@@ -167,6 +167,13 @@ export async function PATCH(request: Request) {
   if (typeof body.canetteIncluse === "boolean") {
     patch.canetteIncluse = body.canetteIncluse;
   }
+  if (body.ordre !== undefined) {
+    const n = Number(body.ordre);
+    if (!Number.isInteger(n) || n < 0) {
+      return NextResponse.json({ error: "Ordre invalide." }, { status: 400 });
+    }
+    patch.ordre = n;
+  }
 
   try {
     await mettreAJourProduit(body.id, patch);

@@ -43,11 +43,12 @@ function libelleDe(categorie: Categorie): string {
 const inputClasse = "w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white";
 
 /**
- * Gestion complète de la carte (Page 3 / Module 6), refonte du
- * 2026-09-13 : la vue par défaut est sobre (nom/prix/interrupteur), un seul
- * produit modifiable à la fois via "Modifier", et un changement de
- * catégorie passe obligatoirement par une confirmation explicite — plus de
- * menu déroulant catégorie librement modifiable à la volée.
+ * Gestion complète de la carte (Page 3 / Module 6), refonte du 2026-09-14 :
+ * fond sombre explicite sur tout l'écran (jamais de texte clair sur un fond
+ * hérité — /patron n'a pas de thème forcé au niveau de la page, cf. bug du
+ * nom de produit invisible en thème clair navigateur) ; Menus Spéciaux et
+ * Plats du jour côte à côte comme sur le site public ; tri par `ordre`
+ * (colonne configurable via les flèches ▲▼, remplace l'ordre alphabétique).
  */
 export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   const [produits, setProduits] = useState<ProduitAdmin[]>(produitsInitiaux);
@@ -61,8 +62,10 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   const [nouveau, setNouveau] = useState({ nom: "", description: "", prix: "" });
   const [ajoutEnCours, setAjoutEnCours] = useState(false);
 
-  // Les 8 sections s'affichent toujours, même vides — structure stable,
-  // jamais une catégorie qui "disparaît" parce qu'elle n'a plus de produit.
+  // Toutes les catégories s'affichent toujours, même vides — structure
+  // stable, jamais une catégorie qui "disparaît" parce qu'elle n'a plus de
+  // produit. Triées par `ordre` (pas alphabétique) : c'est justement ce que
+  // les flèches ▲▼ permettent de changer.
   const parCategorie = useMemo(() => {
     const groupes = new Map<Categorie, ProduitAdmin[]>();
     for (const p of produits) {
@@ -72,9 +75,17 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
     return CATEGORIES.map((c) => ({
       ...c,
-      produits: (groupes.get(c.valeur) ?? []).sort((a, b) => a.nom.localeCompare(b.nom)),
+      produits: (groupes.get(c.valeur) ?? []).sort((a, b) => a.ordre - b.ordre),
     }));
   }, [produits]);
+
+  // Menus Spéciaux + Plats du jour rendus à part, côte à côte, en haut de
+  // l'écran (comme sur /commander) — les deux TOUJOURS affichés ici, même
+  // vides, contrairement au site public qui masque la colonne vide : c'est
+  // un écran de gestion, pas une vitrine client.
+  const groupeMenus = parCategorie.find((g) => g.valeur === "menu_special")!;
+  const groupePlatsDuJour = parCategorie.find((g) => g.valeur === "plat_du_jour")!;
+  const autresGroupes = parCategorie.filter((g) => g.valeur !== "menu_special" && g.valeur !== "plat_du_jour");
 
   function ouvrirEdition(produit: ProduitAdmin) {
     setErreur(null);
@@ -105,6 +116,51 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? { ...p, actif: produit.actif } : p)));
       const data = await reponse.json().catch(() => ({}));
       setErreur(data.error ?? "Échec de la mise à jour.");
+    }
+  }
+
+  // Échange l'`ordre` du produit avec son voisin dans la même catégorie —
+  // toujours recalculé depuis l'état courant (jamais depuis la liste déjà
+  // triée passée au rendu, qui peut être obsolète après un clic précédent).
+  async function deplacer(produit: ProduitAdmin, direction: "haut" | "bas") {
+    const memeCategorie = produits.filter((p) => p.categorie === produit.categorie).sort((a, b) => a.ordre - b.ordre);
+    const index = memeCategorie.findIndex((p) => p.id === produit.id);
+    const voisinIndex = direction === "haut" ? index - 1 : index + 1;
+    if (voisinIndex < 0 || voisinIndex >= memeCategorie.length) return;
+    const voisin = memeCategorie[voisinIndex];
+
+    setErreur(null);
+    const ordreProduit = produit.ordre;
+    const ordreVoisin = voisin.ordre;
+    setProduits((precedent) =>
+      precedent.map((p) => {
+        if (p.id === produit.id) return { ...p, ordre: ordreVoisin };
+        if (p.id === voisin.id) return { ...p, ordre: ordreProduit };
+        return p;
+      })
+    );
+
+    const [r1, r2] = await Promise.all([
+      fetch("/api/patron/produits", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: produit.id, ordre: ordreVoisin }),
+      }),
+      fetch("/api/patron/produits", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: voisin.id, ordre: ordreProduit }),
+      }),
+    ]);
+    if (!r1.ok || !r2.ok) {
+      setProduits((precedent) =>
+        precedent.map((p) => {
+          if (p.id === produit.id) return { ...p, ordre: ordreProduit };
+          if (p.id === voisin.id) return { ...p, ordre: ordreVoisin };
+          return p;
+        })
+      );
+      setErreur("Échec du déplacement.");
     }
   }
 
@@ -244,200 +300,226 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
   }
 
+  function rendreGroupe(groupe: { valeur: Categorie; libelle: string; produits: ProduitAdmin[] }) {
+    return (
+      <div key={groupe.valeur} className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-400">{groupe.libelle}</h3>
+
+        {groupe.produits.length === 0 && <p className="text-xs text-gray-600">Aucun produit.</p>}
+
+        <ul className="space-y-3">
+          {groupe.produits.map((produit, index) =>
+            produitEnEdition === produit.id && brouillon ? (
+              <li key={produit.id} className="space-y-2 rounded border border-gray-600 bg-gray-800 p-3">
+                <input
+                  value={brouillon.nom}
+                  onChange={(e) => modifierBrouillon("nom", e.target.value)}
+                  placeholder="Nom du produit"
+                  className={inputClasse}
+                />
+
+                <CategorieChamp
+                  categorieActuelle={brouillon.categorie}
+                  onConfirmer={(c) => modifierBrouillon("categorie", c)}
+                />
+
+                <input
+                  value={brouillon.description}
+                  onChange={(e) => modifierBrouillon("description", e.target.value)}
+                  placeholder="Description courte (optionnel)"
+                  className={inputClasse}
+                />
+                <input
+                  value={brouillon.prix}
+                  onChange={(e) => modifierBrouillon("prix", e.target.value)}
+                  placeholder="Prix en € (vide = prix libre)"
+                  inputMode="decimal"
+                  className={inputClasse}
+                />
+
+                <details className="rounded border border-gray-700 p-2">
+                  <summary className="cursor-pointer text-xs text-gray-400">Options avancées</summary>
+                  <div className="mt-2 space-y-2">
+                    <label className="block text-xs text-gray-500">
+                      Viande imposée (ex: Poulet — laisser vide sinon)
+                      <input
+                        value={brouillon.viandeImposee}
+                        onChange={(e) => modifierBrouillon("viandeImposee", e.target.value)}
+                        className={`mt-1 ${inputClasse}`}
+                      />
+                    </label>
+                    <label className="block text-xs text-gray-500">
+                      Nombre de viandes à choisir (0 à 4)
+                      <input
+                        value={brouillon.nbViandesMax}
+                        onChange={(e) => modifierBrouillon("nbViandesMax", e.target.value)}
+                        inputMode="numeric"
+                        className={`mt-1 ${inputClasse}`}
+                      />
+                    </label>
+                    <label className="block text-xs text-gray-500">
+                      Nombre de sauces incluses
+                      <input
+                        value={brouillon.nbSaucesIncluses}
+                        onChange={(e) => modifierBrouillon("nbSaucesIncluses", e.target.value)}
+                        inputMode="numeric"
+                        className={`mt-1 ${inputClasse}`}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={brouillon.autoriseExtras}
+                        onChange={(e) => modifierBrouillon("autoriseExtras", e.target.checked)}
+                      />
+                      Autorise les extras (viande/sauce supplémentaire)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={brouillon.nbSaveursMax}
+                        onChange={(e) => modifierBrouillon("nbSaveursMax", e.target.checked)}
+                      />
+                      Propose un choix de saveur (boisson)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={brouillon.canetteIncluse}
+                        onChange={(e) => modifierBrouillon("canetteIncluse", e.target.checked)}
+                      />
+                      Canette incluse dans le prix
+                    </label>
+                  </div>
+                </details>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={enregistrer}
+                    disabled={enregistrementEnCours}
+                    className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
+                  >
+                    {enregistrementEnCours ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                  <button
+                    onClick={fermerEdition}
+                    disabled={enregistrementEnCours}
+                    className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </li>
+            ) : (
+              <li key={produit.id} className="rounded border border-gray-700 bg-gray-900 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium text-white">{produit.nom}</div>
+                    {produit.description && <div className="text-xs text-gray-400">{produit.description}</div>}
+                    <div className="mt-0.5 text-sm text-gray-300">
+                      {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}
+                    </div>
+                  </div>
+                  <InterrupteurActif actif={produit.actif} onBasculer={() => basculerActif(produit)} />
+                </div>
+                <div className="mt-2 flex items-center gap-3 text-xs">
+                  <button
+                    onClick={() => deplacer(produit, "haut")}
+                    disabled={index === 0}
+                    aria-label="Monter"
+                    className="text-gray-400 hover:text-white disabled:opacity-30"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => deplacer(produit, "bas")}
+                    disabled={index === groupe.produits.length - 1}
+                    aria-label="Descendre"
+                    className="text-gray-400 hover:text-white disabled:opacity-30"
+                  >
+                    ▼
+                  </button>
+                  <button onClick={() => ouvrirEdition(produit)} className="text-blue-400 hover:text-blue-300">
+                    Modifier
+                  </button>
+                  <button onClick={() => supprimer(produit)} className="text-red-400 hover:text-red-300">
+                    Supprimer
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
+
+        {sectionAjout === groupe.valeur ? (
+          <div className="space-y-2 rounded border border-dashed border-gray-700 p-3">
+            <input
+              value={nouveau.nom}
+              onChange={(e) => setNouveau((p) => ({ ...p, nom: e.target.value }))}
+              placeholder="Nom du produit"
+              className={inputClasse}
+            />
+            <input
+              value={nouveau.description}
+              onChange={(e) => setNouveau((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Description courte (optionnel)"
+              className={inputClasse}
+            />
+            <input
+              value={nouveau.prix}
+              onChange={(e) => setNouveau((p) => ({ ...p, prix: e.target.value }))}
+              placeholder="Prix en € (vide = prix libre)"
+              inputMode="decimal"
+              className={inputClasse}
+            />
+            <p className="text-xs text-gray-500">
+              Les options avancées (viandes, sauces, saveur, canette) se règlent après création, via « Modifier ».
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={ajouter}
+                disabled={ajoutEnCours}
+                className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
+              >
+                {ajoutEnCours ? "Ajout…" : "Ajouter"}
+              </button>
+              <button
+                onClick={() => setSectionAjout(null)}
+                disabled={ajoutEnCours}
+                className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => ouvrirAjout(groupe.valeur)}
+            className="w-full rounded border border-dashed border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300"
+          >
+            + Ajouter un produit
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-4">
-      <h2 className="text-lg font-bold">Produits</h2>
+    <div className="mx-auto max-w-lg space-y-6 rounded-lg bg-gray-900 p-4">
+      <h2 className="text-lg font-bold text-white">Produits</h2>
       <p className="text-xs text-gray-500">
-        Les produits du site, groupés par catégorie. L&apos;interrupteur active/désactive immédiatement ; « Modifier
-        » ouvre la fiche complète d&apos;un produit.
+        Les produits du site, groupés par catégorie. L&apos;interrupteur active/désactive immédiatement ; les
+        flèches ▲▼ changent l&apos;ordre d&apos;affichage sur le site ; « Modifier » ouvre la fiche complète d&apos;un
+        produit.
       </p>
       {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
 
-      {parCategorie.map((groupe) => (
-        <div key={groupe.valeur} className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-400">{groupe.libelle}</h3>
+      <div className="grid grid-cols-2 gap-3">
+        {rendreGroupe(groupeMenus)}
+        {rendreGroupe(groupePlatsDuJour)}
+      </div>
 
-          {groupe.produits.length === 0 && <p className="text-xs text-gray-600">Aucun produit.</p>}
-
-          <ul className="space-y-3">
-            {groupe.produits.map((produit) =>
-              produitEnEdition === produit.id && brouillon ? (
-                <li key={produit.id} className="space-y-2 rounded border border-gray-600 bg-gray-800/50 p-3">
-                  <input
-                    value={brouillon.nom}
-                    onChange={(e) => modifierBrouillon("nom", e.target.value)}
-                    placeholder="Nom du produit"
-                    className={inputClasse}
-                  />
-
-                  <CategorieChamp
-                    categorieActuelle={brouillon.categorie}
-                    onConfirmer={(c) => modifierBrouillon("categorie", c)}
-                  />
-
-                  <input
-                    value={brouillon.description}
-                    onChange={(e) => modifierBrouillon("description", e.target.value)}
-                    placeholder="Description courte (optionnel)"
-                    className={inputClasse}
-                  />
-                  <input
-                    value={brouillon.prix}
-                    onChange={(e) => modifierBrouillon("prix", e.target.value)}
-                    placeholder="Prix en € (vide = prix libre)"
-                    inputMode="decimal"
-                    className={inputClasse}
-                  />
-
-                  <details className="rounded border border-gray-700 p-2">
-                    <summary className="cursor-pointer text-xs text-gray-400">Options avancées</summary>
-                    <div className="mt-2 space-y-2">
-                      <label className="block text-xs text-gray-500">
-                        Viande imposée (ex: Poulet — laisser vide sinon)
-                        <input
-                          value={brouillon.viandeImposee}
-                          onChange={(e) => modifierBrouillon("viandeImposee", e.target.value)}
-                          className={`mt-1 ${inputClasse}`}
-                        />
-                      </label>
-                      <label className="block text-xs text-gray-500">
-                        Nombre de viandes à choisir (0 à 4)
-                        <input
-                          value={brouillon.nbViandesMax}
-                          onChange={(e) => modifierBrouillon("nbViandesMax", e.target.value)}
-                          inputMode="numeric"
-                          className={`mt-1 ${inputClasse}`}
-                        />
-                      </label>
-                      <label className="block text-xs text-gray-500">
-                        Nombre de sauces incluses
-                        <input
-                          value={brouillon.nbSaucesIncluses}
-                          onChange={(e) => modifierBrouillon("nbSaucesIncluses", e.target.value)}
-                          inputMode="numeric"
-                          className={`mt-1 ${inputClasse}`}
-                        />
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-gray-500">
-                        <input
-                          type="checkbox"
-                          checked={brouillon.autoriseExtras}
-                          onChange={(e) => modifierBrouillon("autoriseExtras", e.target.checked)}
-                        />
-                        Autorise les extras (viande/sauce supplémentaire)
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-gray-500">
-                        <input
-                          type="checkbox"
-                          checked={brouillon.nbSaveursMax}
-                          onChange={(e) => modifierBrouillon("nbSaveursMax", e.target.checked)}
-                        />
-                        Propose un choix de saveur (boisson)
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-gray-500">
-                        <input
-                          type="checkbox"
-                          checked={brouillon.canetteIncluse}
-                          onChange={(e) => modifierBrouillon("canetteIncluse", e.target.checked)}
-                        />
-                        Canette incluse dans le prix
-                      </label>
-                    </div>
-                  </details>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={enregistrer}
-                      disabled={enregistrementEnCours}
-                      className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
-                    >
-                      {enregistrementEnCours ? "Enregistrement…" : "Enregistrer"}
-                    </button>
-                    <button
-                      onClick={fermerEdition}
-                      disabled={enregistrementEnCours}
-                      className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </li>
-              ) : (
-                <li key={produit.id} className="rounded border border-gray-700 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-medium text-white">{produit.nom}</div>
-                      {produit.description && <div className="text-xs text-gray-400">{produit.description}</div>}
-                      <div className="mt-0.5 text-sm text-gray-300">
-                        {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}
-                      </div>
-                    </div>
-                    <InterrupteurActif actif={produit.actif} onBasculer={() => basculerActif(produit)} />
-                  </div>
-                  <div className="mt-2 flex gap-3 text-xs">
-                    <button onClick={() => ouvrirEdition(produit)} className="text-blue-400 hover:text-blue-300">
-                      Modifier
-                    </button>
-                    <button onClick={() => supprimer(produit)} className="text-red-400 hover:text-red-300">
-                      Supprimer
-                    </button>
-                  </div>
-                </li>
-              )
-            )}
-          </ul>
-
-          {sectionAjout === groupe.valeur ? (
-            <div className="space-y-2 rounded border border-dashed border-gray-700 p-3">
-              <input
-                value={nouveau.nom}
-                onChange={(e) => setNouveau((p) => ({ ...p, nom: e.target.value }))}
-                placeholder="Nom du produit"
-                className={inputClasse}
-              />
-              <input
-                value={nouveau.description}
-                onChange={(e) => setNouveau((p) => ({ ...p, description: e.target.value }))}
-                placeholder="Description courte (optionnel)"
-                className={inputClasse}
-              />
-              <input
-                value={nouveau.prix}
-                onChange={(e) => setNouveau((p) => ({ ...p, prix: e.target.value }))}
-                placeholder="Prix en € (vide = prix libre)"
-                inputMode="decimal"
-                className={inputClasse}
-              />
-              <p className="text-xs text-gray-500">
-                Les options avancées (viandes, sauces, saveur, canette) se règlent après création, via « Modifier ».
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={ajouter}
-                  disabled={ajoutEnCours}
-                  className="flex-1 rounded bg-white py-2 text-sm font-semibold text-black disabled:opacity-40"
-                >
-                  {ajoutEnCours ? "Ajout…" : "Ajouter"}
-                </button>
-                <button
-                  onClick={() => setSectionAjout(null)}
-                  disabled={ajoutEnCours}
-                  className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
-                >
-                  Annuler
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => ouvrirAjout(groupe.valeur)}
-              className="w-full rounded border border-dashed border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-300"
-            >
-              + Ajouter un produit
-            </button>
-          )}
-        </div>
-      ))}
+      {autresGroupes.map((groupe) => rendreGroupe(groupe))}
     </div>
   );
 }

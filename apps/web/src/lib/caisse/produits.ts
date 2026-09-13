@@ -22,7 +22,7 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
     )
     .eq("actif", true)
     .order("categorie", { ascending: true })
-    .order("nom", { ascending: true });
+    .order("ordre", { ascending: true });
 
   if (error) {
     throw new Error(`Impossible de charger la carte : ${error.message}`);

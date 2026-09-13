@@ -13,7 +13,6 @@ export type Categorie =
   | "menu_special"
   | "snacking"
   | "grillade"
-  | "cuisine_locale"
   | "boisson"
   | "supplement"
   | "accompagnement"
@@ -77,6 +76,7 @@ export interface Database {
           nb_sauces_incluses: number;
           autorise_extras: boolean;
           nb_saveurs_max: number;
+          ordre: number;
           created_at: string;
           updated_at: string;
         };

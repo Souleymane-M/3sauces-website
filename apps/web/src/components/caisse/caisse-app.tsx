@@ -253,11 +253,6 @@ export function CaisseApp({
         titre: "Accompagnements",
         produits: produits.filter((p) => p.categorie === "accompagnement"),
       },
-      {
-        key: "cuisine_locale",
-        titre: "Cuisine locale",
-        produits: produits.filter((p) => p.categorie === "cuisine_locale"),
-      },
       { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
     ];
     return liste

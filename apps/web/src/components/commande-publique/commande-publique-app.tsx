@@ -54,11 +54,6 @@ const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 const FOND_PAGE = "#F5F0E8";
 
-// Pas de champ d'ordre d'affichage en base : ordre fixé ici par nom, comme
-// pour la distinction Tacos / Barquettes & Bowls plus bas. À ajuster si un
-// 3ᵉ menu spécial apparaît un jour.
-const ORDRE_MENUS_SPECIAUX = ["Menu Étudiant", "Menu Collégien"];
-
 export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parametres }: CommandePubliqueAppProps) {
   const router = useRouter();
 
@@ -83,27 +78,24 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [pulse, setPulse] = useState(false);
 
   // Ordre imposé : Menus spéciaux, Tacos, Barquettes & Bowls, Grillades,
-  // Cuisine locale, puis Boissons en dernier (discrètes). "Tacos" et
-  // "Barquettes & Bowls" partagent tous les deux la catégorie DB `snacking` —
-  // on les distingue ici par le nom du produit plutôt que par une nouvelle
-  // catégorie, pour ne pas complexifier le back-office pour un simple
-  // regroupement d'affichage.
+  // puis Boissons en dernier (discrètes). "Tacos" et "Barquettes & Bowls"
+  // partagent tous les deux la catégorie DB `snacking` — on les distingue
+  // ici par le nom du produit plutôt que par une nouvelle catégorie, pour
+  // ne pas complexifier le back-office pour un simple regroupement
+  // d'affichage.
   //
   // Chaque section a désormais son bandeau de titre, en alternance stricte
   // rouge/vert d'une section à la suivante (jamais deux bandeaux de la même
   // couleur côte à côte) — couleur fixée à la position dans la liste plutôt
   // que par section elle-même, pour que l'alternance reste correcte même si
-  // une section est absente (aucun produit actif dedans, ex: pas de plat en
-  // "cuisine_locale" ce jour-là).
+  // une section est absente (aucun produit actif dedans).
+  //
   // Menus spéciaux + Plats du jour : bloc à part, rendu côte à côte juste
   // avant les autres sections (cf. JSX plus bas) — jamais dans la liste
-  // alternée rouge/vert générique ci-dessous.
-  const menusSpeciaux = useMemo(() => {
-    const menus = produits.filter((p) => p.categorie === "menu_special");
-    return [...menus].sort(
-      (a, b) => ORDRE_MENUS_SPECIAUX.indexOf(a.nom) - ORDRE_MENUS_SPECIAUX.indexOf(b.nom)
-    );
-  }, [produits]);
+  // alternée rouge/vert générique ci-dessous. L'ordre au sein de chaque
+  // catégorie vient de `produits.ordre` (colonne configurable depuis
+  // /patron) — déjà trié par la requête serveur, jamais recalculé ici.
+  const menusSpeciaux = useMemo(() => produits.filter((p) => p.categorie === "menu_special"), [produits]);
   const platsDuJour = useMemo(() => produits.filter((p) => p.categorie === "plat_du_jour"), [produits]);
 
   const sections = useMemo<Section[]>(() => {
@@ -119,11 +111,6 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         key: "accompagnement",
         titre: "Accompagnements",
         produits: produits.filter((p) => p.categorie === "accompagnement"),
-      },
-      {
-        key: "cuisine_locale",
-        titre: "Cuisine locale",
-        produits: produits.filter((p) => p.categorie === "cuisine_locale"),
       },
       { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
     ];
