@@ -5,7 +5,7 @@ import { normaliserTelephone } from "@/lib/telephone";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
-import { annoterPlatsPrincipaux } from "@/lib/plats";
+import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
@@ -301,6 +301,11 @@ export async function POST(request: Request) {
     const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
     const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
 
+    // Index du plat-conteneur (mode "Commande groupée" pris au téléphone) —
+    // donnée déclarative de l'employé, aucune validation métier au-delà du
+    // type.
+    const platIndex = typeof ligneBrute.platIndex === "number" ? ligneBrute.platIndex : null;
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -315,11 +320,19 @@ export async function POST(request: Request) {
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
       pourQui,
+      platIndex,
     });
   }
 
   const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
-  const { nbPlats } = annoterPlatsPrincipaux(lignes);
+  const nbPlats = compterPlatsGroupes(lignes);
+  const modeGroupe = lignes.some((l) => l.platIndex !== null);
+  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
+    return NextResponse.json(
+      { error: "Une commande groupée doit contenir au moins 3 plats." },
+      { status: 400 }
+    );
+  }
 
   const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
   const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
