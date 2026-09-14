@@ -309,6 +309,17 @@ export function CaisseApp({
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
   const infosClientIncompletes = !nom.trim() || !telephone.trim();
 
+  /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
+  function retourChoixMode() {
+    if (panierActuel.length > 0 && !window.confirm("Changer de mode videra le panier en cours. Continuer ?")) {
+      return;
+    }
+    setModeCommande(null);
+    setPanierSimple([]);
+    setPlats([platVide(1)]);
+    setPlatDeplie(null);
+  }
+
   /**
    * Point d'entrée unique pour ajouter un article — écrit dans
    * `plats[plats.length - 1].lignes` (toujours le dernier, le plat actif)
@@ -642,7 +653,16 @@ export function CaisseApp({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={retourChoixMode}
+            className="text-sm font-semibold text-gray-500 underline"
+          >
+            ← Changer de mode ({enModeGroupe ? "commande groupée" : "commande simple"})
+          </button>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
             {sections.map((section) => (
               <div key={section.key}>
@@ -956,6 +976,7 @@ export function CaisseApp({
             >
               {envoiEnCours ? "Envoi…" : canal === "livraison" ? "Valider la commande" : "Encaisser"}
             </button>
+          </div>
           </div>
         </div>
       )}

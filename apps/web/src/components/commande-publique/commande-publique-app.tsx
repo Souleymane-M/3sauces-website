@@ -174,6 +174,17 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const total = panierActuel.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
 
+  /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
+  function retourChoixMode() {
+    if (nbArticles > 0 && !window.confirm("Changer de mode videra le panier en cours. Continuer ?")) {
+      return;
+    }
+    setModeCommande(null);
+    setPanierSimple([]);
+    setPlats([platVide(1)]);
+    setPlatDeplie(null);
+  }
+
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
 
@@ -474,6 +485,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           </div>
         ) : (
           <>
+            <button
+              type="button"
+              onClick={retourChoixMode}
+              className="text-sm font-semibold text-gray-500 underline"
+            >
+              ← Changer de mode ({modeCommande === "groupee" ? "commande groupée" : "commande simple"})
+            </button>
+
             {modeCommande === "groupee" && (
               <div className="rounded-lg border border-[#8B2020] bg-white p-3">
                 <p className="text-sm font-semibold text-gray-900">
