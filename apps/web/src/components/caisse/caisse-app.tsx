@@ -18,6 +18,7 @@ import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
+import { annoterPlatsPrincipaux, SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 
 interface LignePanier {
   id: string;
@@ -29,6 +30,8 @@ interface LignePanier {
   boissonIncluse: string | null;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
+  groupeId: string;
+  pourQui: string;
 }
 
 interface CaisseAppProps {
@@ -281,6 +284,39 @@ export function CaisseApp({
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
   const infosClientIncompletes = !nom.trim() || !telephone.trim();
 
+  const platsAnnotes = useMemo(
+    () => annoterPlatsPrincipaux(panier.map((l) => ({ ...l, categorie: l.produit.categorie }))),
+    [panier]
+  );
+  const nbPlats = platsAnnotes.nbPlats;
+
+  const groupesPanier = useMemo(() => {
+    const ordreGroupes: string[] = [];
+    const parGroupe = new Map<string, typeof platsAnnotes.lignes>();
+    for (const ligne of platsAnnotes.lignes) {
+      if (!parGroupe.has(ligne.groupeId)) {
+        ordreGroupes.push(ligne.groupeId);
+        parGroupe.set(ligne.groupeId, []);
+      }
+      parGroupe.get(ligne.groupeId)!.push(ligne);
+    }
+    return ordreGroupes.map((groupeId) => {
+      const lignesDuGroupe = parGroupe.get(groupeId)!;
+      const principale = lignesDuGroupe.find((l) => l.produit.categorie !== "supplement") ?? lignesDuGroupe[0];
+      const extras = lignesDuGroupe.filter((l) => l.id !== principale.id);
+      return { groupeId, principale, extras };
+    });
+  }, [platsAnnotes]);
+
+  const accompagnementMoinsCher = useMemo(() => {
+    const actifs = produits.filter((p) => p.categorie === "accompagnement" && p.prix !== null);
+    return actifs.length > 0 ? actifs.reduce((min, p) => (p.prix! < min.prix! ? p : min)) : null;
+  }, [produits]);
+  const boissonMoinsChere = useMemo(() => {
+    const actifs = produits.filter((p) => p.categorie === "boisson" && p.prix !== null);
+    return actifs.length > 0 ? actifs.reduce((min, p) => (p.prix! < min.prix! ? p : min)) : null;
+  }, [produits]);
+
   function ajouterAuPanier(
     produit: ProduitCaisse,
     viandesChoisies: string[],
@@ -289,7 +325,8 @@ export function CaisseApp({
     boissonIncluse: string | null = null,
     quantite: number = 1,
     prixSaisi?: number,
-    saladeIncluse: boolean | null = null
+    saladeIncluse: boolean | null = null,
+    groupeId?: string
   ) {
     setPanier((precedent) => {
       const cle = (l: LignePanier) =>
@@ -317,6 +354,8 @@ export function CaisseApp({
           boissonIncluse,
           prixSaisi,
           saladeIncluse,
+          groupeId: groupeId ?? `groupe-${Date.now()}-${Math.random()}`,
+          pourQui: "",
         },
       ];
     });
@@ -347,6 +386,15 @@ export function CaisseApp({
 
   function retirerLigne(id: string) {
     setPanier((precedent) => precedent.filter((l) => l.id !== id));
+  }
+
+  function modifierPourQui(id: string, valeur: string) {
+    setPanier((precedent) => precedent.map((l) => (l.id === id ? { ...l, pourQui: valeur } : l)));
+  }
+
+  function completerPlatGrillade() {
+    if (accompagnementMoinsCher) ajouterAuPanier(accompagnementMoinsCher, []);
+    if (boissonMoinsChere) ajouterAuPanier(boissonMoinsChere, []);
   }
 
   async function rechercherClient() {
@@ -394,6 +442,7 @@ export function CaisseApp({
             boissonIncluse: l.boissonIncluse,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
+            pourQui: l.pourQui.trim() || null,
           })),
         }),
       });
@@ -421,6 +470,7 @@ export function CaisseApp({
         boissonIncluse: l.boissonIncluse,
         canetteIncluse: l.produit.canetteIncluse,
         saladeIncluse: l.saladeIncluse,
+        pourQui: l.pourQui.trim() || null,
       }));
       imprimerEtSignaler({
         id: data.commandeId,
@@ -530,10 +580,26 @@ export function CaisseApp({
 
         <div>
           <h3 className="font-semibold text-gray-900">Panier</h3>
-          {panier.length === 0 && <p className="text-sm text-gray-400">Vide.</p>}
+
+          {canal === "livraison" && (
+            <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
+              <p className="text-sm font-bold">🚀 Commande groupée = livraison prioritaire</p>
+              <p className="text-xs text-white/90">3 plats ou plus → livrés en priorité, sans supplément.</p>
+            </div>
+          )}
+
+          {panier.length === 0 && <p className="mt-2 text-sm text-gray-400">Vide.</p>}
           <ul className="mt-2 space-y-2">
-            {panier.map((l) => (
-              <li key={l.id} className="text-sm">
+            {groupesPanier.map(({ groupeId, principale: l, extras }) => (
+              <li
+                key={groupeId}
+                className={l.numeroPlat !== null ? "rounded-lg border border-gray-200 bg-gray-50 p-2 text-sm" : "text-sm"}
+              >
+                {l.numeroPlat !== null && (
+                  <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8B2020]">
+                    Plat {l.numeroPlat}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-900">{l.produit.nom}</span>
                   <button onClick={() => retirerLigne(l.id)} className="text-gray-400 hover:text-gray-700">
@@ -569,9 +635,57 @@ export function CaisseApp({
                     {((l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite).toFixed(2)} €
                   </span>
                 </div>
+
+                {l.categorie === "grillade" && l.numeroPlat === null && (accompagnementMoinsCher || boissonMoinsChere) && (
+                  <div className="mt-2 rounded border border-dashed border-gray-300 bg-white p-2 text-xs text-gray-600">
+                    <p>Compléter ce plat : + accompagnement + boisson</p>
+                    <button
+                      type="button"
+                      onClick={completerPlatGrillade}
+                      className="mt-1 rounded bg-[#2D5A27] px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                )}
+
+                {extras.length > 0 && (
+                  <ul className="mt-2 space-y-1 border-t border-gray-200 pt-2">
+                    {extras.map((extra) => (
+                      <li key={extra.id} className="flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                          + {extra.produit.nom}
+                          {extra.sauces.length > 0 ? ` (${extra.sauces.join(", ")})` : ""}
+                          {extra.viandes.length > 0 ? ` (${extra.viandes.join(", ")})` : ""}
+                        </span>
+                        <span>{((extra.produit.prix ?? 0) * extra.quantite).toFixed(2)} €</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {l.numeroPlat !== null && (
+                  <input
+                    value={l.pourQui}
+                    onChange={(e) => modifierPourQui(l.id, e.target.value)}
+                    placeholder="Pour qui ? (optionnel)"
+                    className="mt-2 w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                  />
+                )}
               </li>
             ))}
           </ul>
+
+          {canal === "livraison" && nbPlats > 0 && nbPlats < SEUIL_COMMANDE_PRIORITAIRE && (
+            <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
+              {SEUIL_COMMANDE_PRIORITAIRE - nbPlats === 1
+                ? "Plus qu'un plat pour la livraison prioritaire 🚀"
+                : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlats} plats pour la livraison prioritaire 🚀`}
+            </p>
+          )}
+          {canal === "livraison" && nbPlats >= SEUIL_COMMANDE_PRIORITAIRE && (
+            <p className="mt-2 text-sm font-bold text-[#2D5A27]">🚀 Livraison prioritaire activée !</p>
+          )}
         </div>
 
         <div className="border-t border-gray-200 pt-3">
@@ -750,6 +864,7 @@ export function CaisseApp({
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
+            const groupeId = `groupe-${Date.now()}-${Math.random()}`;
             ajouterAuPanier(
               produitEnSelection,
               viandesChoisies,
@@ -758,20 +873,21 @@ export function CaisseApp({
               boissonIncluse,
               1,
               undefined,
-              saladeIncluse
+              saladeIncluse,
+              groupeId
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
-                ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
+                ajouterAuPanier(produitViandeSupplementaire, [nomViande], [], [], null, 1, undefined, null, groupeId);
               }
             }
             if (produitSauceSupplementaire) {
               for (const nomSauce of extras.saucesSupplementaires) {
-                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
+                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce], [], null, 1, undefined, null, groupeId);
               }
             }
             if (saladeOption && produitSaladeSupplementaire) {
-              ajouterAuPanier(produitSaladeSupplementaire, [], []);
+              ajouterAuPanier(produitSaladeSupplementaire, [], [], [], null, 1, undefined, null, groupeId);
             }
             setProduitEnSelection(null);
           }}
