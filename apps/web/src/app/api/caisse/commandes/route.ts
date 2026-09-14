@@ -5,6 +5,7 @@ import { normaliserTelephone } from "@/lib/telephone";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
+import { annoterPlatsPrincipaux } from "@/lib/plats";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
@@ -297,6 +298,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
     }
 
+    const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
+    const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -310,10 +314,12 @@ export async function POST(request: Request) {
       boissonIncluse,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
+      pourQui,
     });
   }
 
   const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
+  const { nbPlats } = annoterPlatsPrincipaux(lignes);
 
   const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
   const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
@@ -401,6 +407,7 @@ export async function POST(request: Request) {
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
+      nb_plats: nbPlats,
     })
     .select("id, numero")
     .single();

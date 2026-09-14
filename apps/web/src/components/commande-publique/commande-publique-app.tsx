@@ -17,6 +17,7 @@ import {
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
+import { annoterPlatsPrincipaux, SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
@@ -32,6 +33,10 @@ interface LignePanierPublique {
   saveurs: string[];
   boissonIncluse: string | null;
   saladeIncluse: boolean | null;
+  /** Relie un plat principal à ses extras (viande/sauce/salade supplémentaire) ajoutés dans le même configurateur — sert à les afficher comme une seule carte empilée. */
+  groupeId: string;
+  /** Nom optionnel du convive ("Pour Rachid"), saisi après coup dans le panier — jamais sur une ligne d'extra. */
+  pourQui: string;
 }
 
 interface CommandePubliqueAppProps {
@@ -145,6 +150,46 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const total = panier.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
 
+  // "Plats principaux" (≥3 en livraison = commande prioritaire) — jamais
+  // recalculé côté serveur à partir d'un total envoyé ici, ceci n'est
+  // qu'un aperçu ; cf. lib/plats.ts pour la règle exacte (grillade +
+  // accompagnement appariés 1-pour-1).
+  const platsAnnotes = useMemo(
+    () => annoterPlatsPrincipaux(panier.map((l) => ({ ...l, categorie: l.produit.categorie }))),
+    [panier]
+  );
+  const nbPlats = platsAnnotes.nbPlats;
+
+  // Regroupe chaque plat principal avec ses extras (viande/sauce/salade
+  // supplémentaire ajoutés dans le même configurateur) en une seule carte,
+  // dans l'ordre d'ajout au panier.
+  const groupesPanier = useMemo(() => {
+    const ordreGroupes: string[] = [];
+    const parGroupe = new Map<string, typeof platsAnnotes.lignes>();
+    for (const ligne of platsAnnotes.lignes) {
+      if (!parGroupe.has(ligne.groupeId)) {
+        ordreGroupes.push(ligne.groupeId);
+        parGroupe.set(ligne.groupeId, []);
+      }
+      parGroupe.get(ligne.groupeId)!.push(ligne);
+    }
+    return ordreGroupes.map((groupeId) => {
+      const lignesDuGroupe = parGroupe.get(groupeId)!;
+      const principale = lignesDuGroupe.find((l) => l.produit.categorie !== "supplement") ?? lignesDuGroupe[0];
+      const extras = lignesDuGroupe.filter((l) => l.id !== principale.id);
+      return { groupeId, principale, extras };
+    });
+  }, [platsAnnotes]);
+
+  const accompagnementMoinsCher = useMemo(() => {
+    const actifs = produits.filter((p) => p.categorie === "accompagnement");
+    return actifs.length > 0 ? actifs.reduce((min, p) => (p.prix < min.prix ? p : min)) : null;
+  }, [produits]);
+  const boissonMoinsChere = useMemo(() => {
+    const actifs = produits.filter((p) => p.categorie === "boisson");
+    return actifs.length > 0 ? actifs.reduce((min, p) => (p.prix < min.prix ? p : min)) : null;
+  }, [produits]);
+
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
 
@@ -166,7 +211,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     saveursChoisies: string[] = [],
     boissonIncluse: string | null = null,
     quantite: number = 1,
-    saladeIncluse: boolean | null = null
+    saladeIncluse: boolean | null = null,
+    groupeId?: string
   ) {
     declencherPulse();
     setPanier((precedent) => {
@@ -193,6 +239,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           saveurs: saveursChoisies,
           boissonIncluse,
           saladeIncluse,
+          groupeId: groupeId ?? `groupe-${Date.now()}-${Math.random()}`,
+          pourQui: "",
         },
       ];
     });
@@ -226,6 +274,16 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
   function retirerLigne(id: string) {
     setPanier((precedent) => precedent.filter((l) => l.id !== id));
+  }
+
+  function modifierPourQui(id: string, valeur: string) {
+    setPanier((precedent) => precedent.map((l) => (l.id === id ? { ...l, pourQui: valeur } : l)));
+  }
+
+  /** "Compléter ce plat" sous une grillade seule : ajoute en 1 tap l'accompagnement et la boisson les moins chers. */
+  function completerPlatGrillade() {
+    if (accompagnementMoinsCher) ajouterAuPanier(accompagnementMoinsCher, []);
+    if (boissonMoinsChere) ajouterAuPanier(boissonMoinsChere, []);
   }
 
   function voirPanier() {
@@ -288,6 +346,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             saveurs: l.saveurs,
             boissonIncluse: l.boissonIncluse,
             saladeIncluse: l.saladeIncluse,
+            pourQui: l.pourQui.trim() || null,
           })),
         }),
       });
@@ -307,6 +366,15 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
+        {canal === "livraison" && (
+          <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
+            <p className="font-bold">🚀 Commande groupée = livraison prioritaire</p>
+            <p className="mt-0.5 text-sm text-white/90">
+              Ajoutez 3 plats ou plus à votre commande — livrés en priorité, sans rien payer de plus.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-6">
           {(menusSpeciaux.length > 0 || platsDuJour.length > 0) && (
             <div className={menusSpeciaux.length > 0 && platsDuJour.length > 0 ? "grid grid-cols-2 gap-3" : ""}>
@@ -410,9 +478,17 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         <div id="panier-recap" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="font-semibold text-gray-900">Ton panier</h3>
           {panier.length === 0 && <p className="text-sm text-gray-400">Vide.</p>}
-          <ul className="space-y-2">
-            {panier.map((l) => (
-              <li key={l.id} className="text-sm">
+          <ul className="space-y-3">
+            {groupesPanier.map(({ groupeId, principale: l, extras }) => (
+              <li
+                key={groupeId}
+                className={l.numeroPlat !== null ? "rounded-lg border border-gray-200 bg-gray-50 p-2" : "text-sm"}
+              >
+                {l.numeroPlat !== null && (
+                  <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8B2020]">
+                    Plat {l.numeroPlat}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-900">{l.produit.nom}</span>
                   <button onClick={() => retirerLigne(l.id)} className="text-gray-400 hover:text-gray-700">
@@ -448,9 +524,57 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                     {(l.produit.prix * l.quantite).toFixed(2)} €
                   </span>
                 </div>
+
+                {l.categorie === "grillade" && l.numeroPlat === null && (accompagnementMoinsCher || boissonMoinsChere) && (
+                  <div className="mt-2 rounded border border-dashed border-gray-300 bg-white p-2 text-xs text-gray-600">
+                    <p>Compléter ce plat : + accompagnement + boisson</p>
+                    <button
+                      type="button"
+                      onClick={completerPlatGrillade}
+                      className="mt-1 rounded bg-[#2D5A27] px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                )}
+
+                {extras.length > 0 && (
+                  <ul className="mt-2 space-y-1 border-t border-gray-200 pt-2">
+                    {extras.map((extra) => (
+                      <li key={extra.id} className="flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                          + {extra.produit.nom}
+                          {extra.sauces.length > 0 ? ` (${extra.sauces.join(", ")})` : ""}
+                          {extra.viandes.length > 0 ? ` (${extra.viandes.join(", ")})` : ""}
+                        </span>
+                        <span>{(extra.produit.prix * extra.quantite).toFixed(2)} €</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {l.numeroPlat !== null && (
+                  <input
+                    value={l.pourQui}
+                    onChange={(e) => modifierPourQui(l.id, e.target.value)}
+                    placeholder="Pour qui ? (optionnel)"
+                    className="mt-2 w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                  />
+                )}
               </li>
             ))}
           </ul>
+
+          {canal === "livraison" && nbPlats > 0 && nbPlats < SEUIL_COMMANDE_PRIORITAIRE && (
+            <p className="text-sm font-semibold text-[#2D5A27]">
+              {SEUIL_COMMANDE_PRIORITAIRE - nbPlats === 1
+                ? "Plus qu'un plat pour la livraison prioritaire 🚀"
+                : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlats} plats pour la livraison prioritaire 🚀`}
+            </p>
+          )}
+          {canal === "livraison" && nbPlats >= SEUIL_COMMANDE_PRIORITAIRE && (
+            <p className="text-sm font-bold text-[#2D5A27]">🚀 Livraison prioritaire activée !</p>
+          )}
 
           <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
             Total : {total.toFixed(2)} €
@@ -602,7 +726,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             <>
               <div className={`transition-transform duration-200 ${pulse ? "scale-110" : "scale-100"}`}>
                 <div className="text-sm font-semibold text-gray-900">
-                  {nbArticles} article{nbArticles > 1 ? "s" : ""}
+                  {nbPlats > 0
+                    ? `${nbPlats} plat${nbPlats > 1 ? "s" : ""}`
+                    : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
                 </div>
                 <div className="text-xs text-gray-500">{total.toFixed(2)} €</div>
               </div>
@@ -642,19 +768,29 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse, 1, saladeIncluse);
+            const groupeId = `groupe-${Date.now()}-${Math.random()}`;
+            ajouterAuPanier(
+              produitEnSelection,
+              viandesChoisies,
+              saucesChoisies,
+              [],
+              boissonIncluse,
+              1,
+              saladeIncluse,
+              groupeId
+            );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
-                ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
+                ajouterAuPanier(produitViandeSupplementaire, [nomViande], [], [], null, 1, null, groupeId);
               }
             }
             if (produitSauceSupplementaire) {
               for (const nomSauce of extras.saucesSupplementaires) {
-                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
+                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce], [], null, 1, null, groupeId);
               }
             }
             if (saladeOption && produitSaladeSupplementaire) {
-              ajouterAuPanier(produitSaladeSupplementaire, [], []);
+              ajouterAuPanier(produitSaladeSupplementaire, [], [], [], null, 1, null, groupeId);
             }
             setProduitEnSelection(null);
           }}

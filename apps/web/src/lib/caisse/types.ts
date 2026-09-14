@@ -23,6 +23,8 @@ export interface LigneCommande {
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
+  /** Nom optionnel du convive ("Pour Rachid"), porté par la ligne plat principal uniquement, jamais par un extra. */
+  pourQui?: string | null;
 }
 
 /**
@@ -65,6 +67,7 @@ export interface LigneCommandePayload {
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
   saladeIncluse: boolean | null;
+  pourQui: string | null;
 }
 
 export interface CreerCommandePayload {

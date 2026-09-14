@@ -86,6 +86,8 @@ export interface LigneCommandePubliquePayload {
   boissonIncluse: string | null;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
+  /** Nom optionnel du convive ("Pour Rachid"), porté par la ligne plat principal uniquement. */
+  pourQui: string | null;
 }
 
 export type CanalPublic = Extract<Canal, "sur_place" | "emporter" | "livraison">;

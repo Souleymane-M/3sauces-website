@@ -11,6 +11,7 @@ import type {
 } from "@/lib/commande-publique/types";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
+import { annoterPlatsPrincipaux } from "@/lib/plats";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
@@ -307,6 +308,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
     }
 
+    // Nom optionnel du convive ("Pour Rachid") — simple étiquette
+    // d'affichage, aucune validation métier au-delà d'une longueur
+    // raisonnable et du nettoyage des espaces.
+    const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
+    const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -320,10 +327,15 @@ export async function POST(request: Request) {
       boissonIncluse,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
+      pourQui,
     });
   }
 
   const montant = Math.round(lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0) * 100) / 100;
+  // Jamais de confiance dans un total de plats envoyé par le client :
+  // recalculé ici à partir des lignes déjà validées, sert à dériver la
+  // priorité livraison en cuisine/livreur.
+  const { nbPlats } = annoterPlatsPrincipaux(lignes);
 
   // --- Règles spécifiques à la livraison ---
   let adresse: string | null = null;
@@ -388,6 +400,7 @@ export async function POST(request: Request) {
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
       consentement_cgv_le: new Date().toISOString(),
+      nb_plats: nbPlats,
     })
     .select("id, numero")
     .single();
