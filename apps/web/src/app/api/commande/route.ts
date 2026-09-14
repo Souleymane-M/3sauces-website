@@ -11,7 +11,7 @@ import type {
 } from "@/lib/commande-publique/types";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { annoterPlatsPrincipaux } from "@/lib/plats";
+import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
@@ -314,6 +314,11 @@ export async function POST(request: Request) {
     const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
     const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
 
+    // Index du plat-conteneur (mode "Commande groupée") — donnée purement
+    // déclarative du client, aucune validation métier au-delà du type :
+    // le regroupement n'est jamais déduit du contenu de la ligne.
+    const platIndex = typeof ligneBrute.platIndex === "number" ? ligneBrute.platIndex : null;
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -328,14 +333,22 @@ export async function POST(request: Request) {
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
       pourQui,
+      platIndex,
     });
   }
 
   const montant = Math.round(lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0) * 100) / 100;
-  // Jamais de confiance dans un total de plats envoyé par le client :
-  // recalculé ici à partir des lignes déjà validées, sert à dériver la
-  // priorité livraison en cuisine/livreur.
-  const { nbPlats } = annoterPlatsPrincipaux(lignes);
+  // Jamais de confiance dans un nombre de plats envoyé par le client :
+  // recalculé ici à partir des `platIndex` déjà validés (type uniquement,
+  // c'est le regroupement lui-même qui est déclaratif).
+  const nbPlats = compterPlatsGroupes(lignes);
+  const modeGroupe = lignes.some((l) => l.platIndex !== null);
+  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
+    return NextResponse.json(
+      { error: "Une commande groupée doit contenir au moins 3 plats." },
+      { status: 400 }
+    );
+  }
 
   // --- Règles spécifiques à la livraison ---
   let adresse: string | null = null;
