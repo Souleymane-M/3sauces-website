@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
+import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import {
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
@@ -21,7 +22,7 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("commandes")
-    .select("id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at")
+    .select("id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats")
     .not("statut", "in", `(${STATUTS_TERMINAUX.join(",")})`)
     .order("heure_souhaitee", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
@@ -30,7 +31,7 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
     throw new Error(`Impossible de charger les commandes : ${error.message}`);
   }
 
-  return (data ?? []).map((c) => ({
+  const commandes: CommandeCuisine[] = (data ?? []).map((c) => ({
     id: c.id,
     numero: c.numero,
     canal: c.canal,
@@ -40,7 +41,14 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
     adresse: c.adresse_livraison,
     heureSouhaitee: c.heure_souhaitee,
     creeLe: c.created_at,
+    nbPlats: c.nb_plats,
   }));
+
+  // Les commandes livraison prioritaires (≥3 plats) passent en tête, sans
+  // perdre l'ordre chronologique existant à l'intérieur de chaque groupe
+  // (tri stable).
+  const estPrioritaire = (cmd: CommandeCuisine) => cmd.canal === "livraison" && cmd.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
+  return [...commandes].sort((a, b) => Number(estPrioritaire(b)) - Number(estPrioritaire(a)));
 }
 
 export async function listerLivreursActifs(): Promise<LivreurActif[]> {

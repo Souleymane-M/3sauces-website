@@ -27,7 +27,7 @@ export async function listerNouvellesCommandesPubliques(
 
   const { data: commandes, error } = await supabase
     .from("commandes")
-    .select("id, numero, canal, contenu, montant, mode_paiement, nom_livraison, adresse_livraison, heure_souhaitee, created_at")
+    .select("id, numero, canal, contenu, montant, mode_paiement, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats")
     .is("commande_par", null)
     .gt("created_at", depuis)
     .order("created_at", { ascending: true })
@@ -69,6 +69,7 @@ export async function listerNouvellesCommandesPubliques(
     heureSouhaitee: c.heure_souhaitee,
     creeLe: c.created_at,
     qrCode: qrCodeParCommandeId.get(c.id) ?? null,
+    nbPlats: c.nb_plats,
   }));
 
   return { commandes: commandesPourImpression, curseurSuivant };

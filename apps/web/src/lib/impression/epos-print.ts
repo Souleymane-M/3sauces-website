@@ -1,4 +1,5 @@
 import type { CommandePourImpression, ConfigImprimante, ResultatImpression } from "./types";
+import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 
 /**
  * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
@@ -73,7 +74,12 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
   return details;
+}
+
+function estPrioritaire(commande: CommandePourImpression): boolean {
+  return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
 }
 
 function enveloppeEposPrint(contenu: string): string {
@@ -128,6 +134,9 @@ export function construireTicketClientXml(
 export function construireBonCuisineXml(commande: CommandePourImpression): string {
   let xml = "";
 
+  if (estPrioritaire(commande)) {
+    xml += ligne("*** PRIORITAIRE ***", { align: "center", gras: true, taille: 2 });
+  }
   xml += ligne(`Commande #${commande.numero}`, { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
     xml += ligne(`Heure souhaitée : ${formaterHeure(commande.heureSouhaitee)}`, { align: "center", gras: true });

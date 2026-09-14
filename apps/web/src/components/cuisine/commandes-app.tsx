@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivreurActif } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
+import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
@@ -42,7 +43,12 @@ function detailLigne(l: CommandeCuisine["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
   return details;
+}
+
+function estPrioritaire(commande: CommandeCuisine): boolean {
+  return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
 }
 
 // Lecture pure (aucun Date.now(), aucune écriture) de l'identité persistée
@@ -234,8 +240,18 @@ export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAp
           const demandeLivreur = statutSuivant === "pris_par_livreur";
           const livreurSelectionne = livreurChoisi[commande.id] ?? "";
 
+          const prioritaire = estPrioritaire(commande);
+
           return (
-            <div key={commande.id} className="rounded-xl border-2 border-gray-200 p-4">
+            <div
+              key={commande.id}
+              className={`rounded-xl border-2 p-4 ${prioritaire ? "border-orange-500" : "border-gray-200"}`}
+            >
+              {prioritaire && (
+                <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
+                  PRIORITAIRE 🚀
+                </div>
+              )}
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-black">Commande #{commande.numero}</span>
                 <span className="text-xl text-black">{formaterHeure(commande.heureSouhaitee)}</span>

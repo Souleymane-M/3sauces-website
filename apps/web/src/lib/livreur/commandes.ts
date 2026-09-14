@@ -1,6 +1,8 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
+import type { LigneCommande } from "@/lib/caisse/types";
+import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import type { LivraisonAssignee, PaiementDeclare } from "./types";
 
 /**
@@ -27,7 +29,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
 
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
-    .select("id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee")
+    .select("id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats")
     .in("id", idsCommandes)
     .eq("statut", "pris_par_livreur")
     .order("heure_souhaitee", { ascending: true, nullsFirst: false });
@@ -36,14 +38,22 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     throw new Error(`Impossible de charger les commandes : ${erreurCommandes.message}`);
   }
 
-  return (commandes ?? []).map((c) => ({
+  const livraisonsAssignees: LivraisonAssignee[] = (commandes ?? []).map((c) => ({
     id: c.id,
     numero: c.numero,
     nom: c.nom_livraison ?? "",
     adresse: c.adresse_livraison,
     montant: c.montant,
     heureSouhaitee: c.heure_souhaitee,
+    lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+    nbPlats: c.nb_plats,
   }));
+
+  // Les livraisons prioritaires (≥3 plats) en tête, sans perdre l'ordre
+  // chronologique existant à l'intérieur de chaque groupe (tri stable).
+  return [...livraisonsAssignees].sort(
+    (a, b) => Number(b.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE) - Number(a.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE)
+  );
 }
 
 interface DeclarationLivraison {

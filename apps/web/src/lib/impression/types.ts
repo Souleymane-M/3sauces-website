@@ -21,6 +21,7 @@ export interface CommandePourImpression {
   heureSouhaitee: string | null;
   creeLe: string;
   qrCode: string | null;
+  nbPlats: number;
 }
 
 export interface ConfigImprimante {

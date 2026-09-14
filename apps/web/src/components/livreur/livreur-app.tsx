@@ -3,6 +3,19 @@
 import { useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee } from "@/lib/livreur/types";
+import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+
+// Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
+// `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
+function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
+  const details: string[] = [];
+  if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
+  if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
+  if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
+  if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
+  return details;
+}
 
 interface LivreurAppProps {
   livraisonsInitiales: LivraisonAssignee[];
@@ -136,14 +149,42 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
           : 0;
         const totalGroupeCorrespond = declaration && totalGroupeDeclare === Math.round(livraison.montant * 100) / 100;
 
+        const prioritaire = livraison.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
+
         return (
-          <div key={livraison.id} className="rounded-xl border-2 border-gray-200 p-4">
+          <div
+            key={livraison.id}
+            className={`rounded-xl border-2 p-4 ${prioritaire ? "border-orange-500" : "border-gray-200"}`}
+          >
+            {prioritaire && (
+              <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
+                PRIORITAIRE 🚀
+              </div>
+            )}
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-bold text-gray-900">Commande #{livraison.numero}</span>
               <span className="text-xl text-gray-900">{formaterHeure(livraison.heureSouhaitee)}</span>
             </div>
             <p className="mt-1 text-lg text-gray-900">{livraison.nom}</p>
             <p className="text-lg text-gray-700">{livraison.adresse}</p>
+
+            {livraison.lignes.length > 0 && (
+              <ul className="mt-2 space-y-1 border-t border-gray-200 pt-2">
+                {livraison.lignes.map((l, i) => (
+                  <li key={i} className="text-base text-gray-900">
+                    <span className="font-semibold">
+                      {l.quantite}x {l.nom}
+                    </span>
+                    {detailLigne(l).map((detail, j) => (
+                      <div key={j} className="text-sm text-gray-600">
+                        {detail}
+                      </div>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <p className="mt-2 text-2xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
 
             {!declaration && (

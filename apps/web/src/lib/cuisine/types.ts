@@ -16,6 +16,7 @@ export interface CommandeCuisine {
   adresse: string | null;
   heureSouhaitee: string | null;
   creeLe: string;
+  nbPlats: number;
 }
 
 /** Statuts journalisables dans `commandes_evenements` — jamais "en_attente" (état initial automatique, pas une action). */

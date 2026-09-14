@@ -484,6 +484,7 @@ export function CaisseApp({
         heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure)?.toISOString() ?? null,
         creeLe: new Date().toISOString(),
         qrCode: canal === "livraison" ? (data.qrCode ?? null) : null,
+        nbPlats,
       });
 
       setPanier([]);
