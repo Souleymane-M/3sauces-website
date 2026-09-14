@@ -32,15 +32,13 @@ interface LignePanier {
   saladeIncluse: boolean | null;
 }
 
-/** Un "plat" en mode Commande groupée (téléphone) : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
+/** Un "plat" en mode Commande groupée : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
 interface PlatGroupeCaisse {
   id: string;
   pourQui: string;
   lignes: LignePanier[];
 }
 
-/** Client au comptoir (panier libre, sans notion de plat) vs commande prise par téléphone (structure simple/groupée imposée, comme le site public) — distinction demandée : ce n'est jamais "site vs caisse", mais "à distance vs client physiquement présent". */
-type TypeCommande = "comptoir" | "telephone";
 type ModeCommande = "simple" | "groupee" | null;
 
 interface CaisseAppProps {
@@ -108,12 +106,10 @@ function platVide(numero: number): PlatGroupeCaisse {
  * sont pour commander sur le site public), quel que soit le canal —
  * l'adresse ne l'est que pour la livraison.
  *
- * "Client au comptoir" (défaut) vs "Commande téléphone" : l'employé voit un
- * client en face et gère librement la complexité (panier plat, sans
- * structure imposée) — mais au téléphone, pour une commande de plusieurs
- * personnes, on retrouve exactement le même mécanisme "Commande simple /
- * Commande groupée" + plats-conteneurs manuels que le site public, rempli
- * par l'employé au fil de l'appel.
+ * Même écran de choix "Commande simple / Commande groupée" qu'au site
+ * public, systématique : un client au comptoir peut tout aussi bien
+ * commander pour un groupe et se faire livrer — ce n'est jamais une
+ * question de canal de prise de commande, seulement du nombre de plats.
  */
 export function CaisseApp({
   produits,
@@ -124,7 +120,6 @@ export function CaisseApp({
   imprimantesInitiales,
   nomEmploye,
 }: CaisseAppProps) {
-  const [typeCommande, setTypeCommande] = useState<TypeCommande>("comptoir");
   const [modeCommande, setModeCommande] = useState<ModeCommande>(null);
   const [panierSimple, setPanierSimple] = useState<LignePanier[]>([]);
   const [plats, setPlats] = useState<PlatGroupeCaisse[]>(() => [platVide(1)]);
@@ -303,7 +298,7 @@ export function CaisseApp({
     [produits]
   );
 
-  const enModeGroupe = typeCommande === "telephone" && modeCommande === "groupee";
+  const enModeGroupe = modeCommande === "groupee";
   const platActif = plats[plats.length - 1];
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
@@ -314,21 +309,12 @@ export function CaisseApp({
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
   const infosClientIncompletes = !nom.trim() || !telephone.trim();
 
-  /** Change de type de commande (comptoir/téléphone) : repart d'un panier vide à chaque bascule, pour ne jamais mélanger une commande comptoir en cours avec une commande téléphone. */
-  function changerTypeCommande(type: TypeCommande) {
-    setTypeCommande(type);
-    setModeCommande(null);
-    setPanierSimple([]);
-    setPlats([platVide(1)]);
-    setPlatDeplie(null);
-  }
-
   /**
    * Point d'entrée unique pour ajouter un article — écrit dans
    * `plats[plats.length - 1].lignes` (toujours le dernier, le plat actif)
-   * en mode "Commande groupée" (téléphone), ou dans le panier plat sinon
-   * (comptoir, ou téléphone en mode "Commande simple"). Aucun article ne
-   * peut jamais "flotter" hors d'un plat en mode groupé.
+   * en mode "Commande groupée", ou dans le panier plat sinon (mode
+   * "Commande simple"). Aucun article ne peut jamais "flotter" hors d'un
+   * plat en mode groupé.
    */
   function ajouterAuPanier(
     produit: ProduitCaisse,
@@ -635,30 +621,9 @@ export function CaisseApp({
     );
   }
 
-  const choixModeEnAttente = typeCommande === "telephone" && modeCommande === null;
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 bg-white p-2">
-        <button
-          onClick={() => changerTypeCommande("comptoir")}
-          className={`rounded py-2 text-sm font-bold uppercase ${
-            typeCommande === "comptoir" ? "bg-[#8B2020] text-white" : "text-gray-600"
-          }`}
-        >
-          Client au comptoir
-        </button>
-        <button
-          onClick={() => changerTypeCommande("telephone")}
-          className={`rounded py-2 text-sm font-bold uppercase ${
-            typeCommande === "telephone" ? "bg-[#8B2020] text-white" : "text-gray-600"
-          }`}
-        >
-          Commande téléphone
-        </button>
-      </div>
-
-      {choixModeEnAttente ? (
+      {modeCommande === null ? (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-center font-semibold text-gray-900">Le client commande pour lui, ou pour un groupe ?</p>
           <div className="grid grid-cols-2 gap-3">
