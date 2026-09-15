@@ -22,6 +22,7 @@ interface Brouillon {
   saladeIncluse: boolean;
   saladePrixOption: string;
   accompagnementInclus: boolean;
+  accompagnementsDisponibles: string[];
 }
 
 function versBrouillon(p: ProduitAdmin): Brouillon {
@@ -39,6 +40,7 @@ function versBrouillon(p: ProduitAdmin): Brouillon {
     saladeIncluse: p.saladeIncluse,
     saladePrixOption: p.saladePrixOption !== null ? String(p.saladePrixOption) : "",
     accompagnementInclus: p.accompagnementInclus,
+    accompagnementsDisponibles: p.accompagnementsDisponibles,
   };
 }
 
@@ -92,6 +94,27 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   const groupeMenus = parCategorie.find((g) => g.valeur === "menu_special")!;
   const groupePlatsDuJour = parCategorie.find((g) => g.valeur === "plat_du_jour")!;
   const autresGroupes = parCategorie.filter((g) => g.valeur !== "menu_special" && g.valeur !== "plat_du_jour");
+
+  // Accompagnements réellement proposables au choix (jamais "Salade", qui
+  // reste incluse automatiquement sans choix) — utilisé pour la checklist
+  // "disponible aujourd'hui" du formulaire d'édition.
+  const accompagnementsCatalogue = useMemo(
+    () => produits.filter((p) => p.categorie === "accompagnement" && p.actif && p.nom !== "Salade"),
+    [produits]
+  );
+
+  function toggleAccompagnementDisponible(nom: string) {
+    setBrouillon((precedent) => {
+      if (!precedent) return precedent;
+      const dejaPresent = precedent.accompagnementsDisponibles.includes(nom);
+      return {
+        ...precedent,
+        accompagnementsDisponibles: dejaPresent
+          ? precedent.accompagnementsDisponibles.filter((n) => n !== nom)
+          : [...precedent.accompagnementsDisponibles, nom],
+      };
+    });
+  }
 
   function ouvrirEdition(produit: ProduitAdmin) {
     setErreur(null);
@@ -219,6 +242,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
         accompagnementInclus: brouillon.accompagnementInclus,
+        accompagnementsDisponibles: brouillon.accompagnementsDisponibles,
       };
       const reponse = await fetch("/api/patron/produits", {
         method: "PATCH",
@@ -245,6 +269,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
         accompagnementInclus: brouillon.accompagnementInclus,
+        accompagnementsDisponibles: brouillon.accompagnementsDisponibles,
       };
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? produitMisAJour : p)));
       fermerEdition();
@@ -434,6 +459,26 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                       />
                       Accompagnement inclus (choix gratuit obligatoire, ex: Plat du jour)
                     </label>
+                    {brouillon.accompagnementInclus && (
+                      <div className="rounded border border-gray-700 p-2">
+                        <p className="text-xs text-gray-500">Accompagnements disponibles aujourd&apos;hui :</p>
+                        <div className="mt-1 space-y-1">
+                          {accompagnementsCatalogue.map((a) => (
+                            <label key={a.id} className="flex items-center gap-2 text-xs text-gray-400">
+                              <input
+                                type="checkbox"
+                                checked={brouillon.accompagnementsDisponibles.includes(a.nom)}
+                                onChange={() => toggleAccompagnementDisponible(a.nom)}
+                              />
+                              {a.nom}
+                            </label>
+                          ))}
+                          {accompagnementsCatalogue.length === 0 && (
+                            <p className="text-xs text-gray-600">Aucun accompagnement actif.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </details>
 

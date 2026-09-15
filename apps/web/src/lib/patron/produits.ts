@@ -20,7 +20,7 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus, accompagnements_disponibles";
 
 function versProduitAdmin(p: {
   id: string;
@@ -39,6 +39,7 @@ function versProduitAdmin(p: {
   salade_incluse: boolean;
   salade_prix_option: number | null;
   accompagnement_inclus: boolean;
+  accompagnements_disponibles: string[] | null;
 }): ProduitAdmin {
   return {
     id: p.id,
@@ -57,6 +58,7 @@ function versProduitAdmin(p: {
     saladeIncluse: p.salade_incluse,
     saladePrixOption: p.salade_prix_option,
     accompagnementInclus: p.accompagnement_inclus,
+    accompagnementsDisponibles: p.accompagnements_disponibles ?? [],
   };
 }
 
@@ -109,6 +111,7 @@ export async function creerProduit(input: ProduitAdminInput): Promise<void> {
     salade_incluse: false,
     salade_prix_option: null,
     accompagnement_inclus: false,
+    accompagnements_disponibles: [],
   });
 
   if (error) {
@@ -134,6 +137,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     salade_incluse?: boolean;
     salade_prix_option?: number | null;
     accompagnement_inclus?: boolean;
+    accompagnements_disponibles?: string[];
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.categorie !== undefined) update.categorie = input.categorie;
@@ -150,6 +154,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.saladeIncluse !== undefined) update.salade_incluse = input.saladeIncluse;
   if (input.saladePrixOption !== undefined) update.salade_prix_option = input.saladePrixOption;
   if (input.accompagnementInclus !== undefined) update.accompagnement_inclus = input.accompagnementInclus;
+  if (input.accompagnementsDisponibles !== undefined) update.accompagnements_disponibles = input.accompagnementsDisponibles;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);
 

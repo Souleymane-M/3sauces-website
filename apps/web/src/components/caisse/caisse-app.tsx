@@ -18,7 +18,7 @@ import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 
 interface LignePanier {
   id: string;
@@ -30,7 +30,7 @@ interface LignePanier {
   boissonIncluse: string | null;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
-  accompagnementInclus: string | null;
+  accompagnementsInclus: string[];
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
@@ -125,6 +125,7 @@ export function CaisseApp({
   const [panierSimple, setPanierSimple] = useState<LignePanier[]>([]);
   const [plats, setPlats] = useState<PlatGroupeCaisse[]>(() => [platVide(1)]);
   const [platDeplie, setPlatDeplie] = useState<string | null>(plats[0]?.id ?? null);
+  const [platActifId, setPlatActifId] = useState<string>(plats[0].id);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
@@ -307,7 +308,9 @@ export function CaisseApp({
   );
 
   const enModeGroupe = modeCommande === "groupee";
-  const platActif = plats[plats.length - 1];
+  const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
+  const totalPlat = (plat: PlatGroupeCaisse) =>
+    plat.lignes.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
   const panierActuel = enModeGroupe ? plats.flatMap((p) => p.lignes) : panierSimple;
@@ -324,16 +327,19 @@ export function CaisseApp({
     }
     setModeCommande(null);
     setPanierSimple([]);
-    setPlats([platVide(1)]);
+    const initial = platVide(1);
+    setPlats([initial]);
+    setPlatActifId(initial.id);
     setPlatDeplie(null);
   }
 
   /**
-   * Point d'entrée unique pour ajouter un article — écrit dans
-   * `plats[plats.length - 1].lignes` (toujours le dernier, le plat actif)
-   * en mode "Commande groupée", ou dans le panier plat sinon (mode
-   * "Commande simple"). Aucun article ne peut jamais "flotter" hors d'un
-   * plat en mode groupé.
+   * Point d'entrée unique pour ajouter un article — écrit dans les lignes
+   * du plat ciblé par `platActifId` en mode "Commande groupée" (pas
+   * forcément le dernier du tableau : "Modifier" peut rediriger vers un
+   * plat déjà fermé), ou dans le panier plat sinon (mode "Commande
+   * simple"). Aucun article ne peut jamais "flotter" hors d'un plat en
+   * mode groupé.
    */
   function ajouterAuPanier(
     produit: ProduitCaisse,
@@ -344,7 +350,7 @@ export function CaisseApp({
     quantite: number = 1,
     prixSaisi?: number,
     saladeIncluse: boolean | null = null,
-    accompagnementInclus: string | null = null
+    accompagnementsInclus: string[] = []
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -354,7 +360,7 @@ export function CaisseApp({
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
       l.saladeIncluse === saladeIncluse &&
-      l.accompagnementInclus === accompagnementInclus;
+      JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanier => ({
       id: `${produit.id}-${Date.now()}-${Math.random()}`,
       produit,
@@ -365,18 +371,20 @@ export function CaisseApp({
       boissonIncluse,
       prixSaisi,
       saladeIncluse,
-      accompagnementInclus,
+      accompagnementsInclus,
     });
 
     if (enModeGroupe) {
       setPlats((precedent) => {
+        const index = precedent.findIndex((p) => p.id === platActifId);
+        const cible = index === -1 ? precedent.length - 1 : index;
         const copie = [...precedent];
-        const actif = copie[copie.length - 1];
+        const actif = copie[cible];
         const existante = actif.lignes.find(cle);
         const lignes = existante
           ? actif.lignes.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l))
           : [...actif.lignes, nouvelleLigne()];
-        copie[copie.length - 1] = { ...actif, lignes };
+        copie[cible] = { ...actif, lignes };
         return copie;
       });
       setPlatDeplie(platActif.id);
@@ -436,11 +444,23 @@ export function CaisseApp({
   }
 
   function platSuivant() {
+    if (totalPlat(platActif) < SEUIL_MINIMUM_PLAT) {
+      setErreur("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
+      return;
+    }
+    setErreur(null);
     setPlats((precedent) => {
       const nouveau = platVide(precedent.length + 1);
+      setPlatActifId(nouveau.id);
       setPlatDeplie(nouveau.id);
       return [...precedent, nouveau];
     });
+  }
+
+  /** Rouvre un plat déjà "fermé" comme cible des prochains ajouts, tout en conservant son contenu existant. */
+  function modifierPlat(platId: string) {
+    setPlatActifId(platId);
+    setPlatDeplie(platId);
   }
 
   function modifierPourQuiPlat(platId: string, valeur: string) {
@@ -448,7 +468,12 @@ export function CaisseApp({
   }
 
   function supprimerPlat(platId: string) {
-    setPlats((precedent) => (precedent.length > 1 ? precedent.filter((p) => p.id !== platId) : precedent));
+    setPlats((precedent) => {
+      if (precedent.length <= 1) return precedent;
+      const suivant = precedent.filter((p) => p.id !== platId);
+      if (platActifId === platId) setPlatActifId(suivant[suivant.length - 1].id);
+      return suivant;
+    });
   }
 
   async function rechercherClient() {
@@ -476,6 +501,16 @@ export function CaisseApp({
       setErreur("Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.");
       return;
     }
+    if (enModeGroupe) {
+      const platsValides = plats.filter((p) => p.lignes.length > 0);
+      const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
+      if (indexPlatSousLeSeuil !== -1) {
+        setErreur(
+          `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`
+        );
+        return;
+      }
+    }
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -490,7 +525,7 @@ export function CaisseApp({
               boissonIncluse: l.boissonIncluse,
               prixSaisi: l.prixSaisi,
               saladeIncluse: l.saladeIncluse,
-              accompagnementInclus: l.accompagnementInclus,
+              accompagnementsInclus: l.accompagnementsInclus,
               platIndex: index,
               pourQui: plat.pourQui.trim() || null,
             }))
@@ -504,7 +539,7 @@ export function CaisseApp({
             boissonIncluse: l.boissonIncluse,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
-            accompagnementInclus: l.accompagnementInclus,
+            accompagnementsInclus: l.accompagnementsInclus,
             platIndex: null,
             pourQui: null,
           }));
@@ -552,7 +587,7 @@ export function CaisseApp({
         boissonIncluse: l.boissonIncluse,
         canetteIncluse: l.produit.canetteIncluse,
         saladeIncluse: l.saladeIncluse,
-        accompagnementInclus: l.accompagnementInclus,
+        accompagnementsInclus: l.accompagnementsInclus,
         pourQui,
         platIndex: null,
       }));
@@ -622,8 +657,8 @@ export function CaisseApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
-        {l.accompagnementInclus && (
-          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementInclus}</div>
+        {l.accompagnementsInclus.length > 0 && (
+          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementsInclus.join(" + ")}</div>
         )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
@@ -744,7 +779,10 @@ export function CaisseApp({
             {enModeGroupe && (
               <div className="rounded-lg border border-[#8B2020] p-3">
                 <p className="text-sm font-semibold text-gray-900">
-                  Plat actif : <span className="text-[#8B2020]">Plat {plats.length}</span>
+                  Plat actif :{" "}
+                  <span className="text-[#8B2020]">
+                    Plat {plats.findIndex((p) => p.id === platActifId) + 1}
+                  </span>
                   {platActif.pourQui ? ` (${platActif.pourQui})` : ""}
                 </p>
                 <button
@@ -809,15 +847,26 @@ export function CaisseApp({
                                 className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
                               />
                               <ul className="space-y-2">{plat.lignes.map(ligneJsx)}</ul>
-                              {plats.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => supprimerPlat(plat.id)}
-                                  className="text-xs text-red-500 underline"
-                                >
-                                  Supprimer ce plat
-                                </button>
-                              )}
+                              <div className="flex items-center gap-3">
+                                {platActifId !== plat.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => modifierPlat(plat.id)}
+                                    className="text-xs font-semibold text-[#8B2020] underline"
+                                  >
+                                    Modifier
+                                  </button>
+                                )}
+                                {plats.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => supprimerPlat(plat.id)}
+                                    className="text-xs text-red-500 underline"
+                                  >
+                                    Supprimer ce plat
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           )}
                         </li>
@@ -1030,7 +1079,7 @@ export function CaisseApp({
             boissonIncluse,
             saladeIncluse,
             saladeOption,
-            accompagnementInclus
+            accompagnementsInclus
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1041,7 +1090,7 @@ export function CaisseApp({
               1,
               undefined,
               saladeIncluse,
-              accompagnementInclus
+              accompagnementsInclus
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

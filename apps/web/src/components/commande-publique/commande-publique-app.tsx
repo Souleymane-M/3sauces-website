@@ -17,7 +17,7 @@ import {
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
@@ -33,7 +33,7 @@ interface LignePanierPublique {
   saveurs: string[];
   boissonIncluse: string | null;
   saladeIncluse: boolean | null;
-  accompagnementInclus: string | null;
+  accompagnementsInclus: string[];
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel le client range tout ce qu'il veut pour une personne — jamais déduit automatiquement du contenu. */
@@ -88,6 +88,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [panierSimple, setPanierSimple] = useState<LignePanierPublique[]>([]);
   const [plats, setPlats] = useState<PlatGroupe[]>(() => [platVide(1)]);
   const [platDeplie, setPlatDeplie] = useState<string | null>(plats[0]?.id ?? null);
+  // Cible des prochains ajouts en mode groupé — pas forcément le dernier
+  // plat du tableau : "Modifier" sur une carte déjà fermée permet de
+  // rediriger les ajouts vers elle sans rien recommencer.
+  const [platActifId, setPlatActifId] = useState<string>(plats[0].id);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
@@ -173,7 +177,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     [produits]
   );
 
-  const platActif = plats[plats.length - 1];
+  const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
+  const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
@@ -189,7 +194,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     }
     setModeCommande(null);
     setPanierSimple([]);
-    setPlats([platVide(1)]);
+    const initial = platVide(1);
+    setPlats([initial]);
+    setPlatActifId(initial.id);
     setPlatDeplie(null);
   }
 
@@ -222,7 +229,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     boissonIncluse: string | null = null,
     quantite: number = 1,
     saladeIncluse: boolean | null = null,
-    accompagnementInclus: string | null = null
+    accompagnementsInclus: string[] = []
   ) {
     declencherPulse();
     const cle = (l: LignePanierPublique) =>
@@ -232,7 +239,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
       l.saladeIncluse === saladeIncluse &&
-      l.accompagnementInclus === accompagnementInclus;
+      JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanierPublique => ({
       id: `${produit.id}-${Date.now()}-${Math.random()}`,
       produit,
@@ -242,18 +249,20 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       saveurs: saveursChoisies,
       boissonIncluse,
       saladeIncluse,
-      accompagnementInclus,
+      accompagnementsInclus,
     });
 
     if (modeCommande === "groupee") {
       setPlats((precedent) => {
+        const index = precedent.findIndex((p) => p.id === platActifId);
+        const cible = index === -1 ? precedent.length - 1 : index;
         const copie = [...precedent];
-        const actif = copie[copie.length - 1];
+        const actif = copie[cible];
         const existante = actif.lignes.find(cle);
         const lignes = existante
           ? actif.lignes.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l))
           : [...actif.lignes, nouvelleLigne()];
-        copie[copie.length - 1] = { ...actif, lignes };
+        copie[cible] = { ...actif, lignes };
         return copie;
       });
       setPlatDeplie(platActif.id);
@@ -316,11 +325,23 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   }
 
   function platSuivant() {
+    if (totalPlat(platActif) < SEUIL_MINIMUM_PLAT) {
+      setErreur("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
+      return;
+    }
+    setErreur(null);
     setPlats((precedent) => {
       const nouveau = platVide(precedent.length + 1);
+      setPlatActifId(nouveau.id);
       setPlatDeplie(nouveau.id);
       return [...precedent, nouveau];
     });
+  }
+
+  /** Rouvre un plat déjà "fermé" comme cible des prochains ajouts, tout en conservant son contenu existant. */
+  function modifierPlat(platId: string) {
+    setPlatActifId(platId);
+    setPlatDeplie(platId);
   }
 
   function modifierPourQuiPlat(platId: string, valeur: string) {
@@ -328,7 +349,12 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   }
 
   function supprimerPlat(platId: string) {
-    setPlats((precedent) => (precedent.length > 1 ? precedent.filter((p) => p.id !== platId) : precedent));
+    setPlats((precedent) => {
+      if (precedent.length <= 1) return precedent;
+      const suivant = precedent.filter((p) => p.id !== platId);
+      if (platActifId === platId) setPlatActifId(suivant[suivant.length - 1].id);
+      return suivant;
+    });
   }
 
   function voirPanier() {
@@ -347,6 +373,16 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     if (modeCommande === "groupee" && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) {
       setErreur("Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.");
       return;
+    }
+    if (modeCommande === "groupee") {
+      const platsValides = plats.filter((p) => p.lignes.length > 0);
+      const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
+      if (indexPlatSousLeSeuil !== -1) {
+        setErreur(
+          `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`
+        );
+        return;
+      }
     }
     if (!nom.trim()) {
       setErreur("Indique ton nom.");
@@ -386,7 +422,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 saveurs: l.saveurs,
                 boissonIncluse: l.boissonIncluse,
                 saladeIncluse: l.saladeIncluse,
-                accompagnementInclus: l.accompagnementInclus,
+                accompagnementsInclus: l.accompagnementsInclus,
                 platIndex: index,
                 pourQui: plat.pourQui.trim() || null,
               }))
@@ -399,7 +435,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               saveurs: l.saveurs,
               boissonIncluse: l.boissonIncluse,
               saladeIncluse: l.saladeIncluse,
-              accompagnementInclus: l.accompagnementInclus,
+              accompagnementsInclus: l.accompagnementsInclus,
               platIndex: null,
               pourQui: null,
             }));
@@ -446,8 +482,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
-        {l.accompagnementInclus && (
-          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementInclus}</div>
+        {l.accompagnementsInclus.length > 0 && (
+          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementsInclus.join(" + ")}</div>
         )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
@@ -513,7 +549,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             {modeCommande === "groupee" && (
               <div className="rounded-lg border border-[#8B2020] bg-white p-3">
                 <p className="text-sm font-semibold text-gray-900">
-                  Tu remplis actuellement : <span className="text-[#8B2020]">Plat {plats.length}</span>
+                  Tu remplis actuellement :{" "}
+                  <span className="text-[#8B2020]">
+                    Plat {plats.findIndex((p) => p.id === platActifId) + 1}
+                  </span>
                   {platActif.pourQui ? ` (${platActif.pourQui})` : ""}
                 </p>
                 <button
@@ -668,15 +707,26 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                                 className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
                               />
                               <ul className="space-y-2">{plat.lignes.map(ligneJsx)}</ul>
-                              {plats.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => supprimerPlat(plat.id)}
-                                  className="text-xs text-red-500 underline"
-                                >
-                                  Supprimer ce plat
-                                </button>
-                              )}
+                              <div className="flex items-center gap-3">
+                                {platActifId !== plat.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => modifierPlat(plat.id)}
+                                    className="text-xs font-semibold text-[#8B2020] underline"
+                                  >
+                                    Modifier
+                                  </button>
+                                )}
+                                {plats.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => supprimerPlat(plat.id)}
+                                    className="text-xs text-red-500 underline"
+                                  >
+                                    Supprimer ce plat
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           )}
                         </li>
@@ -906,7 +956,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
             boissonIncluse,
             saladeIncluse,
             saladeOption,
-            accompagnementInclus
+            accompagnementsInclus
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -916,7 +966,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               boissonIncluse,
               1,
               saladeIncluse,
-              accompagnementInclus
+              accompagnementsInclus
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

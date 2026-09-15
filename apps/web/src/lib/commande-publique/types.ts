@@ -32,6 +32,8 @@ export interface ProduitPublic {
   saladePrixOption: number | null;
   /** Si vrai, le configurateur propose un choix gratuit obligatoire parmi les accompagnements (ex: Plats du jour) — jamais la "Salade" elle-même, incluse automatiquement sans choix quand elle fait partie de la recette. */
   accompagnementInclus: boolean;
+  /** Accompagnements réellement disponibles aujourd'hui parmi la liste (configuré depuis /patron) — n'a de sens que si `accompagnementInclus` est vrai. */
+  accompagnementsDisponibles: string[];
 }
 
 /**
@@ -88,8 +90,8 @@ export interface LigneCommandePubliquePayload {
   boissonIncluse: string | null;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
-  /** Accompagnement gratuit choisi parmi la liste (ex: Plat du jour), null si sans objet. */
-  accompagnementInclus: string | null;
+  /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */
+  accompagnementsInclus: string[];
   /** Nom optionnel du convive ("Pour Rachid"), porté par toutes les lignes d'un même plat en mode groupé, null en mode simple. */
   pourQui: string | null;
   /** Index du plat-conteneur en mode "Commande groupée" (0, 1, 2...), null en mode "Commande simple" — décision explicite du client, jamais déduite du contenu. */

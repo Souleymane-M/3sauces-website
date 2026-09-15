@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   ProduitConfigurable,
   ViandePublique,
   SaucePublique,
   SaveurPublique,
 } from "@/lib/commande-publique/types";
+import { GROUPE_ACCOMPAGNEMENT_COMBINABLE, GROUPE_ACCOMPAGNEMENT_EXCLUSIF } from "@/lib/commande-publique/accompagnements";
 
 export interface ExtrasChoisis {
   /** Une entrée par unité de viande supplémentaire choisie (doublons autorisés, illimité). */
@@ -38,7 +39,7 @@ interface ViandeModalPubliqueProps {
     boissonIncluse: string | null,
     saladeIncluse: boolean | null,
     saladeOption: boolean,
-    accompagnementInclus: string | null
+    accompagnementsInclus: string[]
   ) => void;
   onAnnuler: () => void;
 }
@@ -77,17 +78,25 @@ export function ViandeModalPublique({
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
   const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
-  const [accompagnementChoisi, setAccompagnementChoisi] = useState<string | null>(null);
+  const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
   const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
   const boissonRetenue = !produit.canetteIncluse ? null : demandeChoixBoisson ? boissonChoisie : (saveurs[0]?.nom ?? null);
-  const demandeAccompagnement = produit.accompagnementInclus && accompagnements.length > 0;
+  // Ne propose que les accompagnements réellement disponibles aujourd'hui
+  // pour CE produit (configuré depuis /patron) — jamais la liste globale.
+  const accompagnementsDuJour = useMemo(
+    () => accompagnements.filter((a) => produit.accompagnementsDisponibles.includes(a.nom)),
+    [accompagnements, produit.accompagnementsDisponibles]
+  );
+  const demandeAccompagnement = produit.accompagnementInclus && accompagnementsDuJour.length > 0;
+  const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
+    (!demandeSauce || saucesChoisies.length >= 1) &&
     (!demandeChoixBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
-    (!demandeAccompagnement || accompagnementChoisi !== null);
+    (!demandeAccompagnement || accompagnementsChoisis.length >= 1);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
     setter((precedent) => {
@@ -106,11 +115,19 @@ export function ViandeModalPublique({
     });
   }
 
-  function basculerSauceIncluse(nom: string) {
-    setSaucesChoisies((precedent) => {
-      if (precedent.includes(nom)) return precedent.filter((s) => s !== nom);
-      if (precedent.length >= produit.nbSaucesIncluses) return precedent;
-      return [...precedent, nom];
+  /**
+   * Sélection des accompagnements : cliquer un exclusif remplace toute la
+   * sélection par lui seul ; cliquer un combinable retire un éventuel
+   * exclusif déjà choisi et plafonne à 2 combinables — jamais de mélange
+   * exclusif + combinable, jamais 2 exclusifs.
+   */
+  function toggleAccompagnement(nom: string) {
+    setAccompagnementsChoisis((precedent) => {
+      if (precedent.includes(nom)) return precedent.filter((n) => n !== nom);
+      if (GROUPE_ACCOMPAGNEMENT_EXCLUSIF.has(nom)) return [nom];
+      const combinablesActuels = precedent.filter((n) => GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(n));
+      if (combinablesActuels.length >= 2) return precedent;
+      return [...combinablesActuels, nom];
     });
   }
 
@@ -175,33 +192,43 @@ export function ViandeModalPublique({
           </div>
         )}
 
-        {produit.nbSaucesIncluses > 0 && sauces.length > 0 && (
+        {demandeSauce && (
           <div className="mt-5">
             <p className="text-sm font-bold text-[#2D5A27]">
-              Sauces incluses (jusqu&apos;à {produit.nbSaucesIncluses}, optionnel) — {saucesChoisies.length}/
+              Choisis au moins 1 sauce (jusqu&apos;à {produit.nbSaucesIncluses}) — {saucesChoisies.length}/
               {produit.nbSaucesIncluses}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {sauces.map((s) => {
-                const selectionnee = saucesChoisies.includes(s.nom);
-                const desactivee = !selectionnee && saucesChoisies.length >= produit.nbSaucesIncluses;
+                const count = saucesChoisies.filter((c) => c === s.nom).length;
+                const desactivee = saucesChoisies.length >= produit.nbSaucesIncluses;
                 return (
                   <button
                     key={s.id}
                     type="button"
                     disabled={desactivee}
-                    onClick={() => basculerSauceIncluse(s.nom)}
+                    onClick={() => ajouterOccurrence(setSaucesChoisies, s.nom, produit.nbSaucesIncluses)}
                     className={`rounded-full border px-3 py-1.5 text-sm ${
-                      selectionnee
+                      count > 0
                         ? "border-[#2D5A27] bg-[#2D5A27] text-white"
                         : "border-gray-300 text-gray-700 hover:bg-gray-50"
                     } disabled:opacity-30`}
                   >
                     {s.nom}
+                    {count > 1 ? ` ×${count}` : ""}
                   </button>
                 );
               })}
             </div>
+            {saucesChoisies.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSaucesChoisies([])}
+                className="mt-2 text-xs text-gray-400 underline"
+              >
+                Réinitialiser
+              </button>
+            )}
           </div>
         )}
 
@@ -248,22 +275,33 @@ export function ViandeModalPublique({
 
         {demandeAccompagnement && (
           <div className="mt-5">
-            <p className="text-sm font-bold text-[#2D5A27]">Choisis ton accompagnement</p>
+            <p className="text-sm font-bold text-[#2D5A27]">
+              Choisis ton accompagnement (jusqu&apos;à 2 si combinables)
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {accompagnements.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setAccompagnementChoisi(a.nom)}
-                  className={`rounded-full border px-3 py-1.5 text-sm ${
-                    accompagnementChoisi === a.nom
-                      ? "border-[#2D5A27] bg-[#2D5A27] text-white"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  {a.nom}
-                </button>
-              ))}
+              {accompagnementsDuJour.map((a) => {
+                const choisi = accompagnementsChoisis.includes(a.nom);
+                const combinablesActuels = accompagnementsChoisis.filter((n) =>
+                  GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(n)
+                );
+                const desactive =
+                  !choisi && GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(a.nom) && combinablesActuels.length >= 2;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={desactive}
+                    onClick={() => toggleAccompagnement(a.nom)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      choisi
+                        ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    } disabled:opacity-30`}
+                  >
+                    {a.nom}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -412,7 +450,7 @@ export function ViandeModalPublique({
                 boissonRetenue,
                 produit.saladeIncluse ? saladeGardee : null,
                 saladeOptionCochee,
-                demandeAccompagnement ? accompagnementChoisi : null
+                demandeAccompagnement ? accompagnementsChoisis : []
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

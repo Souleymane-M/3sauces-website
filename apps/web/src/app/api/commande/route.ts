@@ -11,7 +11,8 @@ import type {
 } from "@/lib/commande-publique/types";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
+import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, accompagnements_disponibles"
     )
     .in("id", produitIds);
 
@@ -243,6 +244,8 @@ export async function POST(request: Request) {
     //    Collégien, 3 pour le Menu Étudiant et les Tacos/Barquette/Bowl. Ça
     //    évite de coder en dur une liste de catégories : chaque produit porte
     //    sa propre règle.
+    // Doublons autorisés pour les sauces incluses (ex: "double mayo"), même
+    // mécanique que les viandes — jamais rejetés comme "en double".
     const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
     const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
     if (estSauceSupplementaire) {
@@ -265,9 +268,12 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-    }
-    if (new Set(sauces).size !== sauces.length) {
-      return NextResponse.json({ error: `Sauce en double sur la ligne ${produit.nom}.` }, { status: 400 });
+      // Choix d'au moins 1 sauce obligatoire dès que le produit en propose
+      // (Tacos/Barquette/Bowl/Menu Étudiant/Menu Collégien) — jamais une
+      // commande sans sauce précisée pour la cuisine.
+      if (maxSaucesIncluses > 0 && sauces.length === 0) {
+        return NextResponse.json({ error: `Choisis au moins 1 sauce sur ${produit.nom}.` }, { status: 400 });
+      }
     }
     if (sauces.some((s) => !nomsSaucesValides.has(s))) {
       return NextResponse.json({ error: `Sauce invalide sur la ligne ${produit.nom}.` }, { status: 400 });
@@ -323,22 +329,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
     }
 
-    // Accompagnement inclus (Plats du jour) : choix obligatoire, gratuit,
-    // parmi les accompagnements actifs — jamais "Salade", qui reste incluse
-    // automatiquement sans choix.
-    let accompagnementInclus: string | null = null;
+    // Accompagnement(s) inclus (Plats du jour) : choix obligatoire, gratuit,
+    // parmi les accompagnements actifs ET disponibles aujourd'hui pour ce
+    // produit précis — jamais "Salade", qui reste incluse automatiquement
+    // sans choix. Groupes de combinaison (jusqu'à 2 combinables, jamais
+    // mélangés avec un exclusif) revérifiés ici, jamais confiance dans la
+    // seule validation client.
+    let accompagnementsInclus: string[] = [];
     if (produit.accompagnement_inclus) {
-      if (typeof ligneBrute.accompagnementInclus !== "string") {
-        return NextResponse.json({ error: `Choix d'accompagnement requis sur ${produit.nom}.` }, { status: 400 });
+      const brut = Array.isArray(ligneBrute.accompagnementsInclus) ? ligneBrute.accompagnementsInclus : null;
+      if (!brut || !combinaisonAccompagnementsValide(brut)) {
+        return NextResponse.json({ error: `Choix d'accompagnement invalide sur ${produit.nom}.` }, { status: 400 });
       }
-      if (!nomsAccompagnementsValides.has(ligneBrute.accompagnementInclus)) {
+      const disponibles = new Set(produit.accompagnements_disponibles ?? []);
+      if (brut.some((n) => !nomsAccompagnementsValides.has(n) || !disponibles.has(n))) {
         return NextResponse.json(
-          { error: `Accompagnement invalide sur la ligne ${produit.nom}.` },
+          { error: `Accompagnement non disponible sur ${produit.nom}.` },
           { status: 400 }
         );
       }
-      accompagnementInclus = ligneBrute.accompagnementInclus;
-    } else if (ligneBrute.accompagnementInclus !== undefined && ligneBrute.accompagnementInclus !== null) {
+      accompagnementsInclus = brut;
+    } else if (
+      ligneBrute.accompagnementsInclus !== undefined &&
+      Array.isArray(ligneBrute.accompagnementsInclus) &&
+      ligneBrute.accompagnementsInclus.length > 0
+    ) {
       return NextResponse.json({ error: `Accompagnement non proposé sur ${produit.nom}.` }, { status: 400 });
     }
 
@@ -366,7 +381,7 @@ export async function POST(request: Request) {
       boissonIncluse,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
-      accompagnementInclus,
+      accompagnementsInclus,
       pourQui,
       platIndex,
     });
@@ -381,6 +396,12 @@ export async function POST(request: Request) {
   if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
     return NextResponse.json(
       { error: "Une commande groupée doit contenir au moins 3 plats." },
+      { status: 400 }
+    );
+  }
+  if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
+    return NextResponse.json(
+      { error: "Chaque plat doit atteindre au moins 5€ pour être validé." },
       { status: 400 }
     );
   }

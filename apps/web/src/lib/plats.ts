@@ -22,3 +22,25 @@ export function compterPlatsGroupes<T extends LigneAvecPlat>(lignes: T[]): numbe
   const indices = new Set(lignes.filter((l) => l.platIndex !== null).map((l) => l.platIndex));
   return indices.size;
 }
+
+/**
+ * Montant minimum pour qu'un plat compte comme un vrai repas en mode
+ * "Commande groupée" — une grillade seule à 2€ n'en est pas un. Aligné
+ * sur le Menu Collégien, le plus petit vrai repas de la carte.
+ */
+export const SEUIL_MINIMUM_PLAT = 5;
+
+export interface LigneAvecPlatEtPrix extends LigneAvecPlat {
+  prixUnitaire: number;
+  quantite: number;
+}
+
+/** Total en euros de chaque plat-conteneur, regroupé par `platIndex` — jamais confiance dans un total envoyé par le client, toujours recalculé côté serveur à partir de lignes déjà validées. */
+export function totauxParPlat<T extends LigneAvecPlatEtPrix>(lignes: T[]): Map<number, number> {
+  const totaux = new Map<number, number>();
+  for (const l of lignes) {
+    if (l.platIndex === null) continue;
+    totaux.set(l.platIndex, (totaux.get(l.platIndex) ?? 0) + l.prixUnitaire * l.quantite);
+  }
+  return totaux;
+}

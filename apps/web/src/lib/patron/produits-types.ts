@@ -34,6 +34,7 @@ export interface ProduitAdmin {
   saladeIncluse: boolean;
   saladePrixOption: number | null;
   accompagnementInclus: boolean;
+  accompagnementsDisponibles: string[];
 }
 
 export interface ProduitAdminInput {
@@ -65,4 +66,5 @@ export interface ProduitAdminPatch {
   saladeIncluse?: boolean;
   saladePrixOption?: number | null;
   accompagnementInclus?: boolean;
+  accompagnementsDisponibles?: string[];
 }
