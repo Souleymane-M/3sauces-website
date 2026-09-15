@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Commander — 3 Sauces",
-  description: "Commande en ligne — 3 Sauces, retrait sur place ou livraison à Dembéni.",
+  description:
+    "Grillades au charbon, tacos généreux, cuisine locale à Iloni/Dembéni. Commandez en ligne, sur place ou livré. Menus dès 5€. 3sauces.fr",
 };
 
 export default async function CommanderPage() {
