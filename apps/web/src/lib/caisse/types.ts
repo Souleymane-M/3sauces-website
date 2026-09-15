@@ -23,6 +23,8 @@ export interface LigneCommande {
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
+  /** Accompagnement gratuit choisi parmi la liste (ex: Plat du jour), null si sans objet. */
+  accompagnementInclus?: string | null;
   /** Nom optionnel du convive ("Pour Rachid"), porté par toutes les lignes d'un même plat en mode groupé, null en mode simple/comptoir. */
   pourQui?: string | null;
   /** Index du plat-conteneur en mode "Commande groupée" (téléphone), null en mode comptoir/simple. */
@@ -69,6 +71,7 @@ export interface LigneCommandePayload {
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
   saladeIncluse: boolean | null;
+  accompagnementInclus: string | null;
   pourQui: string | null;
   platIndex: number | null;
 }

@@ -79,6 +79,7 @@ export interface Database {
           ordre: number;
           salade_incluse: boolean;
           salade_prix_option: number | null;
+          accompagnement_inclus: boolean;
           created_at: string;
           updated_at: string;
         };

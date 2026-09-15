@@ -182,6 +182,9 @@ export async function PATCH(request: Request) {
     if (!resultat.ok) return NextResponse.json({ error: "Prix de l'option salade invalide." }, { status: 400 });
     patch.saladePrixOption = resultat.prix;
   }
+  if (typeof body.accompagnementInclus === "boolean") {
+    patch.accompagnementInclus = body.accompagnementInclus;
+  }
 
   try {
     await mettreAJourProduit(body.id, patch);

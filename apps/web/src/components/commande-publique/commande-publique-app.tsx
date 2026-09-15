@@ -33,6 +33,7 @@ interface LignePanierPublique {
   saveurs: string[];
   boissonIncluse: string | null;
   saladeIncluse: boolean | null;
+  accompagnementInclus: string | null;
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel le client range tout ce qu'il veut pour une personne — jamais déduit automatiquement du contenu. */
@@ -164,6 +165,13 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
+  // Accompagnements proposés en choix gratuit inclus (Plats du jour) —
+  // jamais "Salade", qui est incluse automatiquement sans choix quand elle
+  // fait partie de la recette (pas le même mécanisme que ce choix libre).
+  const accompagnements = useMemo(
+    () => produits.filter((p) => p.categorie === "accompagnement" && p.nom !== "Salade"),
+    [produits]
+  );
 
   const platActif = plats[plats.length - 1];
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
@@ -213,7 +221,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     saveursChoisies: string[] = [],
     boissonIncluse: string | null = null,
     quantite: number = 1,
-    saladeIncluse: boolean | null = null
+    saladeIncluse: boolean | null = null,
+    accompagnementInclus: string | null = null
   ) {
     declencherPulse();
     const cle = (l: LignePanierPublique) =>
@@ -222,7 +231,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
-      l.saladeIncluse === saladeIncluse;
+      l.saladeIncluse === saladeIncluse &&
+      l.accompagnementInclus === accompagnementInclus;
     const nouvelleLigne = (): LignePanierPublique => ({
       id: `${produit.id}-${Date.now()}-${Math.random()}`,
       produit,
@@ -232,6 +242,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       saveurs: saveursChoisies,
       boissonIncluse,
       saladeIncluse,
+      accompagnementInclus,
     });
 
     if (modeCommande === "groupee") {
@@ -269,7 +280,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       (!produit.viandeImposee && produit.nbViandesMax > 0) ||
       produit.nbSaucesIncluses > 0 ||
       produit.autoriseExtras ||
-      produit.nbSaveursMax > 0;
+      produit.nbSaveursMax > 0 ||
+      produit.accompagnementInclus;
 
     if (besoinConfigurateur) {
       setProduitEnSelection(produit);
@@ -374,6 +386,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 saveurs: l.saveurs,
                 boissonIncluse: l.boissonIncluse,
                 saladeIncluse: l.saladeIncluse,
+                accompagnementInclus: l.accompagnementInclus,
                 platIndex: index,
                 pourQui: plat.pourQui.trim() || null,
               }))
@@ -386,6 +399,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               saveurs: l.saveurs,
               boissonIncluse: l.boissonIncluse,
               saladeIncluse: l.saladeIncluse,
+              accompagnementInclus: l.accompagnementInclus,
               platIndex: null,
               pourQui: null,
             }));
@@ -432,6 +446,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
+        {l.accompagnementInclus && (
+          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementInclus}</div>
+        )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
         )}
@@ -878,11 +895,29 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           viandes={viandes}
           sauces={sauces}
           saveurs={saveurs}
+          accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse, 1, saladeIncluse);
+          onValider={(
+            viandesChoisies,
+            saucesChoisies,
+            extras,
+            boissonIncluse,
+            saladeIncluse,
+            saladeOption,
+            accompagnementInclus
+          ) => {
+            ajouterAuPanier(
+              produitEnSelection,
+              viandesChoisies,
+              saucesChoisies,
+              [],
+              boissonIncluse,
+              1,
+              saladeIncluse,
+              accompagnementInclus
+            );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);

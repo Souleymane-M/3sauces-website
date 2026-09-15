@@ -30,6 +30,7 @@ interface LignePanier {
   boissonIncluse: string | null;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
+  accompagnementInclus: string | null;
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
@@ -297,6 +298,13 @@ export function CaisseApp({
     () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
+  // Accompagnements proposés en choix gratuit inclus (Plats du jour) —
+  // jamais "Salade", qui est incluse automatiquement sans choix quand elle
+  // fait partie de la recette (pas le même mécanisme que ce choix libre).
+  const accompagnements = useMemo(
+    () => produits.filter((p) => p.categorie === "accompagnement" && p.nom !== "Salade"),
+    [produits]
+  );
 
   const enModeGroupe = modeCommande === "groupee";
   const platActif = plats[plats.length - 1];
@@ -335,7 +343,8 @@ export function CaisseApp({
     boissonIncluse: string | null = null,
     quantite: number = 1,
     prixSaisi?: number,
-    saladeIncluse: boolean | null = null
+    saladeIncluse: boolean | null = null,
+    accompagnementInclus: string | null = null
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -344,7 +353,8 @@ export function CaisseApp({
       JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
-      l.saladeIncluse === saladeIncluse;
+      l.saladeIncluse === saladeIncluse &&
+      l.accompagnementInclus === accompagnementInclus;
     const nouvelleLigne = (): LignePanier => ({
       id: `${produit.id}-${Date.now()}-${Math.random()}`,
       produit,
@@ -355,6 +365,7 @@ export function CaisseApp({
       boissonIncluse,
       prixSaisi,
       saladeIncluse,
+      accompagnementInclus,
     });
 
     if (enModeGroupe) {
@@ -386,7 +397,8 @@ export function CaisseApp({
       (!produit.viandeImposee && produit.nbViandesMax > 0) ||
       produit.nbSaucesIncluses > 0 ||
       produit.autoriseExtras ||
-      produit.nbSaveursMax > 0;
+      produit.nbSaveursMax > 0 ||
+      produit.accompagnementInclus;
 
     if (besoinConfigurateur) {
       setProduitEnSelection(produit);
@@ -478,6 +490,7 @@ export function CaisseApp({
               boissonIncluse: l.boissonIncluse,
               prixSaisi: l.prixSaisi,
               saladeIncluse: l.saladeIncluse,
+              accompagnementInclus: l.accompagnementInclus,
               platIndex: index,
               pourQui: plat.pourQui.trim() || null,
             }))
@@ -491,6 +504,7 @@ export function CaisseApp({
             boissonIncluse: l.boissonIncluse,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
+            accompagnementInclus: l.accompagnementInclus,
             platIndex: null,
             pourQui: null,
           }));
@@ -538,6 +552,7 @@ export function CaisseApp({
         boissonIncluse: l.boissonIncluse,
         canetteIncluse: l.produit.canetteIncluse,
         saladeIncluse: l.saladeIncluse,
+        accompagnementInclus: l.accompagnementInclus,
         pourQui,
         platIndex: null,
       }));
@@ -607,6 +622,9 @@ export function CaisseApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
+        {l.accompagnementInclus && (
+          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementInclus}</div>
+        )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
         )}
@@ -1001,11 +1019,30 @@ export function CaisseApp({
           viandes={viandes}
           sauces={sauces}
           saveurs={saveurs}
+          accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
           onAnnuler={() => setProduitEnSelection(null)}
-          onValider={(viandesChoisies, saucesChoisies, extras, boissonIncluse, saladeIncluse, saladeOption) => {
-            ajouterAuPanier(produitEnSelection, viandesChoisies, saucesChoisies, [], boissonIncluse, 1, undefined, saladeIncluse);
+          onValider={(
+            viandesChoisies,
+            saucesChoisies,
+            extras,
+            boissonIncluse,
+            saladeIncluse,
+            saladeOption,
+            accompagnementInclus
+          ) => {
+            ajouterAuPanier(
+              produitEnSelection,
+              viandesChoisies,
+              saucesChoisies,
+              [],
+              boissonIncluse,
+              1,
+              undefined,
+              saladeIncluse,
+              accompagnementInclus
+            );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], [], [], null, 1, undefined, null);

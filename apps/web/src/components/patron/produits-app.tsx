@@ -21,6 +21,7 @@ interface Brouillon {
   canetteIncluse: boolean;
   saladeIncluse: boolean;
   saladePrixOption: string;
+  accompagnementInclus: boolean;
 }
 
 function versBrouillon(p: ProduitAdmin): Brouillon {
@@ -37,6 +38,7 @@ function versBrouillon(p: ProduitAdmin): Brouillon {
     canetteIncluse: p.canetteIncluse,
     saladeIncluse: p.saladeIncluse,
     saladePrixOption: p.saladePrixOption !== null ? String(p.saladePrixOption) : "",
+    accompagnementInclus: p.accompagnementInclus,
   };
 }
 
@@ -216,6 +218,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         canetteIncluse: brouillon.canetteIncluse,
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
+        accompagnementInclus: brouillon.accompagnementInclus,
       };
       const reponse = await fetch("/api/patron/produits", {
         method: "PATCH",
@@ -241,6 +244,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         canetteIncluse: brouillon.canetteIncluse,
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
+        accompagnementInclus: brouillon.accompagnementInclus,
       };
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? produitMisAJour : p)));
       fermerEdition();
@@ -421,6 +425,14 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                         inputMode="decimal"
                         className={`mt-1 ${inputClasse}`}
                       />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={brouillon.accompagnementInclus}
+                        onChange={(e) => modifierBrouillon("accompagnementInclus", e.target.checked)}
+                      />
+                      Accompagnement inclus (choix gratuit obligatoire, ex: Plat du jour)
                     </label>
                   </div>
                 </details>

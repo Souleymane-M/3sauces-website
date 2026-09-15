@@ -20,7 +20,7 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus";
 
 function versProduitAdmin(p: {
   id: string;
@@ -38,6 +38,7 @@ function versProduitAdmin(p: {
   ordre: number;
   salade_incluse: boolean;
   salade_prix_option: number | null;
+  accompagnement_inclus: boolean;
 }): ProduitAdmin {
   return {
     id: p.id,
@@ -55,6 +56,7 @@ function versProduitAdmin(p: {
     ordre: p.ordre,
     saladeIncluse: p.salade_incluse,
     saladePrixOption: p.salade_prix_option,
+    accompagnementInclus: p.accompagnement_inclus,
   };
 }
 
@@ -106,6 +108,7 @@ export async function creerProduit(input: ProduitAdminInput): Promise<void> {
     // autres options avancées) — jamais au moment de l'ajout rapide.
     salade_incluse: false,
     salade_prix_option: null,
+    accompagnement_inclus: false,
   });
 
   if (error) {
@@ -130,6 +133,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     ordre?: number;
     salade_incluse?: boolean;
     salade_prix_option?: number | null;
+    accompagnement_inclus?: boolean;
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.categorie !== undefined) update.categorie = input.categorie;
@@ -145,6 +149,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.ordre !== undefined) update.ordre = input.ordre;
   if (input.saladeIncluse !== undefined) update.salade_incluse = input.saladeIncluse;
   if (input.saladePrixOption !== undefined) update.salade_prix_option = input.saladePrixOption;
+  if (input.accompagnementInclus !== undefined) update.accompagnement_inclus = input.accompagnementInclus;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);
 

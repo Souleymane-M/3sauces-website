@@ -43,6 +43,7 @@ function detailLigne(l: CommandeCuisine["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.accompagnementInclus) details.push(`Accompagnement : ${l.accompagnementInclus}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
   return details;
 }

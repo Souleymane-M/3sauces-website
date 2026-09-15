@@ -15,11 +15,18 @@ export interface ExtrasChoisis {
   saucesSupplementaires: string[];
 }
 
+export interface AccompagnementPublique {
+  id: string;
+  nom: string;
+}
+
 interface ViandeModalPubliqueProps {
   produit: ProduitConfigurable;
   viandes: ViandePublique[];
   sauces: SaucePublique[];
   saveurs: SaveurPublique[];
+  /** Accompagnements proposés en choix gratuit inclus (ex: Plat du jour) — jamais "Salade", qui est incluse automatiquement sans choix. */
+  accompagnements: AccompagnementPublique[];
   /** Produit "Viande supplémentaire" (prix affiché dynamiquement), null si indisponible. */
   produitViandeSupplementaire: ProduitConfigurable | null;
   /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
@@ -30,7 +37,8 @@ interface ViandeModalPubliqueProps {
     extras: ExtrasChoisis,
     boissonIncluse: string | null,
     saladeIncluse: boolean | null,
-    saladeOption: boolean
+    saladeOption: boolean,
+    accompagnementInclus: string | null
   ) => void;
   onAnnuler: () => void;
 }
@@ -56,6 +64,7 @@ export function ViandeModalPublique({
   viandes,
   sauces,
   saveurs,
+  accompagnements,
   produitViandeSupplementaire,
   produitSauceSupplementaire,
   onValider,
@@ -68,14 +77,17 @@ export function ViandeModalPublique({
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
   const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
+  const [accompagnementChoisi, setAccompagnementChoisi] = useState<string | null>(null);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
   const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
   const boissonRetenue = !produit.canetteIncluse ? null : demandeChoixBoisson ? boissonChoisie : (saveurs[0]?.nom ?? null);
+  const demandeAccompagnement = produit.accompagnementInclus && accompagnements.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
     (!demandeChoixBoisson || boissonChoisie !== null) &&
-    (!produit.saladeIncluse || saladeGardee !== null);
+    (!produit.saladeIncluse || saladeGardee !== null) &&
+    (!demandeAccompagnement || accompagnementChoisi !== null);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
     setter((precedent) => {
@@ -234,6 +246,28 @@ export function ViandeModalPublique({
           </label>
         )}
 
+        {demandeAccompagnement && (
+          <div className="mt-5">
+            <p className="text-sm font-bold text-[#2D5A27]">Choisis ton accompagnement</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {accompagnements.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAccompagnementChoisi(a.nom)}
+                  className={`rounded-full border px-3 py-1.5 text-sm ${
+                    accompagnementChoisi === a.nom
+                      ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {a.nom}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {demandeChoixBoisson && (
           <div className="mt-5">
             <p className="text-sm font-bold text-[#C2540C]">Choisis ta canette incluse</p>
@@ -377,7 +411,8 @@ export function ViandeModalPublique({
                 },
                 boissonRetenue,
                 produit.saladeIncluse ? saladeGardee : null,
-                saladeOptionCochee
+                saladeOptionCochee,
+                demandeAccompagnement ? accompagnementChoisi : null
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

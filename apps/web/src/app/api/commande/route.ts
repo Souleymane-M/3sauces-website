@@ -137,7 +137,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus"
     )
     .in("id", produitIds);
 
@@ -174,6 +174,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur (saveurs)." }, { status: 500 });
   }
   const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
+
+  // Accompagnements proposables en choix gratuit inclus (Plats du jour) —
+  // jamais "Salade", qui reste incluse automatiquement sans choix quand
+  // elle fait partie de la recette (mécanisme distinct de celui-ci).
+  const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
+    .from("produits")
+    .select("nom")
+    .eq("categorie", "accompagnement")
+    .eq("actif", true)
+    .neq("nom", "Salade");
+
+  if (erreurAccompagnements) {
+    return NextResponse.json({ error: "Erreur serveur (accompagnements)." }, { status: 500 });
+  }
+  const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
 
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
@@ -308,6 +323,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
     }
 
+    // Accompagnement inclus (Plats du jour) : choix obligatoire, gratuit,
+    // parmi les accompagnements actifs — jamais "Salade", qui reste incluse
+    // automatiquement sans choix.
+    let accompagnementInclus: string | null = null;
+    if (produit.accompagnement_inclus) {
+      if (typeof ligneBrute.accompagnementInclus !== "string") {
+        return NextResponse.json({ error: `Choix d'accompagnement requis sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (!nomsAccompagnementsValides.has(ligneBrute.accompagnementInclus)) {
+        return NextResponse.json(
+          { error: `Accompagnement invalide sur la ligne ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
+      accompagnementInclus = ligneBrute.accompagnementInclus;
+    } else if (ligneBrute.accompagnementInclus !== undefined && ligneBrute.accompagnementInclus !== null) {
+      return NextResponse.json({ error: `Accompagnement non proposé sur ${produit.nom}.` }, { status: 400 });
+    }
+
     // Nom optionnel du convive ("Pour Rachid") — simple étiquette
     // d'affichage, aucune validation métier au-delà d'une longueur
     // raisonnable et du nettoyage des espaces.
@@ -332,6 +366,7 @@ export async function POST(request: Request) {
       boissonIncluse,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
+      accompagnementInclus,
       pourQui,
       platIndex,
     });
