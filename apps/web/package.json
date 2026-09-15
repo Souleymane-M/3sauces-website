@@ -12,6 +12,7 @@
     "@3sauces/supabase": "workspace:*",
     "@3sauces/ui": "workspace:*",
     "@supabase/supabase-js": "^2.112.4",
+    "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.10",
     "next": "16.3.3",
