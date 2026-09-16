@@ -21,10 +21,10 @@ export type Categorie =
 export type Canal = "sur_place" | "emporter" | "livraison" | "en_ligne";
 
 // Valeurs confirmées par introspection directe des contraintes CHECK en base
-// (`paiements_mode_check`, `commandes_mode_paiement_check`) : seules "cb" et
-// "especes" sont acceptées aujourd'hui. À étendre (+ ALTER CONSTRAINT côté DB)
-// quand les paiements en ligne (Stripe) seront ajoutés.
-export type ModePaiement = "especes" | "cb";
+// (`paiements_mode_check`, `commandes_mode_paiement_check`) — étendues par
+// la migration 20260916120000_paiement_stripe.sql pour accepter "stripe"
+// (paiement en ligne sur 3sauces.fr, confirmé par webhook).
+export type ModePaiement = "especes" | "cb" | "stripe";
 
 // Contrainte CHECK `commandes_statut_check` (migration
 // 20260908090000_tracabilite_commandes.sql) : flux complet en_attente ->

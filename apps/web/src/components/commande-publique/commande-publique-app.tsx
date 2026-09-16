@@ -491,6 +491,24 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         setErreur(data.error ?? "Échec de l'envoi de la commande.");
         return;
       }
+
+      if (modePaiement === "stripe") {
+        // La commande existe déjà (non_paye) : si cet appel échoue, elle
+        // reste réessayable sans jamais créer de doublon.
+        const reponsePaiement = await fetch("/api/commande/paiement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commandeId: data.commandeId }),
+        });
+        const dataPaiement = await reponsePaiement.json();
+        if (!reponsePaiement.ok || !dataPaiement.url) {
+          setErreur(dataPaiement.error ?? "Impossible de démarrer le paiement en ligne.");
+          return;
+        }
+        window.location.href = dataPaiement.url;
+        return;
+      }
+
       router.push(`/commande-confirmee?canal=${canal}&heure=${encodeURIComponent(creneauHeure)}`);
     } catch {
       setErreur("Erreur réseau, réessaie.");
@@ -885,7 +903,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
               <div>
                 <label className="text-xs text-gray-500">
-                  Paiement (à la {canal === "livraison" ? "livraison" : "prise en main"})
+                  {modePaiement === "stripe"
+                    ? "Paiement"
+                    : `Paiement (à la ${canal === "livraison" ? "livraison" : "prise en main"})`}
                 </label>
                 <select
                   value={modePaiement}
@@ -894,6 +914,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 >
                   <option value="especes">Espèces</option>
                   <option value="cb">Carte (terminal SumUp)</option>
+                  <option value="stripe">Payer en ligne (carte)</option>
                 </select>
               </div>
 

@@ -29,9 +29,14 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
 
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
-    .select("id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats")
+    .select(
+      "id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement"
+    )
     .in("id", idsCommandes)
     .eq("statut", "pris_par_livreur")
+    // Une livraison déjà réglée en ligne (Stripe) ne doit jamais être
+    // redemandée en espèces/CB au livreur.
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
     .order("heure_souhaitee", { ascending: true, nullsFirst: false });
 
   if (erreurCommandes) {

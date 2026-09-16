@@ -22,8 +22,15 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("commandes")
-    .select("id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats")
+    .select(
+      "id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement"
+    )
     .not("statut", "in", `(${STATUTS_TERMINAUX.join(",")})`)
+    // Une commande payée en ligne (Stripe) n'apparaît en cuisine qu'une fois
+    // le paiement confirmé — jamais avant, le temps que le client règle sur
+    // la page Stripe ou abandonne. Espèces/CB (payées en personne plus
+    // tard) ne sont jamais concernées par ce filtre.
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
     .order("heure_souhaitee", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 

@@ -15,7 +15,7 @@ import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, to
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
-const MODES_PAIEMENT_PUBLICS = ["especes", "cb"] as const;
+const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
 
 // Anti-spam : cette route est publique, sans authentification. Limite large
 // (pas un login) pour ne pas gêner un client qui corrige une erreur de
@@ -34,9 +34,11 @@ const MAX_QUANTITE_PAR_LIGNE = 20;
  *
  * Sécurité : on ne fait JAMAIS confiance à ce qu'envoie le navigateur pour
  * les prix, la validité de la zone ou du créneau — tout est recalculé /
- * revérifié ici à partir de la base. `paiement_statut` reste "non_paye" :
- * le paiement a lieu en personne (espèces ou CB SumUp) à la livraison ou au
- * retrait, jamais en ligne pour cette itération.
+ * revérifié ici à partir de la base. `paiement_statut` reste toujours
+ * "non_paye" à l'insertion, y compris pour `mode_paiement: "stripe"` : le
+ * paiement en ligne est finalisé dans un second temps par
+ * /api/commande/paiement (création de la session Stripe) puis confirmé de
+ * façon autoritaire par /api/webhooks/stripe, jamais côté client.
  */
 export async function POST(request: Request) {
   const headersList = await headers();
@@ -457,10 +459,9 @@ export async function POST(request: Request) {
       canal: body.canal,
       contenu: lignes,
       montant,
-      // Paiement en personne (espèces/CB) à la livraison ou au retrait —
-      // jamais de paiement en ligne dans cette itération. En laissant
-      // paiement_statut à "non_paye", on évite aussi de déclencher le
-      // trigger de fidélité, hors scope pour ce MVP.
+      // "non_paye" à l'insertion dans tous les cas (espèces/CB payés en
+      // personne plus tard, ou Stripe confirmé par le webhook) — le trigger
+      // de fidélité ne se déclenche qu'au passage à "paye".
       paiement_statut: "non_paye",
       mode_paiement: body.modePaiement,
       client_telephone: telephone,
