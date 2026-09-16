@@ -105,6 +105,11 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Erreur spécifique à la navigation entre plats (seuil de 5€ non atteint) —
+  // séparée de `erreur` (formulaire, tout en bas) pour s'afficher juste
+  // au-dessus du bouton "Plat suivant", là où le client regarde au moment
+  // du clic.
+  const [erreurPlat, setErreurPlat] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
 
   // Ordre imposé : Menus spéciaux, Tacos, Barquettes & Bowls, Grillades,
@@ -198,6 +203,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     setPlats([initial]);
     setPlatActifId(initial.id);
     setPlatDeplie(null);
+    setErreurPlat(null);
   }
 
   const livraisonPossible = parametres.zonesActives.length > 0;
@@ -253,6 +259,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     });
 
     if (modeCommande === "groupee") {
+      setErreurPlat(null);
       setPlats((precedent) => {
         const index = precedent.findIndex((p) => p.id === platActifId);
         const cible = index === -1 ? precedent.length - 1 : index;
@@ -324,12 +331,25 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     setPanierSimple((precedent) => precedent.filter((l) => l.id !== id));
   }
 
+  /**
+   * Avance au plat suivant : si un plat existe déjà après l'actif (ex.
+   * après un retour en arrière via "Plat précédent"), on y navigue tel
+   * quel ; sinon on en crée un nouveau. Dans les deux cas, le plat quitté
+   * doit d'abord atteindre le seuil minimum.
+   */
   function platSuivant() {
     if (totalPlat(platActif) < SEUIL_MINIMUM_PLAT) {
-      setErreur("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
+      setErreurPlat("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
       return;
     }
-    setErreur(null);
+    setErreurPlat(null);
+    const index = plats.findIndex((p) => p.id === platActifId);
+    if (index !== -1 && index < plats.length - 1) {
+      const suivant = plats[index + 1];
+      setPlatActifId(suivant.id);
+      setPlatDeplie(suivant.id);
+      return;
+    }
     setPlats((precedent) => {
       const nouveau = platVide(precedent.length + 1);
       setPlatActifId(nouveau.id);
@@ -338,8 +358,19 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     });
   }
 
+  /** Revient au plat juste avant l'actif, pour le corriger sans attendre la vue panier finale — jamais bloqué par le seuil (on ne fait que naviguer, pas fermer). */
+  function platPrecedent() {
+    const index = plats.findIndex((p) => p.id === platActifId);
+    if (index <= 0) return;
+    setErreurPlat(null);
+    const precedent = plats[index - 1];
+    setPlatActifId(precedent.id);
+    setPlatDeplie(precedent.id);
+  }
+
   /** Rouvre un plat déjà "fermé" comme cible des prochains ajouts, tout en conservant son contenu existant. */
   function modifierPlat(platId: string) {
+    setErreurPlat(null);
     setPlatActifId(platId);
     setPlatDeplie(platId);
   }
@@ -555,14 +586,25 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                   </span>
                   {platActif.pourQui ? ` (${platActif.pourQui})` : ""}
                 </p>
-                <button
-                  type="button"
-                  onClick={platSuivant}
-                  disabled={platActif.lignes.length === 0}
-                  className="mt-2 w-full rounded bg-[#2D5A27] py-2 text-sm font-semibold text-white disabled:opacity-40"
-                >
-                  Plat suivant →
-                </button>
+                {erreurPlat && <p className="mt-2 text-sm text-red-600">{erreurPlat}</p>}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={platPrecedent}
+                    disabled={plats.findIndex((p) => p.id === platActifId) <= 0}
+                    className="flex-1 rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700 disabled:opacity-40"
+                  >
+                    ← Plat précédent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={platSuivant}
+                    disabled={platActif.lignes.length === 0}
+                    className="flex-1 rounded bg-[#2D5A27] py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Plat suivant →
+                  </button>
+                </div>
               </div>
             )}
 
