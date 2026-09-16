@@ -441,7 +441,7 @@ export function ViandeModalPublique({
             disabled={!toutSelectionne}
             onClick={() =>
               onValider(
-                viandesChoisies,
+                produit.viandeImposee ? [produit.viandeImposee] : viandesChoisies,
                 saucesChoisies,
                 {
                   viandesSupplementaires: extraViandes,
