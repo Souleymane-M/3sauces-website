@@ -731,13 +731,15 @@ export function CaisseApp({
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setModeCommande("simple")}
-              className="rounded border border-gray-300 py-3 text-sm font-bold uppercase text-gray-700 active:bg-gray-50"
+              className="bouton-choix-mode rounded py-3 text-sm font-bold uppercase text-white"
+              style={{ backgroundColor: VERT }}
             >
               Commande simple
             </button>
             <button
               onClick={() => setModeCommande("groupee")}
-              className="rounded bg-[#8B2020] py-3 text-sm font-bold uppercase text-white"
+              className="bouton-choix-mode rounded bg-[#8B2020] py-3 text-sm font-bold uppercase text-white"
+              style={{ animationDelay: "0.3s" }}
             >
               Commande groupée
             </button>
