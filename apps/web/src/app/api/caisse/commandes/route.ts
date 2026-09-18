@@ -7,10 +7,10 @@ import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-pu
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
+import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
-const MONTANT_RECOMPENSE = 10;
 
 // Même plafonds anti-abus que le site public (cf. /api/commande) — un
 // panier caisse "normal" ne les dépasse jamais.
@@ -415,6 +415,13 @@ export async function POST(request: Request) {
   }
 
   if (body.recompenseAppliquee) {
+    if (montantBrut < MONTANT_RECOMPENSE) {
+      return NextResponse.json(
+        { error: "La récompense s'applique sur une commande d'au moins 10€." },
+        { status: 400 }
+      );
+    }
+
     const { data: client } = await supabase
       .from("clients")
       .select("recompense_disponible")
@@ -425,7 +432,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ce client n'a pas de récompense disponible." }, { status: 400 });
     }
     recompenseAppliquee = true;
-    montant = Math.max(0, Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100);
+    montant = Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100;
   }
 
   // Le trigger DB `commandes_appliquer_fidelite` crée le client automatiquement,

@@ -13,6 +13,8 @@ import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types"
 import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
+import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { verifierTokenFidelite } from "@/lib/fidelite/session";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
@@ -440,6 +442,70 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
 
+  // --- Récompense fidélité (site public uniquement) ---
+  // Le solde affiché au client a pu changer entre-temps (passage en caisse,
+  // double onglet) : tout est revérifié ici, jamais de confiance dans le
+  // seul état affiché côté client.
+  let recompenseAppliquee = false;
+  let montantFinal = montant;
+  if (body.utiliserRecompense === true) {
+    const fideliteToken = typeof body.fideliteToken === "string" ? body.fideliteToken : null;
+    const session = fideliteToken ? await verifierTokenFidelite(fideliteToken) : null;
+    if (!session) {
+      return NextResponse.json(
+        { error: "Vérification du numéro expirée. Revérifie ton numéro pour utiliser ta récompense." },
+        { status: 401 }
+      );
+    }
+    if (session.telephone !== telephone) {
+      return NextResponse.json(
+        { error: "Le numéro de fidélité doit être le même que celui de la commande." },
+        { status: 400 }
+      );
+    }
+    if (montant < MONTANT_RECOMPENSE) {
+      return NextResponse.json(
+        { error: "Ta récompense s'utilise sur une commande d'au moins 10€." },
+        { status: 400 }
+      );
+    }
+
+    const { data: client, error: erreurClient } = await supabase
+      .from("clients")
+      .select("recompense_disponible")
+      .eq("telephone", telephone)
+      .maybeSingle();
+    if (erreurClient) {
+      console.error("[/api/commande] échec lecture client fidélité :", erreurClient.message);
+      return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+    }
+    if (!client?.recompense_disponible) {
+      return NextResponse.json({ error: "Cette récompense n'est plus disponible." }, { status: 409 });
+    }
+
+    // Empêche deux onglets/tentatives de consommer la même récompense deux
+    // fois : le trigger de fidélité ne se déclenche qu'au paiement, donc
+    // rien d'autre ne départage deux commandes créées coup sur coup.
+    const { data: commandeEnCours } = await supabase
+      .from("commandes")
+      .select("id")
+      .eq("client_telephone", telephone)
+      .eq("recompense_appliquee", true)
+      .neq("paiement_statut", "paye")
+      .gt("created_at", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (commandeEnCours) {
+      return NextResponse.json(
+        { error: "Une commande en cours utilise déjà ta récompense." },
+        { status: 409 }
+      );
+    }
+
+    recompenseAppliquee = true;
+    montantFinal = Math.round((montant - MONTANT_RECOMPENSE) * 100) / 100;
+  }
+
   // --- Création du client fidélité (idempotent) ---
   // Même contrainte de timing que côté caisse : le trigger DB
   // `commandes_appliquer_fidelite` crée le client, mais seulement après
@@ -458,7 +524,7 @@ export async function POST(request: Request) {
     .insert({
       canal: body.canal,
       contenu: lignes,
-      montant,
+      montant: montantFinal,
       // "non_paye" à l'insertion dans tous les cas (espèces/CB payés en
       // personne plus tard, ou Stripe confirmé par le webhook) — le trigger
       // de fidélité ne se déclenche qu'au passage à "paye".
@@ -471,6 +537,7 @@ export async function POST(request: Request) {
       heure_souhaitee: heureSouhaitee.toISOString(),
       consentement_cgv_le: new Date().toISOString(),
       nb_plats: nbPlats,
+      recompense_appliquee: recompenseAppliquee,
     })
     .select("id, numero")
     .single();
@@ -505,7 +572,9 @@ export async function POST(request: Request) {
     ok: true,
     commandeId: commande.id,
     numero: commande.numero,
-    montant,
+    montantBrut: montant,
+    remise: recompenseAppliquee ? MONTANT_RECOMPENSE : 0,
+    montant: montantFinal,
     creneauHeure,
     qrCode,
   });

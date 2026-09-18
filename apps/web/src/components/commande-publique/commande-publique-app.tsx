@@ -23,6 +23,8 @@ import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
 import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
+import { CarteFidelite } from "./carte-fidelite";
+import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 
 interface LignePanierPublique {
   id: string;
@@ -102,6 +104,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
   const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
+  const [fideliteToken, setFideliteToken] = useState<string | null>(null);
+  const [utiliserRecompense, setUtiliserRecompense] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -484,6 +488,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           zone: canal === "livraison" ? zone : undefined,
           consentementCgv: accepteCgv,
           lignes,
+          fideliteToken: utiliserRecompense ? fideliteToken : undefined,
+          utiliserRecompense: utiliserRecompense && Boolean(fideliteToken),
         }),
       });
       const data = await reponse.json();
@@ -809,7 +815,22 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
               <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
                 Total : {total.toFixed(2)} €
+                {utiliserRecompense && fideliteToken && (
+                  <div className="mt-1 text-sm font-semibold text-[#2D5A27]">
+                    Récompense fidélité : −{MONTANT_RECOMPENSE.toFixed(2)} € · Total à payer :{" "}
+                    {Math.max(0, total - MONTANT_RECOMPENSE).toFixed(2)} €
+                  </div>
+                )}
               </div>
+
+              <CarteFidelite
+                telephoneCommande={telephone}
+                montantPanier={total}
+                utiliserRecompense={utiliserRecompense}
+                onChangeUtiliserRecompense={setUtiliserRecompense}
+                onTokenChange={setFideliteToken}
+                onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
+              />
 
               <div className="border-t border-gray-200 pt-3">
                 <label className="text-xs text-gray-500">Nom</label>

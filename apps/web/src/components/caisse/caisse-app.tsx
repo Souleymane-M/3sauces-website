@@ -19,6 +19,7 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
+import { MONTANT_RECOMPENSE, formaterEuros } from "@/lib/fidelite/regles";
 
 interface LignePanier {
   id: string;
@@ -83,8 +84,10 @@ const VERT = "#2D5A27";
 interface ClientInfo {
   existe: boolean;
   telephone: string;
+  montant_cumule?: number;
   tampons_acquis?: number;
   recompense_disponible?: boolean;
+  date_expiration?: string | null;
 }
 
 function platVide(numero: number): PlatGroupeCaisse {
@@ -322,6 +325,11 @@ export function CaisseApp({
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
+
+  // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
+  // minimum après avoir coché la case (ex: article retiré), la récompense
+  // cesse d'être appliquée sans attendre un second rendu.
+  const appliquerRecompenseEffectif = appliquerRecompense && total >= MONTANT_RECOMPENSE;
   const infosClientIncompletes = !nom.trim() || !telephone.trim();
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
@@ -581,7 +589,7 @@ export function CaisseApp({
           canal,
           modePaiement,
           clientTelephone: telephone.trim(),
-          recompenseAppliquee: appliquerRecompense,
+          recompenseAppliquee: appliquerRecompenseEffectif,
           creneauHeure,
           nom: nom.trim(),
           adresse: canal === "livraison" ? adresse.trim() : undefined,
@@ -956,23 +964,38 @@ export function CaisseApp({
                 </button>
               </div>
               {clientInfo && (
-                <div className="mt-2 text-xs text-gray-500">
+                <div className="mt-2 text-sm text-gray-700">
                   {clientInfo.existe ? (
                     <>
-                      <p>Tampons : {clientInfo.tampons_acquis}/10</p>
+                      <p>
+                        {formaterEuros(clientInfo.montant_cumule ?? 0)} cumulés — {clientInfo.tampons_acquis ?? 0}{" "}
+                        tampon{(clientInfo.tampons_acquis ?? 0) > 1 ? "s" : ""} acquis
+                      </p>
                       {clientInfo.recompense_disponible && (
-                        <label className="mt-1 flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={appliquerRecompense}
-                            onChange={(e) => setAppliquerRecompense(e.target.checked)}
-                          />
-                          Appliquer la récompense (-10 €)
-                        </label>
+                        <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
+                          <p>Ce client a 10€ de récompense — appliquer ?</p>
+                          {clientInfo.date_expiration && (
+                            <p className="text-xs font-normal text-red-600">
+                              Expire le {new Date(clientInfo.date_expiration).toLocaleDateString("fr-FR")}
+                            </p>
+                          )}
+                          <label className="mt-1 flex items-center gap-2 font-normal">
+                            <input
+                              type="checkbox"
+                              checked={appliquerRecompense}
+                              disabled={total < MONTANT_RECOMPENSE}
+                              onChange={(e) => setAppliquerRecompense(e.target.checked)}
+                            />
+                            Appliquer la récompense (-10 €)
+                          </label>
+                          {total < MONTANT_RECOMPENSE && (
+                            <p className="text-xs font-normal text-red-600">Commande d&apos;au moins 10€ requise.</p>
+                          )}
+                        </div>
                       )}
                     </>
                   ) : (
-                    <p>Nouveau client (sera créé au paiement).</p>
+                    <p className="text-xs text-gray-500">Nouveau client (sera créé au paiement).</p>
                   )}
                 </div>
               )}
@@ -1063,7 +1086,7 @@ export function CaisseApp({
 
             <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
               Total :{" "}
-              {(appliquerRecompense && clientInfo?.recompense_disponible ? Math.max(0, total - 10) : total).toFixed(
+              {(appliquerRecompenseEffectif && clientInfo?.recompense_disponible ? total - MONTANT_RECOMPENSE : total).toFixed(
                 2
               )}{" "}
               €

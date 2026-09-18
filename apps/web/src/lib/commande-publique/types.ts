@@ -113,4 +113,8 @@ export interface CreerCommandePubliquePayload {
   creneauHeure: string;
   /** Case "J'accepte les CGV et la politique de confidentialité" — obligatoire, revérifié serveur. */
   consentementCgv: boolean;
+  /** Jeton de session fidélité (délivré après vérification OTP), requis si utiliserRecompense est true. */
+  fideliteToken?: string;
+  /** Case "Utiliser ma récompense sur cette commande" — revérifiée intégralement côté serveur. */
+  utiliserRecompense?: boolean;
 }
