@@ -48,6 +48,19 @@ function libelleCanal(canal: CommandePourImpression["canal"]): string {
   return "Sur place";
 }
 
+function libelleModePaiement(mode: CommandePourImpression["modePaiement"]): string {
+  if (mode === "cb") return "Carte";
+  if (mode === "stripe") return "En ligne";
+  return "Espèces";
+}
+
+/** "#0001", "#0042", "#12345" (jamais tronqué au-delà de 4 chiffres). */
+function formaterNumeroTicket(numero: number): string {
+  return `#${String(numero).padStart(4, "0")}`;
+}
+
+const MENTION_LEGALE = "3 Sauces — Auto-entrepreneur — SIRET 532 276 581 00040 — TVA non applicable, art. 293 B du CGI";
+
 function formaterDateHeure(iso: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
@@ -98,7 +111,7 @@ export function construireTicketClientXml(
   }
 
   xml += ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
-  xml += ligne(`Commande #${commande.numero}`, { align: "center", gras: true });
+  xml += ligne(`Commande ${formaterNumeroTicket(commande.numero)}`, { align: "center", gras: true });
   xml += styleTexte({ align: "left", gras: false, taille: 1 });
   xml += ligne(formaterDateHeure(commande.creeLe));
   xml += ligne(`Client : ${commande.nom}`);
@@ -120,13 +133,17 @@ export function construireTicketClientXml(
     if (commande.heureSouhaitee) xml += ligne(`Heure souhaitée : ${formaterHeure(commande.heureSouhaitee)}`);
   }
 
-  xml += ligne(`Paiement : ${commande.modePaiement === "cb" ? "Carte" : "Espèces"}`);
+  xml += ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`);
 
   if (commande.canal === "livraison" && commande.qrCode) {
     xml += `<feed line="1"/>`;
     xml += styleTexte({ align: "center" });
     xml += `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`;
   }
+
+  xml += `<feed line="1"/>`;
+  xml += ligne("--------------------------------");
+  xml += ligne(MENTION_LEGALE, { align: "center" });
 
   xml += `<feed line="2"/><cut type="feed"/>`;
   return enveloppeEposPrint(xml);
