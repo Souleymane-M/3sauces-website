@@ -80,6 +80,32 @@ function formaterHeure(iso: string): string {
   }).format(new Date(iso));
 }
 
+function jourMayotte(iso: string): string {
+  return new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(iso));
+}
+
+function estAujourdhuiMayotte(iso: string): boolean {
+  return jourMayotte(iso) === jourMayotte(new Date().toISOString());
+}
+
+/**
+ * Heure seule pour une commande à récupérer aujourd'hui, jour + heure pour
+ * une commande à l'avance — sans ça, un ticket imprimé plusieurs jours avant
+ * la date de retrait ne montrerait qu'une heure, sans dire de quel jour.
+ */
+function libelleHeureSouhaitee(iso: string): string {
+  if (estAujourdhuiMayotte(iso)) return formaterHeure(iso);
+  const jourHeure = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+  return jourHeure;
+}
+
 /** Description d'une ligne de panier : "2x Tacos 2 viandes" puis le détail en dessous. */
 function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   const details: string[] = [];
@@ -128,9 +154,15 @@ export function construireTicketClientXml(
   xml += ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
   xml += ligne(`Mode de récupération : ${libelleCanal(commande.canal)}`);
 
+  const commandeAvance = commande.heureSouhaitee ? !estAujourdhuiMayotte(commande.heureSouhaitee) : false;
+
   if (commande.canal === "livraison") {
     if (commande.adresse) xml += ligne(`Adresse : ${commande.adresse}`);
-    if (commande.heureSouhaitee) xml += ligne(`Heure souhaitée : ${formaterHeure(commande.heureSouhaitee)}`);
+  }
+  // Une commande à l'avance garde une trace écrite du jour de retrait sur le
+  // ticket, quel que soit le canal — pas seulement en livraison.
+  if (commande.heureSouhaitee && (commande.canal === "livraison" || commandeAvance)) {
+    xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`);
   }
 
   xml += ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`);
@@ -157,7 +189,7 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   }
   xml += ligne(`Commande #${commande.numero}`, { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
-    xml += ligne(`Heure souhaitée : ${formaterHeure(commande.heureSouhaitee)}`, { align: "center", gras: true });
+    xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`, { align: "center", gras: true });
   }
   xml += ligne(libelleCanal(commande.canal), { align: "center" });
   xml += styleTexte({ align: "left", gras: false, taille: 1 });

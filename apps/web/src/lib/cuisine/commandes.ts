@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 import {
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
@@ -20,6 +21,7 @@ import {
  */
 export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
   const supabase = createServiceSupabaseClient();
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
   const { data, error } = await supabase
     .from("commandes")
     .select(
@@ -31,6 +33,11 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
     // la page Stripe ou abandonne. Espèces/CB (payées en personne plus
     // tard) ne sont jamais concernées par ce filtre.
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    // Une commande à l'avance (jour de retrait futur) reste invisible en
+    // cuisine jusqu'à son vrai jour — jamais préparée en avance par erreur.
+    // Pas de borne basse : une commande plus ancienne restée non terminale
+    // (cas anormal) doit continuer à apparaître, pas disparaître silencieusement.
+    .lt("heure_souhaitee", fin.toISOString())
     .order("heure_souhaitee", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 

@@ -16,13 +16,14 @@ import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
 } from "@/lib/commande-publique/types";
-import { genererCreneaux, prochainCreneauValide } from "@/lib/commande-publique/creneau";
+import { creneauxPourDate, prochainesDatesOuvertes, dateMayotteIso } from "@/lib/commande-publique/creneau";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
 import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
+import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 
@@ -76,9 +77,10 @@ function platVide(numero: number): PlatGroupe {
 export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parametres }: CommandePubliqueAppProps) {
   const router = useRouter();
 
-  const creneauxValides = useMemo(
-    () => genererCreneaux(parametres.heureDebut, parametres.heureFin),
-    [parametres.heureDebut, parametres.heureFin]
+  const aujourdHui = useMemo(() => dateMayotteIso(), []);
+  const datesOuvertes = useMemo(
+    () => prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin),
+    [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin]
   );
 
   // Deux structures parallèles, jamais fusionnées : le mode choisi détermine
@@ -102,7 +104,13 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
-  const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
+  const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
+  const creneauxValides = useMemo(
+    () => creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
+    [dateCommande, parametres.heureDebut, parametres.heureFin]
+  );
+  const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
+  const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [fideliteToken, setFideliteToken] = useState<string | null>(null);
   const [utiliserRecompense, setUtiliserRecompense] = useState(false);
@@ -208,6 +216,20 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
     setPlatActifId(initial.id);
     setPlatDeplie(null);
     setErreurPlat(null);
+  }
+
+  /**
+   * Changer de date change la liste des créneaux disponibles : on garde
+   * l'heure déjà choisie si elle reste proposable, sinon on retombe sur le
+   * premier créneau du jour. Une commande à l'avance (date != aujourd'hui)
+   * bascule d'office en paiement en ligne — personne ne peut garantir un
+   * encaissement en personne à une date future.
+   */
+  function changerDate(nouvelleDate: string) {
+    setDateCommande(nouvelleDate);
+    const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
+    if (nouvelleDate !== aujourdHui) setModePaiement("stripe");
   }
 
   const livraisonPossible = parametres.zonesActives.length > 0;
@@ -475,6 +497,11 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
               pourQui: null,
             }));
 
+      // Jamais confiance dans le seul state pour le mode de paiement d'une
+      // commande à l'avance : même si l'UI le verrouille déjà sur "stripe"
+      // dès que la date choisie n'est pas aujourd'hui, on le recalcule ici.
+      const modePaiementEffectif: ModePaiement = commandeAvance ? "stripe" : modePaiement;
+
       const reponse = await fetch("/api/commande", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -482,8 +509,9 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           canal,
           nom: nom.trim(),
           telephone: telephone.trim(),
-          modePaiement,
+          modePaiement: modePaiementEffectif,
           creneauHeure,
+          date: dateCommande,
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           consentementCgv: accepteCgv,
@@ -498,7 +526,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         return;
       }
 
-      if (modePaiement === "stripe") {
+      if (modePaiementEffectif === "stripe") {
         // La commande existe déjà (non_paye) : si cet appel échoue, elle
         // reste réessayable sans jamais créer de doublon.
         const reponsePaiement = await fetch("/api/commande/paiement", {
@@ -515,7 +543,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
         return;
       }
 
-      router.push(`/commande-confirmee?canal=${canal}&heure=${encodeURIComponent(creneauHeure)}`);
+      router.push(`/commande-confirmee?canal=${canal}&commande=${data.commandeId}`);
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -917,6 +945,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 </>
               )}
 
+              <DatePicker
+                dates={datesOuvertes}
+                aujourdHui={aujourdHui}
+                valeur={dateCommande}
+                onChange={changerDate}
+                label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
+              />
+
               <CreneauPicker
                 creneauxValides={creneauxValides}
                 valeur={creneauHeure}
@@ -926,19 +962,25 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
               <div>
                 <label className="text-xs text-gray-500">
-                  {modePaiement === "stripe"
+                  {commandeAvance || modePaiement === "stripe"
                     ? "Paiement"
                     : `Paiement (à la ${canal === "livraison" ? "livraison" : "prise en main"})`}
                 </label>
                 <select
-                  value={modePaiement}
+                  value={commandeAvance ? "stripe" : modePaiement}
+                  disabled={commandeAvance}
                   onChange={(e) => setModePaiement(e.target.value as ModePaiement)}
-                  className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                  className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900 disabled:bg-gray-100"
                 >
-                  <option value="especes">Espèces</option>
-                  <option value="cb">Carte (terminal SumUp)</option>
+                  {!commandeAvance && <option value="especes">Espèces</option>}
+                  {!commandeAvance && <option value="cb">Carte (terminal SumUp)</option>}
                   <option value="stripe">Payer en ligne (carte)</option>
                 </select>
+                {commandeAvance && (
+                  <p className="mt-1 rounded bg-amber-50 p-2 text-xs text-amber-900">
+                    Commande à l&apos;avance : le paiement en ligne est requis pour confirmer votre réservation.
+                  </p>
+                )}
               </div>
 
               <label className="flex items-start gap-2 text-xs text-gray-600">

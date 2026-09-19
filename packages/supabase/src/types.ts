@@ -327,6 +327,7 @@ export interface Database {
           heure_fin: string;
           minimum_commande: number;
           site_ouvert: boolean;
+          jours_fermeture: number[]; // 0 = dimanche ... 6 = samedi
           updated_at: string;
         };
         Insert: {
@@ -335,6 +336,7 @@ export interface Database {
           heure_fin?: string;
           minimum_commande?: number;
           site_ouvert?: boolean;
+          jours_fermeture?: number[];
         };
         Update: Partial<Database["public"]["Tables"]["parametres_livraison"]["Insert"]>;
         Relationships: [];

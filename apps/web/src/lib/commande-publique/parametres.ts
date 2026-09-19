@@ -14,7 +14,7 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
     await Promise.all([
       supabase
         .from("parametres_livraison")
-        .select("heure_debut, heure_fin, minimum_commande, site_ouvert")
+        .select("heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture")
         .eq("id", true)
         .single(),
       supabase.from("zones_livraison").select("commune").eq("actif", true),
@@ -35,5 +35,6 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
     minimumCommande: parametres.minimum_commande,
     zonesActives: (zones ?? []).map((z) => z.commune),
     siteOuvert: parametres.site_ouvert,
+    joursFermeture: parametres.jours_fermeture,
   };
 }

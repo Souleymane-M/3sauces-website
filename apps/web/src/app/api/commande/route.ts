@@ -2,7 +2,13 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
-import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
+import {
+  construireHeureSouhaiteeUtc,
+  creneauDansPlage,
+  dateIsoValide,
+  dateMayotteIso,
+  prochainesDatesOuvertes,
+} from "@/lib/commande-publique/creneau";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import type {
   CanalPublic,
@@ -103,7 +109,7 @@ export async function POST(request: Request) {
     await Promise.all([
       supabase
         .from("parametres_livraison")
-        .select("heure_debut, heure_fin, minimum_commande, site_ouvert")
+        .select("heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture")
         .eq("id", true)
         .single(),
       supabase.from("zones_livraison").select("commune").eq("actif", true),
@@ -123,6 +129,36 @@ export async function POST(request: Request) {
   }
 
   const communesActives = new Set((zones ?? []).map((z) => z.commune));
+
+  // --- Date de retrait (commandes à l'avance) ---
+  // Les jours de fermeture hebdomadaire ne bloquent JAMAIS l'accès au site
+  // (contrairement à site_ouvert, juste au-dessus) : ils restreignent
+  // seulement les dates de retrait proposées. Un seul contrôle couvre à la
+  // fois la date passée, le jour de fermeture, la fenêtre de réservation et
+  // le cas où la cuisine a déjà fermé pour aujourd'hui.
+  const dateCommande = typeof body.date === "string" ? body.date : "";
+  const datesOuvertes = prochainesDatesOuvertes(
+    parametres.jours_fermeture,
+    parametres.heure_debut,
+    parametres.heure_fin
+  );
+  if (!dateIsoValide(dateCommande) || !datesOuvertes.includes(dateCommande)) {
+    return NextResponse.json(
+      { error: "Date de retrait indisponible : choisis une date parmi les prochains jours d'ouverture." },
+      { status: 400 }
+    );
+  }
+
+  // Commande à l'avance : personne ne peut garantir un encaissement en
+  // personne à une date future — le paiement en ligne est la seule façon de
+  // sécuriser la réservation. Revérifié ici, jamais seulement masqué dans
+  // le sélecteur côté client.
+  if (dateCommande !== dateMayotteIso() && body.modePaiement !== "stripe") {
+    return NextResponse.json(
+      { error: "Commande à l'avance : le paiement en ligne est requis pour confirmer votre réservation." },
+      { status: 400 }
+    );
+  }
 
   // On applique la même plage horaire d'ouverture (10h30–15h00) aux deux
   // canaux : la table `parametres_livraison` est la seule source d'horaires
@@ -437,7 +473,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
   if (!heureSouhaitee) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
@@ -576,6 +612,7 @@ export async function POST(request: Request) {
     remise: recompenseAppliquee ? MONTANT_RECOMPENSE : 0,
     montant: montantFinal,
     creneauHeure,
+    date: dateCommande,
     qrCode,
   });
 }

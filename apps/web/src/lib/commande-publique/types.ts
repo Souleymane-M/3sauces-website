@@ -78,6 +78,8 @@ export interface ParametresLivraisonPublic {
   minimumCommande: number;
   zonesActives: string[]; // communes autorisées, ex: ["Dembéni"]
   siteOuvert: boolean;
+  /** Jours de fermeture hebdomadaire (0 = dimanche ... 6 = samedi), configurés depuis /patron. */
+  joursFermeture: number[];
 }
 
 export interface LigneCommandePubliquePayload {
@@ -111,6 +113,8 @@ export interface CreerCommandePubliquePayload {
   zone?: string;
   // Créneau souhaité (heure de passage ou de livraison), "HH:MM".
   creneauHeure: string;
+  /** Date de retrait/livraison souhaitée, "YYYY-MM-DD" (heure de Mayotte). Peut être un jour futur (commande à l'avance). */
+  date: string;
   /** Case "J'accepte les CGV et la politique de confidentialité" — obligatoire, revérifié serveur. */
   consentementCgv: boolean;
   /** Jeton de session fidélité (délivré après vérification OTP), requis si utiliserRecompense est true. */
