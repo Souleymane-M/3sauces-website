@@ -9,6 +9,7 @@ import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
   commandesInitiales: CommandeCuisine[];
+  aVenirInitial: CommandeCuisine[];
   livreursActifs: LivreurActif[];
 }
 
@@ -32,6 +33,18 @@ function formaterHeure(iso: string | null): string {
   return new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", hour: "2-digit", minute: "2-digit" }).format(
     new Date(iso)
   );
+}
+
+function formaterDateHeureComplete(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
 }
 
 // Défensif sur chaque champ : d'anciennes commandes (avant l'introduction
@@ -66,8 +79,9 @@ function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActiv
   }
 }
 
-export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAppProps) {
+export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs }: CommandesAppProps) {
   const [commandes, setCommandes] = useState<CommandeCuisine[]>(commandesInitiales);
+  const [aVenir, setAVenir] = useState<CommandeCuisine[]>(aVenirInitial);
   const [employeActif, setEmployeActif] = useState<EmployeActif | null>(() => lireIdentitePersistee().identite);
   const [modalOuverte, setModalOuverte] = useState(false);
   const [actionEnAttente, setActionEnAttente] = useState<((identite: EmployeActif) => void) | null>(null);
@@ -159,7 +173,10 @@ export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAp
           for (const c of idsNouveaux) idsVusRef.current.add(c.id);
         }
 
-        if (!annule) setCommandes(nouvellesCommandes);
+        if (!annule) {
+          setCommandes(nouvellesCommandes);
+          setAVenir(data.aVenir ?? []);
+        }
       } catch {
         // Erreur réseau ponctuelle : le prochain passage réessaiera.
       }
@@ -178,6 +195,7 @@ export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAp
       if (!reponse.ok) return;
       const data = await reponse.json();
       setCommandes(data.commandes ?? []);
+      setAVenir(data.aVenir ?? []);
     } catch {
       // ignore, le polling reprendra
     }
@@ -263,6 +281,11 @@ export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAp
                 </span>
                 <span className="text-lg text-black">{LIBELLES_STATUT[commande.statut]}</span>
               </div>
+              {commande.commandeAvance && !commande.ticketImprimeLe && (
+                <div className="mt-2 rounded bg-amber-100 p-2 text-base font-semibold text-amber-900">
+                  ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
+                </div>
+              )}
               {commande.canal === "livraison" && commande.adresse && (
                 <p className="mt-1 text-lg text-black">Adresse : {commande.adresse}</p>
               )}
@@ -311,6 +334,20 @@ export function CommandesApp({ commandesInitiales, livreursActifs }: CommandesAp
           );
         })}
       </div>
+
+      {aVenir.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-xl font-bold text-gray-700">Commandes à venir</h2>
+          <div className="space-y-2">
+            {aVenir.map((c) => (
+              <div key={c.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-lg text-gray-700">
+                Commande à venir — {formaterDateHeureComplete(c.heureSouhaitee)} — #{c.numero} — {c.nbPlats} plat
+                {c.nbPlats > 1 ? "s" : ""}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {modalOuverte && (
         <IdentificationModal

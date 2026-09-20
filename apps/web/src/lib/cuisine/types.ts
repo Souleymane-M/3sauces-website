@@ -17,6 +17,10 @@ export interface CommandeCuisine {
   heureSouhaitee: string | null;
   creeLe: string;
   nbPlats: number;
+  /** Vrai si la date de retrait diffère de la date de création — commande passée à l'avance. */
+  commandeAvance: boolean;
+  /** Renseigné une fois le ticket physiquement imprimé (commandes à l'avance uniquement) — null tant que ce n'est pas fait. */
+  ticketImprimeLe: string | null;
 }
 
 /** Statuts journalisables dans `commandes_evenements` — jamais "en_attente" (état initial automatique, pas une action). */

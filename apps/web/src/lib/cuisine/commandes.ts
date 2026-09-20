@@ -11,6 +11,46 @@ import {
   type StatutEvenement,
 } from "./types";
 
+const SELECT_COMMANDES_CUISINE =
+  "id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le";
+
+/** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
+function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
+  if (!heureSouhaitee) return false;
+  const versDateMayotteIso = (iso: string) =>
+    new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(iso));
+  return versDateMayotteIso(heureSouhaitee) !== versDateMayotteIso(creeLe);
+}
+
+function versCommandeCuisine(c: {
+  id: string;
+  numero: number;
+  canal: CommandeCuisine["canal"];
+  statut: CommandeCuisine["statut"];
+  contenu: unknown;
+  nom_livraison: string | null;
+  adresse_livraison: string | null;
+  heure_souhaitee: string | null;
+  created_at: string;
+  nb_plats: number;
+  ticket_imprime_le: string | null;
+}): CommandeCuisine {
+  return {
+    id: c.id,
+    numero: c.numero,
+    canal: c.canal,
+    statut: c.statut,
+    lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+    nom: c.nom_livraison ?? "",
+    adresse: c.adresse_livraison,
+    heureSouhaitee: c.heure_souhaitee,
+    creeLe: c.created_at,
+    nbPlats: c.nb_plats,
+    commandeAvance: estCommandeAvance(c.heure_souhaitee, c.created_at),
+    ticketImprimeLe: c.ticket_imprime_le,
+  };
+}
+
 /**
  * Commandes affichées sur l'écran cuisine (/commandes) : toutes les
  * commandes actives, caisse ET site public confondues, contrairement à
@@ -24,9 +64,7 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
   const { fin } = plageJourMayotteUtc(dateMayotteIso());
   const { data, error } = await supabase
     .from("commandes")
-    .select(
-      "id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement"
-    )
+    .select(SELECT_COMMANDES_CUISINE)
     .not("statut", "in", `(${STATUTS_TERMINAUX.join(",")})`)
     // Une commande payée en ligne (Stripe) n'apparaît en cuisine qu'une fois
     // le paiement confirmé — jamais avant, le temps que le client règle sur
@@ -45,24 +83,36 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
     throw new Error(`Impossible de charger les commandes : ${error.message}`);
   }
 
-  const commandes: CommandeCuisine[] = (data ?? []).map((c) => ({
-    id: c.id,
-    numero: c.numero,
-    canal: c.canal,
-    statut: c.statut,
-    lignes: (Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : []),
-    nom: c.nom_livraison ?? "",
-    adresse: c.adresse_livraison,
-    heureSouhaitee: c.heure_souhaitee,
-    creeLe: c.created_at,
-    nbPlats: c.nb_plats,
-  }));
+  const commandes: CommandeCuisine[] = (data ?? []).map(versCommandeCuisine);
 
   // Les commandes livraison prioritaires (≥3 plats) passent en tête, sans
   // perdre l'ordre chronologique existant à l'intérieur de chaque groupe
   // (tri stable).
   const estPrioritaire = (cmd: CommandeCuisine) => cmd.canal === "livraison" && cmd.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
   return [...commandes].sort((a, b) => Number(estPrioritaire(b)) - Number(estPrioritaire(a)));
+}
+
+/**
+ * Commandes à l'avance dont le jour de retrait n'est pas encore arrivé —
+ * purement informatif pour la cuisine (rien à préparer avant le jour J),
+ * jamais mélangées à `listerCommandesActives`.
+ */
+export async function listerCommandesAVenir(): Promise<CommandeCuisine[]> {
+  const supabase = createServiceSupabaseClient();
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
+  const { data, error } = await supabase
+    .from("commandes")
+    .select(SELECT_COMMANDES_CUISINE)
+    .not("statut", "in", `(${STATUTS_TERMINAUX.join(",")})`)
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    .gte("heure_souhaitee", fin.toISOString())
+    .order("heure_souhaitee", { ascending: true });
+
+  if (error) {
+    throw new Error(`Impossible de charger les commandes à venir : ${error.message}`);
+  }
+
+  return (data ?? []).map(versCommandeCuisine);
 }
 
 export async function listerLivreursActifs(): Promise<LivreurActif[]> {

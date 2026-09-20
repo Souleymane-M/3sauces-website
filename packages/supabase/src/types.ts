@@ -262,6 +262,7 @@ export interface Database {
           alerte_signalee_le: string | null;
           consentement_cgv_le: string | null;
           nb_plats: number;
+          ticket_imprime_le: string | null;
         };
         Insert: {
           id?: string;
@@ -287,6 +288,7 @@ export interface Database {
           alerte_signalee_le?: string | null;
           consentement_cgv_le?: string | null;
           nb_plats?: number;
+          ticket_imprime_le?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];

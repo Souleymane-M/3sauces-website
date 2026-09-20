@@ -22,6 +22,23 @@ function formaterDateHeure(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** Vrai si la date de retrait (Mayotte) est encore dans le futur au moment du rendu — commande passée à l'avance, pas encore due. */
+function estCommandeAVenir(heureSouhaitee: string | null): boolean {
+  if (!heureSouhaitee) return false;
+  const versDateMayotteIso = (iso: string) =>
+    new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(iso));
+  return versDateMayotteIso(heureSouhaitee) > versDateMayotteIso(new Date().toISOString());
+}
+
+function formaterDateCourte(iso: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(iso));
+}
+
 /**
  * Historique complet des commandes (Page 3) : qui a fait quoi et quand,
  * remplace l'ancien widget simplifié (retiré, cf.
@@ -63,6 +80,11 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
               <summary className="cursor-pointer text-sm">
                 <span className="font-semibold">Commande #{c.numero}</span> — {libelleCanal(c.canal)} —{" "}
                 {c.nom || "?"} — <span className="text-gray-400">{LIBELLES_STATUT[c.statut]}</span>
+                {estCommandeAVenir(c.heureSouhaitee) && (
+                  <span className="ml-2 rounded bg-amber-900/40 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
+                    Commande à venir — {formaterDateCourte(c.heureSouhaitee!)}
+                  </span>
+                )}
               </summary>
               <div className="mt-2 space-y-1 text-xs text-gray-400">
                 <p>Créée le {formaterDateHeure(c.creeLe)}</p>

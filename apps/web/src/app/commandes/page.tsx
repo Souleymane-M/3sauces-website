@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { CommandesApp } from "@/components/cuisine/commandes-app";
-import { listerCommandesActives, listerLivreursActifs } from "@/lib/cuisine/commandes";
+import { listerCommandesActives, listerCommandesAVenir, listerLivreursActifs } from "@/lib/cuisine/commandes";
 
 export const metadata: Metadata = {
   title: "Commandes — 3 Sauces",
@@ -20,7 +20,11 @@ export default async function CommandesPage() {
     );
   }
 
-  const [commandes, livreurs] = await Promise.all([listerCommandesActives(), listerLivreursActifs()]);
+  const [commandes, aVenir, livreurs] = await Promise.all([
+    listerCommandesActives(),
+    listerCommandesAVenir(),
+    listerLivreursActifs(),
+  ]);
 
   return (
     <main className="min-h-screen bg-white p-4">
@@ -28,7 +32,7 @@ export default async function CommandesPage() {
         <h1 className="text-2xl font-bold text-black">Commandes — 3 Sauces</h1>
         <LogoutButton />
       </div>
-      <CommandesApp commandesInitiales={commandes} livreursActifs={livreurs} />
+      <CommandesApp commandesInitiales={commandes} aVenirInitial={aVenir} livreursActifs={livreurs} />
     </main>
   );
 }

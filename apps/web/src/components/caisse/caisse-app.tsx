@@ -193,6 +193,39 @@ export function CaisseApp({
     setAvertissementImpression(messages.length > 0 ? messages.join(" · ") : null);
   }
 
+  /**
+   * Impression différée (commande à l'avance dont le jour est arrivé) : ne
+   * marque `ticket_imprime_le` qu'en cas de succès confirmé — un échec
+   * (imprimante hors ligne) laisse le flag à null, pour que le prochain
+   * cycle de polling (7s) retente automatiquement, sans jamais perdre la
+   * commande silencieusement.
+   */
+  async function imprimerPuisMarquer(commande: CommandePourImpression) {
+    const liste = await recupererImprimantes();
+    const resultat = await imprimerCommande(commande, versConfigImprimantes(liste));
+    const echecComptoir = resultat.comptoir !== null && !resultat.comptoir.ok;
+    const echecCuisine = resultat.cuisine !== null && !resultat.cuisine.ok;
+
+    if (echecComptoir || echecCuisine) {
+      const messages: string[] = [];
+      if (echecComptoir && resultat.comptoir && !resultat.comptoir.ok) messages.push(`Comptoir : ${resultat.comptoir.erreur}`);
+      if (echecCuisine && resultat.cuisine && !resultat.cuisine.ok) messages.push(`Cuisine : ${resultat.cuisine.erreur}`);
+      setAvertissementImpression(messages.join(" · "));
+      return;
+    }
+
+    try {
+      await fetch("/api/caisse/commandes-a-imprimer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: commande.id }),
+      });
+    } catch {
+      // Le marquage échoue mais l'impression a réussi : sans conséquence
+      // grave (au pire une réimpression au prochain cycle), jamais bloquant.
+    }
+  }
+
   // Détecte les commandes reçues depuis le site public (jamais celles
   // prises au comptoir, cf. lib/caisse/nouvelles-commandes.ts) pour les
   // imprimer + jouer une alerte sonore, sans que l'employé ait à faire quoi
@@ -230,23 +263,47 @@ export function CaisseApp({
           // ignore
         }
 
-        if (nouvelles.length === 0 || annule) return;
+        if (nouvelles.length > 0 && !annule) {
+          jouerAlerteSonore();
+          // Séquentiel plutôt qu'en parallèle : évite de saturer les deux
+          // imprimantes si plusieurs commandes en ligne arrivent groupées.
+          for (const commande of nouvelles) {
+            if (annule) return;
+            idsImprimesRef.current.add(commande.id);
+            await imprimerEtSignaler(commande);
+          }
+
+          try {
+            const ids = [...idsImprimesRef.current].slice(-MAX_IDS_MEMORISES);
+            idsImprimesRef.current = new Set(ids);
+            localStorage.setItem(CLE_IMPRIMES, JSON.stringify(ids));
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // Erreur réseau ponctuelle : sans conséquence, le prochain passage
+        // de polling réessaiera.
+      }
+
+      // Second volet, indépendant du curseur ci-dessus : commandes à
+      // l'avance dont le jour de retrait est arrivé, jamais encore
+      // imprimées. Toujours vérifié à chaque cycle, même si aucune nouvelle
+      // commande classique n'a été détectée.
+      try {
+        const reponseDifferees = await fetch(
+          `/api/caisse/commandes-a-imprimer?heureDebut=${encodeURIComponent(parametres.heureDebut)}`,
+          { cache: "no-store" }
+        );
+        if (!reponseDifferees.ok || annule) return;
+        const dataDifferees = await reponseDifferees.json();
+        const differees: CommandePourImpression[] = dataDifferees.commandes ?? [];
+        if (differees.length === 0 || annule) return;
 
         jouerAlerteSonore();
-        // Séquentiel plutôt qu'en parallèle : évite de saturer les deux
-        // imprimantes si plusieurs commandes en ligne arrivent groupées.
-        for (const commande of nouvelles) {
+        for (const commande of differees) {
           if (annule) return;
-          idsImprimesRef.current.add(commande.id);
-          await imprimerEtSignaler(commande);
-        }
-
-        try {
-          const ids = [...idsImprimesRef.current].slice(-MAX_IDS_MEMORISES);
-          idsImprimesRef.current = new Set(ids);
-          localStorage.setItem(CLE_IMPRIMES, JSON.stringify(ids));
-        } catch {
-          // ignore
+          await imprimerPuisMarquer(commande);
         }
       } catch {
         // Erreur réseau ponctuelle : sans conséquence, le prochain passage
