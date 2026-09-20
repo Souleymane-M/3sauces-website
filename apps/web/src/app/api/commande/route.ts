@@ -21,6 +21,7 @@ import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, to
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { verifierTokenFidelite } from "@/lib/fidelite/session";
+import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
@@ -109,7 +110,9 @@ export async function POST(request: Request) {
     await Promise.all([
       supabase
         .from("parametres_livraison")
-        .select("heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture")
+        .select(
+          "heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture, remise_lancement_debut, remise_lancement_fin"
+        )
         .eq("id", true)
         .single(),
       supabase.from("zones_livraison").select("commune").eq("actif", true),
@@ -540,6 +543,14 @@ export async function POST(request: Request) {
 
     recompenseAppliquee = true;
     montantFinal = Math.round((montant - MONTANT_RECOMPENSE) * 100) / 100;
+  } else if (
+    remiseLancementActive(parametres.remise_lancement_debut, parametres.remise_lancement_fin, dateMayotteIso()) &&
+    montant >= SEUIL_REMISE_LANCEMENT
+  ) {
+    // Opération de lancement (site public uniquement, jamais en caisse) —
+    // une seule remise à la fois : la récompense fidélité prime toujours
+    // si le client l'utilise sur cette commande (branche ci-dessus).
+    montantFinal = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
   }
 
   // --- Création du client fidélité (idempotent) ---
@@ -609,7 +620,7 @@ export async function POST(request: Request) {
     commandeId: commande.id,
     numero: commande.numero,
     montantBrut: montant,
-    remise: recompenseAppliquee ? MONTANT_RECOMPENSE : 0,
+    remise: Math.round((montant - montantFinal) * 100) / 100,
     montant: montantFinal,
     creneauHeure,
     date: dateCommande,

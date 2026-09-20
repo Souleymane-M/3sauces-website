@@ -26,6 +26,7 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 
 interface LignePanierPublique {
   id: string;
@@ -594,6 +595,14 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
+        {parametres.remiseLancementActive && (
+          <div className="rounded-lg p-3 text-white" style={{ backgroundColor: ROUGE }}>
+            <p className="font-bold">
+              🚀 Lancement 3sauces.fr — -{MONTANT_REMISE_LANCEMENT}€ dès {SEUIL_REMISE_LANCEMENT}€ d&apos;achat,
+              jusqu&apos;au {parametres.remiseLancementFinLibelle}
+            </p>
+          </div>
+        )}
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
           <p className="font-bold">🚀 Commande groupée = livraison prioritaire</p>
           <p className="mt-0.5 text-sm text-white/90">
@@ -845,11 +854,19 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
 
               <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
                 Total : {total.toFixed(2)} €
-                {utiliserRecompense && fideliteToken && (
+                {utiliserRecompense && fideliteToken ? (
                   <div className="mt-1 text-sm font-semibold text-[#2D5A27]">
                     Récompense fidélité : −{MONTANT_RECOMPENSE.toFixed(2)} € · Total à payer :{" "}
                     {Math.max(0, total - MONTANT_RECOMPENSE).toFixed(2)} €
                   </div>
+                ) : (
+                  parametres.remiseLancementActive &&
+                  total >= SEUIL_REMISE_LANCEMENT && (
+                    <div className="mt-1 text-sm font-semibold text-[#8B2020]">
+                      Remise lancement : −{MONTANT_REMISE_LANCEMENT.toFixed(2)} € · Total à payer :{" "}
+                      {(total - MONTANT_REMISE_LANCEMENT).toFixed(2)} €
+                    </div>
+                  )
                 )}
               </div>
 

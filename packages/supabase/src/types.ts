@@ -330,6 +330,8 @@ export interface Database {
           minimum_commande: number;
           site_ouvert: boolean;
           jours_fermeture: number[]; // 0 = dimanche ... 6 = samedi
+          remise_lancement_debut: string | null; // "YYYY-MM-DD"
+          remise_lancement_fin: string | null;
           updated_at: string;
         };
         Insert: {
@@ -339,6 +341,8 @@ export interface Database {
           minimum_commande?: number;
           site_ouvert?: boolean;
           jours_fermeture?: number[];
+          remise_lancement_debut?: string | null;
+          remise_lancement_fin?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["parametres_livraison"]["Insert"]>;
         Relationships: [];

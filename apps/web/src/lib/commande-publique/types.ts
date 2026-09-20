@@ -80,6 +80,10 @@ export interface ParametresLivraisonPublic {
   siteOuvert: boolean;
   /** Jours de fermeture hebdomadaire (0 = dimanche ... 6 = samedi), configurés depuis /patron. */
   joursFermeture: number[];
+  /** Remise de lancement (-2€ dès 10€) active aujourd'hui — dates configurées depuis /patron. */
+  remiseLancementActive: boolean;
+  /** "9 octobre" — pré-formaté, uniquement renseigné si remiseLancementActive. */
+  remiseLancementFinLibelle: string | null;
 }
 
 export interface LigneCommandePubliquePayload {

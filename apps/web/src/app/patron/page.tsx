@@ -10,8 +10,9 @@ import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-liv
 import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { JoursFermetureApp } from "@/components/patron/jours-fermeture-app";
+import { RemiseLancementApp } from "@/components/patron/remise-lancement-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
-import { chargerEtatSite, chargerJoursFermeture } from "@/lib/patron/parametres";
+import { chargerEtatSite, chargerJoursFermeture, chargerRemiseLancement } from "@/lib/patron/parametres";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
@@ -51,6 +52,7 @@ export default async function PatronPage() {
     alertesEncaissement,
     siteOuvert,
     joursFermeture,
+    remiseLancement,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -64,6 +66,7 @@ export default async function PatronPage() {
     listerAlertesEncaissement(),
     chargerEtatSite(),
     chargerJoursFermeture(),
+    chargerRemiseLancement(),
   ]);
 
   return (
@@ -79,6 +82,7 @@ export default async function PatronPage() {
       <div className="mb-4 space-y-3">
         <EtatSiteApp ouvertInitial={siteOuvert} />
         <JoursFermetureApp joursInitiaux={joursFermeture} />
+        <RemiseLancementApp debutInitial={remiseLancement.debut} finInitiale={remiseLancement.fin} />
       </div>
       <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
