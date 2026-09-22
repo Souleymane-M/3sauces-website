@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivreurActif } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
@@ -62,7 +62,7 @@ function detailLigne(l: CommandeCuisine["lignes"][number]): string[] {
 }
 
 function estPrioritaire(commande: CommandeCuisine): boolean {
-  return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
+  return commande.palierGroupe !== null;
 }
 
 // Lecture pure (aucun Date.now(), aucune écriture) de l'identité persistée
@@ -268,7 +268,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
             >
               {prioritaire && (
                 <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
-                  PRIORITAIRE 🚀
+                  {libellePalierGroupe(commande.palierGroupe)} 🚀
                 </div>
               )}
               <div className="flex items-baseline justify-between">

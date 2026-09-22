@@ -7,6 +7,7 @@ import {
   creneauDansPlage,
   dateIsoValide,
   dateMayotteIso,
+  heureActuelleMayotteMinutes,
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import { limiterDebit } from "@/lib/auth/rate-limit";
@@ -22,6 +23,7 @@ import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accomp
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { verifierTokenFidelite } from "@/lib/fidelite/session";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
+import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
@@ -449,6 +451,37 @@ export async function POST(request: Request) {
     );
   }
 
+  // Offre "commande groupée avant 11h" : calculée une seule fois ici, sur le
+  // montant brut (avant remise), jamais re-dérivée plus tard (cf. migration
+  // palier_groupe) — la priorité et la boisson offerte sont réservées à la
+  // livraison, commandée avant 11h (heure de Mayotte).
+  const palierGroupe = palierGroupeActif(nbPlats, montant, body.canal, heureActuelleMayotteMinutes());
+  if (palierGroupe === "GROUPE_4") {
+    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
+      .from("produits")
+      .select("id, nom")
+      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .eq("actif", true)
+      .maybeSingle();
+
+    if (erreurBoissonOfferte) {
+      return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
+    }
+    if (boissonOfferte) {
+      lignes.push({
+        produitId: boissonOfferte.id,
+        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+        categorie: "boisson",
+        quantite: 1,
+        prixUnitaire: 0,
+        coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
+        viandes: [],
+        canetteIncluse: false,
+        platIndex: null,
+      });
+    }
+  }
+
   // --- Règles spécifiques à la livraison ---
   let adresse: string | null = null;
   let zone: string | null = null;
@@ -584,6 +617,7 @@ export async function POST(request: Request) {
       heure_souhaitee: heureSouhaitee.toISOString(),
       consentement_cgv_le: new Date().toISOString(),
       nb_plats: nbPlats,
+      palier_groupe: palierGroupe,
       recompense_appliquee: recompenseAppliquee,
     })
     .select("id, numero")

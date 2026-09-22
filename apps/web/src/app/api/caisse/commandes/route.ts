@@ -3,11 +3,12 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
-import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
+import { construireHeureSouhaiteeUtc, creneauDansPlage, heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
@@ -384,6 +385,35 @@ export async function POST(request: Request) {
     );
   }
 
+  // Offre "commande groupée avant 11h" : même règle que le site public
+  // (/api/commande) — calculée une seule fois ici, sur le montant brut.
+  const palierGroupe = palierGroupeActif(nbPlats, montantBrut, body.canal, heureActuelleMayotteMinutes());
+  if (palierGroupe === "GROUPE_4") {
+    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
+      .from("produits")
+      .select("id, nom, cout_matiere")
+      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .eq("actif", true)
+      .maybeSingle();
+
+    if (erreurBoissonOfferte) {
+      return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
+    }
+    if (boissonOfferte) {
+      lignes.push({
+        produitId: boissonOfferte.id,
+        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+        categorie: "boisson",
+        quantite: 1,
+        prixUnitaire: 0,
+        coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
+        viandes: [],
+        canetteIncluse: false,
+        platIndex: null,
+      });
+    }
+  }
+
   const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
   const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
 
@@ -478,6 +508,7 @@ export async function POST(request: Request) {
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
       nb_plats: nbPlats,
+      palier_groupe: palierGroupe,
     })
     .select("id, numero")
     .single();

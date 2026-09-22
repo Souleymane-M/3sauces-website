@@ -1,8 +1,8 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
+import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import {
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
@@ -12,7 +12,7 @@ import {
 } from "./types";
 
 const SELECT_COMMANDES_CUISINE =
-  "id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le";
+  "id, numero, canal, statut, contenu, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe";
 
 /** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
 function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
@@ -34,6 +34,7 @@ function versCommandeCuisine(c: {
   created_at: string;
   nb_plats: number;
   ticket_imprime_le: string | null;
+  palier_groupe: string | null;
 }): CommandeCuisine {
   return {
     id: c.id,
@@ -46,6 +47,7 @@ function versCommandeCuisine(c: {
     heureSouhaitee: c.heure_souhaitee,
     creeLe: c.created_at,
     nbPlats: c.nb_plats,
+    palierGroupe: c.palier_groupe as PalierGroupe,
     commandeAvance: estCommandeAvance(c.heure_souhaitee, c.created_at),
     ticketImprimeLe: c.ticket_imprime_le,
   };
@@ -85,11 +87,10 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
 
   const commandes: CommandeCuisine[] = (data ?? []).map(versCommandeCuisine);
 
-  // Les commandes livraison prioritaires (≥3 plats) passent en tête, sans
-  // perdre l'ordre chronologique existant à l'intérieur de chaque groupe
-  // (tri stable).
-  const estPrioritaire = (cmd: CommandeCuisine) => cmd.canal === "livraison" && cmd.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
-  return [...commandes].sort((a, b) => Number(estPrioritaire(b)) - Number(estPrioritaire(a)));
+  // Les commandes ayant atteint un palier "commande groupée avant 11h"
+  // passent en tête, sans perdre l'ordre chronologique existant à
+  // l'intérieur de chaque groupe (tri stable).
+  return [...commandes].sort((a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null));
 }
 
 /**

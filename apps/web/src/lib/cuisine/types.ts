@@ -1,5 +1,6 @@
 import type { Canal, StatutCommande } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
+import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 /**
  * Commande affichée sur /commandes (écran cuisine) : jamais de prix, de
@@ -17,6 +18,8 @@ export interface CommandeCuisine {
   heureSouhaitee: string | null;
   creeLe: string;
   nbPlats: number;
+  /** Palier de l'offre "commande groupée avant 11h" atteint à la soumission, null sinon. */
+  palierGroupe: PalierGroupe;
   /** Vrai si la date de retrait diffère de la date de création — commande passée à l'avance. */
   commandeAvance: boolean;
   /** Renseigné une fois le ticket physiquement imprimé (commandes à l'avance uniquement) — null tant que ce n'est pas fait. */

@@ -20,6 +20,13 @@ import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/impri
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { MONTANT_RECOMPENSE, formaterEuros } from "@/lib/fidelite/regles";
+import { heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
+import {
+  HEURE_LIMITE_GROUPE_MINUTES,
+  SEUIL_GROUPE_3_MONTANT,
+  SEUIL_GROUPE_4_MONTANT,
+  palierGroupeActif,
+} from "@/lib/commande-publique/groupe-priorite";
 
 interface LignePanier {
   id: string;
@@ -381,6 +388,7 @@ export function CaisseApp({
   const total = panierActuel.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
+  const avantHeureLimiteGroupe = useMemo(() => heureActuelleMayotteMinutes() < HEURE_LIMITE_GROUPE_MINUTES, []);
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
@@ -907,10 +915,13 @@ export function CaisseApp({
             <div>
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
-              {canal === "livraison" && (
+              {canal === "livraison" && avantHeureLimiteGroupe && (
                 <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                  <p className="text-sm font-bold">🚀 Commande groupée = livraison prioritaire</p>
-                  <p className="text-xs text-white/90">3 plats ou plus → livrés en priorité, sans supplément.</p>
+                  <p className="text-sm font-bold">🚀 Commande groupée avant 11h</p>
+                  <p className="text-xs text-white/90">
+                    3 plats dès {SEUIL_GROUPE_3_MONTANT}€ → priorité. 4 plats dès {SEUIL_GROUPE_4_MONTANT}€ → priorité +
+                    boisson 2L offerte.
+                  </p>
                 </div>
               )}
 
@@ -985,13 +996,40 @@ export function CaisseApp({
                   {nbPlatsValides > 0 && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
                     <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
                       {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides === 1
-                        ? "Plus qu'un plat pour la livraison prioritaire 🚀"
-                        : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour la livraison prioritaire 🚀`}
+                        ? "Plus qu'un plat pour valider la commande groupée."
+                        : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour valider la commande groupée.`}
                     </p>
                   )}
-                  {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE && (
-                    <p className="mt-2 text-sm font-bold text-[#2D5A27]">🚀 Livraison prioritaire activée !</p>
-                  )}
+                  {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
+                    canal === "livraison" &&
+                    avantHeureLimiteGroupe &&
+                    (() => {
+                      const palierActuel = palierGroupeActif(nbPlatsValides, total, "livraison", 0);
+                      if (palierActuel === "GROUPE_4") {
+                        return (
+                          <p className="mt-2 text-sm font-bold text-[#2D5A27]">
+                            🚀 Priorité + 🎁 boisson 2L offerte activées !
+                          </p>
+                        );
+                      }
+                      if (palierActuel === "GROUPE_3") {
+                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
+                        return (
+                          <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
+                            🚀 Priorité activée ! Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte.
+                          </p>
+                        );
+                      }
+                      const montantRestant = Math.max(0, SEUIL_GROUPE_3_MONTANT - total);
+                      if (montantRestant > 0) {
+                        return (
+                          <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
+                            Encore {montantRestant.toFixed(2)}€ pour la livraison prioritaire 🚀
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                 </>
               )}
             </div>

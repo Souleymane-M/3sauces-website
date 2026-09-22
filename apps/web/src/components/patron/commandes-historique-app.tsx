@@ -1,5 +1,6 @@
 import { LIBELLES_STATUT } from "@/lib/cuisine/types";
 import type { CommandeHistorique, TempsPreparationEmploye } from "@/lib/patron/commandes-historique-types";
+import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 interface CommandesHistoriqueAppProps {
   historiqueInitial: CommandeHistorique[];
@@ -83,6 +84,11 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
                 {estCommandeAVenir(c.heureSouhaitee) && (
                   <span className="ml-2 rounded bg-amber-900/40 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
                     Commande à venir — {formaterDateCourte(c.heureSouhaitee!)}
+                  </span>
+                )}
+                {c.palierGroupe && (
+                  <span className="ml-2 rounded bg-orange-900/40 px-1.5 py-0.5 text-xs font-semibold text-orange-400">
+                    {libellePalierGroupe(c.palierGroupe)}
                   </span>
                 )}
               </summary>

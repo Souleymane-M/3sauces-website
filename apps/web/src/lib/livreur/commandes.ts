@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import type { LivraisonAssignee, PaiementDeclare } from "./types";
 
 /**
@@ -30,7 +30,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
     .select(
-      "id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement"
+      "id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement, palier_groupe"
     )
     .in("id", idsCommandes)
     .eq("statut", "pris_par_livreur")
@@ -52,12 +52,14 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     heureSouhaitee: c.heure_souhaitee,
     lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
     nbPlats: c.nb_plats,
+    palierGroupe: c.palier_groupe as PalierGroupe,
   }));
 
-  // Les livraisons prioritaires (≥3 plats) en tête, sans perdre l'ordre
-  // chronologique existant à l'intérieur de chaque groupe (tri stable).
+  // Les livraisons ayant atteint un palier "commande groupée avant 11h" en
+  // tête, sans perdre l'ordre chronologique existant à l'intérieur de
+  // chaque groupe (tri stable).
   return [...livraisonsAssignees].sort(
-    (a, b) => Number(b.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE) - Number(a.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE)
+    (a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null)
   );
 }
 

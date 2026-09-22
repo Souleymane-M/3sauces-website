@@ -59,6 +59,12 @@ export function dateMayotteIso(): string {
   return `${annee}-${mois}-${jour}`;
 }
 
+/** Minutes écoulées depuis minuit à Mayotte (UTC+3 fixe) — pour comparer l'heure actuelle à une heure limite (ex: 11h00). */
+export function heureActuelleMayotteMinutes(): number {
+  const maintenantMayotte = new Date(Date.now() + DECALAGE_MAYOTTE_HEURES * 60 * 60 * 1000);
+  return maintenantMayotte.getUTCHours() * 60 + maintenantMayotte.getUTCMinutes();
+}
+
 /** Ajoute (ou retranche) un nombre de jours calendaires à une date ISO, sans notion d'heure. */
 export function ajouterJoursIso(date: string, jours: number): string {
   const [annee, mois, jour] = date.split("-").map(Number);
@@ -90,8 +96,7 @@ export function creneauxPourDate(date: string, heureDebut: string, heureFin: str
   const creneaux = genererCreneaux(heureDebut, heureFin, pasMinutes);
   if (date !== dateMayotteIso()) return creneaux;
 
-  const maintenantMayotte = new Date(Date.now() + DECALAGE_MAYOTTE_HEURES * 60 * 60 * 1000);
-  const minutesActuelles = maintenantMayotte.getUTCHours() * 60 + maintenantMayotte.getUTCMinutes();
+  const minutesActuelles = heureActuelleMayotteMinutes();
   const versMinutes = (c: string) => {
     const [hh, mm] = c.split(":").map(Number);
     return hh * 60 + mm;
@@ -183,8 +188,7 @@ export function genererCreneaux(heureDebut: string, heureFin: string, pasMinutes
 export function prochainCreneauValide(creneauxValides: string[]): string {
   if (creneauxValides.length === 0) return "";
 
-  const maintenantMayotte = new Date(Date.now() + DECALAGE_MAYOTTE_HEURES * 60 * 60 * 1000);
-  const minutesActuelles = maintenantMayotte.getUTCHours() * 60 + maintenantMayotte.getUTCMinutes();
+  const minutesActuelles = heureActuelleMayotteMinutes();
 
   const versMinutes = (creneau: string) => {
     const [hh, mm] = creneau.split(":").map(Number);

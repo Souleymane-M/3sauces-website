@@ -1,5 +1,6 @@
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
+import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 export interface LivraisonAssignee {
   id: string;
@@ -10,6 +11,8 @@ export interface LivraisonAssignee {
   heureSouhaitee: string | null;
   lignes: LigneCommande[];
   nbPlats: number;
+  /** Palier de l'offre "commande groupée avant 11h" atteint à la soumission, null sinon. */
+  palierGroupe: PalierGroupe;
 }
 
 export interface PaiementDeclare {

@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { CommandeHistorique, EvenementHistorique, TempsPreparationEmploye } from "./commandes-historique-types";
+import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 const LIMITE_COMMANDES = 50;
 
@@ -17,7 +18,7 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
 
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
-    .select("id, numero, canal, statut, nom_livraison, heure_souhaitee, created_at")
+    .select("id, numero, canal, statut, nom_livraison, heure_souhaitee, created_at, palier_groupe")
     .order("created_at", { ascending: false })
     .limit(LIMITE_COMMANDES);
 
@@ -84,6 +85,7 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
       creeLe: c.created_at,
       evenements: evenementsParCommandeId.get(c.id) ?? [],
       livreurNom: livreurId ? (nomParProfilId.get(livreurId) ?? null) : null,
+      palierGroupe: c.palier_groupe as PalierGroupe,
     };
   });
 }

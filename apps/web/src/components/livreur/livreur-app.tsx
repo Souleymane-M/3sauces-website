@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee } from "@/lib/livreur/types";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 // Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
 // `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
@@ -150,7 +150,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
           : 0;
         const totalGroupeCorrespond = declaration && totalGroupeDeclare === Math.round(livraison.montant * 100) / 100;
 
-        const prioritaire = livraison.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
+        const prioritaire = livraison.palierGroupe !== null;
 
         return (
           <div
@@ -159,7 +159,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
           >
             {prioritaire && (
               <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
-                PRIORITAIRE 🚀
+                {libellePalierGroupe(livraison.palierGroupe)} 🚀
               </div>
             )}
             <div className="flex items-baseline justify-between">
