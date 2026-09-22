@@ -125,4 +125,6 @@ export interface CreerCommandePubliquePayload {
   fideliteToken?: string;
   /** Case "Utiliser ma récompense sur cette commande" — revérifiée intégralement côté serveur. */
   utiliserRecompense?: boolean;
+  /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
+  boissonOfferteSaveur?: string;
 }

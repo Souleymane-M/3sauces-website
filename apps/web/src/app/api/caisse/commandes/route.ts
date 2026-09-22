@@ -389,6 +389,14 @@ export async function POST(request: Request) {
   // (/api/commande) — calculée une seule fois ici, sur le montant brut.
   const palierGroupe = palierGroupeActif(nbPlats, montantBrut, body.canal, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
+    const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
+    if (!boissonOfferteSaveur || !nomsSaveursValides.has(boissonOfferteSaveur)) {
+      return NextResponse.json(
+        { error: "Choisis un parfum disponible pour la boisson 2L offerte." },
+        { status: 400 }
+      );
+    }
+
     const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
       .from("produits")
       .select("id, nom, cout_matiere")
@@ -408,6 +416,7 @@ export async function POST(request: Request) {
         prixUnitaire: 0,
         coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
         viandes: [],
+        saveurs: [boissonOfferteSaveur],
         canetteIncluse: false,
         platIndex: null,
       });

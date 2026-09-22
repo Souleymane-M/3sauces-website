@@ -86,6 +86,8 @@ export interface CreerCommandePayload {
   clientTelephone?: string;
   nom?: string;
   recompenseAppliquee?: boolean;
+  /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
+  boissonOfferteSaveur?: string;
   // Livraison uniquement (même règles que le site public, cf. /api/commande) :
   adresse?: string;
   zone?: string;

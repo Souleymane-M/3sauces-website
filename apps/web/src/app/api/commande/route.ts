@@ -457,6 +457,14 @@ export async function POST(request: Request) {
   // livraison, commandée avant 11h (heure de Mayotte).
   const palierGroupe = palierGroupeActif(nbPlats, montant, body.canal, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
+    const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
+    if (!boissonOfferteSaveur || !nomsSaveursValides.has(boissonOfferteSaveur)) {
+      return NextResponse.json(
+        { error: "Choisis un parfum disponible pour ta boisson 2L offerte." },
+        { status: 400 }
+      );
+    }
+
     const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
       .from("produits")
       .select("id, nom")
@@ -476,6 +484,7 @@ export async function POST(request: Request) {
         prixUnitaire: 0,
         coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
         viandes: [],
+        saveurs: [boissonOfferteSaveur],
         canetteIncluse: false,
         platIndex: null,
       });

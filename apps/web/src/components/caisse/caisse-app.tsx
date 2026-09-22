@@ -140,6 +140,7 @@ export function CaisseApp({
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
   const [canal, setCanal] = useState<Canal>("sur_place");
+  const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [telephone, setTelephone] = useState("");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
@@ -389,6 +390,7 @@ export function CaisseApp({
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
   const avantHeureLimiteGroupe = useMemo(() => heureActuelleMayotteMinutes() < HEURE_LIMITE_GROUPE_MINUTES, []);
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal, heureActuelleMayotteMinutes());
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
@@ -655,6 +657,7 @@ export function CaisseApp({
           modePaiement,
           clientTelephone: telephone.trim(),
           recompenseAppliquee: appliquerRecompenseEffectif,
+          boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
           nom: nom.trim(),
           adresse: canal === "livraison" ? adresse.trim() : undefined,
@@ -1004,7 +1007,7 @@ export function CaisseApp({
                     canal === "livraison" &&
                     avantHeureLimiteGroupe &&
                     (() => {
-                      const palierActuel = palierGroupeActif(nbPlatsValides, total, "livraison", 0);
+                      const palierActuel = palierGroupeReel;
                       if (palierActuel === "GROUPE_4") {
                         return (
                           <p className="mt-2 text-sm font-bold text-[#2D5A27]">
@@ -1030,6 +1033,27 @@ export function CaisseApp({
                       }
                       return null;
                     })()}
+                  {palierGroupeReel === "GROUPE_4" && (
+                    <div className="mt-2 rounded-lg border border-gray-300 bg-gray-50 p-2">
+                      <p className="text-xs font-semibold text-gray-900">🎁 Parfum de la boisson 2L offerte</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {saveurs.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setBoissonOfferteSaveur(s.nom)}
+                            className={`rounded-full border px-2.5 py-1 text-xs ${
+                              boissonOfferteSaveur === s.nom
+                                ? "border-[#8B2020] bg-[#8B2020] text-white"
+                                : "border-gray-300 text-gray-700"
+                            }`}
+                          >
+                            {s.nom}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1198,7 +1222,8 @@ export function CaisseApp({
                 envoiEnCours ||
                 canalLivraisonBloque ||
                 infosClientIncompletes ||
-                (enModeGroupe && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE)
+                (enModeGroupe && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) ||
+                (palierGroupeReel === "GROUPE_4" && !boissonOfferteSaveur)
               }
               className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
             >

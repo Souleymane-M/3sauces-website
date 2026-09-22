@@ -115,6 +115,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
   const [canal, setCanal] = useState<CanalPublic>("sur_place");
+  const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
@@ -218,6 +219,10 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
   const panierActuel = modeCommande === "groupee" ? plats.flatMap((p) => p.lignes) : panierSimple;
   const total = panierActuel.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
+  // Palier réel (canal effectivement choisi) pour le blocage/la soumission —
+  // distinct du message d'encouragement affiché dans le panier avant que le
+  // canal soit choisi (qui suppose "livraison" pour rester incitatif).
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal, heureActuelleMayotteMinutes());
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -533,6 +538,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
           lignes,
           fideliteToken: utiliserRecompense ? fideliteToken : undefined,
           utiliserRecompense: utiliserRecompense && Boolean(fideliteToken),
+          boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
         }),
       });
       const data = await reponse.json();
@@ -982,6 +988,28 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 )}
               </div>
 
+              {palierGroupeReel === "GROUPE_4" && (
+                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                  <p className="text-sm font-semibold text-gray-900">🎁 Choisis le parfum de ta boisson 2L offerte</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {saveurs.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setBoissonOfferteSaveur(s.nom)}
+                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                          boissonOfferteSaveur === s.nom
+                            ? "border-[#8B2020] bg-[#8B2020] text-white"
+                            : "border-gray-300 text-gray-700"
+                        }`}
+                      >
+                        {s.nom}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {canal === "livraison" && (
                 <>
                   <div>
@@ -1076,7 +1104,8 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                   canalLivraisonBloque ||
                   !accepteCgv ||
                   nbArticles === 0 ||
-                  (modeCommande === "groupee" && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE)
+                  (modeCommande === "groupee" && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) ||
+                  (palierGroupeReel === "GROUPE_4" && !boissonOfferteSaveur)
                 }
                 className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
               >
