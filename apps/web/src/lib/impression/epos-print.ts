@@ -113,6 +113,7 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
   if (l.accompagnementsInclus?.length) details.push(`Accompagnement : ${l.accompagnementsInclus.join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
   return details;

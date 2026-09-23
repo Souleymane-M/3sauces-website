@@ -73,6 +73,8 @@ export interface SaveurPublique {
 export const NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE = "Viande supplémentaire";
 export const NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE = "Sauce supplémentaire";
 export const NOM_PRODUIT_SALADE_SUPPLEMENTAIRE = "Salade supplémentaire";
+/** Réduction pour une formule à canette incluse (Tacos, Barquette, Bowl, Menu Étudiant) commandée sans la canette. */
+export const MONTANT_REDUCTION_SANS_BOISSON = 1.5;
 
 export interface ParametresLivraisonPublic {
   heureDebut: string; // "HH:MM:SS"
@@ -96,6 +98,8 @@ export interface LigneCommandePubliquePayload {
   saveurs: string[];
   /** Saveur choisie pour la canette incluse dans la formule (Tacos/Barquette/Bowl/Menu Étudiant), null si sans objet. */
   boissonIncluse: string | null;
+  /** Client a explicitement refusé la canette incluse (-1,50€) — jamais déduit de `boissonIncluse === null`. */
+  sansBoisson?: boolean;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */

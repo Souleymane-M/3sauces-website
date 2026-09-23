@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
-import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
+import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE, MONTANT_REDUCTION_SANS_BOISSON } from "@/lib/commande-publique/types";
 import { construireHeureSouhaiteeUtc, creneauDansPlage, heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
@@ -315,6 +315,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Sans boisson (-1,50€) : le client refuse explicitement la canette
+    // incluse de cette formule — jamais déduit de `boissonIncluse === null`.
+    const sansBoisson = ligneBrute.sansBoisson === true;
+    if (sansBoisson) {
+      if (!produit.canette_incluse) {
+        return NextResponse.json(
+          { error: `Pas de canette incluse sur ${produit.nom}, rien à retirer.` },
+          { status: 400 }
+        );
+      }
+      if (boissonIncluse !== null) {
+        return NextResponse.json(
+          { error: `Choix incohérent (saveur + sans boisson) sur ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Différence caisse : un produit à prix libre (ex: "Plat du jour") est
     // autorisé ici (jamais côté public), avec un prix du jour saisi par
     // l'employé plutôt qu'un rejet.
@@ -325,6 +343,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `${produit.nom} est à prix libre : indique un prix du jour.` }, { status: 400 });
       }
       prixUnitaire = prixSaisi;
+    }
+    if (produit.canette_incluse && sansBoisson) {
+      prixUnitaire = Math.round((prixUnitaire - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
     }
 
     // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle
@@ -386,6 +407,7 @@ export async function POST(request: Request) {
       sauces,
       saveurs,
       boissonIncluse,
+      sansBoisson,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
       accompagnementsInclus,

@@ -16,7 +16,7 @@ import type {
   CreerCommandePubliquePayload,
   LigneCommandePubliquePayload,
 } from "@/lib/commande-publique/types";
-import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE } from "@/lib/commande-publique/types";
+import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE, MONTANT_REDUCTION_SANS_BOISSON } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
@@ -384,6 +384,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Sans boisson (-1,50€) : le client refuse explicitement la canette
+    // incluse de cette formule — jamais déduit de `boissonIncluse === null`.
+    const sansBoisson = ligneBrute.sansBoisson === true;
+    if (sansBoisson) {
+      if (!produit.canette_incluse) {
+        return NextResponse.json(
+          { error: `Pas de canette incluse sur ${produit.nom}, rien à retirer.` },
+          { status: 400 }
+        );
+      }
+      if (boissonIncluse !== null) {
+        return NextResponse.json(
+          { error: `Choix incohérent (saveur + sans boisson) sur ${produit.nom}.` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Salade incluse (Barquettes) : choix obligatoire, gratuit — le client
     // doit trancher explicitement, jamais de valeur par défaut silencieuse.
     // La salade en option payante (Tacos/Bowl) n'a pas besoin de champ ici :
@@ -443,12 +461,16 @@ export async function POST(request: Request) {
       nom: produit.nom,
       categorie: produit.categorie,
       quantite,
-      prixUnitaire: produit.prix,
+      prixUnitaire:
+        produit.canette_incluse && sansBoisson
+          ? Math.round((produit.prix - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
+          : produit.prix,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
       sauces,
       saveurs,
       boissonIncluse,
+      sansBoisson,
       canetteIncluse: produit.canette_incluse,
       saladeIncluse,
       accompagnementsInclus,

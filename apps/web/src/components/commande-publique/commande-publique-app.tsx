@@ -15,6 +15,7 @@ import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
+  MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
@@ -50,6 +51,7 @@ interface LignePanierPublique {
   sauces: string[];
   saveurs: string[];
   boissonIncluse: string | null;
+  sansBoisson: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
 }
@@ -221,13 +223,17 @@ export function CommandePubliqueApp({
   );
 
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
-  const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
+  // Prix effectif d'une ligne : le prix catalogue, moins la réduction "sans
+  // boisson" si le client a refusé la canette incluse de cette ligne.
+  const prixLigne = (l: LignePanierPublique) =>
+    l.produit.prix - (l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+  const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
   const panierActuel = modeCommande === "groupee" ? plats.flatMap((p) => p.lignes) : panierSimple;
-  const total = panierActuel.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
+  const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
   // Palier réel (canal effectivement choisi) pour le blocage/la soumission —
   // distinct du message d'encouragement affiché dans le panier avant que le
@@ -291,7 +297,8 @@ export function CommandePubliqueApp({
     boissonIncluse: string | null = null,
     quantite: number = 1,
     saladeIncluse: boolean | null = null,
-    accompagnementsInclus: string[] = []
+    accompagnementsInclus: string[] = [],
+    sansBoisson: boolean = false
   ) {
     declencherPulse();
     const cle = (l: LignePanierPublique) =>
@@ -300,6 +307,7 @@ export function CommandePubliqueApp({
       JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
+      l.sansBoisson === sansBoisson &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanierPublique => ({
@@ -310,6 +318,7 @@ export function CommandePubliqueApp({
       sauces: saucesChoisies,
       saveurs: saveursChoisies,
       boissonIncluse,
+      sansBoisson,
       saladeIncluse,
       accompagnementsInclus,
     });
@@ -508,6 +517,7 @@ export function CommandePubliqueApp({
                 sauces: l.sauces,
                 saveurs: l.saveurs,
                 boissonIncluse: l.boissonIncluse,
+                sansBoisson: l.sansBoisson,
                 saladeIncluse: l.saladeIncluse,
                 accompagnementsInclus: l.accompagnementsInclus,
                 platIndex: index,
@@ -521,6 +531,7 @@ export function CommandePubliqueApp({
               sauces: l.sauces,
               saveurs: l.saveurs,
               boissonIncluse: l.boissonIncluse,
+              sansBoisson: l.sansBoisson,
               saladeIncluse: l.saladeIncluse,
               accompagnementsInclus: l.accompagnementsInclus,
               platIndex: null,
@@ -596,6 +607,11 @@ export function CommandePubliqueApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
+        {l.sansBoisson && (
+          <div className="text-xs font-semibold text-orange-600">
+            Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+          </div>
+        )}
         {l.accompagnementsInclus.length > 0 && (
           <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementsInclus.join(" + ")}</div>
         )}
@@ -616,7 +632,7 @@ export function CommandePubliqueApp({
           >
             +
           </button>
-          <span className="ml-auto font-medium text-gray-900">{(l.produit.prix * l.quantite).toFixed(2)} €</span>
+          <span className="ml-auto font-medium text-gray-900">{(prixLigne(l) * l.quantite).toFixed(2)} €</span>
         </div>
       </li>
     );
@@ -847,7 +863,7 @@ export function CommandePubliqueApp({
                   <ul className="space-y-2">
                     {plats.map((plat, index) => {
                       if (plat.lignes.length === 0) return null;
-                      const totalPlat = plat.lignes.reduce((acc, l) => acc + l.produit.prix * l.quantite, 0);
+                      const totalPlat = plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
                       const nbArticlesPlat = plat.lignes.reduce((acc, l) => acc + l.quantite, 0);
                       const deplie = platDeplie === plat.id;
                       return (
@@ -1213,7 +1229,8 @@ export function CommandePubliqueApp({
             boissonIncluse,
             saladeIncluse,
             saladeOption,
-            accompagnementsInclus
+            accompagnementsInclus,
+            sansBoisson
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1223,7 +1240,8 @@ export function CommandePubliqueApp({
               boissonIncluse,
               1,
               saladeIncluse,
-              accompagnementsInclus
+              accompagnementsInclus,
+              sansBoisson
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

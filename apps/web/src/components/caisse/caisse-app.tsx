@@ -8,6 +8,7 @@ import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
+  MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
 import { genererCreneaux, prochainCreneauValide, construireHeureSouhaiteeUtc } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
@@ -37,6 +38,7 @@ interface LignePanier {
   sauces: string[];
   saveurs: string[];
   boissonIncluse: string | null;
+  sansBoisson: boolean;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
@@ -385,12 +387,15 @@ export function CaisseApp({
 
   const enModeGroupe = modeCommande === "groupee";
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
-  const totalPlat = (plat: PlatGroupeCaisse) =>
-    plat.lignes.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
+  // Prix effectif d'une ligne : prix catalogue (ou saisi pour un plat du jour
+  // à prix libre), moins la réduction "sans boisson" le cas échéant.
+  const prixLigne = (l: LignePanier) =>
+    (l.produit.prix ?? l.prixSaisi ?? 0) - (l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+  const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
   const panierActuel = enModeGroupe ? plats.flatMap((p) => p.lignes) : panierSimple;
-  const total = panierActuel.reduce((acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite, 0);
+  const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
   const avantHeureLimiteGroupe = useMemo(() => heureActuelleMayotteMinutes() < HEURE_LIMITE_GROUPE_MINUTES, []);
@@ -434,7 +439,8 @@ export function CaisseApp({
     quantite: number = 1,
     prixSaisi?: number,
     saladeIncluse: boolean | null = null,
-    accompagnementsInclus: string[] = []
+    accompagnementsInclus: string[] = [],
+    sansBoisson: boolean = false
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -443,6 +449,7 @@ export function CaisseApp({
       JSON.stringify([...l.sauces].sort()) === JSON.stringify([...saucesChoisies].sort()) &&
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
+      l.sansBoisson === sansBoisson &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanier => ({
@@ -453,6 +460,7 @@ export function CaisseApp({
       sauces: saucesChoisies,
       saveurs: saveursChoisies,
       boissonIncluse,
+      sansBoisson,
       prixSaisi,
       saladeIncluse,
       accompagnementsInclus,
@@ -632,6 +640,7 @@ export function CaisseApp({
               sauces: l.sauces,
               saveurs: l.saveurs,
               boissonIncluse: l.boissonIncluse,
+              sansBoisson: l.sansBoisson,
               prixSaisi: l.prixSaisi,
               saladeIncluse: l.saladeIncluse,
               accompagnementsInclus: l.accompagnementsInclus,
@@ -646,6 +655,7 @@ export function CaisseApp({
             sauces: l.sauces,
             saveurs: l.saveurs,
             boissonIncluse: l.boissonIncluse,
+            sansBoisson: l.sansBoisson,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
@@ -689,12 +699,13 @@ export function CaisseApp({
         nom: l.produit.nom,
         categorie: l.produit.categorie,
         quantite: l.quantite,
-        prixUnitaire: l.produit.prix ?? l.prixSaisi ?? 0,
+        prixUnitaire: prixLigne(l),
         coutMatiereUnitaire: l.produit.coutMatiere,
         viandes: l.viandes,
         sauces: l.sauces,
         saveurs: l.saveurs,
         boissonIncluse: l.boissonIncluse,
+        sansBoisson: l.sansBoisson,
         canetteIncluse: l.produit.canetteIncluse,
         saladeIncluse: l.saladeIncluse,
         accompagnementsInclus: l.accompagnementsInclus,
@@ -767,6 +778,11 @@ export function CaisseApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
+        {l.sansBoisson && (
+          <div className="text-xs font-semibold text-orange-600">
+            Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+          </div>
+        )}
         {l.accompagnementsInclus.length > 0 && (
           <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementsInclus.join(" + ")}</div>
         )}
@@ -787,9 +803,7 @@ export function CaisseApp({
           >
             +
           </button>
-          <span className="ml-auto font-medium text-gray-900">
-            {((l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite).toFixed(2)} €
-          </span>
+          <span className="ml-auto font-medium text-gray-900">{(prixLigne(l) * l.quantite).toFixed(2)} €</span>
         </div>
       </li>
     );
@@ -956,10 +970,7 @@ export function CaisseApp({
                   <ul className="mt-2 space-y-2">
                     {plats.map((plat, index) => {
                       if (plat.lignes.length === 0) return null;
-                      const totalPlat = plat.lignes.reduce(
-                        (acc, l) => acc + (l.produit.prix ?? l.prixSaisi ?? 0) * l.quantite,
-                        0
-                      );
+                      const totalPlat = plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
                       const nbArticlesPlat = plat.lignes.reduce((acc, l) => acc + l.quantite, 0);
                       const deplie = platDeplie === plat.id;
                       return (
@@ -1282,7 +1293,8 @@ export function CaisseApp({
             boissonIncluse,
             saladeIncluse,
             saladeOption,
-            accompagnementsInclus
+            accompagnementsInclus,
+            sansBoisson
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1293,7 +1305,8 @@ export function CaisseApp({
               1,
               undefined,
               saladeIncluse,
-              accompagnementsInclus
+              accompagnementsInclus,
+              sansBoisson
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

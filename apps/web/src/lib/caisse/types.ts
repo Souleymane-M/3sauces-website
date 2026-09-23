@@ -20,6 +20,8 @@ export interface LigneCommande {
   saveurs?: string[];
   /** Saveur de la canette incluse dans une formule (Tacos/Barquette/Bowl/Menu Étudiant). */
   boissonIncluse?: string | null;
+  /** Client a explicitement refusé la canette incluse (-1,50€) — jamais déduit de `boissonIncluse === null`. */
+  sansBoisson?: boolean;
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
@@ -68,6 +70,7 @@ export interface LigneCommandePayload {
   sauces: string[];
   saveurs: string[];
   boissonIncluse: string | null;
+  sansBoisson?: boolean;
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
   saladeIncluse: boolean | null;
