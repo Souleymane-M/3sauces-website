@@ -176,6 +176,9 @@ export function construireTicketClientXml(
 
   xml += `<feed line="1"/>`;
   xml += ligne("--------------------------------");
+  xml += ligne("Fidelite : chaque euro compte !", { align: "center", gras: true });
+  xml += ligne("Suivez vos tampons sur 3sauces.fr/fidelite", { align: "center" });
+  xml += ligne("--------------------------------");
   xml += ligne(MENTION_LEGALE, { align: "center" });
 
   xml += `<feed line="2"/><cut type="feed"/>`;
