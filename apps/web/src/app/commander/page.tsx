@@ -6,6 +6,7 @@ import {
   listerViandesPubliques,
   listerSaucesPubliques,
   listerSaveursPubliques,
+  listerParfums2lPublics,
 } from "@/lib/commande-publique/produits";
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
 
@@ -18,11 +19,12 @@ export const metadata: Metadata = {
 };
 
 export default async function CommanderPage() {
-  const [produits, viandes, sauces, saveurs, parametres] = await Promise.all([
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres] = await Promise.all([
     listerProduitsPublics(),
     listerViandesPubliques(),
     listerSaucesPubliques(),
     listerSaveursPubliques(),
+    listerParfums2lPublics(),
     chargerParametresLivraisonPublics(),
   ]);
 
@@ -72,6 +74,7 @@ export default async function CommanderPage() {
         viandes={viandes}
         sauces={sauces}
         saveurs={saveurs}
+        parfums2l={parfums2l}
         parametres={parametres}
       />
     </main>

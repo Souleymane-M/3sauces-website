@@ -3,16 +3,18 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { TypeOption, OptionAdmin } from "./options-types";
 
 /**
- * Gestion des 3 référentiels d'options (Page 3 / Module 6) : viandes,
- * sauces, saveurs — chacun référencé par nom depuis `produits` dans le
- * configurateur public.
+ * Gestion des 4 référentiels d'options (Page 3 / Module 6) : viandes,
+ * sauces, saveurs, parfums2l — chacun référencé par nom depuis
+ * `produits` dans le configurateur public (parfums2l : uniquement pour
+ * la Boisson 2L, cf. `NOM_PRODUIT_BOISSON_OFFERTE`, indépendant de
+ * `saveurs` qui sert aux canettes).
  *
  * Écrit en branches explicites par table plutôt qu'en code générique
  * paramétré par nom de table : Supabase génère un type très strict par
  * table (ex: `viandes` exige `unite_deduction`, absent de `sauces`/
- * `saveurs`), et un wrapper générique unique casse cette vérification de
- * type à la compilation sans réel gain de lisibilité vu qu'il n'y a que
- * 3 tables.
+ * `saveurs`/`parfums_2l`), et un wrapper générique unique casse cette
+ * vérification de type à la compilation sans réel gain de lisibilité
+ * vu qu'il n'y a que 4 tables.
  */
 export async function listerOptionsAdmin(type: TypeOption): Promise<OptionAdmin[]> {
   const supabase = createServiceSupabaseClient();
@@ -29,6 +31,15 @@ export async function listerOptionsAdmin(type: TypeOption): Promise<OptionAdmin[
   if (type === "sauces") {
     const { data, error } = await supabase.from("sauces").select("id, nom, actif").order("nom", { ascending: true });
     if (error) throw new Error(`Impossible de charger les sauces : ${error.message}`);
+    return data ?? [];
+  }
+
+  if (type === "parfums2l") {
+    const { data, error } = await supabase
+      .from("parfums_2l")
+      .select("id, nom, actif")
+      .order("nom", { ascending: true });
+    if (error) throw new Error(`Impossible de charger les parfums Boisson 2L : ${error.message}`);
     return data ?? [];
   }
 
@@ -51,7 +62,7 @@ export async function creerOption(
     return;
   }
 
-  const table = type === "sauces" ? "sauces" : "saveurs";
+  const table = type === "sauces" ? "sauces" : type === "parfums2l" ? "parfums_2l" : "saveurs";
   const { error } = await supabase.from(table).insert({ nom: input.nom, actif: true });
   if (error) throw new Error(`Impossible de créer : ${error.message}`);
 }
@@ -76,14 +87,15 @@ export async function mettreAJourOption(
   const update: { nom?: string; actif?: boolean } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.actif !== undefined) update.actif = input.actif;
-  const table = type === "sauces" ? "sauces" : "saveurs";
+  const table = type === "sauces" ? "sauces" : type === "parfums2l" ? "parfums_2l" : "saveurs";
   const { error } = await supabase.from(table).update(update).eq("id", id);
   if (error) throw new Error(`Impossible de mettre à jour : ${error.message}`);
 }
 
 export async function supprimerOption(type: TypeOption, id: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
-  const table = type === "viandes" ? "viandes" : type === "sauces" ? "sauces" : "saveurs";
+  const table =
+    type === "viandes" ? "viandes" : type === "sauces" ? "sauces" : type === "parfums2l" ? "parfums_2l" : "saveurs";
   const { error } = await supabase.from(table).delete().eq("id", id);
   if (error) throw new Error(`Impossible de supprimer : ${error.message}`);
 }

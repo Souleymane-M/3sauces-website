@@ -9,6 +9,7 @@ import {
   listerViandesActives,
   listerSaucesActives,
   listerSaveursActives,
+  listerParfums2lActifs,
 } from "@/lib/caisse/produits";
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
@@ -29,15 +30,17 @@ export default async function CaissePage() {
     );
   }
 
-  const [produits, viandes, sauces, saveurs, parametres, imprimantes, livraisonsAEncaisser] = await Promise.all([
-    listerProduitsActifs(),
-    listerViandesActives(),
-    listerSaucesActives(),
-    listerSaveursActives(),
-    chargerParametresLivraisonPublics(),
-    listerImprimantesAdmin(),
-    listerLivraisonsAEncaisser(),
-  ]);
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser] =
+    await Promise.all([
+      listerProduitsActifs(),
+      listerViandesActives(),
+      listerSaucesActives(),
+      listerSaveursActives(),
+      listerParfums2lActifs(),
+      chargerParametresLivraisonPublics(),
+      listerImprimantesAdmin(),
+      listerLivraisonsAEncaisser(),
+    ]);
 
   return (
     <main className="min-h-screen bg-[#F5F0E8] p-8">
@@ -66,6 +69,7 @@ export default async function CaissePage() {
         viandes={viandes}
         sauces={sauces}
         saveurs={saveurs}
+        parfums2l={parfums2l}
         parametres={parametres}
         imprimantesInitiales={imprimantes}
         nomEmploye={session.nom}

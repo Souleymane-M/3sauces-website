@@ -136,6 +136,20 @@ export interface Database {
         Relationships: [];
       };
 
+      parfums_2l: {
+        Row: {
+          id: string;
+          nom: string;
+          actif: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["parfums_2l"]["Row"]> & {
+          nom: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["parfums_2l"]["Row"]>;
+        Relationships: [];
+      };
+
       articles_stock: {
         Row: {
           id: string;

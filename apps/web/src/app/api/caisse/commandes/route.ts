@@ -178,6 +178,18 @@ export async function POST(request: Request) {
   }
   const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
 
+  // Parfums Boisson 2L : référentiel indépendant de `saveurs` (canettes),
+  // uniquement pour ce produit (cf. NOM_PRODUIT_BOISSON_OFFERTE).
+  const { data: parfums2lActifs, error: erreurParfums2l } = await supabase
+    .from("parfums_2l")
+    .select("nom")
+    .eq("actif", true);
+
+  if (erreurParfums2l) {
+    return NextResponse.json({ error: "Erreur serveur (parfums Boisson 2L)." }, { status: 500 });
+  }
+  const nomsParfums2lValides = new Set((parfums2lActifs ?? []).map((s) => s.nom));
+
   // Accompagnements proposables en choix gratuit inclus (Plats du jour) —
   // jamais "Salade", incluse automatiquement sans choix (mécanisme distinct).
   const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
@@ -271,7 +283,10 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (saveurs.some((s) => !nomsSaveursValides.has(s))) {
+    // La Boisson 2L a son propre référentiel de parfums, indépendant de
+    // `saveurs` (canettes) — cf. lib/patron/options.ts.
+    const listeSaveursValides = produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? nomsParfums2lValides : nomsSaveursValides;
+    if (saveurs.some((s) => !listeSaveursValides.has(s))) {
       return NextResponse.json({ error: `Saveur invalide sur la ligne ${produit.nom}.` }, { status: 400 });
     }
 
@@ -390,7 +405,7 @@ export async function POST(request: Request) {
   const palierGroupe = palierGroupeActif(nbPlats, montantBrut, body.canal, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
-    if (!boissonOfferteSaveur || !nomsSaveursValides.has(boissonOfferteSaveur)) {
+    if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
       return NextResponse.json(
         { error: "Choisis un parfum disponible pour la boisson 2L offerte." },
         { status: 400 }

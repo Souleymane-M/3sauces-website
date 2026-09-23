@@ -29,6 +29,7 @@ import {
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
+  NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
 } from "@/lib/commande-publique/groupe-priorite";
 import { FooterLegal } from "@/components/legal/footer-legal";
@@ -67,6 +68,8 @@ interface CommandePubliqueAppProps {
   viandes: ViandePublique[];
   sauces: SaucePublique[];
   saveurs: SaveurPublique[];
+  /** Parfums de la Boisson 2L — référentiel indépendant de `saveurs` (canettes), cf. lib/patron/options.ts. */
+  parfums2l: SaveurPublique[];
   parametres: ParametresLivraisonPublic;
 }
 
@@ -88,7 +91,14 @@ function platVide(numero: number): PlatGroupe {
   return { id: `plat-${numero}-${Date.now()}-${Math.random()}`, pourQui: "", lignes: [] };
 }
 
-export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parametres }: CommandePubliqueAppProps) {
+export function CommandePubliqueApp({
+  produits,
+  viandes,
+  sauces,
+  saveurs,
+  parfums2l,
+  parametres,
+}: CommandePubliqueAppProps) {
   const router = useRouter();
 
   const aujourdHui = useMemo(() => dateMayotteIso(), []);
@@ -992,7 +1002,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
                 <div className="rounded-lg border border-gray-200 bg-white p-3">
                   <p className="text-sm font-semibold text-gray-900">🎁 Choisis le parfum de ta boisson 2L offerte</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {saveurs.map((s) => (
+                    {parfums2l.map((s) => (
                       <button
                         key={s.id}
                         type="button"
@@ -1149,7 +1159,7 @@ export function CommandePubliqueApp({ produits, viandes, sauces, saveurs, parame
       {produitEnSelection && produitEnSelection.nbSaveursMax > 0 && (
         <SaveurModalPublique
           produit={produitEnSelection}
-          saveurs={saveurs}
+          saveurs={produitEnSelection.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs}
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(saveursChoisies) => {
             for (const nom of saveursChoisies) {

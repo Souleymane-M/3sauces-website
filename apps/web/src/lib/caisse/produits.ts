@@ -94,3 +94,19 @@ export async function listerSaveursActives(): Promise<SaveurCaisse[]> {
 
   return data ?? [];
 }
+
+/** Parfums de la Boisson 2L — référentiel indépendant de `saveurs` (canettes), cf. lib/patron/options.ts. */
+export async function listerParfums2lActifs(): Promise<SaveurCaisse[]> {
+  const supabase = createServiceSupabaseClient();
+  const { data, error } = await supabase
+    .from("parfums_2l")
+    .select("id, nom")
+    .eq("actif", true)
+    .order("nom", { ascending: true });
+
+  if (error) {
+    throw new Error(`Impossible de charger les parfums Boisson 2L : ${error.message}`);
+  }
+
+  return data ?? [];
+}

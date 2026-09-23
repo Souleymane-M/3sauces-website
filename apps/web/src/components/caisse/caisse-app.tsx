@@ -25,6 +25,7 @@ import {
   HEURE_LIMITE_GROUPE_MINUTES,
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_MONTANT,
+  NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
 } from "@/lib/commande-publique/groupe-priorite";
 
@@ -55,6 +56,8 @@ interface CaisseAppProps {
   viandes: ViandeCaisse[];
   sauces: SauceCaisse[];
   saveurs: SaveurCaisse[];
+  /** Parfums de la Boisson 2L — référentiel indépendant de `saveurs` (canettes), cf. lib/patron/options.ts. */
+  parfums2l: SaveurCaisse[];
   parametres: ParametresLivraisonPublic;
   imprimantesInitiales: ImprimanteAdmin[];
   nomEmploye: string;
@@ -127,6 +130,7 @@ export function CaisseApp({
   viandes,
   sauces,
   saveurs,
+  parfums2l,
   parametres,
   imprimantesInitiales,
   nomEmploye,
@@ -1037,7 +1041,7 @@ export function CaisseApp({
                     <div className="mt-2 rounded-lg border border-gray-300 bg-gray-50 p-2">
                       <p className="text-xs font-semibold text-gray-900">🎁 Parfum de la boisson 2L offerte</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        {saveurs.map((s) => (
+                        {parfums2l.map((s) => (
                           <button
                             key={s.id}
                             type="button"
@@ -1237,7 +1241,7 @@ export function CaisseApp({
       {produitEnSelection && produitEnSelection.nbSaveursMax > 0 && (
         <SaveurModalPublique
           produit={produitEnSelection}
-          saveurs={saveurs}
+          saveurs={produitEnSelection.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs}
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(saveursChoisies) => {
             for (const nom of saveursChoisies) {

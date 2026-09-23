@@ -46,6 +46,7 @@ export default async function PatronPage() {
     viandes,
     sauces,
     saveurs,
+    parfums2l,
     imprimantes,
     historique,
     tempsMoyenParEmploye,
@@ -61,6 +62,7 @@ export default async function PatronPage() {
     listerOptionsAdmin("viandes"),
     listerOptionsAdmin("sauces"),
     listerOptionsAdmin("saveurs"),
+    listerOptionsAdmin("parfums2l"),
     listerImprimantesAdmin(),
     listerHistoriqueCommandes(),
     calculerTempsPreparationMoyenParEmploye(),
@@ -93,7 +95,12 @@ export default async function PatronPage() {
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
       <CommandesHistoriqueApp historiqueInitial={historique} tempsMoyenParEmploye={tempsMoyenParEmploye} />
       <ProduitsApp produitsInitiaux={produits} />
-      <OptionsApp viandesInitiales={viandes} saucesInitiales={sauces} saveursInitiales={saveurs} />
+      <OptionsApp
+        viandesInitiales={viandes}
+        saucesInitiales={sauces}
+        saveursInitiales={saveurs}
+        parfums2lInitiales={parfums2l}
+      />
       <ImprimantesApp imprimantesInitiales={imprimantes} />
     </main>
   );

@@ -4,9 +4,9 @@
  * pour que le composant client puisse les importer sans entraîner le code
  * d'accès Supabase dans le bundle navigateur.
  */
-export type TypeOption = "viandes" | "sauces" | "saveurs";
+export type TypeOption = "viandes" | "sauces" | "saveurs" | "parfums2l";
 
-const TYPES_VALIDES = new Set<string>(["viandes", "sauces", "saveurs"]);
+const TYPES_VALIDES = new Set<string>(["viandes", "sauces", "saveurs", "parfums2l"]);
 
 export function estTypeOptionValide(valeur: string): valeur is TypeOption {
   return TYPES_VALIDES.has(valeur);

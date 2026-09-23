@@ -7,12 +7,14 @@ interface OptionsAppProps {
   viandesInitiales: OptionAdmin[];
   saucesInitiales: OptionAdmin[];
   saveursInitiales: OptionAdmin[];
+  parfums2lInitiales: OptionAdmin[];
 }
 
 const LIBELLES: Record<TypeOption, string> = {
   viandes: "Viandes",
   sauces: "Sauces",
   saveurs: "Saveurs (boissons)",
+  parfums2l: "Parfums Boisson 2L",
 };
 
 function ListeOptions({ type, optionsInitiales }: { type: TypeOption; optionsInitiales: OptionAdmin[] }) {
@@ -161,7 +163,12 @@ function ListeOptions({ type, optionsInitiales }: { type: TypeOption; optionsIni
  * Gestion des référentiels d'options (Page 3 / Module 6) : viandes,
  * sauces, saveurs — cf. lib/patron/options.ts.
  */
-export function OptionsApp({ viandesInitiales, saucesInitiales, saveursInitiales }: OptionsAppProps) {
+export function OptionsApp({
+  viandesInitiales,
+  saucesInitiales,
+  saveursInitiales,
+  parfums2lInitiales,
+}: OptionsAppProps) {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Options (viandes, sauces, saveurs)</h2>
@@ -172,6 +179,7 @@ export function OptionsApp({ viandesInitiales, saucesInitiales, saveursInitiales
       <ListeOptions type="viandes" optionsInitiales={viandesInitiales} />
       <ListeOptions type="sauces" optionsInitiales={saucesInitiales} />
       <ListeOptions type="saveurs" optionsInitiales={saveursInitiales} />
+      <ListeOptions type="parfums2l" optionsInitiales={parfums2lInitiales} />
     </div>
   );
 }
