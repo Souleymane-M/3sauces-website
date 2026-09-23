@@ -73,8 +73,10 @@ export interface SaveurPublique {
 export const NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE = "Viande supplémentaire";
 export const NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE = "Sauce supplémentaire";
 export const NOM_PRODUIT_SALADE_SUPPLEMENTAIRE = "Salade supplémentaire";
-/** Réduction pour une formule à canette incluse (Tacos, Barquette, Bowl, Menu Étudiant) commandée sans la canette. */
+/** Réduction pour une formule à canette incluse (Tacos, Barquette, Bowl) commandée sans la canette. */
 export const MONTANT_REDUCTION_SANS_BOISSON = 1.5;
+/** Seule formule à canette incluse jamais éligible à "Sans boisson" — décision explicite du patron. */
+export const NOM_PRODUIT_MENU_ETUDIANT = "Menu Étudiant";
 
 export interface ParametresLivraisonPublic {
   heureDebut: string; // "HH:MM:SS"

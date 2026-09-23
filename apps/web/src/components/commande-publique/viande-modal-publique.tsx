@@ -8,7 +8,7 @@ import type {
   SaveurPublique,
 } from "@/lib/commande-publique/types";
 import { GROUPE_ACCOMPAGNEMENT_COMBINABLE, GROUPE_ACCOMPAGNEMENT_EXCLUSIF } from "@/lib/commande-publique/accompagnements";
-import { MONTANT_REDUCTION_SANS_BOISSON } from "@/lib/commande-publique/types";
+import { MONTANT_REDUCTION_SANS_BOISSON, NOM_PRODUIT_MENU_ETUDIANT } from "@/lib/commande-publique/types";
 
 export interface ExtrasChoisis {
   /** Une entrée par unité de viande supplémentaire choisie (doublons autorisés, illimité). */
@@ -84,9 +84,16 @@ export function ViandeModalPublique({
   const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
+  // Le Menu Étudiant n'est jamais éligible à "Sans boisson" — décision
+  // explicite du patron, malgré `canetteIncluse: true`.
+  const proposeSansBoisson = produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT;
   const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
   const boissonRetenue =
-    !produit.canetteIncluse || sansBoisson ? null : demandeChoixBoisson ? boissonChoisie : (saveurs[0]?.nom ?? null);
+    !produit.canetteIncluse || (proposeSansBoisson && sansBoisson)
+      ? null
+      : demandeChoixBoisson
+        ? boissonChoisie
+        : (saveurs[0]?.nom ?? null);
   // Ne propose que les accompagnements réellement disponibles aujourd'hui
   // pour CE produit (configuré depuis /patron) — jamais la liste globale.
   const accompagnementsDuJour = useMemo(
@@ -98,7 +105,7 @@ export function ViandeModalPublique({
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
     (!demandeSauce || saucesChoisies.length >= 1) &&
-    (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
+    (!demandeChoixBoisson || (proposeSansBoisson && sansBoisson) || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
     (!demandeAccompagnement || accompagnementsChoisis.length >= 1);
 
@@ -310,7 +317,7 @@ export function ViandeModalPublique({
           </div>
         )}
 
-        {produit.canetteIncluse && (
+        {proposeSansBoisson && (
           <label className="mt-5 flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -321,7 +328,7 @@ export function ViandeModalPublique({
           </label>
         )}
 
-        {demandeChoixBoisson && !sansBoisson && (
+        {demandeChoixBoisson && !(proposeSansBoisson && sansBoisson) && (
           <div className="mt-5">
             <p className="text-sm font-bold text-[#C2540C]">Choisis ta canette incluse</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -466,7 +473,7 @@ export function ViandeModalPublique({
                 produit.saladeIncluse ? saladeGardee : null,
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
-                produit.canetteIncluse && sansBoisson
+                proposeSansBoisson && sansBoisson
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

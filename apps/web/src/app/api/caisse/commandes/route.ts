@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
-import { NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE, MONTANT_REDUCTION_SANS_BOISSON } from "@/lib/commande-publique/types";
+import {
+  NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
+  MONTANT_REDUCTION_SANS_BOISSON,
+  NOM_PRODUIT_MENU_ETUDIANT,
+} from "@/lib/commande-publique/types";
 import { construireHeureSouhaiteeUtc, creneauDansPlage, heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
@@ -322,6 +326,12 @@ export async function POST(request: Request) {
       if (!produit.canette_incluse) {
         return NextResponse.json(
           { error: `Pas de canette incluse sur ${produit.nom}, rien à retirer.` },
+          { status: 400 }
+        );
+      }
+      if (produit.nom === NOM_PRODUIT_MENU_ETUDIANT) {
+        return NextResponse.json(
+          { error: `"Sans boisson" n'est pas proposé sur ${produit.nom}.` },
           { status: 400 }
         );
       }
