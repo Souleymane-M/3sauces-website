@@ -748,14 +748,27 @@ export function CommandePubliqueApp({
                         {platsDuJour.map((produit) => (
                           <button
                             key={produit.id}
-                            onClick={() => surClicProduit(produit)}
-                            className="rounded-lg border border-gray-200 bg-white p-3 text-left text-sm shadow-sm active:bg-gray-50"
+                            onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
+                            disabled={produit.stockJour === 0}
+                            className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
+                              produit.stockJour === 0
+                                ? "border-gray-200 bg-gray-100 opacity-60"
+                                : "border-gray-200 bg-white active:bg-gray-50"
+                            }`}
                           >
                             <div className="font-medium text-gray-900">{produit.nom}</div>
                             {produit.description && (
                               <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
                             )}
                             <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
+                            {produit.stockJour === 0 && (
+                              <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>
+                            )}
+                            {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
+                              <div className="mt-1 text-xs font-semibold text-orange-600">
+                                Plus que {produit.stockJour} !
+                              </div>
+                            )}
                           </button>
                         ))}
                       </div>
@@ -791,14 +804,27 @@ export function CommandePubliqueApp({
                       {section.produits.map((produit) => (
                         <button
                           key={produit.id}
-                          onClick={() => surClicProduit(produit)}
-                          className="rounded-lg border border-gray-200 bg-white p-3 text-left text-sm shadow-sm active:bg-gray-50"
+                          onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
+                          disabled={produit.stockJour === 0}
+                          className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
+                            produit.stockJour === 0
+                              ? "border-gray-200 bg-gray-100 opacity-60"
+                              : "border-gray-200 bg-white active:bg-gray-50"
+                          }`}
                         >
                           <div className="font-medium text-gray-900">{produit.nom}</div>
                           {produit.description && (
                             <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
                           )}
                           <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
+                          {produit.stockJour === 0 && (
+                            <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>
+                          )}
+                          {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
+                            <div className="mt-1 text-xs font-semibold text-orange-600">
+                              Plus que {produit.stockJour} !
+                            </div>
+                          )}
                         </button>
                       ))}
                     </div>

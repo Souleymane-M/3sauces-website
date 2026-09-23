@@ -20,7 +20,7 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus, accompagnements_disponibles";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus, accompagnements_disponibles, stock_jour";
 
 function versProduitAdmin(p: {
   id: string;
@@ -40,6 +40,7 @@ function versProduitAdmin(p: {
   salade_prix_option: number | null;
   accompagnement_inclus: boolean;
   accompagnements_disponibles: string[] | null;
+  stock_jour: number | null;
 }): ProduitAdmin {
   return {
     id: p.id,
@@ -59,6 +60,7 @@ function versProduitAdmin(p: {
     saladePrixOption: p.salade_prix_option,
     accompagnementInclus: p.accompagnement_inclus,
     accompagnementsDisponibles: p.accompagnements_disponibles ?? [],
+    stockJour: p.stock_jour,
   };
 }
 
@@ -138,6 +140,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     salade_prix_option?: number | null;
     accompagnement_inclus?: boolean;
     accompagnements_disponibles?: string[];
+    stock_jour?: number | null;
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
   if (input.categorie !== undefined) update.categorie = input.categorie;
@@ -155,6 +158,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.saladePrixOption !== undefined) update.salade_prix_option = input.saladePrixOption;
   if (input.accompagnementInclus !== undefined) update.accompagnement_inclus = input.accompagnementInclus;
   if (input.accompagnementsDisponibles !== undefined) update.accompagnements_disponibles = input.accompagnementsDisponibles;
+  if (input.stockJour !== undefined) update.stock_jour = input.stockJour;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);
 

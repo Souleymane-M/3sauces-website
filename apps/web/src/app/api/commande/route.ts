@@ -183,7 +183,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, accompagnements_disponibles"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, accompagnements_disponibles, stock_jour"
     )
     .in("id", produitIds);
 
@@ -266,6 +266,16 @@ export async function POST(request: Request) {
     const quantite = Number(ligneBrute.quantite);
     if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
       return NextResponse.json({ error: `Quantité invalide pour ${produit.nom}.` }, { status: 400 });
+    }
+
+    // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai
+    // garde-fou contre la concurrence est le décrément atomique juste avant
+    // l'insertion de la commande (cf. plus bas).
+    if (produit.stock_jour !== null && quantite > produit.stock_jour) {
+      return NextResponse.json(
+        { error: `Il ne reste que ${produit.stock_jour} ${produit.nom} disponible(s) aujourd'hui.` },
+        { status: 400 }
+      );
     }
 
     const viandes = Array.isArray(ligneBrute.viandes) ? ligneBrute.viandes : [];
@@ -621,6 +631,27 @@ export async function POST(request: Request) {
   if (erreurUpsertClient) {
     console.error("[/api/commande] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
+  // contre la concurrence, en plus du pré-check informatif ci-dessus.
+  const stockAVerifier = new Map<string, number>();
+  for (const l of lignes) {
+    const produit = produitParId.get(l.produitId);
+    if (produit?.stock_jour !== null && produit?.stock_jour !== undefined) {
+      stockAVerifier.set(l.produitId, (stockAVerifier.get(l.produitId) ?? 0) + l.quantite);
+    }
+  }
+  if (stockAVerifier.size > 0) {
+    const { error: erreurStock } = await supabase.rpc("decrementer_stocks_produits", {
+      items: [...stockAVerifier.entries()].map(([produitId, quantite]) => ({ produitId, quantite })),
+    });
+    if (erreurStock) {
+      return NextResponse.json(
+        { error: "Un plat du jour de ta commande n'est plus disponible en quantité suffisante — vérifie ton panier." },
+        { status: 400 }
+      );
+    }
   }
 
   const { data: commande, error: erreurCommande } = await supabase

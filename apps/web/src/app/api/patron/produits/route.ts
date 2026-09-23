@@ -191,6 +191,15 @@ export async function PATCH(request: Request) {
     }
     patch.accompagnementsDisponibles = body.accompagnementsDisponibles as string[];
   }
+  if (body.stockJour !== undefined) {
+    if (body.stockJour === null || body.stockJour === "") {
+      patch.stockJour = null;
+    } else {
+      const n = validerEntierEntre(body.stockJour, 0, 999);
+      if (n === null) return NextResponse.json({ error: "Stock du jour invalide (0 à 999)." }, { status: 400 });
+      patch.stockJour = n;
+    }
+  }
 
   try {
     await mettreAJourProduit(body.id, patch);

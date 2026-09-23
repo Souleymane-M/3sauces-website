@@ -81,6 +81,7 @@ export interface Database {
           salade_prix_option: number | null;
           accompagnement_inclus: boolean;
           accompagnements_disponibles: string[];
+          stock_jour: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -456,7 +457,12 @@ export interface Database {
         Relationships: [];
       };
     };
-    Functions: {};
+    Functions: {
+      decrementer_stocks_produits: {
+        Args: { items: { produitId: string; quantite: number }[] };
+        Returns: void;
+      };
+    };
     Enums: {};
     CompositeTypes: {};
   };

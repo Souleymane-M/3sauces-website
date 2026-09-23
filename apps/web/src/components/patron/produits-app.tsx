@@ -148,6 +148,27 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
   }
 
+  /** Saisie quotidienne du stock (plats du jour) — `valeur` vide = illimité. */
+  async function mettreAJourStock(produit: ProduitAdmin, valeur: string) {
+    setErreur(null);
+    const stockJour = valeur.trim() === "" ? null : Number(valeur);
+    if (stockJour !== null && (!Number.isInteger(stockJour) || stockJour < 0)) return;
+
+    const ancienStock = produit.stockJour;
+    setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? { ...p, stockJour } : p)));
+
+    const reponse = await fetch("/api/patron/produits", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: produit.id, stockJour }),
+    });
+    if (!reponse.ok) {
+      setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? { ...p, stockJour: ancienStock } : p)));
+      const data = await reponse.json().catch(() => ({}));
+      setErreur(data.error ?? "Échec de la mise à jour.");
+    }
+  }
+
   // Échange l'`ordre` du produit avec son voisin dans la même catégorie —
   // toujours recalculé depuis l'état courant (jamais depuis la liste déjà
   // triée passée au rendu, qui peut être obsolète après un clic précédent).
@@ -508,6 +529,19 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                     <div className="mt-0.5 text-sm text-gray-300">
                       {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}
                     </div>
+                    {produit.categorie === "plat_du_jour" && (
+                      <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                        Stock du jour :
+                        <input
+                          type="number"
+                          min={0}
+                          defaultValue={produit.stockJour ?? ""}
+                          placeholder="illimité"
+                          onBlur={(e) => mettreAJourStock(produit, e.target.value)}
+                          className="w-16 rounded border border-gray-600 bg-gray-800 p-1 text-white"
+                        />
+                      </label>
+                    )}
                   </div>
                   <InterrupteurActif actif={produit.actif} onBasculer={() => basculerActif(produit)} />
                 </div>

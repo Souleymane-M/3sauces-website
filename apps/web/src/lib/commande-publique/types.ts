@@ -34,6 +34,8 @@ export interface ProduitPublic {
   accompagnementInclus: boolean;
   /** Accompagnements réellement disponibles aujourd'hui parmi la liste (configuré depuis /patron) — n'a de sens que si `accompagnementInclus` est vrai. */
   accompagnementsDisponibles: string[];
+  /** Quantité restante aujourd'hui (plats du jour) — null = illimité. */
+  stockJour: number | null;
 }
 
 /**
