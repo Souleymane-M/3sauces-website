@@ -15,6 +15,7 @@ import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
+  NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
@@ -482,6 +483,22 @@ export function CommandePubliqueApp({
     appliquerBoisson(ligne.id, saveurs[0]?.nom ?? null);
   }
 
+  /** Symétrique de `appliquerBoisson` : repasse une ligne en "Sans boisson" sans recomposer toute la formule. */
+  function retirerBoisson(id: string) {
+    if (modeCommande === "groupee") {
+      setPlats((precedent) =>
+        precedent.map((plat) => ({
+          ...plat,
+          lignes: plat.lignes.map((l) => (l.id === id ? { ...l, sansBoisson: true, boissonIncluse: null } : l)),
+        }))
+      );
+      return;
+    }
+    setPanierSimple((precedent) =>
+      precedent.map((l) => (l.id === id ? { ...l, sansBoisson: true, boissonIncluse: null } : l))
+    );
+  }
+
   /**
    * Avance au plat suivant : si un plat existe déjà après l'actif (ex.
    * après un retour en arrière via "Plat précédent"), on y navigue tel
@@ -702,7 +719,20 @@ export function CommandePubliqueApp({
         {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
-        {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
+        {l.boissonIncluse && (
+          <div className="text-xs text-gray-400">
+            <div>Boisson incluse : {l.boissonIncluse}</div>
+            {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && (
+              <button
+                type="button"
+                onClick={() => retirerBoisson(l.id)}
+                className="mt-0.5 text-orange-600 underline decoration-dotted"
+              >
+                − Retirer la boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+              </button>
+            )}
+          </div>
+        )}
         {l.sansBoisson && (
           <div className="text-xs font-semibold text-orange-600">
             <div>Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)</div>
