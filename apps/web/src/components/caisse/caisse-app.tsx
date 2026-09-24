@@ -20,7 +20,7 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import { MONTANT_RECOMPENSE, formaterEuros } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
 import { heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import {
   HEURE_LIMITE_GROUPE_MINUTES,
@@ -1116,9 +1116,21 @@ export function CaisseApp({
                 <div className="mt-2 text-sm text-gray-700">
                   {clientInfo.existe ? (
                     <>
-                      <p>
-                        {formaterEuros(clientInfo.montant_cumule ?? 0)} cumulés — {clientInfo.tampons_acquis ?? 0}{" "}
-                        tampon{(clientInfo.tampons_acquis ?? 0) > 1 ? "s" : ""} acquis
+                      <div className="flex gap-1">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <span
+                            key={i}
+                            className={`h-3 w-3 rounded-full ${
+                              i < (clientInfo.tampons_acquis ?? 0) ? "bg-[#8B2020]" : "bg-gray-200"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-1 font-semibold">
+                        {messageFidelite({
+                          montantCumule: clientInfo.montant_cumule ?? 0,
+                          recompenseDisponible: clientInfo.recompense_disponible ?? false,
+                        })}
                       </p>
                       {clientInfo.recompense_disponible && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
