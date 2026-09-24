@@ -93,6 +93,13 @@ interface Section {
 const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 
+/**
+ * sessionStorage (pas localStorage) : le panier en cours doit survivre à un
+ * rechargement accidentel de l'iPad, mais jamais réapparaître le lendemain
+ * ou dans un autre onglet.
+ */
+const CLE_PANIER_CAISSE = "3sauces_caisse_panier";
+
 interface ClientInfo {
   existe: boolean;
   telephone: string;
@@ -145,8 +152,56 @@ export function CaisseApp({
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
+  // Ligne du panier pour laquelle le client vient de changer d'avis sur une
+  // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
+  // sont possibles, sinon appliqué directement.
+  const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanier | null>(null);
   const [canal, setCanal] = useState<Canal>("sur_place");
   const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
+
+  // Restauration du panier après un rechargement accidentel de l'iPad : on
+  // ne persiste qu'après cette première lecture (`pretPourPersistance`),
+  // sinon le tout premier effet d'écriture, qui s'exécute avant que les
+  // `setState` de restauration ci-dessous n'aient été pris en compte,
+  // écraserait le panier sauvegardé avec un panier vide.
+  const [pretPourPersistance, setPretPourPersistance] = useState(false);
+  useEffect(() => {
+    // Différé en microtâche : lire sessionStorage et restaurer l'état sont
+    // deux opérations distinctes, jamais un simple calcul synchrone de
+    // rendu — le report en microtâche évite les rendus en cascade au
+    // montage tout en gardant la restauration quasi instantanée.
+    queueMicrotask(() => {
+      try {
+        const brut = sessionStorage.getItem(CLE_PANIER_CAISSE);
+        if (brut) {
+          const etat = JSON.parse(brut);
+          if (etat.modeCommande !== undefined) setModeCommande(etat.modeCommande);
+          if (Array.isArray(etat.panierSimple)) setPanierSimple(etat.panierSimple);
+          if (Array.isArray(etat.plats) && etat.plats.length > 0) setPlats(etat.plats);
+          if (etat.platDeplie !== undefined) setPlatDeplie(etat.platDeplie);
+          if (etat.platActifId) setPlatActifId(etat.platActifId);
+          if (etat.canal) setCanal(etat.canal);
+          if (etat.boissonOfferteSaveur !== undefined) setBoissonOfferteSaveur(etat.boissonOfferteSaveur);
+        }
+      } catch {
+        // sessionStorage indisponible ou contenu corrompu : on repart d'un panier vide, jamais bloquant.
+      }
+      setPretPourPersistance(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!pretPourPersistance) return;
+    try {
+      sessionStorage.setItem(
+        CLE_PANIER_CAISSE,
+        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur })
+      );
+    } catch {
+      // Stockage plein ou indisponible : la session continue simplement sans persistance.
+    }
+  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur]);
+
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [telephone, setTelephone] = useState("");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
@@ -537,6 +592,37 @@ export function CaisseApp({
   }
 
   /**
+   * Complète une formule passée en "Sans boisson" : remet `sansBoisson` à
+   * false et fixe la saveur choisie, sans jamais créer de nouvelle ligne —
+   * c'est la même canette que celle déjà comptée dans le prix de la
+   * formule, jamais un article distinct facturé plein tarif.
+   */
+  function appliquerBoisson(id: string, saveur: string | null) {
+    if (enModeGroupe) {
+      setPlats((precedent) =>
+        precedent.map((plat) => ({
+          ...plat,
+          lignes: plat.lignes.map((l) => (l.id === id ? { ...l, sansBoisson: false, boissonIncluse: saveur } : l)),
+        }))
+      );
+    } else {
+      setPanierSimple((precedent) =>
+        precedent.map((l) => (l.id === id ? { ...l, sansBoisson: false, boissonIncluse: saveur } : l))
+      );
+    }
+    setLigneCorrectionBoisson(null);
+  }
+
+  /** Ouvre le choix de saveur si plusieurs sont possibles, sinon applique directement l'unique saveur disponible. */
+  function completerBoisson(ligne: LignePanier) {
+    if (saveurs.length > 1) {
+      setLigneCorrectionBoisson(ligne);
+      return;
+    }
+    appliquerBoisson(ligne.id, saveurs[0]?.nom ?? null);
+  }
+
+  /**
    * Avance au plat suivant : si un plat existe déjà après l'actif (ex.
    * après un retour en arrière via "Plat précédent"), on y navigue tel
    * quel ; sinon on en crée un nouveau. Dans les deux cas, le plat quitté
@@ -780,7 +866,14 @@ export function CaisseApp({
         {l.boissonIncluse && <div className="text-xs text-gray-400">Boisson incluse : {l.boissonIncluse}</div>}
         {l.sansBoisson && (
           <div className="text-xs font-semibold text-orange-600">
-            Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+            <div>Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)</div>
+            <button
+              type="button"
+              onClick={() => completerBoisson(l)}
+              className="mt-0.5 underline decoration-dotted"
+            >
+              + Ajouter la boisson (+{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+            </button>
           </div>
         )}
         {l.accompagnementsInclus.length > 0 && (
@@ -1358,6 +1451,33 @@ export function CaisseApp({
             setProduitEnQuantite(null);
           }}
         />
+      )}
+
+      {ligneCorrectionBoisson && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+          <div className="w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-5 sm:rounded-2xl">
+            <h2 className="text-lg font-bold text-gray-900">Choisis ta canette</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {saveurs.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => appliquerBoisson(ligneCorrectionBoisson.id, s.nom)}
+                  className="rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  {s.nom}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setLigneCorrectionBoisson(null)}
+              className="mt-4 text-sm text-gray-500 underline"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
