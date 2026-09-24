@@ -20,7 +20,7 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, TAGLINE_FIDELITE, messageFidelite } from "@/lib/fidelite/regles";
 import { heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import {
   HEURE_LIMITE_GROUPE_MINUTES,
@@ -1159,6 +1159,9 @@ export function CaisseApp({
                     <p className="text-xs text-gray-500">Nouveau client (sera créé au paiement).</p>
                   )}
                 </div>
+              )}
+              {!clientInfo && (
+                <p className="mt-2 text-xs text-gray-500">🎁 Fidélité — {TAGLINE_FIDELITE}</p>
               )}
             </div>
 
