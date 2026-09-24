@@ -22,9 +22,7 @@ import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/impri
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { MONTANT_RECOMPENSE, TAGLINE_FIDELITE, messageFidelite } from "@/lib/fidelite/regles";
-import { heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import {
-  HEURE_LIMITE_GROUPE_MINUTES,
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
@@ -454,8 +452,7 @@ export function CaisseApp({
   const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
-  const avantHeureLimiteGroupe = useMemo(() => heureActuelleMayotteMinutes() < HEURE_LIMITE_GROUPE_MINUTES, []);
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal, heureActuelleMayotteMinutes());
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal);
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
@@ -1072,9 +1069,9 @@ export function CaisseApp({
             <div>
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
-              {canal === "livraison" && avantHeureLimiteGroupe && (
+              {canal === "livraison" && (
                 <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                  <p className="text-sm font-bold">🚀 Commande groupée avant 11h</p>
+                  <p className="text-sm font-bold">🚀 Commande groupée</p>
                   <p className="text-xs text-white/90">
                     3 plats dès {SEUIL_GROUPE_3_MONTANT}€ → priorité. 4 plats dès {SEUIL_GROUPE_4_MONTANT}€ → priorité +
                     boisson 2L offerte.
@@ -1156,7 +1153,6 @@ export function CaisseApp({
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
                     canal === "livraison" &&
-                    avantHeureLimiteGroupe &&
                     (() => {
                       const palierActuel = palierGroupeReel;
                       if (palierActuel === "GROUPE_4") {

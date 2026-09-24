@@ -87,7 +87,7 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
 
   const commandes: CommandeCuisine[] = (data ?? []).map(versCommandeCuisine);
 
-  // Les commandes ayant atteint un palier "commande groupée avant 11h"
+  // Les commandes ayant atteint un palier "commande groupée"
   // passent en tête, sans perdre l'ordre chronologique existant à
   // l'intérieur de chaque groupe (tri stable).
   return [...commandes].sort((a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null));

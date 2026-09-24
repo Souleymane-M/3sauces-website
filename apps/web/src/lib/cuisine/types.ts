@@ -18,7 +18,7 @@ export interface CommandeCuisine {
   heureSouhaitee: string | null;
   creeLe: string;
   nbPlats: number;
-  /** Palier de l'offre "commande groupée avant 11h" atteint à la soumission, null sinon. */
+  /** Palier de l'offre "commande groupée" atteint à la soumission, null sinon. */
   palierGroupe: PalierGroupe;
   /** Vrai si la date de retrait diffère de la date de création — commande passée à l'avance. */
   commandeAvance: boolean;

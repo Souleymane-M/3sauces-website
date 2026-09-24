@@ -55,7 +55,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     palierGroupe: c.palier_groupe as PalierGroupe,
   }));
 
-  // Les livraisons ayant atteint un palier "commande groupée avant 11h" en
+  // Les livraisons ayant atteint un palier "commande groupée" en
   // tête, sans perdre l'ordre chronologique existant à l'intérieur de
   // chaque groupe (tri stable).
   return [...livraisonsAssignees].sort(

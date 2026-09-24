@@ -11,7 +11,7 @@ export interface MetriquesGroupe {
 const FENETRE_JOURS = 7;
 
 /**
- * Suivi de l'offre "commande groupée avant 11h" sur les 7 derniers jours —
+ * Suivi de l'offre "commande groupée" sur les 7 derniers jours —
  * uniquement ce qui est réellement dérivable de `commandes.palier_groupe`
  * (posé une fois à la soumission, cf. migration palier_groupe). Le nombre
  * de plats livrés par déplacement et les retards/réclamations ne sont pas

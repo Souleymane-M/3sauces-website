@@ -17,7 +17,7 @@ export interface CommandeHistorique {
   creeLe: string;
   evenements: EvenementHistorique[];
   livreurNom: string | null;
-  /** Palier de l'offre "commande groupée avant 11h" atteint à la soumission, null sinon. */
+  /** Palier de l'offre "commande groupée" atteint à la soumission, null sinon. */
   palierGroupe: PalierGroupe;
 }
 

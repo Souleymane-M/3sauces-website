@@ -7,7 +7,6 @@ import {
   creneauDansPlage,
   dateIsoValide,
   dateMayotteIso,
-  heureActuelleMayotteMinutes,
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import { limiterDebit } from "@/lib/auth/rate-limit";
@@ -162,7 +161,8 @@ export async function POST(request: Request) {
   // personne à une date future — le paiement en ligne est la seule façon de
   // sécuriser la réservation. Revérifié ici, jamais seulement masqué dans
   // le sélecteur côté client.
-  if (dateCommande !== dateMayotteIso() && body.modePaiement !== "stripe") {
+  const commandeAvance = dateCommande !== dateMayotteIso();
+  if (commandeAvance && body.modePaiement !== "stripe") {
     return NextResponse.json(
       { error: "Commande à l'avance : le paiement en ligne est requis pour confirmer votre réservation." },
       { status: 400 }
@@ -508,11 +508,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Offre "commande groupée avant 11h" : calculée une seule fois ici, sur le
-  // montant brut (avant remise), jamais re-dérivée plus tard (cf. migration
+  // Offre "commande groupée" : calculée une seule fois ici, sur le montant
+  // brut (avant remise), jamais re-dérivée plus tard (cf. migration
   // palier_groupe) — la priorité et la boisson offerte sont réservées à la
-  // livraison, commandée avant 11h (heure de Mayotte).
-  const palierGroupe = palierGroupeActif(nbPlats, montant, body.canal, heureActuelleMayotteMinutes());
+  // livraison, sans aucune limite horaire.
+  const palierGroupe = palierGroupeActif(nbPlats, montant, body.canal);
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
     if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
