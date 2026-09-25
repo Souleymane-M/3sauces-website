@@ -1,4 +1,8 @@
-import { LIBELLES_STATUT } from "@/lib/cuisine/types";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL, type LivreurActif } from "@/lib/cuisine/types";
 import type { CommandeHistorique, TempsPreparationEmploye } from "@/lib/patron/commandes-historique-types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -6,6 +10,10 @@ import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 interface CommandesHistoriqueAppProps {
   historiqueInitial: CommandeHistorique[];
   tempsMoyenParEmploye: TempsPreparationEmploye[];
+  /** Pour attribuer les changements de statut faits depuis cet écran (cf. `commandes_evenements`). */
+  profilId: string;
+  /** Nécessaire pour la transition "Pris par le livreur" en livraison. */
+  livreursActifs: LivreurActif[];
 }
 
 function libelleCanal(canal: CommandeHistorique["canal"]): string {
@@ -70,8 +78,46 @@ function formaterDateCourte(iso: string): string {
  * commandes publiques avec un flux à 3 statuts. L'écart heure souhaitée /
  * heure réelle de livraison n'est pas encore disponible : nécessite le
  * flash QR du livreur (Module 2, pas encore construit).
+ *
+ * Fait aussi office de secours pour faire avancer une commande (mêmes
+ * transitions, même endpoint `/api/cuisine/commandes` que l'écran cuisine
+ * `/commandes`) : le fonctionnement normal reste de surveiller `/commandes`
+ * en cuisine, ceci n'est qu'un filet de sécurité si personne ne s'en occupe
+ * côté cuisine à un moment donné.
  */
-export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye }: CommandesHistoriqueAppProps) {
+export function CommandesHistoriqueApp({
+  historiqueInitial,
+  tempsMoyenParEmploye,
+  profilId,
+  livreursActifs,
+}: CommandesHistoriqueAppProps) {
+  const router = useRouter();
+  const [livreurChoisi, setLivreurChoisi] = useState<Record<string, string>>({});
+  const [enCoursId, setEnCoursId] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  async function appliquerChangement(commandeId: string, statut: string, livreurId?: string) {
+    setErreur(null);
+    setEnCoursId(commandeId);
+    try {
+      const reponse = await fetch("/api/cuisine/commandes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId, statut, profilId, livreurId }),
+      });
+      if (!reponse.ok) {
+        const data = await reponse.json().catch(() => ({}));
+        setErreur(data.error ?? "Échec du changement de statut.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setErreur("Erreur réseau, réessaie.");
+    } finally {
+      setEnCoursId(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Historique des commandes</h2>
@@ -94,64 +140,107 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
 
       <p className="text-xs text-gray-500">
         50 dernières commandes. Écart heure souhaitée / heure réelle de livraison : à venir (nécessite le flash QR
-        livreur, Module 2).
+        livreur, Module 2). Faire avancer une commande ici est un secours — le suivi normal se fait depuis
+        l&apos;écran cuisine <span className="font-semibold">/commandes</span>.
       </p>
 
+      {erreur && <p className="text-sm text-red-500">{erreur}</p>}
+
       <ul className="space-y-2">
-        {historiqueInitial.map((c) => (
-          <li key={c.id} className="rounded border border-gray-700 p-3">
-            <details>
-              <summary className="cursor-pointer text-sm">
-                <span className="font-semibold">Commande #{c.numero}</span> — {libelleCanal(c.canal)} —{" "}
-                {c.nom || "?"} — <span className="text-gray-400">{LIBELLES_STATUT[c.statut]}</span>
-                {estCommandeAVenir(c.heureSouhaitee) && (
-                  <span className="ml-2 rounded bg-amber-900/40 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
-                    Commande à venir — {formaterDateCourte(c.heureSouhaitee!)}
-                  </span>
-                )}
-                {c.palierGroupe && (
-                  <span className="ml-2 rounded bg-orange-900/40 px-1.5 py-0.5 text-xs font-semibold text-orange-400">
-                    {libellePalierGroupe(c.palierGroupe)}
-                  </span>
-                )}
-              </summary>
-              <div className="mt-2 space-y-1 text-xs text-gray-400">
-                <p>Créée le {formaterDateHeure(c.creeLe)}</p>
-                {c.telephone && <p>Téléphone : {c.telephone}</p>}
-                {c.adresse && <p>Adresse : {c.adresse}</p>}
-                {c.livreurNom && <p>Livreur : {c.livreurNom}</p>}
-                <p>
-                  Total : {c.montant.toFixed(2)} € — Paiement : {libelleModePaiement(c.modePaiement)}
-                </p>
-              </div>
+        {historiqueInitial.map((c) => {
+          const statutSuivant = TRANSITIONS_PAR_CANAL[c.canal]?.[c.statut];
+          const demandeLivreur = statutSuivant === "pris_par_livreur";
+          const livreurSelectionne = livreurChoisi[c.id] ?? "";
 
-              <ul className="mt-2 space-y-1 border-t border-gray-700 pt-2 text-xs">
-                {c.lignes.length === 0 && <li className="text-gray-500">Contenu indisponible pour cette commande.</li>}
-                {c.lignes.map((l, i) => (
-                  <li key={i}>
-                    <span className="font-semibold">
-                      {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
+          return (
+            <li key={c.id} className="rounded border border-gray-700 p-3">
+              <details>
+                <summary className="cursor-pointer text-sm">
+                  <span className="font-semibold">Commande #{c.numero}</span> — {libelleCanal(c.canal)} —{" "}
+                  {c.nom || "?"} — <span className="text-gray-400">{LIBELLES_STATUT[c.statut]}</span>
+                  {estCommandeAVenir(c.heureSouhaitee) && (
+                    <span className="ml-2 rounded bg-amber-900/40 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
+                      Commande à venir — {formaterDateCourte(c.heureSouhaitee!)}
                     </span>
-                    {detailLigne(l).map((detail, j) => (
-                      <div key={j} className="text-gray-500">
-                        {detail}
-                      </div>
-                    ))}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-xs text-gray-400">
-                {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
-                {c.evenements.map((e, i) => (
-                  <p key={i}>
-                    {LIBELLES_STATUT[e.statut]} — {e.profilNom} — {formaterDateHeure(e.creeLe)}
+                  )}
+                  {c.palierGroupe && (
+                    <span className="ml-2 rounded bg-orange-900/40 px-1.5 py-0.5 text-xs font-semibold text-orange-400">
+                      {libellePalierGroupe(c.palierGroupe)}
+                    </span>
+                  )}
+                </summary>
+                <div className="mt-2 space-y-1 text-xs text-gray-400">
+                  <p>Créée le {formaterDateHeure(c.creeLe)}</p>
+                  {c.telephone && <p>Téléphone : {c.telephone}</p>}
+                  {c.adresse && <p>Adresse : {c.adresse}</p>}
+                  {c.livreurNom && <p>Livreur : {c.livreurNom}</p>}
+                  <p>
+                    Total : {c.montant.toFixed(2)} € — Paiement : {libelleModePaiement(c.modePaiement)}
                   </p>
-                ))}
-              </div>
-            </details>
-          </li>
-        ))}
+                </div>
+
+                <ul className="mt-2 space-y-1 border-t border-gray-700 pt-2 text-xs">
+                  {c.lignes.length === 0 && (
+                    <li className="text-gray-500">Contenu indisponible pour cette commande.</li>
+                  )}
+                  {c.lignes.map((l, i) => (
+                    <li key={i} className="flex items-baseline justify-between gap-2">
+                      <div>
+                        <span className="font-semibold">
+                          {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
+                        </span>
+                        {detailLigne(l).map((detail, j) => (
+                          <div key={j} className="text-gray-500">
+                            {detail}
+                          </div>
+                        ))}
+                      </div>
+                      <span className="shrink-0 text-gray-400">{(l.prixUnitaire * l.quantite).toFixed(2)} €</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-xs text-gray-400">
+                  {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
+                  {c.evenements.map((e, i) => (
+                    <p key={i}>
+                      {LIBELLES_STATUT[e.statut]} — {e.profilNom} — {formaterDateHeure(e.creeLe)}
+                    </p>
+                  ))}
+                </div>
+
+                {statutSuivant && (
+                  <div className="mt-2 space-y-2 border-t border-gray-700 pt-2">
+                    {demandeLivreur && (
+                      <select
+                        value={livreurSelectionne}
+                        onChange={(e) => setLivreurChoisi((prec) => ({ ...prec, [c.id]: e.target.value }))}
+                        className="w-full rounded border border-gray-700 bg-transparent p-2 text-xs"
+                      >
+                        <option value="">Choisir le livreur…</option>
+                        {livreursActifs.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.nom}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        appliquerChangement(c.id, statutSuivant, demandeLivreur ? livreurSelectionne : undefined)
+                      }
+                      disabled={enCoursId === c.id || (demandeLivreur && !livreurSelectionne)}
+                      className="w-full rounded bg-[#8B2020] py-2 text-xs font-bold text-white disabled:opacity-40"
+                    >
+                      {enCoursId === c.id ? "…" : LIBELLES_STATUT[statutSuivant]}
+                    </button>
+                  </div>
+                )}
+              </details>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

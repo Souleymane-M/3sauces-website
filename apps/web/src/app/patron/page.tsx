@@ -18,6 +18,7 @@ import { chargerEtatSite, chargerJoursFermeture, chargerRemiseLancement } from "
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
+import { listerLivreursActifs } from "@/lib/cuisine/commandes";
 import {
   listerLivraisonsAEncaisser,
   calculerEncaissementsJour,
@@ -57,6 +58,7 @@ export default async function PatronPage() {
     joursFermeture,
     remiseLancement,
     metriquesGroupe,
+    livreursActifs,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -73,6 +75,7 @@ export default async function PatronPage() {
     chargerJoursFermeture(),
     chargerRemiseLancement(),
     calculerMetriquesGroupe(),
+    listerLivreursActifs(),
   ]);
 
   return (
@@ -93,7 +96,12 @@ export default async function PatronPage() {
       </div>
       <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
-      <CommandesHistoriqueApp historiqueInitial={historique} tempsMoyenParEmploye={tempsMoyenParEmploye} />
+      <CommandesHistoriqueApp
+        historiqueInitial={historique}
+        tempsMoyenParEmploye={tempsMoyenParEmploye}
+        profilId={session.profilId}
+        livreursActifs={livreursActifs}
+      />
       <ProduitsApp produitsInitiaux={produits} />
       <OptionsApp
         viandesInitiales={viandes}

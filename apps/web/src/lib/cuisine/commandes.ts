@@ -146,13 +146,14 @@ interface ChangementStatut {
  * déjà appliqué — même logique "jamais de blocage" que le reste du code
  * (impression, etc.).
  *
- * Réutilisée à la fois depuis /api/cuisine/commandes (un employé fait
- * progresser une commande jusqu'à "pris_par_livreur") et depuis
- * /api/livreur/declarer (le livreur déclare "livre" au moment de sa
- * déclaration de paiement) — la garde de rôle correcte est déjà faite au
- * niveau de chaque route (`requireRole(["employe"])` vs
- * `requireRole(["livreur"])`), donc ici on vérifie juste que le profil
- * existe et est actif, sans imposer un rôle unique.
+ * Réutilisée depuis /api/cuisine/commandes (un employé — ou le patron en
+ * secours depuis /patron — fait progresser une commande jusqu'à
+ * "pris_par_livreur") et depuis /api/livreur/declarer (le livreur déclare
+ * "livre" au moment de sa déclaration de paiement) — la garde de rôle
+ * correcte est déjà faite au niveau de chaque route (`requireRole(["employe"])`
+ * vs `requireRole(["livreur"])`, sachant que `requireRole` laisse toujours
+ * passer un patron), donc ici on vérifie juste que le profil existe et est
+ * actif, sans imposer un rôle unique.
  */
 export async function changerStatutCommande({
   commandeId,
@@ -166,7 +167,7 @@ export async function changerStatutCommande({
     .from("profils")
     .select("id")
     .eq("id", profilId)
-    .in("role", ["employe", "livreur"])
+    .in("role", ["employe", "livreur", "patron"])
     .eq("actif", true)
     .maybeSingle();
   if (erreurProfil || !profil) {

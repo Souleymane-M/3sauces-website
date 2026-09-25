@@ -14,6 +14,7 @@ import {
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
+import { listerCommandesActives } from "@/lib/cuisine/commandes";
 
 export const metadata: Metadata = {
   title: "Caisse — 3 Sauces",
@@ -30,7 +31,7 @@ export default async function CaissePage() {
     );
   }
 
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser] =
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser, commandesActives] =
     await Promise.all([
       listerProduitsActifs(),
       listerViandesActives(),
@@ -40,6 +41,7 @@ export default async function CaissePage() {
       chargerParametresLivraisonPublics(),
       listerImprimantesAdmin(),
       listerLivraisonsAEncaisser(),
+      listerCommandesActives(),
     ]);
 
   return (
@@ -47,6 +49,17 @@ export default async function CaissePage() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Caisse — 3 Sauces</h1>
         <div className="flex items-center gap-3">
+          <Link
+            href="/commandes"
+            className="flex items-center gap-2 rounded bg-[#2D5A27] px-4 py-2 text-sm font-semibold text-white shadow-sm"
+          >
+            Commandes en cuisine
+            {commandesActives.length > 0 && (
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[#2D5A27]">
+                {commandesActives.length}
+              </span>
+            )}
+          </Link>
           <Link
             href="/caisse/encaissements"
             className="flex items-center gap-2 rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white shadow-sm"
