@@ -22,6 +22,7 @@ import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/impri
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { MONTANT_RECOMPENSE, TAGLINE_FIDELITE, messageFidelite } from "@/lib/fidelite/regles";
+import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_MONTANT,
@@ -908,6 +909,13 @@ export function CaisseApp({
         )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
+        )}
+        {piecesParPaquet(l.produit.nom) > 1 && (
+          <div className="text-xs text-gray-400">
+            = {l.quantite * piecesParPaquet(l.produit.nom)}{" "}
+            {nomPluriel(nomSansMultiplicateur(l.produit.nom).toLowerCase(), l.quantite * piecesParPaquet(l.produit.nom))}{" "}
+            au total
+          </div>
         )}
         <div className="mt-1 flex items-center gap-2">
           <button

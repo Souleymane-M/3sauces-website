@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ProduitConfigurable } from "@/lib/commande-publique/types";
+import { piecesParPaquet } from "@/lib/pieces-produit";
 
 interface QuantiteModalPubliqueProps {
   produit: ProduitConfigurable;
@@ -30,6 +31,7 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
   const demandePrixLibre = produit.prix === null;
   const prixUnitaire = produit.prix ?? Number(prixSaisi.replace(",", "."));
   const prixValide = !demandePrixLibre || (Number.isFinite(prixUnitaire) && prixUnitaire > 0);
+  const nbPiecesParPaquet = piecesParPaquet(produit.nom);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
@@ -86,6 +88,9 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
         <p className="mt-6 text-center text-4xl font-extrabold text-[#8B2020]">
           {(prixValide ? prixUnitaire * quantite : 0).toFixed(2)} €
         </p>
+        {nbPiecesParPaquet > 1 && (
+          <p className="mt-1 text-center text-sm text-gray-500">Soit {quantite * nbPiecesParPaquet} pièces</p>
+        )}
 
         <div className="mt-6 flex gap-2">
           <button

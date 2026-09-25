@@ -35,6 +35,7 @@ import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
+import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 
 interface LignePanierPublique {
   id: string;
@@ -740,6 +741,13 @@ export function CommandePubliqueApp({
         )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
+        )}
+        {piecesParPaquet(l.produit.nom) > 1 && (
+          <div className="text-xs text-gray-400">
+            = {l.quantite * piecesParPaquet(l.produit.nom)}{" "}
+            {nomPluriel(nomSansMultiplicateur(l.produit.nom).toLowerCase(), l.quantite * piecesParPaquet(l.produit.nom))}{" "}
+            au total
+          </div>
         )}
         <div className="mt-1 flex items-center gap-2">
           <button

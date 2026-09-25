@@ -1,5 +1,6 @@
 import type { CommandePourImpression, ConfigImprimante, ResultatImpression } from "./types";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
+import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 
 /**
  * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
@@ -145,7 +146,7 @@ export function construireTicketClientXml(
   xml += ligne("--------------------------------");
 
   for (const l of commande.lignes) {
-    xml += ligne(`${l.quantite}x ${l.nom}`, { gras: true });
+    xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, { gras: true });
     for (const detail of detailLigne(l)) {
       xml += ligne(`  ${detail}`);
     }
@@ -200,7 +201,10 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   xml += ligne("--------------------------------");
 
   for (const l of commande.lignes) {
-    xml += ligne(`${l.quantite}x ${l.nom}`, { gras: true, taille: 2 });
+    xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, {
+      gras: true,
+      taille: 2,
+    });
     for (const detail of detailLigne(l)) {
       xml += ligne(`  ${detail}`, { taille: 1 });
     }

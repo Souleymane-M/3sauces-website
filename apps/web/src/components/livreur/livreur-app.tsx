@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee } from "@/lib/livreur/types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 
 // Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
 // `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
@@ -175,7 +176,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
                 {livraison.lignes.map((l, i) => (
                   <li key={i} className="text-base text-gray-900">
                     <span className="font-semibold">
-                      {l.quantite}x {l.nom}
+                      {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
                     </span>
                     {detailLigne(l).map((detail, j) => (
                       <div key={j} className="text-sm text-gray-600">

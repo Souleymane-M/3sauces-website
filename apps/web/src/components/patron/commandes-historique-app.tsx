@@ -1,6 +1,7 @@
 import { LIBELLES_STATUT } from "@/lib/cuisine/types";
 import type { CommandeHistorique, TempsPreparationEmploye } from "@/lib/patron/commandes-historique-types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 
 interface CommandesHistoriqueAppProps {
   historiqueInitial: CommandeHistorique[];
@@ -129,7 +130,7 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
                 {c.lignes.map((l, i) => (
                   <li key={i}>
                     <span className="font-semibold">
-                      {l.quantite}x {l.nom}
+                      {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
                     </span>
                     {detailLigne(l).map((detail, j) => (
                       <div key={j} className="text-gray-500">

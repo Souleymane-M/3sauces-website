@@ -5,6 +5,7 @@ import type { CommandeCuisine, LivreurActif } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
@@ -295,7 +296,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 {commande.lignes.map((ligne, i) => (
                   <li key={i} className="text-xl text-black">
                     <span className="font-semibold">
-                      {ligne.quantite}x {ligne.nom}
+                      {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
                     </span>
                     {detailLigne(ligne).map((detail, j) => (
                       <div key={j} className="text-lg text-gray-700">
