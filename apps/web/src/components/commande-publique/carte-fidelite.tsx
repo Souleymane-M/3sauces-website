@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
-import { MONTANT_RECOMPENSE, TAGLINE_FIDELITE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
 
 const CLE_LOCALSTORAGE = "3sauces_fidelite";
 const DUREE_COOLDOWN_RENVOI = 60;
@@ -195,7 +195,8 @@ export function CarteFidelite({
     return (
       <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
         <p className="font-bold">
-          🎁 {TAGLINE_FIDELITE} — cumulez et gagnez {MONTANT_RECOMPENSE}€ offerts
+          🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_RECOMPENSE / MONTANT_RECOMPENSE} tampons ={" "}
+          {MONTANT_RECOMPENSE}€ offerts.
         </p>
         <button
           type="button"
