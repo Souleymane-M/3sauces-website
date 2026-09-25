@@ -452,7 +452,7 @@ export function CaisseApp({
   const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal);
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total);
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
@@ -1069,15 +1069,13 @@ export function CaisseApp({
             <div>
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
-              {canal === "livraison" && (
-                <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                  <p className="text-sm font-bold">🚀 Commande groupée</p>
-                  <p className="text-xs text-white/90">
-                    3 plats dès {SEUIL_GROUPE_3_MONTANT}€ → priorité. 4 plats dès {SEUIL_GROUPE_4_MONTANT}€ → priorité +
-                    boisson 2L offerte.
-                  </p>
-                </div>
-              )}
+              <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
+                <p className="text-sm font-bold">🚀 Commande groupée</p>
+                <p className="text-xs text-white/90">
+                  4 plats dès {SEUIL_GROUPE_4_MONTANT}€ → boisson 2L offerte, quel que soit le canal.
+                  {canal === "livraison" && <> Dès 3 plats/{SEUIL_GROUPE_3_MONTANT}€ → priorité en plus.</>}
+                </p>
+              </div>
 
               {!enModeGroupe ? (
                 <>
@@ -1152,17 +1150,30 @@ export function CaisseApp({
                     </p>
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
-                    canal === "livraison" &&
                     (() => {
-                      const palierActuel = palierGroupeReel;
-                      if (palierActuel === "GROUPE_4") {
+                      // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
+                      // la priorité reste propre à la livraison.
+                      if (canal !== "livraison") {
+                        if (palierGroupeReel === "GROUPE_4") {
+                          return (
+                            <p className="mt-2 text-sm font-bold text-[#2D5A27]">🎁 Boisson 2L offerte activée !</p>
+                          );
+                        }
+                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
+                        return (
+                          <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
+                            Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁
+                          </p>
+                        );
+                      }
+                      if (palierGroupeReel === "GROUPE_4") {
                         return (
                           <p className="mt-2 text-sm font-bold text-[#2D5A27]">
                             🚀 Priorité + 🎁 boisson 2L offerte activées !
                           </p>
                         );
                       }
-                      if (palierActuel === "GROUPE_3") {
+                      if (palierGroupeReel === "GROUPE_3") {
                         const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="mt-2 text-sm font-semibold text-[#2D5A27]">

@@ -284,10 +284,9 @@ export function CommandePubliqueApp({
   const panierActuel = modeCommande === "groupee" ? plats.flatMap((p) => p.lignes) : panierSimple;
   const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
-  // Palier réel (canal effectivement choisi) pour le blocage/la soumission —
-  // distinct du message d'encouragement affiché dans le panier avant que le
-  // canal soit choisi (qui suppose "livraison" pour rester incitatif).
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, canal);
+  // Le palier (quantité/montant) est le même quel que soit le canal — seule
+  // la priorité livraison, gérée à l'affichage ci-dessous, dépend du canal.
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total);
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -778,9 +777,10 @@ export function CommandePubliqueApp({
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
           <p className="font-bold">🚀 Commandez en groupe !</p>
           <p className="mt-0.5 text-sm text-white/90">
-            {SEUIL_GROUPE_3_PLATS} plats dès {SEUIL_GROUPE_3_MONTANT}€ : livraison prioritaire.
+            {SEUIL_GROUPE_4_PLATS} plats dès {SEUIL_GROUPE_4_MONTANT}€ : boisson 2L offerte, quel que soit le mode de
+            récupération.
             <br />
-            {SEUIL_GROUPE_4_PLATS} plats dès {SEUIL_GROUPE_4_MONTANT}€ : livraison prioritaire + boisson 2L offerte.
+            En livraison : dès {SEUIL_GROUPE_3_PLATS} plats/{SEUIL_GROUPE_3_MONTANT}€, livraison prioritaire en plus.
             <br />
             Une seule commande • Une seule adresse.
           </p>
@@ -1050,20 +1050,32 @@ export function CommandePubliqueApp({
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
                     (() => {
-                      const palierActuel = palierGroupeActif(nbPlatsValides, total, "livraison");
-                      if (palierActuel === "GROUPE_4") {
-                        return (
-                          <p className="text-sm font-bold text-[#2D5A27]">
-                            🚀 Livraison prioritaire + 🎁 boisson 2L offerte (en livraison) !
-                          </p>
-                        );
-                      }
-                      if (palierActuel === "GROUPE_3") {
+                      // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
+                      // la priorité livraison, elle, reste propre à ce canal.
+                      if (canal !== "livraison") {
+                        if (palierGroupeReel === "GROUPE_4") {
+                          return <p className="text-sm font-bold text-[#2D5A27]">🎁 Boisson 2L offerte !</p>;
+                        }
                         const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="text-sm font-semibold text-[#2D5A27]">
-                            🚀 Livraison prioritaire activée (en livraison) ! Encore {montantRestant.toFixed(2)}€ pour la
-                            boisson 2L offerte.
+                            Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁
+                          </p>
+                        );
+                      }
+                      if (palierGroupeReel === "GROUPE_4") {
+                        return (
+                          <p className="text-sm font-bold text-[#2D5A27]">
+                            🚀 Livraison prioritaire + 🎁 boisson 2L offerte !
+                          </p>
+                        );
+                      }
+                      if (palierGroupeReel === "GROUPE_3") {
+                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
+                        return (
+                          <p className="text-sm font-semibold text-[#2D5A27]">
+                            🚀 Livraison prioritaire activée ! Encore {montantRestant.toFixed(2)}€ pour la boisson 2L
+                            offerte.
                           </p>
                         );
                       }

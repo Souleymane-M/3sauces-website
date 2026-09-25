@@ -444,7 +444,7 @@ export async function POST(request: Request) {
 
   // Offre "commande groupée" : même règle que le site public (/api/commande)
   // — calculée une seule fois ici, sur le montant brut.
-  const palierGroupe = palierGroupeActif(nbPlats, montantBrut, body.canal);
+  const palierGroupe = palierGroupeActif(nbPlats, montantBrut);
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
     if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {

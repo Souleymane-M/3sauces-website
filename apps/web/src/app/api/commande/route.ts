@@ -510,9 +510,10 @@ export async function POST(request: Request) {
 
   // Offre "commande groupée" : calculée une seule fois ici, sur le montant
   // brut (avant remise), jamais re-dérivée plus tard (cf. migration
-  // palier_groupe) — la priorité et la boisson offerte sont réservées à la
-  // livraison, sans aucune limite horaire.
-  const palierGroupe = palierGroupeActif(nbPlats, montant, body.canal);
+  // palier_groupe) — la boisson offerte s'applique quel que soit le canal,
+  // sans aucune limite horaire. Seule la priorité (badge affiché côté UI)
+  // reste propre à la livraison.
+  const palierGroupe = palierGroupeActif(nbPlats, montant);
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
     if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
