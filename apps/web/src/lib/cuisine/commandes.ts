@@ -175,7 +175,7 @@ export async function changerStatutCommande({
 
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
-    .select("id, canal, statut")
+    .select("id, canal, statut, mode_paiement, paiement_statut")
     .eq("id", commandeId)
     .maybeSingle();
   if (erreurCommande || !commande) {
@@ -190,7 +190,18 @@ export async function changerStatutCommande({
     throw new Error("Choisis le livreur qui prend la commande.");
   }
 
-  const { error: erreurMaj } = await supabase.from("commandes").update({ statut }).eq("id", commandeId);
+  // "Remis au client" (sur place/à emporter) est le moment réel de
+  // l'encaissement pour une commande espèces/CB payée au comptoir — jusqu'ici
+  // rien ne faisait jamais passer `paiement_statut` à "paye" pour ce cas
+  // précis (ni Stripe, déjà géré par son webhook, ni la caisse, déjà payée
+  // à la création), ce qui empêchait le trigger de fidélité de se déclencher
+  // et laissait la commande "non payée" indéfiniment.
+  const misesAJour: { statut: StatutEvenement; paiement_statut?: "paye" } = { statut };
+  if (statut === "remis_au_client" && commande.mode_paiement !== "stripe" && commande.paiement_statut !== "paye") {
+    misesAJour.paiement_statut = "paye";
+  }
+
+  const { error: erreurMaj } = await supabase.from("commandes").update(misesAJour).eq("id", commandeId);
   if (erreurMaj) {
     throw new Error(`Impossible de mettre à jour le statut : ${erreurMaj.message}`);
   }
