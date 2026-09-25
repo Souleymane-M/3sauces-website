@@ -124,11 +124,11 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
                 </p>
               </div>
 
-              <ul className="mt-2 space-y-1 border-t border-gray-800 pt-2 text-xs">
+              <ul className="mt-2 space-y-1 border-t border-gray-700 pt-2 text-xs">
                 {c.lignes.length === 0 && <li className="text-gray-500">Contenu indisponible pour cette commande.</li>}
                 {c.lignes.map((l, i) => (
-                  <li key={i} className="text-gray-300">
-                    <span className="font-semibold text-white">
+                  <li key={i}>
+                    <span className="font-semibold">
                       {l.quantite}x {l.nom}
                     </span>
                     {detailLigne(l).map((detail, j) => (
@@ -140,7 +140,7 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
                 ))}
               </ul>
 
-              <div className="mt-2 space-y-1 border-t border-gray-800 pt-2 text-xs text-gray-400">
+              <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-xs text-gray-400">
                 {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
                 {c.evenements.map((e, i) => (
                   <p key={i}>
