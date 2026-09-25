@@ -21,9 +21,7 @@ import {
 import { creneauxPourDate, prochainesDatesOuvertes, dateMayotteIso } from "@/lib/commande-publique/creneau";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
-  SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
-  SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
@@ -766,6 +764,15 @@ export function CommandePubliqueApp({
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
+        <CarteFidelite
+          telephoneCommande={telephone}
+          montantPanier={total}
+          utiliserRecompense={utiliserRecompense}
+          onChangeUtiliserRecompense={setUtiliserRecompense}
+          onTokenChange={setFideliteToken}
+          onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
+        />
+
         {parametres.remiseLancementActive && (
           <div className="rounded-lg p-3 text-white" style={{ backgroundColor: ROUGE }}>
             <p className="font-bold">
@@ -775,15 +782,7 @@ export function CommandePubliqueApp({
           </div>
         )}
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
-          <p className="font-bold">🚀 Commandez en groupe !</p>
-          <p className="mt-0.5 text-sm text-white/90">
-            {SEUIL_GROUPE_4_PLATS} plats dès {SEUIL_GROUPE_4_MONTANT}€ : boisson 2L offerte, quel que soit le mode de
-            récupération.
-            <br />
-            En livraison : dès {SEUIL_GROUPE_3_PLATS} plats/{SEUIL_GROUPE_3_MONTANT}€, livraison prioritaire en plus.
-            <br />
-            Une seule commande • Une seule adresse.
-          </p>
+          <p className="font-bold">🚀 Commandez à plusieurs : boisson 2L offerte + livraison prioritaire</p>
         </div>
 
         {modeCommande === null ? (
@@ -1109,15 +1108,6 @@ export function CommandePubliqueApp({
                   )
                 )}
               </div>
-
-              <CarteFidelite
-                telephoneCommande={telephone}
-                montantPanier={total}
-                utiliserRecompense={utiliserRecompense}
-                onChangeUtiliserRecompense={setUtiliserRecompense}
-                onTokenChange={setFideliteToken}
-                onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
-              />
 
               <div className="border-t border-gray-200 pt-3">
                 <label className="text-xs text-gray-500">Nom</label>

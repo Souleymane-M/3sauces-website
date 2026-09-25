@@ -191,19 +191,28 @@ export function CarteFidelite({
 
   const recompenseUtilisable = montantPanier >= MONTANT_RECOMPENSE;
 
-  return (
-    <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
-      {etape === "repliee" && (
+  if (etape === "repliee") {
+    return (
+      <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
+        <p className="font-bold">
+          🎁 {TAGLINE_FIDELITE} — cumulez et gagnez {MONTANT_RECOMPENSE}€ offerts
+        </p>
         <button
           type="button"
           onClick={() => setEtape("saisie")}
-          className="flex w-full items-center justify-between text-left"
+          className="mt-2 w-full rounded bg-white py-2 text-sm font-semibold text-[#2D5A27]"
         >
-          <span className="font-semibold text-gray-900">🎁 Fidélité — {TAGLINE_FIDELITE}</span>
-          <span className="text-sm font-semibold text-[#8B2020]">Voir mes tampons</span>
+          Voir mon solde fidélité
         </button>
-      )}
+        <Link href="/fidelite" className="mt-2 block text-center text-xs text-white/80 underline">
+          Comment ça marche ?
+        </Link>
+      </div>
+    );
+  }
 
+  return (
+    <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
       {(etape === "saisie" || etape === "envoi") && (
         <div className="space-y-2">
           <p className="text-sm font-semibold text-gray-900">Vérifie ton numéro pour voir tes tampons</p>
