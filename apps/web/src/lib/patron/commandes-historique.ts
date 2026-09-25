@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { CommandeHistorique, EvenementHistorique, TempsPreparationEmploye } from "./commandes-historique-types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import type { LigneCommande } from "@/lib/caisse/types";
 
 const LIMITE_COMMANDES = 50;
 
@@ -18,7 +19,9 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
 
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
-    .select("id, numero, canal, statut, nom_livraison, heure_souhaitee, created_at, palier_groupe")
+    .select(
+      "id, numero, canal, statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, palier_groupe, contenu, montant, mode_paiement"
+    )
     .order("created_at", { ascending: false })
     .limit(LIMITE_COMMANDES);
 
@@ -81,11 +84,16 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
       canal: c.canal,
       statut: c.statut,
       nom: c.nom_livraison ?? "",
+      adresse: c.adresse_livraison,
+      telephone: c.client_telephone,
       heureSouhaitee: c.heure_souhaitee,
       creeLe: c.created_at,
       evenements: evenementsParCommandeId.get(c.id) ?? [],
       livreurNom: livreurId ? (nomParProfilId.get(livreurId) ?? null) : null,
       palierGroupe: c.palier_groupe as PalierGroupe,
+      lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+      montant: c.montant,
+      modePaiement: c.mode_paiement,
     };
   });
 }

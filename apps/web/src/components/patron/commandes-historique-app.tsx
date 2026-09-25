@@ -13,6 +13,28 @@ function libelleCanal(canal: CommandeHistorique["canal"]): string {
   return "Sur place";
 }
 
+function libelleModePaiement(mode: CommandeHistorique["modePaiement"]): string {
+  if (mode === "cb") return "Carte";
+  if (mode === "stripe") return "En ligne";
+  if (mode === "especes") return "Espèces";
+  return "?";
+}
+
+// Défensif sur chaque champ : d'anciennes commandes (avant l'introduction
+// des viandes/sauces/saveurs multiples) ont un `contenu` qui ne respecte
+// pas forcément la forme actuelle de LigneCommande.
+function detailLigne(l: CommandeHistorique["lignes"][number]): string[] {
+  const details: string[] = [];
+  if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
+  if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
+  if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
+  if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.sansBoisson) details.push("Sans boisson");
+  if (l.accompagnementsInclus?.length) details.push(`Accompagnement : ${l.accompagnementsInclus.join(" + ")}`);
+  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
+  return details;
+}
+
 function formaterDateHeure(iso: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
@@ -94,7 +116,31 @@ export function CommandesHistoriqueApp({ historiqueInitial, tempsMoyenParEmploye
               </summary>
               <div className="mt-2 space-y-1 text-xs text-gray-400">
                 <p>Créée le {formaterDateHeure(c.creeLe)}</p>
+                {c.telephone && <p>Téléphone : {c.telephone}</p>}
+                {c.adresse && <p>Adresse : {c.adresse}</p>}
                 {c.livreurNom && <p>Livreur : {c.livreurNom}</p>}
+                <p>
+                  Total : {c.montant.toFixed(2)} € — Paiement : {libelleModePaiement(c.modePaiement)}
+                </p>
+              </div>
+
+              <ul className="mt-2 space-y-1 border-t border-gray-800 pt-2 text-xs">
+                {c.lignes.length === 0 && <li className="text-gray-500">Contenu indisponible pour cette commande.</li>}
+                {c.lignes.map((l, i) => (
+                  <li key={i} className="text-gray-300">
+                    <span className="font-semibold text-white">
+                      {l.quantite}x {l.nom}
+                    </span>
+                    {detailLigne(l).map((detail, j) => (
+                      <div key={j} className="text-gray-500">
+                        {detail}
+                      </div>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-2 space-y-1 border-t border-gray-800 pt-2 text-xs text-gray-400">
                 {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
                 {c.evenements.map((e, i) => (
                   <p key={i}>
