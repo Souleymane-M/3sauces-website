@@ -21,13 +21,20 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import { MONTANT_RECOMPENSE, TAGLINE_FIDELITE, messageFidelite } from "@/lib/fidelite/regles";
+import {
+  MONTANT_RECOMPENSE,
+  SEUIL_RECOMPENSE,
+  messageFidelite,
+  progressionFideliteCommande,
+  texteProgressionFidelite,
+} from "@/lib/fidelite/regles";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
+  messageProgressionBoissonOfferte,
 } from "@/lib/commande-publique/groupe-priorite";
 
 interface LignePanier {
@@ -938,7 +945,7 @@ export function CaisseApp({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${modeCommande !== null ? "pb-20" : ""}`}>
       {modeCommande === null ? (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-center font-semibold text-gray-900">Le client commande pour lui, ou pour un groupe ?</p>
@@ -1031,7 +1038,7 @@ export function CaisseApp({
             ))}
           </div>
 
-          <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div id="panier-caisse" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-gray-500">Caissier·e : {nomEmploye}</p>
             <p className="text-xs text-gray-400">
               🖨️{" "}
@@ -1151,7 +1158,7 @@ export function CaisseApp({
                   </ul>
 
                   {nbPlatsValides > 0 && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
-                    <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
+                    <p className="texte-alerte-pulsant mt-2 text-sm font-bold text-[#8B2020]">
                       {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides === 1
                         ? "Plus qu'un plat pour valider la commande groupée."
                         : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour valider la commande groupée.`}
@@ -1167,10 +1174,9 @@ export function CaisseApp({
                             <p className="mt-2 text-sm font-bold text-[#2D5A27]">🎁 Boisson 2L offerte activée !</p>
                           );
                         }
-                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
-                            Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁
+                            {messageProgressionBoissonOfferte(nbPlatsValides, total)}
                           </p>
                         );
                       }
@@ -1182,10 +1188,9 @@ export function CaisseApp({
                         );
                       }
                       if (palierGroupeReel === "GROUPE_3") {
-                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
-                            🚀 Priorité activée ! Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte.
+                            🚀 Priorité activée ! {messageProgressionBoissonOfferte(nbPlatsValides, total)}
                           </p>
                         );
                       }
@@ -1299,7 +1304,10 @@ export function CaisseApp({
                 </div>
               )}
               {!clientInfo && (
-                <p className="mt-2 text-xs text-gray-500">🎁 Fidélité — {TAGLINE_FIDELITE}</p>
+                <p className="mt-2 text-xs text-gray-500">
+                  🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_RECOMPENSE / MONTANT_RECOMPENSE} tampons ={" "}
+                  {MONTANT_RECOMPENSE}€ offerts.
+                </p>
               )}
             </div>
 
@@ -1392,6 +1400,13 @@ export function CaisseApp({
                 2
               )}{" "}
               €
+              {total > 0 && (
+                <p className="mt-1 text-xs font-semibold text-gray-500">
+                  {texteProgressionFidelite(
+                    progressionFideliteCommande(total, clientInfo?.existe ? (clientInfo.montant_cumule ?? 0) : 0)
+                  )}
+                </p>
+              )}
             </div>
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
@@ -1411,6 +1426,37 @@ export function CaisseApp({
               {envoiEnCours ? "Envoi…" : canal === "livraison" ? "Valider la commande" : "Encaisser"}
             </button>
           </div>
+          </div>
+        </div>
+      )}
+
+      {modeCommande !== null && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+            {panierActuel.length === 0 ? (
+              <span className="text-sm text-gray-400">Panier vide</span>
+            ) : (
+              <>
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    {enModeGroupe
+                      ? `${nbPlatsValides} plat${nbPlatsValides > 1 ? "s" : ""}`
+                      : `${panierActuel.reduce((acc, l) => acc + l.quantite, 0)} article${
+                          panierActuel.reduce((acc, l) => acc + l.quantite, 0) > 1 ? "s" : ""
+                        }`}
+                  </div>
+                  <div className="text-xs text-gray-500">{total.toFixed(2)} €</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
+                  style={{ backgroundColor: ROUGE }}
+                >
+                  Voir le panier
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

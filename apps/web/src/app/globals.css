@@ -41,3 +41,20 @@ body {
 .bouton-choix-mode {
   animation: respire 2s ease-in-out infinite;
 }
+
+/* Pulsation douce (jamais un clignotement franc, moins agressif et plus
+   accessible) pour attirer l'œil sur un message qui demande une action
+   immédiate — ex: "plus qu'un plat pour valider la commande groupée". */
+@keyframes pulse-alerte {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.texte-alerte-pulsant {
+  animation: pulse-alerte 1.4s ease-in-out infinite;
+}

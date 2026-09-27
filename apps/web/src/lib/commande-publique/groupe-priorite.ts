@@ -28,3 +28,22 @@ export function libellePalierGroupe(palier: PalierGroupe): string | null {
   if (palier === "GROUPE_3") return "GROUPE 3";
   return null;
 }
+
+/**
+ * Message de progression vers la boisson offerte (GROUPE_4), à appeler
+ * uniquement quand ce palier n'est pas encore atteint. Doit toujours tenir
+ * compte des DEUX conditions (plats ET montant) — un montant déjà suffisant
+ * ne doit jamais afficher "Encore 0,00€" tant qu'il manque des plats, ça
+ * laisserait croire à tort que l'offre est sur le point de s'activer.
+ */
+export function messageProgressionBoissonOfferte(nbPlatsValides: number, montantBrut: number): string {
+  const platsRestants = Math.max(0, SEUIL_GROUPE_4_PLATS - nbPlatsValides);
+  const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - montantBrut);
+  if (platsRestants > 0 && montantRestant > 0) {
+    return `Encore ${platsRestants} plat${platsRestants > 1 ? "s" : ""} et ${montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁`;
+  }
+  if (platsRestants > 0) {
+    return `Encore ${platsRestants} plat${platsRestants > 1 ? "s" : ""} pour la boisson 2L offerte 🎁`;
+  }
+  return `Encore ${montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁`;
+}

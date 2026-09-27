@@ -22,9 +22,9 @@ import { creneauxPourDate, prochainesDatesOuvertes, dateMayotteIso } from "@/lib
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
   SEUIL_GROUPE_3_MONTANT,
-  SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
+  messageProgressionBoissonOfferte,
 } from "@/lib/commande-publique/groupe-priorite";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
@@ -33,7 +33,7 @@ import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
-import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 
@@ -1049,7 +1049,7 @@ export function CommandePubliqueApp({
                   </ul>
 
                   {nbPlatsValides > 0 && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
-                    <p className="text-sm font-semibold text-[#2D5A27]">
+                    <p className="texte-alerte-pulsant text-sm font-bold text-[#8B2020]">
                       {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides === 1
                         ? "Plus qu'un plat pour valider votre commande groupée."
                         : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour valider votre commande groupée.`}
@@ -1063,10 +1063,9 @@ export function CommandePubliqueApp({
                         if (palierGroupeReel === "GROUPE_4") {
                           return <p className="text-sm font-bold text-[#2D5A27]">🎁 Boisson 2L offerte !</p>;
                         }
-                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="text-sm font-semibold text-[#2D5A27]">
-                            Encore {montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁
+                            {messageProgressionBoissonOfferte(nbPlatsValides, total)}
                           </p>
                         );
                       }
@@ -1078,11 +1077,9 @@ export function CommandePubliqueApp({
                         );
                       }
                       if (palierGroupeReel === "GROUPE_3") {
-                        const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
                         return (
                           <p className="text-sm font-semibold text-[#2D5A27]">
-                            🚀 Livraison prioritaire activée ! Encore {montantRestant.toFixed(2)}€ pour la boisson 2L
-                            offerte.
+                            🚀 Livraison prioritaire activée ! {messageProgressionBoissonOfferte(nbPlatsValides, total)}
                           </p>
                         );
                       }
@@ -1114,6 +1111,11 @@ export function CommandePubliqueApp({
                       {(total - MONTANT_REMISE_LANCEMENT).toFixed(2)} €
                     </div>
                   )
+                )}
+                {total > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-gray-500">
+                    {texteProgressionFidelite(progressionFideliteCommande(total))}
+                  </p>
                 )}
               </div>
 

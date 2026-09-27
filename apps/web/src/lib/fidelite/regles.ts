@@ -17,6 +17,39 @@ export function formaterEuros(montant: number): string {
   return `${texte}€`;
 }
 
+export interface ProgressionFidelite {
+  /** Nombre de tampons que cette commande fait gagner (0 si le montant ne complète aucun tampon). */
+  tamponsGagnes: number;
+  /** Montant restant à ajouter pour obtenir un tampon de plus. */
+  montantProchainTampon: number;
+}
+
+/**
+ * Calcule ce qu'une commande apporte en tampons — à partir du montant cumulé
+ * juste avant cette commande (0 si inconnu, ex: client non identifié sur le
+ * site public : le calcul devient alors une simple estimation sur le panier,
+ * jamais le vrai solde, qu'on ne peut pas connaître sans lui demander son
+ * numéro).
+ */
+export function progressionFideliteCommande(totalCommande: number, montantCumuleAvant: number = 0): ProgressionFidelite {
+  const tamponsAvant = Math.floor(montantCumuleAvant / MONTANT_RECOMPENSE);
+  const montantApres = montantCumuleAvant + totalCommande;
+  const tamponsApres = Math.floor(montantApres / MONTANT_RECOMPENSE);
+  const reste = montantApres % MONTANT_RECOMPENSE;
+  return {
+    tamponsGagnes: tamponsApres - tamponsAvant,
+    montantProchainTampon: reste === 0 ? MONTANT_RECOMPENSE : MONTANT_RECOMPENSE - reste,
+  };
+}
+
+/** Texte prêt à afficher juste à côté du total (site public et caisse) — jamais le même message vague partout. */
+export function texteProgressionFidelite({ tamponsGagnes, montantProchainTampon }: ProgressionFidelite): string {
+  if (tamponsGagnes > 0) {
+    return `🎁 Cette commande vous rapporte ${tamponsGagnes} tampon${tamponsGagnes > 1 ? "s" : ""} ! Encore ${formaterEuros(montantProchainTampon)} pour le suivant.`;
+  }
+  return `🎁 Encore ${formaterEuros(montantProchainTampon)} pour votre prochain tampon fidélité.`;
+}
+
 export function messageFidelite({
   montantCumule,
   recompenseDisponible,
