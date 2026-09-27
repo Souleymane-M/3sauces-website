@@ -20,7 +20,7 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
     .select(
-      "id, numero, canal, statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, palier_groupe, contenu, montant, mode_paiement"
+      "id, numero, canal, statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, palier_groupe, contenu, montant, mode_paiement, motif_annulation"
     )
     .order("created_at", { ascending: false })
     .limit(LIMITE_COMMANDES);
@@ -94,6 +94,7 @@ export async function listerHistoriqueCommandes(): Promise<CommandeHistorique[]>
       lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
       montant: c.montant,
       modePaiement: c.mode_paiement,
+      motifAnnulation: c.motif_annulation,
     };
   });
 }

@@ -236,3 +236,76 @@ export async function changerStatutCommande({
     console.error("[cuisine/commandes] échec journalisation évènement :", erreurEvenement.message);
   }
 }
+
+interface AnnulationCommande {
+  commandeId: string;
+  profilId: string;
+  motif?: string;
+}
+
+/**
+ * Annule une commande — volontairement limité aux commandes encore
+ * "en_attente" : au-delà, la préparation a déjà commencé, ça se gère de
+ * vive voix avec la cuisine, pas depuis un écran. Restitue le stock du
+ * jour déjà décompté (plats du jour). Si la commande était payée, le
+ * trigger DB `commandes_appliquer_fidelite` reverse l'accumulation déjà
+ * créditée — jamais le cas d'une récompense déjà consommée sur cette
+ * commande, à corriger à la main si besoin (rare, pas encore outillé).
+ * Le remboursement réel (carte ou espèces) reste toujours fait à la main,
+ * hors de l'app.
+ */
+export async function annulerCommande({ commandeId, profilId, motif }: AnnulationCommande): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: profil, error: erreurProfil } = await supabase
+    .from("profils")
+    .select("id")
+    .eq("id", profilId)
+    .in("role", ["employe", "livreur", "patron"])
+    .eq("actif", true)
+    .maybeSingle();
+  if (erreurProfil || !profil) {
+    throw new Error("Identité invalide.");
+  }
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select("id, statut, contenu")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.statut !== "en_attente") {
+    throw new Error('Seules les commandes encore "En attente" peuvent être annulées.');
+  }
+
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({ statut: "annulee", motif_annulation: motif?.trim() || null })
+    .eq("id", commandeId);
+  if (erreurMaj) {
+    throw new Error(`Impossible d'annuler la commande : ${erreurMaj.message}`);
+  }
+
+  const lignes = Array.isArray(commande.contenu)
+    ? (commande.contenu as { produitId?: string; quantite?: number }[])
+    : [];
+  if (lignes.length > 0) {
+    const { error: erreurStock } = await supabase.rpc("incrementer_stocks_produits", {
+      items: lignes
+        .filter((l): l is { produitId: string; quantite: number } => Boolean(l.produitId) && Boolean(l.quantite))
+        .map((l) => ({ produitId: l.produitId, quantite: l.quantite })),
+    });
+    if (erreurStock) {
+      console.error("[cuisine/commandes] échec restitution stock à l'annulation :", erreurStock.message);
+    }
+  }
+
+  const { error: erreurEvenement } = await supabase
+    .from("commandes_evenements")
+    .insert({ commande_id: commandeId, statut: "annulee", profil_id: profilId });
+  if (erreurEvenement) {
+    console.error("[cuisine/commandes] échec journalisation annulation :", erreurEvenement.message);
+  }
+}

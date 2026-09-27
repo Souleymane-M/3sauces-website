@@ -30,7 +30,14 @@ export type ModePaiement = "especes" | "cb" | "stripe";
 // 20260908090000_tracabilite_commandes.sql) : flux complet en_attente ->
 // en_preparation -> pret -> remis_au_client (sur place/à emporter) ou
 // pris_par_livreur -> livre (livraison, flash QR du livreur - Module 2).
-export type StatutCommande = "en_attente" | "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+export type StatutCommande =
+  | "en_attente"
+  | "en_preparation"
+  | "pret"
+  | "remis_au_client"
+  | "pris_par_livreur"
+  | "livre"
+  | "annulee";
 
 export interface Database {
   public: {
@@ -279,6 +286,7 @@ export interface Database {
           nb_plats: number;
           ticket_imprime_le: string | null;
           palier_groupe: string | null;
+          motif_annulation: string | null;
         };
         Insert: {
           id?: string;
@@ -306,6 +314,7 @@ export interface Database {
           nb_plats?: number;
           ticket_imprime_le?: string | null;
           palier_groupe?: string | null;
+          motif_annulation?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];
@@ -406,14 +415,14 @@ export interface Database {
         Row: {
           id: string;
           commande_id: string;
-          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre" | "annulee";
           profil_id: string;
           created_at: string;
         };
         Insert: {
           id?: string;
           commande_id: string;
-          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre";
+          statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre" | "annulee";
           profil_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["commandes_evenements"]["Insert"]>;
@@ -459,6 +468,10 @@ export interface Database {
     };
     Functions: {
       decrementer_stocks_produits: {
+        Args: { items: { produitId: string; quantite: number }[] };
+        Returns: void;
+      };
+      incrementer_stocks_produits: {
         Args: { items: { produitId: string; quantite: number }[] };
         Returns: void;
       };

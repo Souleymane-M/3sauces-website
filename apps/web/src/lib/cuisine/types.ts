@@ -60,7 +60,7 @@ export const TRANSITIONS_PAR_CANAL: Record<Canal, Partial<Record<StatutCommande,
  * au livreur, la cuisine n'a plus rien à faire dessus, même si elle n'est
  * pas encore réellement livrée (ça, c'est le rôle de /livreur).
  */
-export const STATUTS_TERMINAUX: StatutCommande[] = ["remis_au_client", "pris_par_livreur", "livre"];
+export const STATUTS_TERMINAUX: StatutCommande[] = ["remis_au_client", "pris_par_livreur", "livre", "annulee"];
 
 export const LIBELLES_STATUT: Record<StatutCommande, string> = {
   en_attente: "En attente",
@@ -69,4 +69,5 @@ export const LIBELLES_STATUT: Record<StatutCommande, string> = {
   remis_au_client: "Remis au client",
   pris_par_livreur: "Pris par livreur",
   livre: "Livré",
+  annulee: "Annulée",
 };

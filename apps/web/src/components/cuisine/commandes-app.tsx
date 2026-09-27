@@ -203,12 +203,18 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
     }
   }
 
-  async function appliquerChangement(commandeId: string, statut: string, profilId: string, livreurId?: string) {
+  async function appliquerChangement(
+    commandeId: string,
+    statut: string,
+    profilId: string,
+    livreurId?: string,
+    motif?: string
+  ) {
     setErreur(null);
     const reponse = await fetch("/api/cuisine/commandes", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commandeId, statut, profilId, livreurId }),
+      body: JSON.stringify({ commandeId, statut, profilId, livreurId, motif }),
     });
     if (!reponse.ok) {
       const data = await reponse.json().catch(() => ({}));
@@ -218,9 +224,9 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
     await rafraichir();
   }
 
-  function demanderChangement(commandeId: string, statut: string, livreurId?: string) {
+  function demanderChangement(commandeId: string, statut: string, livreurId?: string, motif?: string) {
     const executer = (identite: EmployeActif) => {
-      appliquerChangement(commandeId, statut, identite.profilId, livreurId);
+      appliquerChangement(commandeId, statut, identite.profilId, livreurId, motif);
     };
 
     if (employeActif) {
@@ -229,6 +235,13 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
     }
     setActionEnAttente(() => executer);
     setModalOuverte(true);
+  }
+
+  /** Uniquement pour une commande encore "en_attente" — vérifié aussi côté serveur. */
+  function demanderAnnulation(commandeId: string) {
+    const motif = window.prompt("Pourquoi annuler cette commande ? (optionnel)");
+    if (motif === null) return;
+    demanderChangement(commandeId, "annulee", undefined, motif);
   }
 
   return (
@@ -331,6 +344,14 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                     {LIBELLES_STATUT[statutSuivant]}
                   </button>
                 </div>
+              )}
+              {commande.statut === "en_attente" && (
+                <button
+                  onClick={() => demanderAnnulation(commande.id)}
+                  className="mt-2 w-full rounded border border-red-600 py-2 text-base font-semibold text-red-600"
+                >
+                  Annuler la commande
+                </button>
               )}
             </div>
           );

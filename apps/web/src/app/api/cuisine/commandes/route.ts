@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { listerCommandesActives, listerCommandesAVenir, changerStatutCommande } from "@/lib/cuisine/commandes";
+import { listerCommandesActives, listerCommandesAVenir, changerStatutCommande, annulerCommande } from "@/lib/cuisine/commandes";
 import type { StatutEvenement } from "@/lib/cuisine/types";
 
 // "en_attente" est l'état initial automatique, jamais une transition
 // demandée par un employé — exclu volontairement des statuts acceptés ici.
-const STATUTS_VALIDES: StatutEvenement[] = ["en_preparation", "pret", "remis_au_client", "pris_par_livreur", "livre"];
+const STATUTS_VALIDES: StatutEvenement[] = [
+  "en_preparation",
+  "pret",
+  "remis_au_client",
+  "pris_par_livreur",
+  "livre",
+  "annulee",
+];
 
 export async function GET() {
   const session = await requireRole(["employe"]);
@@ -29,7 +36,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; statut?: string; profilId?: string; livreurId?: string }
+    | { commandeId?: string; statut?: string; profilId?: string; livreurId?: string; motif?: string }
     | null;
 
   if (!body?.commandeId || typeof body.commandeId !== "string") {
@@ -43,12 +50,16 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    await changerStatutCommande({
-      commandeId: body.commandeId,
-      statut: body.statut as StatutEvenement,
-      profilId: body.profilId,
-      livreurId: body.livreurId,
-    });
+    if (body.statut === "annulee") {
+      await annulerCommande({ commandeId: body.commandeId, profilId: body.profilId, motif: body.motif });
+    } else {
+      await changerStatutCommande({
+        commandeId: body.commandeId,
+        statut: body.statut as StatutEvenement,
+        profilId: body.profilId,
+        livreurId: body.livreurId,
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";

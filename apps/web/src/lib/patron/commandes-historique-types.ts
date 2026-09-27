@@ -26,6 +26,8 @@ export interface CommandeHistorique {
   lignes: LigneCommande[];
   montant: number;
   modePaiement: ModePaiement | null;
+  /** Renseigné uniquement si la commande a été annulée. */
+  motifAnnulation: string | null;
 }
 
 export interface TempsPreparationEmploye {

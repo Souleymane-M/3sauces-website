@@ -96,14 +96,14 @@ export function CommandesHistoriqueApp({
   const [enCoursId, setEnCoursId] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  async function appliquerChangement(commandeId: string, statut: string, livreurId?: string) {
+  async function appliquerChangement(commandeId: string, statut: string, livreurId?: string, motif?: string) {
     setErreur(null);
     setEnCoursId(commandeId);
     try {
       const reponse = await fetch("/api/cuisine/commandes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, statut, profilId, livreurId }),
+        body: JSON.stringify({ commandeId, statut, profilId, livreurId, motif }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
@@ -116,6 +116,13 @@ export function CommandesHistoriqueApp({
     } finally {
       setEnCoursId(null);
     }
+  }
+
+  /** Uniquement pour une commande encore "en_attente" — vérifié aussi côté serveur. */
+  function demanderAnnulation(commandeId: string) {
+    const motif = window.prompt("Pourquoi annuler cette commande ? (optionnel)");
+    if (motif === null) return;
+    appliquerChangement(commandeId, "annulee", undefined, motif);
   }
 
   return (
@@ -201,6 +208,7 @@ export function CommandesHistoriqueApp({
                 </ul>
 
                 <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-xs text-gray-400">
+                  {c.motifAnnulation && <p className="text-red-500">Motif d&apos;annulation : {c.motifAnnulation}</p>}
                   {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
                   {c.evenements.map((e, i) => (
                     <p key={i}>
@@ -236,6 +244,16 @@ export function CommandesHistoriqueApp({
                       {enCoursId === c.id ? "…" : LIBELLES_STATUT[statutSuivant]}
                     </button>
                   </div>
+                )}
+                {c.statut === "en_attente" && (
+                  <button
+                    type="button"
+                    onClick={() => demanderAnnulation(c.id)}
+                    disabled={enCoursId === c.id}
+                    className="mt-2 w-full rounded border border-red-600 py-2 text-xs font-semibold text-red-500 disabled:opacity-40"
+                  >
+                    Annuler la commande
+                  </button>
                 )}
               </details>
             </li>
