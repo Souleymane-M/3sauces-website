@@ -246,14 +246,22 @@ export function CommandesHistoriqueApp({
                   </div>
                 )}
                 {c.statut === "en_attente" && (
-                  <button
-                    type="button"
-                    onClick={() => demanderAnnulation(c.id)}
-                    disabled={enCoursId === c.id}
-                    className="mt-2 w-full rounded border border-red-600 py-2 text-xs font-semibold text-red-500 disabled:opacity-40"
-                  >
-                    Annuler la commande
-                  </button>
+                  <div className="mt-2 flex gap-2">
+                    <a
+                      href={`/caisse?modifier=${c.id}`}
+                      className="flex-1 rounded border border-gray-400 py-2 text-center text-xs font-semibold text-gray-400"
+                    >
+                      Modifier
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => demanderAnnulation(c.id)}
+                      disabled={enCoursId === c.id}
+                      className="flex-1 rounded border border-red-600 py-2 text-xs font-semibold text-red-500 disabled:opacity-40"
+                    >
+                      Annuler la commande
+                    </button>
+                  </div>
                 )}
               </details>
             </li>

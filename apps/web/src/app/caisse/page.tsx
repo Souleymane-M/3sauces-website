@@ -15,12 +15,17 @@ import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/param
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
 import { listerCommandesActives } from "@/lib/cuisine/commandes";
+import { chargerCommandePourModification } from "@/lib/caisse/modification";
 
 export const metadata: Metadata = {
   title: "Caisse — 3 Sauces",
 };
 
-export default async function CaissePage() {
+interface CaissePageProps {
+  searchParams: Promise<{ modifier?: string }>;
+}
+
+export default async function CaissePage({ searchParams }: CaissePageProps) {
   const session = await requireRole(["employe"]);
 
   if (!session) {
@@ -31,7 +36,9 @@ export default async function CaissePage() {
     );
   }
 
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser, commandesActives] =
+  const { modifier } = await searchParams;
+
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser, commandesActives, modification] =
     await Promise.all([
       listerProduitsActifs(),
       listerViandesActives(),
@@ -42,7 +49,24 @@ export default async function CaissePage() {
       listerImprimantesAdmin(),
       listerLivraisonsAEncaisser(),
       listerCommandesActives(),
+      modifier ? chargerCommandePourModification(modifier) : Promise.resolve(null),
     ]);
+
+  if (modifier && modification?.erreur) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F0E8] p-8">
+        <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-sm">
+          <p className="font-semibold text-red-700">{modification.erreur}</p>
+          <Link
+            href="/commandes"
+            className="mt-4 inline-block rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retour aux commandes
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F5F0E8] p-8">
@@ -86,6 +110,7 @@ export default async function CaissePage() {
         parametres={parametres}
         imprimantesInitiales={imprimantes}
         nomEmploye={session.nom}
+        commandeExistante={modification?.commande ?? null}
       />
     </main>
   );

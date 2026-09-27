@@ -8,11 +8,11 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
-import type { CreerCommandePayload, LigneCommande, LigneCommandePayload } from "@/lib/caisse/types";
+import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
-import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
+import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
@@ -21,6 +21,312 @@ const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
 // panier caisse "normal" ne les dépasse jamais.
 const MAX_LIGNES_PAR_COMMANDE = 30;
 const MAX_QUANTITE_PAR_LIGNE = 20;
+
+/** Levée par `validerLignesCommande` pour toute erreur imputable au client (400) — jamais une erreur serveur. */
+class ErreurValidation extends Error {}
+
+interface LignesValidees {
+  lignes: LigneCommande[];
+  montantBrut: number;
+  nbPlats: number;
+  palierGroupe: PalierGroupe;
+  coutMatiereTotal: number;
+  coutIncomplet: boolean;
+  produitParId: Map<string, { id: string; stock_jour: number | null }>;
+}
+
+/**
+ * Cœur de validation partagé entre la création (POST) et la modification
+ * (PATCH) d'une commande caisse : reconstruit et revalide chaque ligne à
+ * partir de la carte en base (jamais de confiance dans ce qu'envoie le
+ * navigateur), calcule le montant brut, le nombre de plats et le palier
+ * "commande groupée" (boisson 2L offerte). Lève `ErreurValidation` pour
+ * toute erreur imputable au client — jamais un throw générique, pour que
+ * l'appelant puisse toujours répondre 400 avec un message clair.
+ */
+async function validerLignesCommande(
+  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  lignesBrutes: unknown,
+  boissonOfferteSaveurBrut: unknown
+): Promise<LignesValidees> {
+  if (!Array.isArray(lignesBrutes) || lignesBrutes.length === 0) {
+    throw new ErreurValidation("Requête invalide : au moins une ligne de commande est requise.");
+  }
+  if (lignesBrutes.length > MAX_LIGNES_PAR_COMMANDE) {
+    throw new ErreurValidation("Panier trop volumineux.");
+  }
+
+  const produitIds = [...new Set((lignesBrutes as LigneCommandePayload[]).map((l) => l.produitId))];
+  const { data: produits, error: erreurProduits } = await supabase
+    .from("produits")
+    .select(
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, accompagnements_disponibles, stock_jour"
+    )
+    .in("id", produitIds);
+  if (erreurProduits) {
+    throw new Error("Erreur serveur (produits).");
+  }
+
+  const { data: viandesActives, error: erreurViandes } = await supabase.from("viandes").select("nom").eq("actif", true);
+  if (erreurViandes) throw new Error("Erreur serveur (viandes).");
+  const nomsViandesValides = new Set((viandesActives ?? []).map((v) => v.nom));
+
+  const { data: saucesActives, error: erreurSauces } = await supabase.from("sauces").select("nom").eq("actif", true);
+  if (erreurSauces) throw new Error("Erreur serveur (sauces).");
+  const nomsSaucesValides = new Set((saucesActives ?? []).map((s) => s.nom));
+
+  const { data: saveursActives, error: erreurSaveurs } = await supabase.from("saveurs").select("nom").eq("actif", true);
+  if (erreurSaveurs) throw new Error("Erreur serveur (saveurs).");
+  const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
+
+  // Parfums Boisson 2L : référentiel indépendant de `saveurs` (canettes),
+  // uniquement pour ce produit (cf. NOM_PRODUIT_BOISSON_OFFERTE).
+  const { data: parfums2lActifs, error: erreurParfums2l } = await supabase.from("parfums_2l").select("nom").eq("actif", true);
+  if (erreurParfums2l) throw new Error("Erreur serveur (parfums Boisson 2L).");
+  const nomsParfums2lValides = new Set((parfums2lActifs ?? []).map((s) => s.nom));
+
+  // Accompagnements proposables en choix gratuit inclus (Plats du jour) —
+  // jamais "Salade", incluse automatiquement sans choix (mécanisme distinct).
+  const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
+    .from("produits")
+    .select("nom")
+    .eq("categorie", "accompagnement")
+    .eq("actif", true)
+    .neq("nom", "Salade");
+  if (erreurAccompagnements) throw new Error("Erreur serveur (accompagnements).");
+  const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
+
+  const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
+  const lignes: LigneCommande[] = [];
+
+  for (const ligneBrute of lignesBrutes as LigneCommandePayload[]) {
+    const produit = produitParId.get(ligneBrute.produitId);
+    if (!produit || !produit.actif) {
+      throw new ErreurValidation(`Produit introuvable ou inactif : ${ligneBrute.produitId}`);
+    }
+
+    const quantite = Number(ligneBrute.quantite);
+    if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
+      throw new ErreurValidation(`Quantité invalide pour ${produit.nom}.`);
+    }
+
+    // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai
+    // garde-fou contre la concurrence est le décrément atomique juste avant
+    // l'insertion/mise à jour de la commande (cf. plus bas).
+    if (produit.stock_jour !== null && quantite > produit.stock_jour) {
+      throw new ErreurValidation(`Il ne reste que ${produit.stock_jour} ${produit.nom} disponible(s) aujourd'hui.`);
+    }
+
+    const viandes = Array.isArray(ligneBrute.viandes) ? ligneBrute.viandes : [];
+    if (viandes.length !== produit.nb_viandes_max) {
+      throw new ErreurValidation(`${produit.nom} nécessite exactement ${produit.nb_viandes_max} viande(s) sélectionnée(s).`);
+    }
+    if (viandes.some((v) => !nomsViandesValides.has(v))) {
+      throw new ErreurValidation(`Viande invalide sur la ligne ${produit.nom}.`);
+    }
+
+    // Produit "verrouillé" (ex: Menu Collégien) : la viande envoyée doit
+    // correspondre à la viande imposée en base.
+    if (produit.viande_imposee && viandes[0] !== produit.viande_imposee) {
+      throw new ErreurValidation(`${produit.nom} est disponible uniquement en ${produit.viande_imposee}.`);
+    }
+
+    // Sauces : même double régime que /api/commande — "Sauce supplémentaire"
+    // exige exactement 1 sauce par ligne, sinon le maximum vient de
+    // `nb_sauces_incluses` du produit lui-même. Doublons autorisés (ex:
+    // "double mayo"), même mécanique que les viandes.
+    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
+    const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
+    if (estSauceSupplementaire) {
+      if (sauces.length !== 1) {
+        throw new ErreurValidation("Sélectionne exactement une sauce supplémentaire.");
+      }
+    } else {
+      const maxSaucesIncluses = produit.nb_sauces_incluses ?? 0;
+      if (sauces.length > maxSaucesIncluses) {
+        throw new ErreurValidation(
+          maxSaucesIncluses === 0 ? `Sauces non disponibles sur ${produit.nom}.` : `Maximum ${maxSaucesIncluses} sauces sur ${produit.nom}.`
+        );
+      }
+      if (maxSaucesIncluses > 0 && sauces.length === 0) {
+        throw new ErreurValidation(`Choisis au moins 1 sauce sur ${produit.nom}.`);
+      }
+    }
+    if (sauces.some((s) => !nomsSaucesValides.has(s))) {
+      throw new ErreurValidation(`Sauce invalide sur la ligne ${produit.nom}.`);
+    }
+
+    // Saveur (produit vendu directement à la saveur, ex: Canette 33cl) : un
+    // choix exact et obligatoire dès que `nb_saveurs_max > 0`.
+    const saveurs = Array.isArray(ligneBrute.saveurs) ? ligneBrute.saveurs : [];
+    if (saveurs.length !== produit.nb_saveurs_max) {
+      throw new ErreurValidation(
+        produit.nb_saveurs_max === 0
+          ? `Pas de choix de saveur sur ${produit.nom}.`
+          : `${produit.nom} nécessite exactement ${produit.nb_saveurs_max} saveur(s) sélectionnée(s).`
+      );
+    }
+    // La Boisson 2L a son propre référentiel de parfums, indépendant de
+    // `saveurs` (canettes) — cf. lib/patron/options.ts.
+    const listeSaveursValides = produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? nomsParfums2lValides : nomsSaveursValides;
+    if (saveurs.some((s) => !listeSaveursValides.has(s))) {
+      throw new ErreurValidation(`Saveur invalide sur la ligne ${produit.nom}.`);
+    }
+
+    // Boisson incluse (Tacos/Barquette/Bowl/Menu Étudiant) : n'a de sens que
+    // si le produit inclut effectivement une canette.
+    const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
+    if (boissonIncluse !== null) {
+      if (!produit.canette_incluse) {
+        throw new ErreurValidation(`Pas de canette incluse sur ${produit.nom}.`);
+      }
+      if (!nomsSaveursValides.has(boissonIncluse)) {
+        throw new ErreurValidation(`Saveur de canette invalide sur la ligne ${produit.nom}.`);
+      }
+    }
+
+    // Sans boisson (-1,50€) : le client refuse explicitement la canette
+    // incluse de cette formule — jamais déduit de `boissonIncluse === null`.
+    const sansBoisson = ligneBrute.sansBoisson === true;
+    if (sansBoisson) {
+      if (!produit.canette_incluse) {
+        throw new ErreurValidation(`Pas de canette incluse sur ${produit.nom}, rien à retirer.`);
+      }
+      if (produit.nom === NOM_PRODUIT_MENU_ETUDIANT) {
+        throw new ErreurValidation(`"Sans boisson" n'est pas proposé sur ${produit.nom}.`);
+      }
+      if (boissonIncluse !== null) {
+        throw new ErreurValidation(`Choix incohérent (saveur + sans boisson) sur ${produit.nom}.`);
+      }
+    }
+
+    // Différence caisse : un produit à prix libre (ex: "Plat du jour") est
+    // autorisé ici (jamais côté public), avec un prix du jour saisi par
+    // l'employé plutôt qu'un rejet.
+    let prixUnitaire = produit.prix;
+    if (prixUnitaire === null) {
+      const prixSaisi = Number(ligneBrute.prixSaisi);
+      if (!Number.isFinite(prixSaisi) || prixSaisi <= 0) {
+        throw new ErreurValidation(`${produit.nom} est à prix libre : indique un prix du jour.`);
+      }
+      prixUnitaire = prixSaisi;
+    }
+    if (produit.canette_incluse && sansBoisson) {
+      prixUnitaire = Math.round((prixUnitaire - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
+    }
+
+    // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle
+    // qu'au site public. La salade en option payante (Tacos/Bowl) est un
+    // produit "Salade supplémentaire" comme un autre, pas de champ dédié ici.
+    let saladeIncluse: boolean | null = null;
+    if (produit.salade_incluse) {
+      if (typeof ligneBrute.saladeIncluse !== "boolean") {
+        throw new ErreurValidation(`Choix salade requis sur ${produit.nom}.`);
+      }
+      saladeIncluse = ligneBrute.saladeIncluse;
+    } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
+      throw new ErreurValidation(`Salade non proposée sur ${produit.nom}.`);
+    }
+
+    // Accompagnement(s) inclus (Plats du jour) : choix obligatoire, gratuit,
+    // parmi les accompagnements actifs ET disponibles aujourd'hui pour ce
+    // produit précis — jamais "Salade", incluse automatiquement sans choix.
+    // Groupes de combinaison revérifiés ici, jamais confiance dans la seule
+    // validation client.
+    let accompagnementsInclus: string[] = [];
+    if (produit.accompagnement_inclus) {
+      const brut = Array.isArray(ligneBrute.accompagnementsInclus) ? ligneBrute.accompagnementsInclus : null;
+      if (!brut || !combinaisonAccompagnementsValide(brut)) {
+        throw new ErreurValidation(`Choix d'accompagnement invalide sur ${produit.nom}.`);
+      }
+      const disponibles = new Set(produit.accompagnements_disponibles ?? []);
+      if (brut.some((n) => !nomsAccompagnementsValides.has(n) || !disponibles.has(n))) {
+        throw new ErreurValidation(`Accompagnement non disponible sur ${produit.nom}.`);
+      }
+      accompagnementsInclus = brut;
+    } else if (
+      ligneBrute.accompagnementsInclus !== undefined &&
+      Array.isArray(ligneBrute.accompagnementsInclus) &&
+      ligneBrute.accompagnementsInclus.length > 0
+    ) {
+      throw new ErreurValidation(`Accompagnement non proposé sur ${produit.nom}.`);
+    }
+
+    const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
+    const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
+
+    // Index du plat-conteneur (mode "Commande groupée" pris au téléphone) —
+    // donnée déclarative de l'employé, aucune validation métier au-delà du
+    // type.
+    const platIndex = typeof ligneBrute.platIndex === "number" ? ligneBrute.platIndex : null;
+
+    lignes.push({
+      produitId: produit.id,
+      nom: produit.nom,
+      categorie: produit.categorie,
+      quantite,
+      prixUnitaire,
+      coutMatiereUnitaire: produit.cout_matiere,
+      viandes,
+      sauces,
+      saveurs,
+      boissonIncluse,
+      sansBoisson,
+      canetteIncluse: produit.canette_incluse,
+      saladeIncluse,
+      accompagnementsInclus,
+      pourQui,
+      platIndex,
+    });
+  }
+
+  const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
+  const nbPlats = compterPlatsGroupes(lignes);
+  const modeGroupe = lignes.some((l) => l.platIndex !== null);
+  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
+    throw new ErreurValidation("Une commande groupée doit contenir au moins 3 plats.");
+  }
+  if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
+    throw new ErreurValidation("Chaque plat doit atteindre au moins 5€ pour être validé.");
+  }
+
+  // Offre "commande groupée" : même règle que le site public (/api/commande)
+  // — calculée une seule fois ici, sur le montant brut.
+  const palierGroupe = palierGroupeActif(nbPlats, montantBrut);
+  if (palierGroupe === "GROUPE_4") {
+    const boissonOfferteSaveur = typeof boissonOfferteSaveurBrut === "string" ? boissonOfferteSaveurBrut : null;
+    if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
+      throw new ErreurValidation("Choisis un parfum disponible pour la boisson 2L offerte.");
+    }
+
+    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
+      .from("produits")
+      .select("id, nom, cout_matiere")
+      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .eq("actif", true)
+      .maybeSingle();
+    if (erreurBoissonOfferte) throw new Error("Erreur serveur (boisson offerte).");
+    if (boissonOfferte) {
+      lignes.push({
+        produitId: boissonOfferte.id,
+        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+        categorie: "boisson",
+        quantite: 1,
+        prixUnitaire: 0,
+        coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
+        viandes: [],
+        saveurs: [boissonOfferteSaveur],
+        canetteIncluse: false,
+        platIndex: null,
+      });
+    }
+  }
+
+  const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
+  const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
+
+  return { lignes, montantBrut, nbPlats, palierGroupe, coutMatiereTotal, coutIncomplet, produitParId };
+}
 
 /**
  * Crée une commande caisse (Module 1) : mêmes règles de validation que le
@@ -68,14 +374,8 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as CreerCommandePayload | null;
-  if (!body || !Array.isArray(body.lignes) || body.lignes.length === 0) {
-    return NextResponse.json(
-      { error: "Requête invalide : au moins une ligne de commande est requise." },
-      { status: 400 }
-    );
-  }
-  if (body.lignes.length > MAX_LIGNES_PAR_COMMANDE) {
-    return NextResponse.json({ error: "Panier trop volumineux." }, { status: 400 });
+  if (!body) {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
   if (!CANAUX_CAISSE.includes(body.canal as (typeof CANAUX_CAISSE)[number])) {
@@ -140,348 +440,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
 
-  const produitIds = [...new Set(body.lignes.map((l) => l.produitId))];
-  const { data: produits, error: erreurProduits } = await supabase
-    .from("produits")
-    .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, accompagnements_disponibles, stock_jour"
-    )
-    .in("id", produitIds);
-
-  if (erreurProduits) {
-    return NextResponse.json({ error: "Erreur serveur (produits)." }, { status: 500 });
+  let validation;
+  try {
+    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveur);
+  } catch (e) {
+    if (e instanceof ErreurValidation) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    console.error("[/api/caisse/commandes] échec validation :", e);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
-
-  const { data: viandesActives, error: erreurViandes } = await supabase
-    .from("viandes")
-    .select("nom")
-    .eq("actif", true);
-
-  if (erreurViandes) {
-    return NextResponse.json({ error: "Erreur serveur (viandes)." }, { status: 500 });
-  }
-  const nomsViandesValides = new Set((viandesActives ?? []).map((v) => v.nom));
-
-  const { data: saucesActives, error: erreurSauces } = await supabase
-    .from("sauces")
-    .select("nom")
-    .eq("actif", true);
-
-  if (erreurSauces) {
-    return NextResponse.json({ error: "Erreur serveur (sauces)." }, { status: 500 });
-  }
-  const nomsSaucesValides = new Set((saucesActives ?? []).map((s) => s.nom));
-
-  const { data: saveursActives, error: erreurSaveurs } = await supabase
-    .from("saveurs")
-    .select("nom")
-    .eq("actif", true);
-
-  if (erreurSaveurs) {
-    return NextResponse.json({ error: "Erreur serveur (saveurs)." }, { status: 500 });
-  }
-  const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
-
-  // Parfums Boisson 2L : référentiel indépendant de `saveurs` (canettes),
-  // uniquement pour ce produit (cf. NOM_PRODUIT_BOISSON_OFFERTE).
-  const { data: parfums2lActifs, error: erreurParfums2l } = await supabase
-    .from("parfums_2l")
-    .select("nom")
-    .eq("actif", true);
-
-  if (erreurParfums2l) {
-    return NextResponse.json({ error: "Erreur serveur (parfums Boisson 2L)." }, { status: 500 });
-  }
-  const nomsParfums2lValides = new Set((parfums2lActifs ?? []).map((s) => s.nom));
-
-  // Accompagnements proposables en choix gratuit inclus (Plats du jour) —
-  // jamais "Salade", incluse automatiquement sans choix (mécanisme distinct).
-  const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
-    .from("produits")
-    .select("nom")
-    .eq("categorie", "accompagnement")
-    .eq("actif", true)
-    .neq("nom", "Salade");
-
-  if (erreurAccompagnements) {
-    return NextResponse.json({ error: "Erreur serveur (accompagnements)." }, { status: 500 });
-  }
-  const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
-
-  const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
-  const lignes: LigneCommande[] = [];
-
-  for (const ligneBrute of body.lignes as LigneCommandePayload[]) {
-    const produit = produitParId.get(ligneBrute.produitId);
-    if (!produit || !produit.actif) {
-      return NextResponse.json({ error: `Produit introuvable ou inactif : ${ligneBrute.produitId}` }, { status: 400 });
-    }
-
-    const quantite = Number(ligneBrute.quantite);
-    if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
-      return NextResponse.json({ error: `Quantité invalide pour ${produit.nom}.` }, { status: 400 });
-    }
-
-    // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai
-    // garde-fou contre la concurrence est le décrément atomique juste avant
-    // l'insertion de la commande (cf. plus bas).
-    if (produit.stock_jour !== null && quantite > produit.stock_jour) {
-      return NextResponse.json(
-        { error: `Il ne reste que ${produit.stock_jour} ${produit.nom} disponible(s) aujourd'hui.` },
-        { status: 400 }
-      );
-    }
-
-    const viandes = Array.isArray(ligneBrute.viandes) ? ligneBrute.viandes : [];
-    if (viandes.length !== produit.nb_viandes_max) {
-      return NextResponse.json(
-        { error: `${produit.nom} nécessite exactement ${produit.nb_viandes_max} viande(s) sélectionnée(s).` },
-        { status: 400 }
-      );
-    }
-    if (viandes.some((v) => !nomsViandesValides.has(v))) {
-      return NextResponse.json({ error: `Viande invalide sur la ligne ${produit.nom}.` }, { status: 400 });
-    }
-
-    // Produit "verrouillé" (ex: Menu Collégien) : la viande envoyée doit
-    // correspondre à la viande imposée en base.
-    if (produit.viande_imposee && viandes[0] !== produit.viande_imposee) {
-      return NextResponse.json(
-        { error: `${produit.nom} est disponible uniquement en ${produit.viande_imposee}.` },
-        { status: 400 }
-      );
-    }
-
-    // Sauces : même double régime que /api/commande — "Sauce supplémentaire"
-    // exige exactement 1 sauce par ligne, sinon le maximum vient de
-    // `nb_sauces_incluses` du produit lui-même. Doublons autorisés (ex:
-    // "double mayo"), même mécanique que les viandes.
-    const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
-    const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
-    if (estSauceSupplementaire) {
-      if (sauces.length !== 1) {
-        return NextResponse.json({ error: "Sélectionne exactement une sauce supplémentaire." }, { status: 400 });
-      }
-    } else {
-      const maxSaucesIncluses = produit.nb_sauces_incluses ?? 0;
-      if (sauces.length > maxSaucesIncluses) {
-        return NextResponse.json(
-          {
-            error:
-              maxSaucesIncluses === 0
-                ? `Sauces non disponibles sur ${produit.nom}.`
-                : `Maximum ${maxSaucesIncluses} sauces sur ${produit.nom}.`,
-          },
-          { status: 400 }
-        );
-      }
-      if (maxSaucesIncluses > 0 && sauces.length === 0) {
-        return NextResponse.json({ error: `Choisis au moins 1 sauce sur ${produit.nom}.` }, { status: 400 });
-      }
-    }
-    if (sauces.some((s) => !nomsSaucesValides.has(s))) {
-      return NextResponse.json({ error: `Sauce invalide sur la ligne ${produit.nom}.` }, { status: 400 });
-    }
-
-    // Saveur (produit vendu directement à la saveur, ex: Canette 33cl) : un
-    // choix exact et obligatoire dès que `nb_saveurs_max > 0`.
-    const saveurs = Array.isArray(ligneBrute.saveurs) ? ligneBrute.saveurs : [];
-    if (saveurs.length !== produit.nb_saveurs_max) {
-      return NextResponse.json(
-        {
-          error:
-            produit.nb_saveurs_max === 0
-              ? `Pas de choix de saveur sur ${produit.nom}.`
-              : `${produit.nom} nécessite exactement ${produit.nb_saveurs_max} saveur(s) sélectionnée(s).`,
-        },
-        { status: 400 }
-      );
-    }
-    // La Boisson 2L a son propre référentiel de parfums, indépendant de
-    // `saveurs` (canettes) — cf. lib/patron/options.ts.
-    const listeSaveursValides = produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? nomsParfums2lValides : nomsSaveursValides;
-    if (saveurs.some((s) => !listeSaveursValides.has(s))) {
-      return NextResponse.json({ error: `Saveur invalide sur la ligne ${produit.nom}.` }, { status: 400 });
-    }
-
-    // Boisson incluse (Tacos/Barquette/Bowl/Menu Étudiant) : n'a de sens que
-    // si le produit inclut effectivement une canette.
-    const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
-    if (boissonIncluse !== null) {
-      if (!produit.canette_incluse) {
-        return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
-      }
-      if (!nomsSaveursValides.has(boissonIncluse)) {
-        return NextResponse.json(
-          { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Sans boisson (-1,50€) : le client refuse explicitement la canette
-    // incluse de cette formule — jamais déduit de `boissonIncluse === null`.
-    const sansBoisson = ligneBrute.sansBoisson === true;
-    if (sansBoisson) {
-      if (!produit.canette_incluse) {
-        return NextResponse.json(
-          { error: `Pas de canette incluse sur ${produit.nom}, rien à retirer.` },
-          { status: 400 }
-        );
-      }
-      if (produit.nom === NOM_PRODUIT_MENU_ETUDIANT) {
-        return NextResponse.json(
-          { error: `"Sans boisson" n'est pas proposé sur ${produit.nom}.` },
-          { status: 400 }
-        );
-      }
-      if (boissonIncluse !== null) {
-        return NextResponse.json(
-          { error: `Choix incohérent (saveur + sans boisson) sur ${produit.nom}.` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Différence caisse : un produit à prix libre (ex: "Plat du jour") est
-    // autorisé ici (jamais côté public), avec un prix du jour saisi par
-    // l'employé plutôt qu'un rejet.
-    let prixUnitaire = produit.prix;
-    if (prixUnitaire === null) {
-      const prixSaisi = Number(ligneBrute.prixSaisi);
-      if (!Number.isFinite(prixSaisi) || prixSaisi <= 0) {
-        return NextResponse.json({ error: `${produit.nom} est à prix libre : indique un prix du jour.` }, { status: 400 });
-      }
-      prixUnitaire = prixSaisi;
-    }
-    if (produit.canette_incluse && sansBoisson) {
-      prixUnitaire = Math.round((prixUnitaire - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
-    }
-
-    // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle
-    // qu'au site public. La salade en option payante (Tacos/Bowl) est un
-    // produit "Salade supplémentaire" comme un autre, pas de champ dédié ici.
-    let saladeIncluse: boolean | null = null;
-    if (produit.salade_incluse) {
-      if (typeof ligneBrute.saladeIncluse !== "boolean") {
-        return NextResponse.json({ error: `Choix salade requis sur ${produit.nom}.` }, { status: 400 });
-      }
-      saladeIncluse = ligneBrute.saladeIncluse;
-    } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
-      return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
-    }
-
-    // Accompagnement(s) inclus (Plats du jour) : choix obligatoire, gratuit,
-    // parmi les accompagnements actifs ET disponibles aujourd'hui pour ce
-    // produit précis — jamais "Salade", incluse automatiquement sans choix.
-    // Groupes de combinaison revérifiés ici, jamais confiance dans la seule
-    // validation client.
-    let accompagnementsInclus: string[] = [];
-    if (produit.accompagnement_inclus) {
-      const brut = Array.isArray(ligneBrute.accompagnementsInclus) ? ligneBrute.accompagnementsInclus : null;
-      if (!brut || !combinaisonAccompagnementsValide(brut)) {
-        return NextResponse.json({ error: `Choix d'accompagnement invalide sur ${produit.nom}.` }, { status: 400 });
-      }
-      const disponibles = new Set(produit.accompagnements_disponibles ?? []);
-      if (brut.some((n) => !nomsAccompagnementsValides.has(n) || !disponibles.has(n))) {
-        return NextResponse.json(
-          { error: `Accompagnement non disponible sur ${produit.nom}.` },
-          { status: 400 }
-        );
-      }
-      accompagnementsInclus = brut;
-    } else if (
-      ligneBrute.accompagnementsInclus !== undefined &&
-      Array.isArray(ligneBrute.accompagnementsInclus) &&
-      ligneBrute.accompagnementsInclus.length > 0
-    ) {
-      return NextResponse.json({ error: `Accompagnement non proposé sur ${produit.nom}.` }, { status: 400 });
-    }
-
-    const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
-    const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
-
-    // Index du plat-conteneur (mode "Commande groupée" pris au téléphone) —
-    // donnée déclarative de l'employé, aucune validation métier au-delà du
-    // type.
-    const platIndex = typeof ligneBrute.platIndex === "number" ? ligneBrute.platIndex : null;
-
-    lignes.push({
-      produitId: produit.id,
-      nom: produit.nom,
-      categorie: produit.categorie,
-      quantite,
-      prixUnitaire,
-      coutMatiereUnitaire: produit.cout_matiere,
-      viandes,
-      sauces,
-      saveurs,
-      boissonIncluse,
-      sansBoisson,
-      canetteIncluse: produit.canette_incluse,
-      saladeIncluse,
-      accompagnementsInclus,
-      pourQui,
-      platIndex,
-    });
-  }
-
-  const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
-  const nbPlats = compterPlatsGroupes(lignes);
-  const modeGroupe = lignes.some((l) => l.platIndex !== null);
-  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
-    return NextResponse.json(
-      { error: "Une commande groupée doit contenir au moins 3 plats." },
-      { status: 400 }
-    );
-  }
-  if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
-    return NextResponse.json(
-      { error: "Chaque plat doit atteindre au moins 5€ pour être validé." },
-      { status: 400 }
-    );
-  }
-
-  // Offre "commande groupée" : même règle que le site public (/api/commande)
-  // — calculée une seule fois ici, sur le montant brut.
-  const palierGroupe = palierGroupeActif(nbPlats, montantBrut);
-  if (palierGroupe === "GROUPE_4") {
-    const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
-    if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
-      return NextResponse.json(
-        { error: "Choisis un parfum disponible pour la boisson 2L offerte." },
-        { status: 400 }
-      );
-    }
-
-    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
-      .from("produits")
-      .select("id, nom, cout_matiere")
-      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
-      .eq("actif", true)
-      .maybeSingle();
-
-    if (erreurBoissonOfferte) {
-      return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
-    }
-    if (boissonOfferte) {
-      lignes.push({
-        produitId: boissonOfferte.id,
-        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
-        categorie: "boisson",
-        quantite: 1,
-        prixUnitaire: 0,
-        coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
-        viandes: [],
-        saveurs: [boissonOfferteSaveur],
-        canetteIncluse: false,
-        platIndex: null,
-      });
-    }
-  }
-
-  const coutIncomplet = lignes.some((l) => l.coutMatiereUnitaire === null);
-  const coutMatiereTotal = lignes.reduce((total, l) => total + (l.coutMatiereUnitaire ?? 0) * l.quantite, 0);
+  const { lignes, montantBrut, nbPlats, palierGroupe, coutMatiereTotal, coutIncomplet, produitParId } = validation;
 
   let recompenseAppliquee = false;
   let montant = Math.round(montantBrut * 100) / 100;
@@ -655,4 +624,192 @@ export async function POST(request: Request) {
     coutIncomplet,
     qrCode,
   });
+}
+
+/**
+ * Modifie le contenu d'une commande existante encore "en_attente" — mêmes
+ * règles de validation que la création (POST), via `validerLignesCommande`.
+ * Le canal n'est jamais modifiable ici (cf. `ModifierCommandePayload`) :
+ * `paiement_statut` et `recompense_appliquee` restent donc toujours
+ * inchangés, seul le contenu (et donc le montant) peut changer. Si la
+ * commande était déjà payée, le trigger DB `commandes_appliquer_fidelite`
+ * ajuste l'accumulation déjà créditée par la différence de montant.
+ * Le stock du jour déjà décompté est ajusté atomiquement (restitution des
+ * anciennes quantités + décompte des nouvelles, annulé en bloc si le stock
+ * est insuffisant pour la nouvelle composition).
+ */
+export async function PATCH(request: Request) {
+  const session = await requireRole(["employe"]);
+  if (!session) {
+    return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as ModifierCommandePayload | null;
+  if (!body?.commandeId || typeof body.commandeId !== "string") {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  }
+  if (!MODES_PAIEMENT_CAISSE.includes(body.modePaiement as (typeof MODES_PAIEMENT_CAISSE)[number])) {
+    return NextResponse.json({ error: "Mode de paiement invalide." }, { status: 400 });
+  }
+
+  const nom = (body.nom ?? "").trim();
+  if (!nom) {
+    return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
+  }
+  const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
+  if (!clientTelephone) {
+    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+  }
+
+  const supabase = createServiceSupabaseClient();
+
+  const { data: commandeExistante, error: erreurExistante } = await supabase
+    .from("commandes")
+    .select("id, canal, statut, contenu, montant, recompense_appliquee")
+    .eq("id", body.commandeId)
+    .maybeSingle();
+  if (erreurExistante || !commandeExistante) {
+    return NextResponse.json({ error: "Commande introuvable." }, { status: 404 });
+  }
+  if (commandeExistante.statut !== "en_attente") {
+    return NextResponse.json(
+      { error: 'Seules les commandes encore "En attente" peuvent être modifiées.' },
+      { status: 400 }
+    );
+  }
+  if (commandeExistante.recompense_appliquee) {
+    return NextResponse.json(
+      { error: "Cette commande a utilisé une récompense fidélité et ne peut pas être modifiée ici." },
+      { status: 400 }
+    );
+  }
+
+  const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
+    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande").eq("id", true).single(),
+    supabase.from("zones_livraison").select("commune").eq("actif", true),
+  ]);
+  if (erreurParametres || !parametres) {
+    return NextResponse.json({ error: "Erreur serveur (paramètres livraison)." }, { status: 500 });
+  }
+  if (erreurZones) {
+    return NextResponse.json({ error: "Erreur serveur (zones livraison)." }, { status: 500 });
+  }
+  const communesActives = new Set((zones ?? []).map((z) => z.commune));
+
+  const creneauHeure = body.creneauHeure;
+  if (typeof creneauHeure !== "string" || !creneauHeure) {
+    return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
+  }
+  if (!creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
+    return NextResponse.json(
+      {
+        error: `Créneau invalide : choisis une heure entre ${parametres.heure_debut.slice(0, 5)} et ${parametres.heure_fin.slice(0, 5)}.`,
+      },
+      { status: 400 }
+    );
+  }
+  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+  if (!heureSouhaitee) {
+    return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
+  }
+
+  let validation;
+  try {
+    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveur);
+  } catch (e) {
+    if (e instanceof ErreurValidation) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    console.error("[/api/caisse/commandes PATCH] échec validation :", e);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+  const { lignes, montantBrut, nbPlats, palierGroupe, coutMatiereTotal, coutIncomplet, produitParId } = validation;
+
+  const montant = Math.round(montantBrut * 100) / 100;
+
+  // Canal jamais modifiable ici (cf. doc du payload) — toujours celui de la
+  // commande existante.
+  const canal = commandeExistante.canal;
+  let adresse: string | null = null;
+  let zone: string | null = null;
+  if (canal === "livraison") {
+    adresse = (body.adresse ?? "").trim();
+    zone = (body.zone ?? "").trim();
+    if (!adresse) {
+      return NextResponse.json({ error: "Adresse de livraison requise." }, { status: 400 });
+    }
+    if (!zone || !communesActives.has(zone)) {
+      return NextResponse.json({ error: "Zone de livraison invalide." }, { status: 400 });
+    }
+    if (montant < parametres.minimum_commande) {
+      return NextResponse.json(
+        { error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} €.` },
+        { status: 400 }
+      );
+    }
+  }
+
+  const { error: erreurUpsertClient } = await supabase
+    .from("clients")
+    .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
+  if (erreurUpsertClient) {
+    console.error("[/api/caisse/commandes PATCH] échec upsert client :", erreurUpsertClient.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // Ajustement atomique du stock du jour : restitue les anciennes quantités
+  // (contenu avant modification) puis décompte les nouvelles, dans la même
+  // transaction — jamais de stock à moitié ajusté si la nouvelle
+  // composition dépasse ce qu'il reste.
+  const anciennesLignes = Array.isArray(commandeExistante.contenu)
+    ? (commandeExistante.contenu as { produitId?: string; quantite?: number }[])
+    : [];
+  const anciensAVerifier = new Map<string, number>();
+  for (const l of anciennesLignes) {
+    if (l.produitId && l.quantite) {
+      anciensAVerifier.set(l.produitId, (anciensAVerifier.get(l.produitId) ?? 0) + l.quantite);
+    }
+  }
+  const nouveauxAVerifier = new Map<string, number>();
+  for (const l of lignes) {
+    const produit = produitParId.get(l.produitId);
+    if (produit?.stock_jour !== null && produit?.stock_jour !== undefined) {
+      nouveauxAVerifier.set(l.produitId, (nouveauxAVerifier.get(l.produitId) ?? 0) + l.quantite);
+    }
+  }
+  if (anciensAVerifier.size > 0 || nouveauxAVerifier.size > 0) {
+    const { error: erreurStock } = await supabase.rpc("ajuster_stocks_produits", {
+      anciens: [...anciensAVerifier.entries()].map(([produitId, quantite]) => ({ produitId, quantite })),
+      nouveaux: [...nouveauxAVerifier.entries()].map(([produitId, quantite]) => ({ produitId, quantite })),
+    });
+    if (erreurStock) {
+      return NextResponse.json(
+        { error: "Un plat du jour de cette nouvelle composition n'est plus disponible en quantité suffisante." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({
+      contenu: lignes,
+      montant,
+      mode_paiement: body.modePaiement,
+      client_telephone: clientTelephone,
+      cout_matiere_total: coutMatiereTotal,
+      nom_livraison: nom,
+      adresse_livraison: adresse,
+      zone_livraison: zone,
+      heure_souhaitee: heureSouhaitee.toISOString(),
+      nb_plats: nbPlats,
+      palier_groupe: palierGroupe,
+    })
+    .eq("id", body.commandeId);
+  if (erreurMaj) {
+    console.error("[/api/caisse/commandes PATCH] échec mise à jour :", erreurMaj.message);
+    return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, commandeId: body.commandeId, montant, coutMatiereTotal, coutIncomplet });
 }

@@ -475,6 +475,10 @@ export interface Database {
         Args: { items: { produitId: string; quantite: number }[] };
         Returns: void;
       };
+      ajuster_stocks_produits: {
+        Args: { anciens: { produitId: string; quantite: number }[]; nouveaux: { produitId: string; quantite: number }[] };
+        Returns: void;
+      };
     };
     Enums: {};
     CompositeTypes: {};

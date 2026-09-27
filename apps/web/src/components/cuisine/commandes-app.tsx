@@ -346,12 +346,20 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 </div>
               )}
               {commande.statut === "en_attente" && (
-                <button
-                  onClick={() => demanderAnnulation(commande.id)}
-                  className="mt-2 w-full rounded border border-red-600 py-2 text-base font-semibold text-red-600"
-                >
-                  Annuler la commande
-                </button>
+                <div className="mt-2 flex gap-2">
+                  <a
+                    href={`/caisse?modifier=${commande.id}`}
+                    className="flex-1 rounded border border-gray-400 py-2 text-center text-base font-semibold text-gray-700"
+                  >
+                    Modifier
+                  </a>
+                  <button
+                    onClick={() => demanderAnnulation(commande.id)}
+                    className="flex-1 rounded border border-red-600 py-2 text-base font-semibold text-red-600"
+                  >
+                    Annuler la commande
+                  </button>
+                </div>
               )}
             </div>
           );

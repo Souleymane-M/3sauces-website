@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Canal, ModePaiement } from "@3sauces/supabase";
 import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse, LigneCommande } from "@/lib/caisse/types";
+import type { CommandeAModifier } from "@/lib/caisse/modification";
 import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
@@ -70,6 +72,8 @@ interface CaisseAppProps {
   parametres: ParametresLivraisonPublic;
   imprimantesInitiales: ImprimanteAdmin[];
   nomEmploye: string;
+  /** Présent uniquement quand /caisse est ouvert via `?modifier=<id>` — bascule tout l'écran en mode édition d'une commande déjà "en_attente" plutôt qu'en prise de commande. */
+  commandeExistante?: CommandeAModifier | null;
 }
 
 // Clés localStorage du polling des commandes en ligne : persistées pour que
@@ -150,10 +154,68 @@ export function CaisseApp({
   parametres,
   imprimantesInitiales,
   nomEmploye,
+  commandeExistante,
 }: CaisseAppProps) {
-  const [modeCommande, setModeCommande] = useState<ModeCommande>(null);
-  const [panierSimple, setPanierSimple] = useState<LignePanier[]>([]);
-  const [plats, setPlats] = useState<PlatGroupeCaisse[]>(() => [platVide(1)]);
+  const router = useRouter();
+  const enModeEdition = commandeExistante != null;
+
+  /**
+   * Convertit une ligne persistée (`commandes.contenu`) en ligne de panier en
+   * retrouvant le produit courant du catalogue. La ligne "Boisson 2L
+   * (offerte)" est exclue : elle est régénérée automatiquement côté serveur
+   * selon le palier groupée recalculé, jamais éditée à la main.
+   */
+  function ligneDepuisCommande(l: LigneCommande): LignePanier | null {
+    if (l.nom === NOM_PRODUIT_BOISSON_OFFERTE) return null;
+    const produit = produits.find((p) => p.id === l.produitId);
+    if (!produit) return null;
+    return {
+      id: `${l.produitId}-${Date.now()}-${Math.random()}`,
+      produit,
+      quantite: l.quantite,
+      viandes: l.viandes,
+      sauces: l.sauces ?? [],
+      saveurs: l.saveurs ?? [],
+      boissonIncluse: l.boissonIncluse ?? null,
+      sansBoisson: l.sansBoisson ?? false,
+      prixSaisi: produit.prix === null ? l.prixUnitaire : undefined,
+      saladeIncluse: l.saladeIncluse ?? null,
+      accompagnementsInclus: l.accompagnementsInclus ?? [],
+    };
+  }
+
+  const [modeCommande, setModeCommande] = useState<ModeCommande>(() => {
+    if (!enModeEdition) return null;
+    return commandeExistante.lignes.some((l) => l.platIndex !== null) ? "groupee" : "simple";
+  });
+  const [panierSimple, setPanierSimple] = useState<LignePanier[]>(() => {
+    if (!enModeEdition) return [];
+    return commandeExistante.lignes
+      .filter((l) => l.platIndex === null)
+      .map(ligneDepuisCommande)
+      .filter((l): l is LignePanier => l !== null);
+  });
+  const [plats, setPlats] = useState<PlatGroupeCaisse[]>(() => {
+    if (enModeEdition) {
+      const parIndex = new Map<number, LigneCommande[]>();
+      for (const l of commandeExistante.lignes) {
+        if (l.platIndex === null) continue;
+        const liste = parIndex.get(l.platIndex) ?? [];
+        liste.push(l);
+        parIndex.set(l.platIndex, liste);
+      }
+      if (parIndex.size > 0) {
+        return [...parIndex.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([index, lignesBrutes]) => ({
+            id: `plat-${index}-${Date.now()}-${Math.random()}`,
+            pourQui: lignesBrutes[0]?.pourQui ?? "",
+            lignes: lignesBrutes.map(ligneDepuisCommande).filter((l): l is LignePanier => l !== null),
+          }));
+      }
+    }
+    return [platVide(1)];
+  });
   const [platDeplie, setPlatDeplie] = useState<string | null>(plats[0]?.id ?? null);
   const [platActifId, setPlatActifId] = useState<string>(plats[0].id);
 
@@ -163,16 +225,21 @@ export function CaisseApp({
   // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
   // sont possibles, sinon appliqué directement.
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanier | null>(null);
-  const [canal, setCanal] = useState<Canal>("sur_place");
+  const [canal, setCanal] = useState<Canal>(() => commandeExistante?.canal ?? "sur_place");
   const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
 
   // Restauration du panier après un rechargement accidentel de l'iPad : on
   // ne persiste qu'après cette première lecture (`pretPourPersistance`),
   // sinon le tout premier effet d'écriture, qui s'exécute avant que les
   // `setState` de restauration ci-dessous n'aient été pris en compte,
-  // écraserait le panier sauvegardé avec un panier vide.
+  // écraserait le panier sauvegardé avec un panier vide. En mode édition, on
+  // ignore entièrement ce mécanisme : ni lecture (le panier vient de la
+  // commande à modifier, jamais d'un panier comptoir resté en session), ni
+  // écriture (on ne veut pas polluer le panier comptoir normal avec le
+  // contenu en cours d'édition).
   const [pretPourPersistance, setPretPourPersistance] = useState(false);
   useEffect(() => {
+    if (enModeEdition) return;
     // Différé en microtâche : lire sessionStorage et restaurer l'état sont
     // deux opérations distinctes, jamais un simple calcul synchrone de
     // rendu — le report en microtâche évite les rendus en cascade au
@@ -195,10 +262,11 @@ export function CaisseApp({
       }
       setPretPourPersistance(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!pretPourPersistance) return;
+    if (enModeEdition || !pretPourPersistance) return;
     try {
       sessionStorage.setItem(
         CLE_PANIER_CAISSE,
@@ -207,10 +275,20 @@ export function CaisseApp({
     } catch {
       // Stockage plein ou indisponible : la session continue simplement sans persistance.
     }
-  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur]);
+  }, [
+    enModeEdition,
+    pretPourPersistance,
+    modeCommande,
+    panierSimple,
+    plats,
+    platDeplie,
+    platActifId,
+    canal,
+    boissonOfferteSaveur,
+  ]);
 
-  const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
-  const [telephone, setTelephone] = useState("");
+  const [modePaiement, setModePaiement] = useState<ModePaiement>(() => commandeExistante?.modePaiement ?? "especes");
+  const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const [appliquerRecompense, setAppliquerRecompense] = useState(false);
@@ -233,10 +311,12 @@ export function CaisseApp({
     () => genererCreneaux(parametres.heureDebut, parametres.heureFin),
     [parametres.heureDebut, parametres.heureFin]
   );
-  const [creneauHeure, setCreneauHeure] = useState(() => prochainCreneauValide(creneauxValides));
-  const [nom, setNom] = useState("");
-  const [adresse, setAdresse] = useState("");
-  const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
+  const [creneauHeure, setCreneauHeure] = useState(
+    () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
+  );
+  const [nom, setNom] = useState(() => commandeExistante?.nom ?? "");
+  const [adresse, setAdresse] = useState(() => commandeExistante?.adresse ?? "");
+  const [zone, setZone] = useState(() => commandeExistante?.zone ?? parametres.zonesActives[0] ?? "");
 
   // Impression thermique (comptoir + cuisine) : la config réseau est
   // re-récupérée juste avant chaque impression (pas seulement au chargement)
@@ -720,43 +800,26 @@ export function CaisseApp({
     }
   }
 
-  async function encaisser() {
-    if (panierActuel.length === 0) return;
+  /** Vérifications communes à l'encaissement et à la modification — jamais de commande groupée sous le seuil, ni de plat sous 5€. */
+  function validerPanierAvantEnvoi(): string | null {
     if (enModeGroupe && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) {
-      setErreur("Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.");
-      return;
+      return "Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.";
     }
     if (enModeGroupe) {
       const platsValides = plats.filter((p) => p.lignes.length > 0);
       const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
       if (indexPlatSousLeSeuil !== -1) {
-        setErreur(
-          `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`
-        );
-        return;
+        return `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`;
       }
     }
-    setEnvoiEnCours(true);
-    setErreur(null);
-    try {
-      const lignesPayload = enModeGroupe
-        ? plats.flatMap((plat, index) =>
-            plat.lignes.map((l) => ({
-              produitId: l.produit.id,
-              quantite: l.quantite,
-              viandes: l.viandes,
-              sauces: l.sauces,
-              saveurs: l.saveurs,
-              boissonIncluse: l.boissonIncluse,
-              sansBoisson: l.sansBoisson,
-              prixSaisi: l.prixSaisi,
-              saladeIncluse: l.saladeIncluse,
-              accompagnementsInclus: l.accompagnementsInclus,
-              platIndex: index,
-              pourQui: plat.pourQui.trim() || null,
-            }))
-          )
-        : panierSimple.map((l) => ({
+    return null;
+  }
+
+  /** Même transformation panier → payload pour la création (POST) et la modification (PATCH) — seule la requête HTTP diffère ensuite. */
+  function construireLignesPayload() {
+    return enModeGroupe
+      ? plats.flatMap((plat, index) =>
+          plat.lignes.map((l) => ({
             produitId: l.produit.id,
             quantite: l.quantite,
             viandes: l.viandes,
@@ -767,9 +830,37 @@ export function CaisseApp({
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
-            platIndex: null,
-            pourQui: null,
-          }));
+            platIndex: index,
+            pourQui: plat.pourQui.trim() || null,
+          }))
+        )
+      : panierSimple.map((l) => ({
+          produitId: l.produit.id,
+          quantite: l.quantite,
+          viandes: l.viandes,
+          sauces: l.sauces,
+          saveurs: l.saveurs,
+          boissonIncluse: l.boissonIncluse,
+          sansBoisson: l.sansBoisson,
+          prixSaisi: l.prixSaisi,
+          saladeIncluse: l.saladeIncluse,
+          accompagnementsInclus: l.accompagnementsInclus,
+          platIndex: null,
+          pourQui: null,
+        }));
+  }
+
+  async function encaisser() {
+    if (panierActuel.length === 0) return;
+    const erreurValidation = validerPanierAvantEnvoi();
+    if (erreurValidation) {
+      setErreur(erreurValidation);
+      return;
+    }
+    setEnvoiEnCours(true);
+    setErreur(null);
+    try {
+      const lignesPayload = construireLignesPayload();
 
       const reponse = await fetch("/api/caisse/commandes", {
         method: "POST",
@@ -844,6 +935,53 @@ export function CaisseApp({
       setAppliquerRecompense(false);
       setNom("");
       setAdresse("");
+    } catch {
+      setErreur("Erreur réseau, réessaie.");
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  }
+
+  /**
+   * Enregistre les modifications d'une commande existante (PATCH) — jamais
+   * de canal ni de récompense fidélité dans le payload (verrouillés côté
+   * serveur, cf. lib/caisse/modification.ts), et pas d'impression ni d'écran
+   * de confirmation avec ticket : on revient simplement sur /commandes une
+   * fois enregistré.
+   */
+  async function enregistrerModification() {
+    if (!commandeExistante || panierActuel.length === 0) return;
+    const erreurValidation = validerPanierAvantEnvoi();
+    if (erreurValidation) {
+      setErreur(erreurValidation);
+      return;
+    }
+    setEnvoiEnCours(true);
+    setErreur(null);
+    try {
+      const lignesPayload = construireLignesPayload();
+
+      const reponse = await fetch("/api/caisse/commandes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commandeId: commandeExistante.id,
+          modePaiement,
+          clientTelephone: telephone.trim(),
+          boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
+          creneauHeure,
+          nom: nom.trim(),
+          adresse: canal === "livraison" ? adresse.trim() : undefined,
+          zone: canal === "livraison" ? zone : undefined,
+          lignes: lignesPayload,
+        }),
+      });
+      const data = await reponse.json();
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Échec de la modification.");
+        return;
+      }
+      router.push("/commandes");
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -968,13 +1106,28 @@ export function CaisseApp({
         </div>
       ) : (
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={retourChoixMode}
-            className="text-sm font-semibold text-gray-500 underline"
-          >
-            ← Changer de mode ({enModeGroupe ? "commande groupée" : "commande simple"})
-          </button>
+          {enModeEdition ? (
+            <div className="flex items-center justify-between rounded-lg border border-[#8B2020] bg-[#8B2020]/5 px-3 py-2">
+              <p className="text-sm font-semibold text-[#8B2020]">
+                ✏️ Modification de la commande n°{commandeExistante.numero}
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/commandes")}
+                className="text-sm font-semibold text-gray-500 underline"
+              >
+                Annuler la modification
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={retourChoixMode}
+              className="text-sm font-semibold text-gray-500 underline"
+            >
+              ← Changer de mode ({enModeGroupe ? "commande groupée" : "commande simple"})
+            </button>
+          )}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
@@ -1316,7 +1469,8 @@ export function CaisseApp({
               <div className="mt-1 grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setCanal("sur_place")}
-                  className={`rounded border py-2 text-xs font-bold uppercase ${
+                  disabled={enModeEdition}
+                  className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
                 >
@@ -1324,7 +1478,8 @@ export function CaisseApp({
                 </button>
                 <button
                   onClick={() => setCanal("emporter")}
-                  className={`rounded border py-2 text-xs font-bold uppercase ${
+                  disabled={enModeEdition}
+                  className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
                 >
@@ -1332,14 +1487,19 @@ export function CaisseApp({
                 </button>
                 <button
                   onClick={() => setCanal("livraison")}
-                  disabled={!livraisonPossible}
-                  className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-30 ${
+                  disabled={enModeEdition || !livraisonPossible}
+                  className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
                 >
                   Livraison
                 </button>
               </div>
+              {enModeEdition && (
+                <p className="mt-2 text-xs text-gray-400">
+                  Canal non modifiable ici — pour en changer, annule la commande et recrée-la.
+                </p>
+              )}
               {canal === "livraison" && !minimumAtteint && (
                 <p className="mt-2 text-xs text-orange-600">
                   Minimum {parametres.minimumCommande.toFixed(2)} € pour la livraison — ajoute des articles ou choisis
@@ -1412,7 +1572,7 @@ export function CaisseApp({
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
             <button
-              onClick={encaisser}
+              onClick={enModeEdition ? enregistrerModification : encaisser}
               disabled={
                 panierActuel.length === 0 ||
                 envoiEnCours ||
@@ -1423,7 +1583,13 @@ export function CaisseApp({
               }
               className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
             >
-              {envoiEnCours ? "Envoi…" : canal === "livraison" ? "Valider la commande" : "Encaisser"}
+              {envoiEnCours
+                ? "Envoi…"
+                : enModeEdition
+                  ? "Enregistrer les modifications"
+                  : canal === "livraison"
+                    ? "Valider la commande"
+                    : "Encaisser"}
             </button>
           </div>
           </div>
