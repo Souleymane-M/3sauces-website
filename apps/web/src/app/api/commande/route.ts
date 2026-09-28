@@ -7,6 +7,7 @@ import {
   creneauDansPlage,
   dateIsoValide,
   dateMayotteIso,
+  heureActuelleMayotteMinutes,
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import { limiterDebit } from "@/lib/auth/rate-limit";
@@ -512,7 +513,7 @@ export async function POST(request: Request) {
   // palier_groupe) — la boisson offerte s'applique quel que soit le canal,
   // sans aucune limite horaire. Seule la priorité (badge affiché côté UI)
   // reste propre à la livraison.
-  const palierGroupe = palierGroupeActif(nbPlats, montant);
+  const palierGroupe = palierGroupeActif(nbPlats, montant, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
     if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {

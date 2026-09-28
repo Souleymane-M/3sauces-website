@@ -13,7 +13,12 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
-import { genererCreneaux, prochainCreneauValide, construireHeureSouhaiteeUtc } from "@/lib/commande-publique/creneau";
+import {
+  genererCreneaux,
+  prochainCreneauValide,
+  construireHeureSouhaiteeUtc,
+  heureActuelleMayotteMinutes,
+} from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
@@ -36,6 +41,7 @@ import {
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
+  palierGroupeSelonQuantite,
   messageProgressionBoissonOfferte,
 } from "@/lib/commande-publique/groupe-priorite";
 
@@ -546,7 +552,10 @@ export function CaisseApp({
   const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
   const minimumAtteint = total >= parametres.minimumCommande;
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total);
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, heureActuelleMayotteMinutes());
+  // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
+  // (après 11h) — message dédié, distinct de "il manque des plats/€".
+  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbPlatsValides, total) !== null;
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
@@ -1244,10 +1253,10 @@ export function CaisseApp({
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
               <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                <p className="text-sm font-bold">🚀 Commande groupée</p>
+                <p className="text-sm font-bold">🚀 Commande groupée, avant 11h</p>
                 <p className="text-xs text-white/90">
-                  4 plats dès {SEUIL_GROUPE_4_MONTANT}€ → boisson 2L offerte, quel que soit le canal.
-                  {canal === "livraison" && <> Dès 3 plats/{SEUIL_GROUPE_3_MONTANT}€ → priorité en plus.</>}
+                  3 plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
+                  <br />4 plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
                 </p>
               </div>
 
@@ -1325,6 +1334,13 @@ export function CaisseApp({
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
                     (() => {
+                      if (groupeTropTard) {
+                        return (
+                          <p className="mt-2 text-sm font-semibold text-orange-600">
+                            Trop tard pour aujourd&apos;hui — la commande groupée doit être passée avant 11h.
+                          </p>
+                        );
+                      }
                       // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
                       // la priorité reste propre à la livraison.
                       if (canal !== "livraison") {

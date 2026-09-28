@@ -18,12 +18,21 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
-import { creneauxPourDate, prochainesDatesOuvertes, dateMayotteIso } from "@/lib/commande-publique/creneau";
+import {
+  creneauxPourDate,
+  prochainesDatesOuvertes,
+  dateMayotteIso,
+  heureActuelleMayotteMinutes,
+} from "@/lib/commande-publique/creneau";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
+  SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
+  SEUIL_GROUPE_4_PLATS,
+  SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
+  palierGroupeSelonQuantite,
   messageProgressionBoissonOfferte,
 } from "@/lib/commande-publique/groupe-priorite";
 import { FooterLegal } from "@/components/legal/footer-legal";
@@ -291,7 +300,10 @@ export function CommandePubliqueApp({
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
   // Le palier (quantité/montant) est le même quel que soit le canal — seule
   // la priorité livraison, gérée à l'affichage ci-dessous, dépend du canal.
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total);
+  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, heureActuelleMayotteMinutes());
+  // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
+  // (après 11h) — message dédié, distinct de "il manque des plats/€".
+  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbPlatsValides, total) !== null;
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -796,7 +808,12 @@ export function CommandePubliqueApp({
           </div>
         )}
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
-          <p className="font-bold">🚀 Commandez à plusieurs : boisson 2L offerte + livraison prioritaire</p>
+          <p className="font-bold">🚀 Commandez à plusieurs, avant 11h :</p>
+          <p className="mt-1 text-sm text-white/90">
+            {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
+            <br />
+            {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
+          </p>
         </div>
 
         {modeCommande === null ? (
@@ -1063,6 +1080,13 @@ export function CommandePubliqueApp({
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
                     (() => {
+                      if (groupeTropTard) {
+                        return (
+                          <p className="text-sm font-semibold text-orange-600">
+                            Trop tard pour aujourd&apos;hui — la commande groupée doit être passée avant 11h.
+                          </p>
+                        );
+                      }
                       // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
                       // la priorité livraison, elle, reste propre à ce canal.
                       if (canal !== "livraison") {

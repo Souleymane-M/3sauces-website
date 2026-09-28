@@ -7,7 +7,7 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
-import { construireHeureSouhaiteeUtc, creneauDansPlage } from "@/lib/commande-publique/creneau";
+import { construireHeureSouhaiteeUtc, creneauDansPlage, heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
@@ -291,7 +291,7 @@ async function validerLignesCommande(
 
   // Offre "commande groupée" : même règle que le site public (/api/commande)
   // — calculée une seule fois ici, sur le montant brut.
-  const palierGroupe = palierGroupeActif(nbPlats, montantBrut);
+  const palierGroupe = palierGroupeActif(nbPlats, montantBrut, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
     const boissonOfferteSaveur = typeof boissonOfferteSaveurBrut === "string" ? boissonOfferteSaveurBrut : null;
     if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
