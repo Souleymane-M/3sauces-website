@@ -7,11 +7,17 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
-import { construireHeureSouhaiteeUtc, creneauDansPlage, heureActuelleMayotteMinutes } from "@/lib/commande-publique/creneau";
+import {
+  construireHeureSouhaiteeUtc,
+  creneauDansPlage,
+  dateMayotteIso,
+  heureActuelleMayotteMinutes,
+} from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
@@ -664,7 +670,7 @@ export async function PATCH(request: Request) {
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")
-    .select("id, canal, statut, contenu, montant, recompense_appliquee")
+    .select("id, canal, statut, contenu, montant, recompense_appliquee, commande_par")
     .eq("id", body.commandeId)
     .maybeSingle();
   if (erreurExistante || !commandeExistante) {
@@ -684,7 +690,11 @@ export async function PATCH(request: Request) {
   }
 
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
-    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande").eq("id", true).single(),
+    supabase
+      .from("parametres_livraison")
+      .select("heure_debut, heure_fin, minimum_commande, remise_lancement_debut, remise_lancement_fin")
+      .eq("id", true)
+      .single(),
     supabase.from("zones_livraison").select("commune").eq("actif", true),
   ]);
   if (erreurParametres || !parametres) {
@@ -724,7 +734,19 @@ export async function PATCH(request: Request) {
   }
   const { lignes, montantBrut, nbPlats, palierGroupe, coutMatiereTotal, coutIncomplet, produitParId } = validation;
 
-  const montant = Math.round(montantBrut * 100) / 100;
+  // La remise de lancement doit survivre à une modification : sans ça, un
+  // employé qui corrige juste une commande passée sur le site public en
+  // ferait perdre le bénéfice au client, sans que rien ne le signale.
+  // Jamais recréée sur une commande créée en caisse (`commande_par` non
+  // nul) — jamais éligible à la remise, comme à la création.
+  let montant = Math.round(montantBrut * 100) / 100;
+  if (
+    commandeExistante.commande_par === null &&
+    remiseLancementActive(parametres.remise_lancement_debut, parametres.remise_lancement_fin, dateMayotteIso()) &&
+    montant >= SEUIL_REMISE_LANCEMENT
+  ) {
+    montant = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
+  }
 
   // Canal jamais modifiable ici (cf. doc du payload) — toujours celui de la
   // commande existante.
