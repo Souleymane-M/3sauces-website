@@ -1425,6 +1425,11 @@ export function CommandePubliqueApp({
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
+          quantiteMax={
+            produitEnSelection.stockJour !== null
+              ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
+              : undefined
+          }
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(
             viandesChoisies,
@@ -1434,7 +1439,8 @@ export function CommandePubliqueApp({
             saladeIncluse,
             saladeOption,
             accompagnementsInclus,
-            sansBoisson
+            sansBoisson,
+            quantite
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1442,7 +1448,7 @@ export function CommandePubliqueApp({
               saucesChoisies,
               [],
               boissonIncluse,
-              1,
+              quantite,
               saladeIncluse,
               accompagnementsInclus,
               sansBoisson

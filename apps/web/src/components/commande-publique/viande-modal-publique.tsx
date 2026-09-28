@@ -41,10 +41,15 @@ interface ViandeModalPubliqueProps {
     saladeIncluse: boolean | null,
     saladeOption: boolean,
     accompagnementsInclus: string[],
-    sansBoisson: boolean
+    sansBoisson: boolean,
+    quantite: number
   ) => void;
   onAnnuler: () => void;
+  /** Plafond de quantité sélectionnable — stock du jour restant (déjà net de ce qui est présent au panier) si limité, 20 sinon. */
+  quantiteMax?: number;
 }
+
+const QUANTITE_MAX_DEFAUT = 20;
 
 /**
  * Configurateur public (Menu Collégien / Menu Étudiant / Tacos / Barquette /
@@ -72,7 +77,9 @@ export function ViandeModalPublique({
   produitSauceSupplementaire,
   onValider,
   onAnnuler,
+  quantiteMax = QUANTITE_MAX_DEFAUT,
 }: ViandeModalPubliqueProps) {
+  const [quantite, setQuantite] = useState(1);
   const [viandesChoisies, setViandesChoisies] = useState<string[]>([]);
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
@@ -153,6 +160,31 @@ export function ViandeModalPublique({
           </button>
         </div>
         {produit.description && <p className="text-sm text-gray-500">{produit.description}</p>}
+
+        <div className="mt-4 flex items-center justify-center gap-5">
+          <button
+            type="button"
+            onClick={() => setQuantite((q) => Math.max(1, q - 1))}
+            disabled={quantite <= 1}
+            aria-label="Retirer une unité"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 text-xl font-bold text-gray-700 disabled:opacity-30"
+          >
+            −
+          </button>
+          <span className="w-10 text-center text-2xl font-bold text-gray-900">{quantite}</span>
+          <button
+            type="button"
+            onClick={() => setQuantite((q) => Math.min(quantiteMax, q + 1))}
+            disabled={quantite >= quantiteMax}
+            aria-label="Ajouter une unité"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 text-xl font-bold text-gray-700 disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
+        {quantiteMax < QUANTITE_MAX_DEFAUT && (
+          <p className="mt-1 text-center text-xs text-gray-400">Stock du jour : {quantiteMax} restant(s)</p>
+        )}
 
         {produit.viandeImposee && (
           <p className="mt-3 rounded bg-gray-100 px-3 py-2 text-sm text-gray-700">
@@ -470,7 +502,8 @@ export function ViandeModalPublique({
                 produit.saladeIncluse ? saladeGardee : null,
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
-                proposeSansBoisson && sansBoisson
+                proposeSansBoisson && sansBoisson,
+                quantite
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

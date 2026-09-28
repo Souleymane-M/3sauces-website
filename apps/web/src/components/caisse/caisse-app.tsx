@@ -1711,6 +1711,11 @@ export function CaisseApp({
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
+          quantiteMax={
+            produitEnSelection.stockJour !== null
+              ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
+              : undefined
+          }
           onAnnuler={() => setProduitEnSelection(null)}
           onValider={(
             viandesChoisies,
@@ -1720,7 +1725,8 @@ export function CaisseApp({
             saladeIncluse,
             saladeOption,
             accompagnementsInclus,
-            sansBoisson
+            sansBoisson,
+            quantite
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1728,7 +1734,7 @@ export function CaisseApp({
               saucesChoisies,
               [],
               boissonIncluse,
-              1,
+              quantite,
               undefined,
               saladeIncluse,
               accompagnementsInclus,
