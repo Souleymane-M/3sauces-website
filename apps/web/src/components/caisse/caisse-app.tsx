@@ -622,6 +622,17 @@ export function CaisseApp({
       accompagnementsInclus,
     });
 
+    // Avertit plutôt que d'ajuster silencieusement — un ajout refusé ou
+    // réduit sans explication ressemblerait à un bug côté caisse.
+    const stockRestantAvantAjout = produit.stockJour !== null ? plafonnerQuantite(produit, null, produit.stockJour) : null;
+    if (stockRestantAvantAjout !== null && quantite > stockRestantAvantAjout) {
+      window.alert(
+        stockRestantAvantAjout > 0
+          ? `Il ne reste que ${stockRestantAvantAjout} ${produit.nom} disponible(s) aujourd'hui (déjà dans le panier compris).`
+          : `${produit.nom} est épuisé pour aujourd'hui, ou déjà entièrement dans le panier.`
+      );
+    }
+
     if (enModeGroupe) {
       setErreurPlat(null);
       setPlats((precedent) => {
@@ -630,9 +641,15 @@ export function CaisseApp({
         const copie = [...precedent];
         const actif = copie[cible];
         const existante = actif.lignes.find(cle);
-        const lignes = existante
-          ? actif.lignes.map((l) => (l === existante ? { ...l, quantite: quantitePlafonnee(l, l.quantite + quantite) } : l))
-          : [...actif.lignes, nouvelleLigne()];
+        let lignes: LignePanier[];
+        if (existante) {
+          lignes = actif.lignes.map((l) =>
+            l === existante ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite) } : l
+          );
+        } else {
+          const quantiteAjoutee = plafonnerQuantite(produit, null, quantite);
+          lignes = quantiteAjoutee > 0 ? [...actif.lignes, { ...nouvelleLigne(), quantite: quantiteAjoutee }] : actif.lignes;
+        }
         copie[cible] = { ...actif, lignes };
         return copie;
       });
@@ -644,10 +661,11 @@ export function CaisseApp({
       const existante = precedent.find(cle);
       if (existante) {
         return precedent.map((l) =>
-          l === existante ? { ...l, quantite: quantitePlafonnee(l, l.quantite + quantite) } : l
+          l === existante ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite) } : l
         );
       }
-      return [...precedent, nouvelleLigne()];
+      const quantiteAjoutee = plafonnerQuantite(produit, null, quantite);
+      return quantiteAjoutee > 0 ? [...precedent, { ...nouvelleLigne(), quantite: quantiteAjoutee }] : precedent;
     });
   }
 
@@ -669,11 +687,21 @@ export function CaisseApp({
     setProduitEnQuantite(produit);
   }
 
-  // Jamais au-delà du stock du jour restant, sinon "+" sur une ligne déjà au
-  // panier laisse croire à un stock illimité malgré la limite affichée
-  // ailleurs (carte produit, sélecteur de quantité).
-  function quantitePlafonnee(l: LignePanier, quantiteVoulue: number): number {
-    return l.produit.stockJour !== null ? Math.min(quantiteVoulue, l.produit.stockJour) : quantiteVoulue;
+  /**
+   * Plafonne une quantité au stock du jour RÉELLEMENT restant, en tenant
+   * compte de TOUTES les lignes déjà au panier pour ce produit — pas
+   * seulement la ligne en cours. Indispensable pour un produit à choix
+   * (ex: Poisson grillé + Frites, puis + Bananes) : sans ça, chaque variante
+   * repart d'un plafond individuel à 10 et leur somme dépasse largement le
+   * stock réel. `ligneId` exclut la ligne elle-même du décompte "déjà au
+   * panier" quand on l'augmente (sinon elle se compterait deux fois).
+   */
+  function plafonnerQuantite(produit: { id: string; stockJour: number | null }, ligneId: string | null, quantiteVoulue: number): number {
+    if (produit.stockJour === null) return quantiteVoulue;
+    const dejaAuPanier = panierActuel
+      .filter((l) => l.produit.id === produit.id && l.id !== ligneId)
+      .reduce((total, l) => total + l.quantite, 0);
+    return Math.max(0, Math.min(quantiteVoulue, produit.stockJour - dejaAuPanier));
   }
 
   function modifierQuantite(id: string, delta: number) {
@@ -682,7 +710,7 @@ export function CaisseApp({
         precedent.map((plat) => ({
           ...plat,
           lignes: plat.lignes
-            .map((l) => (l.id === id ? { ...l, quantite: quantitePlafonnee(l, l.quantite + delta) } : l))
+            .map((l) => (l.id === id ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + delta) } : l))
             .filter((l) => l.quantite > 0),
         }))
       );
@@ -690,7 +718,7 @@ export function CaisseApp({
     }
     setPanierSimple((precedent) =>
       precedent
-        .map((l) => (l.id === id ? { ...l, quantite: quantitePlafonnee(l, l.quantite + delta) } : l))
+        .map((l) => (l.id === id ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + delta) } : l))
         .filter((l) => l.quantite > 0)
     );
   }
@@ -1726,7 +1754,16 @@ export function CaisseApp({
 
       {produitEnQuantite && (
         <QuantiteModalPublique
-          produit={produitEnQuantite}
+          produit={{
+            ...produitEnQuantite,
+            // Stock affiché/plafonné dans le sélecteur = ce qu'il reste
+            // VRAIMENT compte tenu de ce que ce produit occupe déjà dans le
+            // panier (toutes variantes confondues) — jamais le stock brut.
+            stockJour:
+              produitEnQuantite.stockJour !== null
+                ? plafonnerQuantite(produitEnQuantite, null, produitEnQuantite.stockJour)
+                : null,
+          }}
           onAnnuler={() => setProduitEnQuantite(null)}
           onValider={(quantite, prixSaisi) => {
             ajouterAuPanier(
