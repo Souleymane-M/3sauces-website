@@ -316,6 +316,9 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                   <li key={i} className="text-xl text-black">
                     <span className="font-semibold">
                       {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+                    </span>{" "}
+                    <span className="text-lg text-gray-500">
+                      ({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)
                     </span>
                     {detailLigne(ligne).map((detail, j) => (
                       <div key={j} className="text-lg text-gray-700">
