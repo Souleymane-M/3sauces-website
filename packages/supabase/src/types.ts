@@ -87,7 +87,6 @@ export interface Database {
           salade_incluse: boolean;
           salade_prix_option: number | null;
           accompagnement_inclus: boolean;
-          accompagnements_disponibles: string[];
           stock_jour: number | null;
           created_at: string;
           updated_at: string;

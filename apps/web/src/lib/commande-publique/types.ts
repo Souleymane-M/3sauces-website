@@ -30,10 +30,8 @@ export interface ProduitPublic {
   saladeIncluse: boolean;
   /** Si renseigné, le configurateur propose une case "+ Salade (X€)" facultative (ex: Tacos, Tacos Bowl). Null = non proposée. */
   saladePrixOption: number | null;
-  /** Si vrai, le configurateur propose un choix gratuit obligatoire parmi les accompagnements (ex: Plats du jour) — jamais la "Salade" elle-même, incluse automatiquement sans choix quand elle fait partie de la recette. */
+  /** Si vrai, le configurateur propose un choix gratuit obligatoire parmi les accompagnements actifs aujourd'hui (ex: Plats du jour) — jamais la "Salade" elle-même, incluse automatiquement sans choix quand elle fait partie de la recette. */
   accompagnementInclus: boolean;
-  /** Accompagnements réellement disponibles aujourd'hui parmi la liste (configuré depuis /patron) — n'a de sens que si `accompagnementInclus` est vrai. */
-  accompagnementsDisponibles: string[];
   /** Quantité restante aujourd'hui (plats du jour) — null = illimité. */
   stockJour: number | null;
 }

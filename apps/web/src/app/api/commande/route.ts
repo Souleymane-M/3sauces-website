@@ -187,7 +187,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, accompagnements_disponibles, stock_jour"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, stock_jour"
     )
     .in("id", produitIds);
 
@@ -439,8 +439,7 @@ export async function POST(request: Request) {
       if (!brut || !combinaisonAccompagnementsValide(brut)) {
         return NextResponse.json({ error: `Choix d'accompagnement invalide sur ${produit.nom}.` }, { status: 400 });
       }
-      const disponibles = new Set(produit.accompagnements_disponibles ?? []);
-      if (brut.some((n) => !nomsAccompagnementsValides.has(n) || !disponibles.has(n))) {
+      if (brut.some((n) => !nomsAccompagnementsValides.has(n))) {
         return NextResponse.json(
           { error: `Accompagnement non disponible sur ${produit.nom}.` },
           { status: 400 }

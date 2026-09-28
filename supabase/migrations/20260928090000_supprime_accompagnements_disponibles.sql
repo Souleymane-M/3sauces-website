@@ -1,0 +1,11 @@
+-- Supprime la liste figée d'accompagnements par produit (introduite le
+-- 2026-09-16, migration 20260916110000). Elle obligeait le patron à cocher
+-- manuellement chaque nouvel accompagnement sur chaque plat concerné
+-- (Poisson grillé, Poulpe grillé...), source d'oubli : un accompagnement
+-- activé aujourd'hui (ex: Bananes x3) n'apparaissait pas tant que la liste
+-- du produit n'était pas mise à jour à la main. Désormais, un produit à
+-- "accompagnement inclus" propose systématiquement tous les accompagnements
+-- actuellement actifs (`produits.actif = true`, catégorie "accompagnement")
+-- — seule cette bascule globale, déjà utilisée quotidiennement, pilote la
+-- disponibilité du jour.
+alter table produits drop column if exists accompagnements_disponibles;

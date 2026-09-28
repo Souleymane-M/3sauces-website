@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type {
   ProduitConfigurable,
   ViandePublique,
@@ -94,13 +94,10 @@ export function ViandeModalPublique({
       : demandeChoixBoisson
         ? boissonChoisie
         : (saveurs[0]?.nom ?? null);
-  // Ne propose que les accompagnements réellement disponibles aujourd'hui
-  // pour CE produit (configuré depuis /patron) — jamais la liste globale.
-  const accompagnementsDuJour = useMemo(
-    () => accompagnements.filter((a) => produit.accompagnementsDisponibles.includes(a.nom)),
-    [accompagnements, produit.accompagnementsDisponibles]
-  );
-  const demandeAccompagnement = produit.accompagnementInclus && accompagnementsDuJour.length > 0;
+  // Tous les accompagnements actifs aujourd'hui (basculés depuis /patron)
+  // sont proposés — plus de liste figée par produit, qui obligeait à cocher
+  // manuellement chaque nouvel accompagnement sur chaque plat concerné.
+  const demandeAccompagnement = produit.accompagnementInclus && accompagnements.length > 0;
   const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
@@ -290,7 +287,7 @@ export function ViandeModalPublique({
               Choisis ton accompagnement (jusqu&apos;à 2 si combinables)
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {accompagnementsDuJour.map((a) => {
+              {accompagnements.map((a) => {
                 const choisi = accompagnementsChoisis.includes(a.nom);
                 const combinablesActuels = accompagnementsChoisis.filter((n) =>
                   GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(n)

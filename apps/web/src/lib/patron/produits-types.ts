@@ -34,7 +34,6 @@ export interface ProduitAdmin {
   saladeIncluse: boolean;
   saladePrixOption: number | null;
   accompagnementInclus: boolean;
-  accompagnementsDisponibles: string[];
   /** Quantité restante aujourd'hui (plats du jour) — null = illimité, saisi chaque matin par le patron. */
   stockJour: number | null;
 }
@@ -68,6 +67,5 @@ export interface ProduitAdminPatch {
   saladeIncluse?: boolean;
   saladePrixOption?: number | null;
   accompagnementInclus?: boolean;
-  accompagnementsDisponibles?: string[];
   stockJour?: number | null;
 }

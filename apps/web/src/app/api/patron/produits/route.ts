@@ -185,12 +185,6 @@ export async function PATCH(request: Request) {
   if (typeof body.accompagnementInclus === "boolean") {
     patch.accompagnementInclus = body.accompagnementInclus;
   }
-  if (Array.isArray(body.accompagnementsDisponibles)) {
-    if (body.accompagnementsDisponibles.some((n: unknown) => typeof n !== "string" || !n.trim())) {
-      return NextResponse.json({ error: "Liste d'accompagnements invalide." }, { status: 400 });
-    }
-    patch.accompagnementsDisponibles = body.accompagnementsDisponibles as string[];
-  }
   if (body.stockJour !== undefined) {
     if (body.stockJour === null || body.stockJour === "") {
       patch.stockJour = null;

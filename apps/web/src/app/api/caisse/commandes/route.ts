@@ -60,7 +60,7 @@ async function validerLignesCommande(
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, accompagnements_disponibles, stock_jour"
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, stock_jour"
     )
     .in("id", produitIds);
   if (erreurProduits) {
@@ -239,8 +239,7 @@ async function validerLignesCommande(
       if (!brut || !combinaisonAccompagnementsValide(brut)) {
         throw new ErreurValidation(`Choix d'accompagnement invalide sur ${produit.nom}.`);
       }
-      const disponibles = new Set(produit.accompagnements_disponibles ?? []);
-      if (brut.some((n) => !nomsAccompagnementsValides.has(n) || !disponibles.has(n))) {
+      if (brut.some((n) => !nomsAccompagnementsValides.has(n))) {
         throw new ErreurValidation(`Accompagnement non disponible sur ${produit.nom}.`);
       }
       accompagnementsInclus = brut;
