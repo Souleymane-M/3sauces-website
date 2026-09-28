@@ -14,6 +14,7 @@ export interface CommandeCuisine {
   statut: StatutCommande;
   lignes: LigneCommande[];
   nom: string;
+  telephone: string | null;
   adresse: string | null;
   heureSouhaitee: string | null;
   creeLe: string;

@@ -301,7 +301,12 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                   ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
                 </div>
               )}
-              {commande.nom && <p className="mt-1 text-lg text-black">Client : {commande.nom}</p>}
+              {commande.nom && (
+                <p className="mt-1 text-lg text-black">
+                  Client : {commande.nom}
+                  {commande.telephone && ` — ${commande.telephone}`}
+                </p>
+              )}
               {commande.canal === "livraison" && commande.adresse && (
                 <p className="mt-1 text-lg text-black">Adresse : {commande.adresse}</p>
               )}
