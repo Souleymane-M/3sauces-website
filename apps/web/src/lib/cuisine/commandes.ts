@@ -36,6 +36,7 @@ function versCommandeCuisine(c: {
   nb_plats: number;
   ticket_imprime_le: string | null;
   palier_groupe: string | null;
+  mode_paiement: CommandeCuisine["modePaiement"];
 }): CommandeCuisine {
   return {
     id: c.id,
@@ -46,6 +47,7 @@ function versCommandeCuisine(c: {
     nom: c.nom_livraison ?? "",
     telephone: c.client_telephone,
     adresse: c.adresse_livraison,
+    modePaiement: c.mode_paiement,
     heureSouhaitee: c.heure_souhaitee,
     creeLe: c.created_at,
     nbPlats: c.nb_plats,

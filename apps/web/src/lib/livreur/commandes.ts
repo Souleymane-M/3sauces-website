@@ -53,6 +53,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
     nbPlats: c.nb_plats,
     palierGroupe: c.palier_groupe as PalierGroupe,
+    modePaiement: c.mode_paiement,
   }));
 
   // Les livraisons ayant atteint un palier "commande groupée" en
@@ -75,11 +76,13 @@ interface DeclarationLivraison {
  * enregistrement. `paiement_statut` passe à "declare" (pas "paye") — la
  * caisse ou le patron doit encore valider manuellement, cf.
  * lib/encaissements-livraison.ts.
+ *
+ * Une commande déjà réglée en ligne (Stripe, `mode_paiement === "stripe"`)
+ * ne demande aucune déclaration de paiement : rien n'a été encaissé à la
+ * livraison, `paiement_statut` est déjà "paye" — on se contente de marquer
+ * la livraison faite, jamais de faire payer le client une seconde fois.
  */
 export async function declarerLivraison({ commandeId, livreurId, paiements }: DeclarationLivraison): Promise<void> {
-  if (paiements.length === 0) {
-    throw new Error("Au moins un paiement est requis.");
-  }
   for (const p of paiements) {
     if (!Number.isFinite(p.montant) || p.montant <= 0) {
       throw new Error("Montant de paiement invalide.");
@@ -90,7 +93,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
 
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
-    .select("id, montant, canal, statut")
+    .select("id, montant, canal, statut, mode_paiement")
     .eq("id", commandeId)
     .maybeSingle();
   if (erreurCommande || !commande) {
@@ -107,6 +110,15 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     .maybeSingle();
   if (!livraison || livraison.livreur_id !== livreurId) {
     throw new Error("Cette livraison n'est pas assignée à ce livreur.");
+  }
+
+  if (commande.mode_paiement === "stripe") {
+    await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
+    return;
+  }
+
+  if (paiements.length === 0) {
+    throw new Error("Au moins un paiement est requis.");
   }
 
   const totalDeclare = Math.round(paiements.reduce((total, p) => total + p.montant, 0) * 100) / 100;

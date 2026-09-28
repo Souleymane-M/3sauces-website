@@ -175,6 +175,11 @@ export function CommandesHistoriqueApp({
                       {libellePalierGroupe(c.palierGroupe)}
                     </span>
                   )}
+                  {c.modePaiement === "stripe" && (
+                    <span className="ml-2 rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-bold text-green-400">
+                      ✅ DÉJÀ PAYÉE EN LIGNE
+                    </span>
+                  )}
                 </summary>
                 <div className="mt-2 space-y-1 text-xs text-gray-400">
                   <p>Créée le {formaterDateHeure(c.creeLe)}</p>

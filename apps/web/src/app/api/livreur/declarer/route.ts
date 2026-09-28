@@ -19,9 +19,12 @@ export async function POST(request: Request) {
   if (!body?.commandeId || typeof body.commandeId !== "string") {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
-  if (!Array.isArray(body.paiements) || body.paiements.length === 0) {
-    return NextResponse.json({ error: "Au moins un paiement est requis." }, { status: 400 });
+  if (!Array.isArray(body.paiements)) {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
+  // Un tableau vide est légitime pour une commande déjà réglée en ligne
+  // (Stripe) — `declarerLivraison` revérifie lui-même le mode de paiement
+  // réel de la commande avant d'accepter cette absence de paiement.
 
   const paiements: PaiementDeclare[] = [];
   for (const p of body.paiements) {

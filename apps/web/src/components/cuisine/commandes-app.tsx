@@ -296,6 +296,12 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 </span>
                 <span className="text-lg text-black">{LIBELLES_STATUT[commande.statut]}</span>
               </div>
+              {commande.modePaiement === "stripe" && (
+                <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
+                  <p className="text-xl font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+                  <p className="text-base font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
+                </div>
+              )}
               {commande.commandeAvance && !commande.ticketImprimeLe && (
                 <div className="mt-2 rounded bg-amber-100 p-2 text-base font-semibold text-amber-900">
                   ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.

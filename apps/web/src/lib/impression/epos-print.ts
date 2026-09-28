@@ -140,6 +140,12 @@ export function construireTicketClientXml(
 
   xml += ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
   xml += ligne(`Commande ${formaterNumeroTicket(commande.numero)}`, { align: "center", gras: true });
+
+  if (commande.modePaiement === "stripe") {
+    xml += ligne("*** DEJA PAYEE EN LIGNE ***", { align: "center", gras: true, taille: 2 });
+    xml += ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
+  }
+
   xml += styleTexte({ align: "left", gras: false, taille: 1 });
   xml += ligne(formaterDateHeure(commande.creeLe));
   xml += ligne(`Client : ${commande.nom}`);
@@ -167,7 +173,10 @@ export function construireTicketClientXml(
     xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`);
   }
 
-  xml += ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`);
+  xml += ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.modePaiement === "stripe" });
+  if (commande.modePaiement === "stripe") {
+    xml += ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
+  }
 
   if (commande.canal === "livraison" && commande.qrCode) {
     xml += `<feed line="1"/>`;
@@ -193,6 +202,9 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
     xml += ligne("*** PRIORITAIRE ***", { align: "center", gras: true, taille: 2 });
   }
   xml += ligne(`Commande #${commande.numero}`, { align: "center", gras: true, taille: 2 });
+  if (commande.modePaiement === "stripe") {
+    xml += ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true });
+  }
   if (commande.heureSouhaitee) {
     xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`, { align: "center", gras: true });
   }

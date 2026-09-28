@@ -13,6 +13,8 @@ export interface LivraisonAssignee {
   nbPlats: number;
   /** Palier de l'offre "commande groupée" atteint à la soumission, null sinon. */
   palierGroupe: PalierGroupe;
+  /** "stripe" = déjà réglée en ligne — rien à encaisser, jamais redemander de paiement au client. */
+  modePaiement: ModePaiement | null;
 }
 
 export interface PaiementDeclare {

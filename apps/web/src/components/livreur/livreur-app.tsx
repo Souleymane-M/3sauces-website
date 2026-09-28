@@ -188,9 +188,26 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
               </ul>
             )}
 
-            <p className="mt-2 text-2xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
+            {livraison.modePaiement === "stripe" ? (
+              <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-3 text-center">
+                <p className="text-xl font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+                <p className="text-base font-semibold text-[#2D5A27]">Rien à récupérer — ne rien demander au client</p>
+              </div>
+            ) : (
+              <p className="mt-2 text-2xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
+            )}
 
-            {!declaration && (
+            {!declaration && livraison.modePaiement === "stripe" && (
+              <button
+                onClick={() => envoyer(livraison, [])}
+                disabled={enCours === livraison.id}
+                className="mt-4 w-full rounded bg-[#2D5A27] py-3 text-xl font-bold text-white disabled:opacity-40"
+              >
+                Marquer comme livrée
+              </button>
+            )}
+
+            {!declaration && livraison.modePaiement !== "stripe" && (
               <button
                 onClick={() => ouvrirDeclaration(livraison.id)}
                 className="mt-4 w-full rounded bg-[#8B2020] py-3 text-xl font-bold text-white"
