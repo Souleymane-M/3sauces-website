@@ -223,8 +223,14 @@ export function CommandePubliqueApp({
 
   const sections = useMemo<Section[]>(() => {
     const snacking = produits.filter((p) => p.categorie === "snacking");
-    const tacos = snacking.filter((p) => p.nom.includes("Tacos") && !p.nom.includes("Bowl"));
-    const barquettesBowls = snacking.filter((p) => p.nom.includes("Barquette") || p.nom.includes("Bowl"));
+    // Insensible à la casse : un nom saisi tout en majuscules depuis /patron
+    // (ex: "TACOS DU CHEF") ne doit jamais disparaître silencieusement de
+    // toute la page faute de correspondance exacte.
+    const nomMinuscule = (p: (typeof snacking)[number]) => p.nom.toLowerCase();
+    const tacos = snacking.filter((p) => nomMinuscule(p).includes("tacos") && !nomMinuscule(p).includes("bowl"));
+    const barquettesBowls = snacking.filter(
+      (p) => nomMinuscule(p).includes("barquette") || nomMinuscule(p).includes("bowl")
+    );
 
     const liste: Omit<Section, "couleur">[] = [
       { key: "tacos", titre: "Tacos", produits: tacos },
