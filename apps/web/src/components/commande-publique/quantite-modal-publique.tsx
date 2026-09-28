@@ -32,6 +32,9 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
   const prixUnitaire = produit.prix ?? Number(prixSaisi.replace(",", "."));
   const prixValide = !demandePrixLibre || (Number.isFinite(prixUnitaire) && prixUnitaire > 0);
   const nbPiecesParPaquet = piecesParPaquet(produit.nom);
+  // Jamais plus que le stock du jour restant, sinon le sélecteur laisse
+  // croire à un stock illimité jusqu'à 20 alors qu'il en reste bien moins.
+  const quantiteMax = produit.stockJour !== null ? Math.min(QUANTITE_MAX, produit.stockJour) : QUANTITE_MAX;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
@@ -76,8 +79,8 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
           <span className="w-10 text-center text-2xl font-bold text-gray-900">{quantite}</span>
           <button
             type="button"
-            onClick={() => setQuantite((q) => Math.min(QUANTITE_MAX, q + 1))}
-            disabled={quantite >= QUANTITE_MAX}
+            onClick={() => setQuantite((q) => Math.min(quantiteMax, q + 1))}
+            disabled={quantite >= quantiteMax}
             aria-label="Ajouter une unité"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 text-xl font-bold text-gray-700 disabled:opacity-30"
           >
@@ -90,6 +93,9 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
         </p>
         {nbPiecesParPaquet > 1 && (
           <p className="mt-1 text-center text-sm text-gray-500">Soit {quantite * nbPiecesParPaquet} pièces</p>
+        )}
+        {produit.stockJour !== null && (
+          <p className="mt-1 text-center text-xs text-gray-400">Stock du jour : {produit.stockJour} restant(s)</p>
         )}
 
         <div className="mt-6 flex gap-2">

@@ -631,7 +631,7 @@ export function CaisseApp({
         const actif = copie[cible];
         const existante = actif.lignes.find(cle);
         const lignes = existante
-          ? actif.lignes.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l))
+          ? actif.lignes.map((l) => (l === existante ? { ...l, quantite: quantitePlafonnee(l, l.quantite + quantite) } : l))
           : [...actif.lignes, nouvelleLigne()];
         copie[cible] = { ...actif, lignes };
         return copie;
@@ -643,7 +643,9 @@ export function CaisseApp({
     setPanierSimple((precedent) => {
       const existante = precedent.find(cle);
       if (existante) {
-        return precedent.map((l) => (l === existante ? { ...l, quantite: l.quantite + quantite } : l));
+        return precedent.map((l) =>
+          l === existante ? { ...l, quantite: quantitePlafonnee(l, l.quantite + quantite) } : l
+        );
       }
       return [...precedent, nouvelleLigne()];
     });
@@ -667,20 +669,29 @@ export function CaisseApp({
     setProduitEnQuantite(produit);
   }
 
+  // Jamais au-delà du stock du jour restant, sinon "+" sur une ligne déjà au
+  // panier laisse croire à un stock illimité malgré la limite affichée
+  // ailleurs (carte produit, sélecteur de quantité).
+  function quantitePlafonnee(l: LignePanier, quantiteVoulue: number): number {
+    return l.produit.stockJour !== null ? Math.min(quantiteVoulue, l.produit.stockJour) : quantiteVoulue;
+  }
+
   function modifierQuantite(id: string, delta: number) {
     if (enModeGroupe) {
       setPlats((precedent) =>
         precedent.map((plat) => ({
           ...plat,
           lignes: plat.lignes
-            .map((l) => (l.id === id ? { ...l, quantite: l.quantite + delta } : l))
+            .map((l) => (l.id === id ? { ...l, quantite: quantitePlafonnee(l, l.quantite + delta) } : l))
             .filter((l) => l.quantite > 0),
         }))
       );
       return;
     }
     setPanierSimple((precedent) =>
-      precedent.map((l) => (l.id === id ? { ...l, quantite: l.quantite + delta } : l)).filter((l) => l.quantite > 0)
+      precedent
+        .map((l) => (l.id === id ? { ...l, quantite: quantitePlafonnee(l, l.quantite + delta) } : l))
+        .filter((l) => l.quantite > 0)
     );
   }
 
