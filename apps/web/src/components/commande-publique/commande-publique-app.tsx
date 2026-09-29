@@ -295,12 +295,12 @@ export function CommandePubliqueApp({
   );
 
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
-  // Prix effectif d'une ligne : le prix catalogue, moins la réduction "sans
-  // boisson" si le client a refusé la canette incluse de cette ligne.
-  // La canette n'est plus incluse dans le prix de base des formules — elle
-  // se rajoute en option (+1,50€), jamais l'inverse.
+  // Prix effectif d'une ligne : le prix catalogue, plus la boisson formule
+  // si le client l'a demandée — uniquement pour les produits à canette
+  // incluse (Tacos/Barquette/Bowl). Ne concerne jamais les autres produits
+  // (grillades, accompagnements, boissons vendues seules, etc.).
   const prixLigne = (l: LignePanierPublique) =>
-    l.produit.prix + (l.sansBoisson ? 0 : MONTANT_REDUCTION_SANS_BOISSON);
+    l.produit.prix + (l.produit.canetteIncluse && !l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.
@@ -1467,6 +1467,8 @@ export function CommandePubliqueApp({
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
+          canetteRapideProduit={produitEnSelection.categorie === "plat_du_jour" ? produitCanetteRapide : null}
+          canetteRapideSaveurs={saveurs}
           quantiteMax={
             produitEnSelection.stockJour !== null
               ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
@@ -1482,7 +1484,8 @@ export function CommandePubliqueApp({
             saladeOption,
             accompagnementsInclus,
             sansBoisson,
-            quantite
+            quantite,
+            canettesRapidesChoisies
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1507,6 +1510,11 @@ export function CommandePubliqueApp({
             }
             if (saladeOption && produitSaladeSupplementaire) {
               ajouterAuPanier(produitSaladeSupplementaire, [], []);
+            }
+            if (produitCanetteRapide) {
+              for (const saveur of canettesRapidesChoisies) {
+                ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
+              }
             }
             setProduitEnSelection(null);
           }}

@@ -76,7 +76,7 @@ export function VitrineModalPublique({
     onValider(choix);
   }
 
-  function ligneStepper(cleItem: string, label: string, sousLigne?: string) {
+  function ligneStepper(cleItem: string, label: string, prix: number, sousLigne?: string) {
     const q = quantites[cleItem] ?? 0;
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 py-2 last:border-0">
@@ -85,6 +85,11 @@ export function VitrineModalPublique({
           {sousLigne && <p className="text-xs text-gray-400">{sousLigne}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {q > 0 && (
+            <span className="min-w-[3.5rem] text-right text-sm font-extrabold text-[#8B2020]">
+              {(prix * q).toFixed(2)} €
+            </span>
+          )}
           <button
             type="button"
             onClick={() => ajuster(cleItem, -1)}
@@ -128,7 +133,7 @@ export function VitrineModalPublique({
                     const pieces = piecesParPaquet(produit.nom);
                     const sousLigne =
                       `${(produit.prix ?? 0).toFixed(2)} €` + (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "");
-                    return ligneStepper(cle(produit.id, null), produit.nom, sousLigne);
+                    return ligneStepper(cle(produit.id, null), produit.nom, produit.prix ?? 0, sousLigne);
                   })}
                 </div>
               )
@@ -139,7 +144,7 @@ export function VitrineModalPublique({
               <p className="mb-1 text-sm font-bold text-[#8B2020]">
                 {produit.nom} <span className="font-normal text-gray-400">({(produit.prix ?? 0).toFixed(2)} €)</span>
               </p>
-              {saveurs.map((s) => ligneStepper(cle(produit.id, s.nom), s.nom))}
+              {saveurs.map((s) => ligneStepper(cle(produit.id, s.nom), s.nom, produit.prix ?? 0))}
             </div>
           ))}
         </div>

@@ -551,11 +551,10 @@ export function CaisseApp({
   const enModeGroupe = modeCommande === "groupee";
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
   // Prix effectif d'une ligne : prix catalogue (ou saisi pour un plat du jour
-  // à prix libre), moins la réduction "sans boisson" le cas échéant.
-  // La canette n'est plus incluse dans le prix de base des formules — elle
-  // se rajoute en option (+1,50€), jamais l'inverse.
+  // à prix libre), plus la boisson formule si demandée — uniquement pour les
+  // produits à canette incluse (Tacos/Barquette/Bowl), jamais les autres.
   const prixLigne = (l: LignePanier) =>
-    (l.produit.prix ?? l.prixSaisi ?? 0) + (l.sansBoisson ? 0 : MONTANT_REDUCTION_SANS_BOISSON);
+    (l.produit.prix ?? l.prixSaisi ?? 0) + (l.produit.canetteIncluse && !l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
@@ -1746,6 +1745,8 @@ export function CaisseApp({
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
+          canetteRapideProduit={produitEnSelection.categorie === "plat_du_jour" ? produitCanetteRapide : null}
+          canetteRapideSaveurs={saveurs}
           quantiteMax={
             produitEnSelection.stockJour !== null
               ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
@@ -1761,7 +1762,8 @@ export function CaisseApp({
             saladeOption,
             accompagnementsInclus,
             sansBoisson,
-            quantite
+            quantite,
+            canettesRapidesChoisies
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1787,6 +1789,11 @@ export function CaisseApp({
             }
             if (saladeOption && produitSaladeSupplementaire) {
               ajouterAuPanier(produitSaladeSupplementaire, [], [], [], null, 1, undefined, null);
+            }
+            if (produitCanetteRapide) {
+              for (const saveur of canettesRapidesChoisies) {
+                ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
+              }
             }
             setProduitEnSelection(null);
           }}

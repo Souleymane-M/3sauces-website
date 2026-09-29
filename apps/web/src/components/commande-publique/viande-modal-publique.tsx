@@ -33,6 +33,9 @@ interface ViandeModalPubliqueProps {
   produitViandeSupplementaire: ProduitConfigurable | null;
   /** Produit "Sauce supplémentaire" (prix affiché dynamiquement), null si indisponible. */
   produitSauceSupplementaire: ProduitConfigurable | null;
+  /** Boisson proposée en ajout rapide (Plats du jour sans canette incluse, ex: Poisson grillé) — évite d'aller la chercher dans une autre section. `null`/omis = pas de section boisson. */
+  canetteRapideProduit?: ProduitConfigurable | null;
+  canetteRapideSaveurs?: SaveurPublique[];
   onValider: (
     viandes: string[],
     sauces: string[],
@@ -42,7 +45,8 @@ interface ViandeModalPubliqueProps {
     saladeOption: boolean,
     accompagnementsInclus: string[],
     sansBoisson: boolean,
-    quantite: number
+    quantite: number,
+    canettesRapidesChoisies: string[]
   ) => void;
   onAnnuler: () => void;
   /** Plafond de quantité sélectionnable — stock du jour restant (déjà net de ce qui est présent au panier) si limité, 20 sinon. */
@@ -75,6 +79,8 @@ export function ViandeModalPublique({
   accompagnements,
   produitViandeSupplementaire,
   produitSauceSupplementaire,
+  canetteRapideProduit,
+  canetteRapideSaveurs = [],
   onValider,
   onAnnuler,
   quantiteMax = QUANTITE_MAX_DEFAUT,
@@ -84,6 +90,7 @@ export function ViandeModalPublique({
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
+  const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
   // Sans boisson par défaut : la canette n'est plus incluse dans le prix de
   // base (elle se rajoute en option à +1,50€, cf. MONTANT_REDUCTION_SANS_BOISSON)
@@ -108,6 +115,10 @@ export function ViandeModalPublique({
   // sont proposés — plus de liste figée par produit, qui obligeait à cocher
   // manuellement chaque nouvel accompagnement sur chaque plat concerné.
   const demandeAccompagnement = produit.accompagnementInclus && accompagnements.length > 0;
+  // Ajout rapide de canette, uniquement pour les produits SANS canette
+  // incluse dans le prix (ex: Poisson grillé) — jamais en même temps que le
+  // choix de canette incluse des formules Tacos/Barquette ci-dessous.
+  const proposeCanetteRapide = !produit.canetteIncluse && !!canetteRapideProduit && canetteRapideSaveurs.length > 0;
   const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
@@ -128,6 +139,19 @@ export function ViandeModalPublique({
       const index = precedent.lastIndexOf(nom);
       if (index === -1) return precedent;
       const copie = [...precedent];
+      copie.splice(index, 1);
+      return copie;
+    });
+  }
+
+  function ajouterCanetteRapide(nom: string) {
+    setCanettesRapides((prec) => [...prec, nom]);
+  }
+  function retirerCanetteRapide(nom: string) {
+    setCanettesRapides((prec) => {
+      const index = prec.lastIndexOf(nom);
+      if (index === -1) return prec;
+      const copie = [...prec];
       copie.splice(index, 1);
       return copie;
     });
@@ -484,6 +508,57 @@ export function ViandeModalPublique({
           </div>
         )}
 
+        {proposeCanetteRapide && (
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <p className="text-sm font-bold text-[#C2540C]">
+              + Une boisson avec ? ({(canetteRapideProduit!.prix ?? 0).toFixed(2)} € / unité)
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {canetteRapideSaveurs.map((s) => {
+                const count = canettesRapides.filter((c) => c === s.nom).length;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => ajouterCanetteRapide(s.nom)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      count > 0
+                        ? "border-[#C2540C] bg-[#C2540C] text-white"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s.nom}
+                    {count > 1 ? ` ×${count}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+            {canettesRapides.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {[...new Set(canettesRapides)].map((nom) => (
+                  <span
+                    key={nom}
+                    className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                  >
+                    {nom} ×{canettesRapides.filter((c) => c === nom).length}
+                    <button
+                      type="button"
+                      onClick={() => retirerCanetteRapide(nom)}
+                      className="text-gray-400 hover:text-gray-700"
+                      aria-label={`Retirer une unité de ${nom}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <span className="text-base font-extrabold text-[#C2540C]">
+                  = {(canettesRapides.length * (canetteRapideProduit!.prix ?? 0)).toFixed(2)} €
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-5 flex gap-2">
           <button
             onClick={onAnnuler}
@@ -506,7 +581,8 @@ export function ViandeModalPublique({
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
                 proposeSansBoisson && sansBoisson,
-                quantite
+                quantite,
+                canettesRapides
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
