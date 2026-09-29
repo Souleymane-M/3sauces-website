@@ -464,6 +464,24 @@ export interface Database {
         };
         Relationships: [];
       };
+      v_marge_brute_jour: {
+        Row: {
+          ca_jour: number | null;
+          cout_matiere_jour: number | null;
+          marge_brute_jour: number | null;
+          commandes_sans_cout: number | null;
+        };
+        Relationships: [];
+      };
+      v_produit_plus_rentable_jour: {
+        Row: {
+          produit_id: string | null;
+          nom: string | null;
+          quantite_vendue: number | null;
+          marge_totale: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       decrementer_stocks_produits: {

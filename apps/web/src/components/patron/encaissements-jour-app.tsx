@@ -34,6 +34,10 @@ export function EncaissementsJourApp({ totauxJour, alertes }: EncaissementsJourA
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Encaissements du jour</h2>
+      <p className="text-xs text-gray-500">
+        Espèces/carte physiquement encaissés (comptoir + livreurs) uniquement — pour le chiffre d&apos;affaires
+        complet avec les paiements en ligne, voir &quot;Ventes du jour&quot; ci-dessus.
+      </p>
       <div className="flex gap-4 rounded border border-gray-700 p-3 text-sm">
         <div>
           <p className="text-gray-400">Espèces</p>

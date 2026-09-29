@@ -8,6 +8,7 @@ import { ImprimantesApp } from "@/components/patron/imprimantes-app";
 import { CommandesHistoriqueApp } from "@/components/patron/commandes-historique-app";
 import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-livraison-app";
 import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
+import { StatistiquesJourApp } from "@/components/patron/statistiques-jour-app";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { JoursFermetureApp } from "@/components/patron/jours-fermeture-app";
 import { RemiseLancementApp } from "@/components/patron/remise-lancement-app";
@@ -24,6 +25,7 @@ import {
   calculerEncaissementsJour,
   listerAlertesEncaissement,
 } from "@/lib/encaissements-livraison";
+import { chargerStatistiquesJour } from "@/lib/patron/statistiques";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,7 @@ export default async function PatronPage() {
     remiseLancement,
     metriquesGroupe,
     livreursActifs,
+    statistiquesJour,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -76,6 +79,7 @@ export default async function PatronPage() {
     chargerRemiseLancement(),
     calculerMetriquesGroupe(),
     listerLivreursActifs(),
+    chargerStatistiquesJour(),
   ]);
 
   return (
@@ -94,6 +98,7 @@ export default async function PatronPage() {
         <RemiseLancementApp debutInitial={remiseLancement.debut} finInitiale={remiseLancement.fin} />
         <GroupeMetriquesApp metriques={metriquesGroupe} />
       </div>
+      <StatistiquesJourApp stats={statistiquesJour} />
       <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
       <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
       <CommandesHistoriqueApp
