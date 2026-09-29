@@ -22,6 +22,7 @@ import {
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
+import { VitrineModalPublique, type ChoixVitrine } from "@/components/commande-publique/vitrine-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
 import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
@@ -227,6 +228,7 @@ export function CaisseApp({
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
+  const [vitrineOuverte, setVitrineOuverte] = useState(false);
   // Ligne du panier pour laquelle le client vient de changer d'avis sur une
   // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
   // sont possibles, sinon appliqué directement.
@@ -685,6 +687,29 @@ export function CaisseApp({
     // jour" à prix libre) : QuantiteModalPublique demande le prix du jour
     // si besoin et laisse choisir la quantité, jamais d'ajout direct.
     setProduitEnQuantite(produit);
+  }
+
+  /**
+   * Grillades, accompagnements et boissons s'ouvrent tous dans la même
+   * fenêtre "rayon" (VitrineModalPublique) — la caissière compose un
+   * panier mixte en un seul geste, jamais besoin de rouvrir une fenêtre
+   * par article. Tacos/Barquettes/Bowls/Plats du jour gardent leur
+   * configurateur dédié, jamais concernés par le rayon.
+   */
+  function ouvrirRayon(sectionKey: string, produit: ProduitCaisse) {
+    if (sectionKey === "grillade" || sectionKey === "accompagnement" || sectionKey === "boisson") {
+      setVitrineOuverte(true);
+      return;
+    }
+    surClicProduit(produit);
+  }
+
+  /** Ajoute en une fois tout ce qui a été composé dans la fenêtre "rayon". */
+  function validerVitrine(choix: ChoixVitrine[]) {
+    for (const c of choix) {
+      ajouterAuPanier(c.produit as ProduitCaisse, [], [], c.saveur ? [c.saveur] : [], null, c.quantite);
+    }
+    setVitrineOuverte(false);
   }
 
   /**
@@ -1199,7 +1224,7 @@ export function CaisseApp({
                     {section.produits.map((produit) => (
                       <button
                         key={produit.id}
-                        onClick={() => surClicProduit(produit)}
+                        onClick={() => ouvrirRayon(section.key, produit)}
                         className="flex w-full items-center justify-between rounded bg-white px-3 py-2 text-left text-sm text-gray-700 shadow-sm active:bg-gray-50"
                       >
                         <span>{produit.nom}</span>
@@ -1214,7 +1239,7 @@ export function CaisseApp({
                     {section.produits.map((produit) => (
                       <button
                         key={produit.id}
-                        onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
+                        onClick={() => produit.stockJour !== 0 && ouvrirRayon(section.key, produit)}
                         disabled={produit.stockJour === 0}
                         className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
                           produit.stockJour === 0
@@ -1786,6 +1811,30 @@ export function CaisseApp({
           }}
         />
       )}
+
+      {vitrineOuverte &&
+        (() => {
+          const sectionGrillade = sections.find((s) => s.key === "grillade");
+          const sectionAccompagnement = sections.find((s) => s.key === "accompagnement");
+          const sectionBoisson = sections.find((s) => s.key === "boisson");
+          const boissonsSimples = (sectionBoisson?.produits ?? []).filter((p) => p.nbSaveursMax === 0);
+          const boissonsAvecSaveurs = (sectionBoisson?.produits ?? [])
+            .filter((p) => p.nbSaveursMax > 0)
+            .map((p) => ({ produit: p, saveurs: p.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs }));
+          return (
+            <VitrineModalPublique
+              titre="Grillades, accompagnements & boissons"
+              sections={[
+                { titre: "Grillades", produits: sectionGrillade?.produits ?? [] },
+                { titre: "Accompagnements", produits: sectionAccompagnement?.produits ?? [] },
+                { titre: "Boissons", produits: boissonsSimples },
+              ]}
+              produitsAvecSaveurs={boissonsAvecSaveurs}
+              onAnnuler={() => setVitrineOuverte(false)}
+              onValider={validerVitrine}
+            />
+          );
+        })()}
 
       {ligneCorrectionBoisson && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
