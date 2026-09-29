@@ -1202,9 +1202,12 @@ export function CommandePubliqueApp({
                 <input
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
-                  placeholder="0639..."
+                  placeholder="0639... (ou +33... pour un numéro métropolitain)"
                   className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
                 />
+                <p className="mt-1 text-xs text-gray-400">
+                  Numéro mahorais : 0639... ou 0692... Numéro d&apos;un autre pays : commence par +, ex. +33...
+                </p>
               </div>
 
               <div>

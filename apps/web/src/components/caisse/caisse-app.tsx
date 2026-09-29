@@ -1469,6 +1469,7 @@ export function CaisseApp({
                   🔍
                 </button>
               </div>
+              <p className="mt-1 text-xs text-gray-400">Numéro d&apos;un autre pays : commence par +, ex. +33...</p>
               {clientInfo && (
                 <div className="mt-2 text-sm text-gray-700">
                   {clientInfo.existe ? (

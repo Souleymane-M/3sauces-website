@@ -220,7 +220,7 @@ export function CarteFidelite({
           <input
             value={telephoneSaisi}
             onChange={(e) => setTelephoneSaisi(e.target.value)}
-            placeholder="0639..."
+            placeholder="0639... (ou +33... pour un numéro métropolitain)"
             className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
           />
           {erreur && <p className="text-sm text-red-600">{erreur}</p>}
