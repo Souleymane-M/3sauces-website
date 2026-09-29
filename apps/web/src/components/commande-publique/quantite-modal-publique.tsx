@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import type { ProduitConfigurable } from "@/lib/commande-publique/types";
+import type { ProduitConfigurable, SaveurPublique } from "@/lib/commande-publique/types";
 import { piecesParPaquet } from "@/lib/pieces-produit";
 
 interface QuantiteModalPubliqueProps {
   produit: ProduitConfigurable;
-  onValider: (quantite: number, prixSaisi?: number) => void;
+  onValider: (quantite: number, prixSaisi?: number, canettesChoisies?: string[]) => void;
   onAnnuler: () => void;
+  /** Boisson proposée en ajout rapide (Plats du jour uniquement) — évite d'aller la chercher dans une autre section. `null`/omis = pas de section boisson. */
+  canetteProduit?: ProduitConfigurable | null;
+  canetteSaveurs?: SaveurPublique[];
 }
 
 const QUANTITE_MAX = 20;
@@ -24,9 +27,31 @@ const QUANTITE_MAX = 20;
  * `listerProduitsPublics`) : demande un prix avant d'activer "Ajouter",
  * utilisé à la place de `produit.prix` pour le total affiché.
  */
-export function QuantiteModalPublique({ produit, onValider, onAnnuler }: QuantiteModalPubliqueProps) {
+export function QuantiteModalPublique({
+  produit,
+  onValider,
+  onAnnuler,
+  canetteProduit,
+  canetteSaveurs = [],
+}: QuantiteModalPubliqueProps) {
   const [quantite, setQuantite] = useState(1);
   const [prixSaisi, setPrixSaisi] = useState("");
+  // Une entrée par unité choisie (doublons autorisés, ex: 2x Coca) — même
+  // convention que les extras viande/sauce du configurateur Tacos.
+  const [canettesChoisies, setCanettesChoisies] = useState<string[]>([]);
+
+  function ajouterCanette(nom: string) {
+    setCanettesChoisies((prec) => [...prec, nom]);
+  }
+  function retirerCanette(nom: string) {
+    setCanettesChoisies((prec) => {
+      const index = prec.lastIndexOf(nom);
+      if (index === -1) return prec;
+      const copie = [...prec];
+      copie.splice(index, 1);
+      return copie;
+    });
+  }
 
   const demandePrixLibre = produit.prix === null;
   const prixUnitaire = produit.prix ?? Number(prixSaisi.replace(",", "."));
@@ -89,13 +114,66 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
         </div>
 
         <p className="mt-6 text-center text-4xl font-extrabold text-[#8B2020]">
-          {(prixValide ? prixUnitaire * quantite : 0).toFixed(2)} €
+          {(
+            (prixValide ? prixUnitaire * quantite : 0) + canettesChoisies.length * (canetteProduit?.prix ?? 0)
+          ).toFixed(2)} €
         </p>
         {nbPiecesParPaquet > 1 && (
           <p className="mt-1 text-center text-sm text-gray-500">Soit {quantite * nbPiecesParPaquet} pièces</p>
         )}
         {produit.stockJour !== null && (
           <p className="mt-1 text-center text-xs text-gray-400">Stock du jour : {produit.stockJour} restant(s)</p>
+        )}
+
+        {canetteProduit && canetteSaveurs.length > 0 && (
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <p className="text-sm font-bold text-[#C2540C]">
+              + Une boisson avec ? ({(canetteProduit.prix ?? 0).toFixed(2)} € / unité)
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {canetteSaveurs.map((s) => {
+                const count = canettesChoisies.filter((c) => c === s.nom).length;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => ajouterCanette(s.nom)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      count > 0
+                        ? "border-[#C2540C] bg-[#C2540C] text-white"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s.nom}
+                    {count > 1 ? ` ×${count}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+            {canettesChoisies.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {[...new Set(canettesChoisies)].map((nom) => (
+                  <span
+                    key={nom}
+                    className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                  >
+                    {nom} ×{canettesChoisies.filter((c) => c === nom).length}
+                    <button
+                      type="button"
+                      onClick={() => retirerCanette(nom)}
+                      className="text-gray-400 hover:text-gray-700"
+                      aria-label={`Retirer une unité de ${nom}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <span className="text-sm font-extrabold text-[#C2540C]">
+                  = {(canettesChoisies.length * (canetteProduit.prix ?? 0)).toFixed(2)} €
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="mt-6 flex gap-2">
@@ -107,7 +185,9 @@ export function QuantiteModalPublique({ produit, onValider, onAnnuler }: Quantit
           </button>
           <button
             disabled={!prixValide}
-            onClick={() => onValider(quantite, demandePrixLibre ? prixUnitaire : undefined)}
+            onClick={() =>
+              onValider(quantite, demandePrixLibre ? prixUnitaire : undefined, canettesChoisies)
+            }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
             Ajouter

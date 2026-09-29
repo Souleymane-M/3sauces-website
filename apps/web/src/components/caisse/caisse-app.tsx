@@ -540,6 +540,13 @@ export function CaisseApp({
     () => produits.filter((p) => p.categorie === "accompagnement" && p.nom !== "Salade"),
     [produits]
   );
+  // Boisson en ajout rapide dans la fenêtre "Plats du jour" (jamais la
+  // Boisson 2L offerte, un produit synthétique distinct) — identifié par
+  // structure (boisson à choix de saveur), jamais par nom en dur.
+  const produitCanetteRapide = useMemo(
+    () => produits.find((p) => p.categorie === "boisson" && p.nbSaveursMax > 0 && p.nom !== NOM_PRODUIT_BOISSON_OFFERTE) ?? null,
+    [produits]
+  );
 
   const enModeGroupe = modeCommande === "groupee";
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
@@ -1796,8 +1803,10 @@ export function CaisseApp({
                 ? plafonnerQuantite(produitEnQuantite, null, produitEnQuantite.stockJour)
                 : null,
           }}
+          canetteProduit={produitEnQuantite.categorie === "plat_du_jour" ? produitCanetteRapide : null}
+          canetteSaveurs={saveurs}
           onAnnuler={() => setProduitEnQuantite(null)}
-          onValider={(quantite, prixSaisi) => {
+          onValider={(quantite, prixSaisi, canettesChoisies) => {
             ajouterAuPanier(
               produitEnQuantite,
               produitEnQuantite.viandeImposee ? [produitEnQuantite.viandeImposee] : [],
@@ -1807,6 +1816,11 @@ export function CaisseApp({
               quantite,
               prixSaisi
             );
+            if (produitCanetteRapide) {
+              for (const saveur of canettesChoisies ?? []) {
+                ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
+              }
+            }
             setProduitEnQuantite(null);
           }}
         />
