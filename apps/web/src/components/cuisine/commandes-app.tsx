@@ -244,6 +244,28 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
     setModalOuverte(true);
   }
 
+  /**
+   * Raccourci "Prêt & remis au livreur" : enchaîne les deux transitions
+   * (en_preparation -> pret -> pris_par_livreur) en un seul geste côté
+   * employé, sans supprimer l'évènement "pret" lui-même — encore utilisé
+   * pour calculer le temps de préparation moyen par employé
+   * (lib/patron/commandes-historique.ts). Seule l'ergonomie change, jamais
+   * l'historique enregistré.
+   */
+  function demanderChangementFusionne(commandeId: string, livreurId: string) {
+    const executer = async (identite: EmployeActif) => {
+      await appliquerChangement(commandeId, "pret", identite.profilId);
+      await appliquerChangement(commandeId, "pris_par_livreur", identite.profilId, livreurId);
+    };
+
+    if (employeActif) {
+      executer(employeActif);
+      return;
+    }
+    setActionEnAttente(() => executer);
+    setModalOuverte(true);
+  }
+
   /** Uniquement pour une commande encore "en_attente" — vérifié aussi côté serveur. */
   function demanderAnnulation(commandeId: string) {
     const motif = window.prompt("Pourquoi annuler cette commande ? (optionnel)");
@@ -278,7 +300,11 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {commandes.map((commande) => {
           const statutSuivant = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
-          const demandeLivreur = statutSuivant === "pris_par_livreur";
+          // Fusionne "Prêt" et "Pris par livreur" en une seule étape : le
+          // livreur se choisit dès "En préparation", jamais besoin de
+          // revenir sur la commande une fois prête.
+          const fusionPretLivreur = commande.canal === "livraison" && commande.statut === "en_preparation";
+          const demandeLivreur = statutSuivant === "pris_par_livreur" || fusionPretLivreur;
           const livreurSelectionne = livreurChoisi[commande.id] ?? "";
 
           const prioritaire = estPrioritaire(commande);
@@ -360,11 +386,15 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                     </select>
                   )}
                   <button
-                    onClick={() => demanderChangement(commande.id, statutSuivant, demandeLivreur ? livreurSelectionne : undefined)}
+                    onClick={() =>
+                      fusionPretLivreur
+                        ? demanderChangementFusionne(commande.id, livreurSelectionne)
+                        : demanderChangement(commande.id, statutSuivant, demandeLivreur ? livreurSelectionne : undefined)
+                    }
                     disabled={demandeLivreur && !livreurSelectionne}
                     className="w-full rounded bg-[#8B2020] py-3 text-xl font-bold text-white disabled:opacity-40"
                   >
-                    {LIBELLES_STATUT[statutSuivant]}
+                    {fusionPretLivreur ? "Prêt & remis au livreur" : LIBELLES_STATUT[statutSuivant]}
                   </button>
                 </div>
               )}
