@@ -48,11 +48,17 @@ function declarationVide(): DeclarationEnCours {
   };
 }
 
+// Toujours la date ET l'heure, jamais l'heure seule — sinon impossible de
+// distinguer une livraison de la veille restée bloquée d'une du jour même.
 function formaterHeure(iso: string | null): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso)
-  );
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
 }
 
 export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {

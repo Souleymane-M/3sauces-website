@@ -29,11 +29,18 @@ function libelleCanal(canal: CommandeCuisine["canal"]): string {
   return "Sur place";
 }
 
+// Toujours la date ET l'heure, jamais l'heure seule — une commande de la
+// veille encore affichée (statut non terminal) est sinon impossible à
+// distinguer d'une commande du jour même à l'écran.
 function formaterHeure(iso: string | null): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso)
-  );
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
 }
 
 function formaterDateHeureComplete(iso: string | null): string {
@@ -288,8 +295,9 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
               )}
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-black">Commande #{commande.numero}</span>
-                <span className="text-xl text-black">{formaterHeure(commande.heureSouhaitee)}</span>
+                <span className="text-xl text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</span>
               </div>
+              <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="rounded bg-gray-200 px-2 py-1 text-lg font-semibold text-black">
                   {libelleCanal(commande.canal)}
