@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { ModePaiement } from "@3sauces/supabase";
+import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import type { EncaissementsJour, LivraisonAEncaisser } from "./encaissements-livraison-types";
 
 /**
@@ -107,6 +108,88 @@ export async function marquerLivraisonEncaissee(commandeId: string): Promise<voi
 
   if (erreurMaj) {
     throw new Error(`Impossible de valider l'encaissement : ${erreurMaj.message}`);
+  }
+}
+
+interface PaiementManuel {
+  mode: ModePaiement;
+  montant: number;
+  payeur?: string;
+}
+
+/**
+ * Filet de secours quand le livreur n'est jamais passé par /livreur pour
+ * déclarer ce qu'il a récupéré (cas très fréquent en pratique — la
+ * livraison reste alors bloquée indéfiniment à "non_paye" sans que rien
+ * n'atteigne jamais l'étape "à valider"). Permet à la caisse/au patron de
+ * saisir directement ce qui a été remis, sans dépendre du livreur.
+ * Contrairement à `marquerLivraisonEncaissee`, insère elle-même les lignes
+ * `paiements` (jamais encore enregistrées ici) et fait aussi passer la
+ * commande à "livre" si elle ne l'était pas déjà — la caisse ne fait ça que
+ * pour une livraison dont elle sait, par un autre moyen (le livreur de
+ * retour, un appel client), qu'elle a bien été remise.
+ */
+export async function declarerEtValiderManuellement(
+  commandeId: string,
+  paiements: PaiementManuel[],
+  profilId: string
+): Promise<void> {
+  if (paiements.length === 0) {
+    throw new Error("Au moins un paiement est requis.");
+  }
+  for (const p of paiements) {
+    if (!Number.isFinite(p.montant) || p.montant <= 0) {
+      throw new Error("Montant de paiement invalide.");
+    }
+  }
+
+  const supabase = createServiceSupabaseClient();
+
+  const { data: commande, error: erreurLecture } = await supabase
+    .from("commandes")
+    .select("id, canal, statut, montant, paiement_statut")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurLecture || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.canal !== "livraison") {
+    throw new Error("Cette commande n'est pas une livraison.");
+  }
+  if (commande.paiement_statut === "paye") {
+    throw new Error("Cette commande est déjà marquée comme encaissée.");
+  }
+
+  const totalDeclare = Math.round(paiements.reduce((total, p) => total + p.montant, 0) * 100) / 100;
+  const totalAttendu = Math.round(commande.montant * 100) / 100;
+  if (totalDeclare !== totalAttendu) {
+    throw new Error(
+      `Le total saisi (${totalDeclare.toFixed(2)} €) ne correspond pas au montant dû (${totalAttendu.toFixed(2)} €).`
+    );
+  }
+
+  const { error: erreurPaiements } = await supabase.from("paiements").insert(
+    paiements.map((p) => ({
+      commande_id: commandeId,
+      mode: p.mode,
+      montant: p.montant,
+      payeur: p.payeur ?? null,
+    }))
+  );
+  if (erreurPaiements) {
+    throw new Error(`Impossible d'enregistrer les paiements : ${erreurPaiements.message}`);
+  }
+
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({ paiement_statut: "paye" })
+    .eq("id", commandeId);
+  if (erreurMaj) {
+    throw new Error(`Impossible de valider l'encaissement : ${erreurMaj.message}`);
+  }
+
+  if (commande.statut === "pris_par_livreur") {
+    await changerStatutCommande({ commandeId, statut: "livre", profilId });
   }
 }
 

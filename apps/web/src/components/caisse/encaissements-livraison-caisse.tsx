@@ -30,8 +30,12 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
   const [livraisons, setLivraisons] = useState<LivraisonAEncaisser[]>(livraisonsInitiales);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [succes, setSucces] = useState<string | null>(null);
   const [noteEcart, setNoteEcart] = useState<Record<string, string>>({});
   const [signalementOuvert, setSignalementOuvert] = useState<string | null>(null);
+  const [saisieManuelleOuverte, setSaisieManuelleOuverte] = useState<string | null>(null);
+  const [modeManuel, setModeManuel] = useState<Record<string, "especes" | "cb">>({});
+  const [montantManuel, setMontantManuel] = useState<Record<string, string>>({});
 
   async function appeler(commandeId: string, body: Record<string, unknown>) {
     setErreur(null);
@@ -57,7 +61,41 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
     const precedentes = livraisons;
     setLivraisons((prec) => prec.filter((l) => l.id !== livraison.id));
     const ok = await appeler(livraison.id, { action: "valider" });
-    if (!ok) setLivraisons(precedentes);
+    if (ok) {
+      setSucces(`Commande #${livraison.numero} validée.`);
+      setTimeout(() => setSucces(null), 4000);
+    } else {
+      setLivraisons(precedentes);
+    }
+  }
+
+  function ouvrirSaisieManuelle(livraison: LivraisonAEncaisser) {
+    setErreur(null);
+    setSaisieManuelleOuverte(livraison.id);
+    setModeManuel((prec) => ({ ...prec, [livraison.id]: prec[livraison.id] ?? "especes" }));
+    setMontantManuel((prec) => ({ ...prec, [livraison.id]: prec[livraison.id] ?? livraison.montant.toFixed(2) }));
+  }
+
+  async function confirmerSaisieManuelle(livraison: LivraisonAEncaisser) {
+    const montant = Number((montantManuel[livraison.id] ?? "").replace(",", "."));
+    if (!Number.isFinite(montant) || montant <= 0) {
+      setErreur("Montant invalide.");
+      return;
+    }
+    const mode = modeManuel[livraison.id] ?? "especes";
+    const precedentes = livraisons;
+    setLivraisons((prec) => prec.filter((l) => l.id !== livraison.id));
+    const ok = await appeler(livraison.id, {
+      action: "declarer_et_valider",
+      paiements: [{ mode, montant }],
+    });
+    if (ok) {
+      setSaisieManuelleOuverte(null);
+      setSucces(`Commande #${livraison.numero} déclarée et validée.`);
+      setTimeout(() => setSucces(null), 4000);
+    } else {
+      setLivraisons(precedentes);
+    }
   }
 
   async function signalerEcart(livraison: LivraisonAEncaisser) {
@@ -79,6 +117,7 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
         Le livreur déclare ce qu&apos;il a récupéré depuis son écran — contrôle et valide chaque livraison ici.
       </p>
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+      {succes && <p className="text-sm font-semibold text-[#2D5A27]">✅ {succes}</p>}
 
       {livraisons.length === 0 && <p className="text-lg text-gray-400">Aucune livraison en attente d&apos;encaissement.</p>}
 
@@ -102,7 +141,47 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
             )}
 
             {l.statutPaiement === "non_paye" ? (
-              <p className="mt-3 text-sm text-gray-400">En attente de livraison — le livreur n&apos;a pas encore déclaré.</p>
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="text-sm text-gray-400">Le livreur n&apos;a pas déclaré ce paiement.</p>
+                {saisieManuelleOuverte === l.id ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <select
+                      value={modeManuel[l.id] ?? "especes"}
+                      onChange={(e) =>
+                        setModeManuel((prec) => ({ ...prec, [l.id]: e.target.value as "especes" | "cb" }))
+                      }
+                      className="rounded border border-gray-300 p-2 text-sm text-gray-900"
+                    >
+                      <option value="especes">Espèces</option>
+                      <option value="cb">Carte</option>
+                    </select>
+                    <input
+                      value={montantManuel[l.id] ?? ""}
+                      onChange={(e) => setMontantManuel((prec) => ({ ...prec, [l.id]: e.target.value }))}
+                      inputMode="decimal"
+                      placeholder={l.montant.toFixed(2)}
+                      className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
+                    />
+                    <button
+                      onClick={() => confirmerSaisieManuelle(l)}
+                      disabled={enCours === l.id}
+                      className="rounded bg-[#8B2020] px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      Confirmer
+                    </button>
+                    <button onClick={() => setSaisieManuelleOuverte(null)} className="text-sm text-gray-500 underline">
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => ouvrirSaisieManuelle(l)}
+                    className="mt-2 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700"
+                  >
+                    Déclarer et valider manuellement
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
                 <ul className="text-sm text-gray-700">

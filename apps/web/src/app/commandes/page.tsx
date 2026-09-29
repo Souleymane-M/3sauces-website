@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -28,9 +29,17 @@ export default async function CommandesPage() {
 
   return (
     <main className="min-h-screen bg-white p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-black">Commandes — 3 Sauces</h1>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/caisse"
+            className="rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white shadow-sm"
+          >
+            ← Caisse (prendre une commande)
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
       <CommandesApp commandesInitiales={commandes} aVenirInitial={aVenir} livreursActifs={livreurs} />
     </main>
