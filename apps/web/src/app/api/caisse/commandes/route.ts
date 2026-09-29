@@ -217,8 +217,10 @@ async function validerLignesCommande(
       }
       prixUnitaire = prixSaisi;
     }
-    if (produit.canette_incluse && sansBoisson) {
-      prixUnitaire = Math.round((prixUnitaire - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
+    // La canette n'est plus incluse dans le prix de base des formules
+    // (Tacos/Barquette/Bowl) — elle se rajoute en option, jamais l'inverse.
+    if (produit.canette_incluse && !sansBoisson) {
+      prixUnitaire = Math.round((prixUnitaire + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
     }
 
     // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle

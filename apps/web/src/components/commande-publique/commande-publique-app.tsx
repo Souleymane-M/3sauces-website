@@ -297,8 +297,10 @@ export function CommandePubliqueApp({
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
   // Prix effectif d'une ligne : le prix catalogue, moins la réduction "sans
   // boisson" si le client a refusé la canette incluse de cette ligne.
+  // La canette n'est plus incluse dans le prix de base des formules — elle
+  // se rajoute en option (+1,50€), jamais l'inverse.
   const prixLigne = (l: LignePanierPublique) =>
-    l.produit.prix - (l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+    l.produit.prix + (l.sansBoisson ? 0 : MONTANT_REDUCTION_SANS_BOISSON);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.

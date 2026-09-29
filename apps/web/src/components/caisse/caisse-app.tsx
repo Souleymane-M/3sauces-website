@@ -552,8 +552,10 @@ export function CaisseApp({
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
   // Prix effectif d'une ligne : prix catalogue (ou saisi pour un plat du jour
   // à prix libre), moins la réduction "sans boisson" le cas échéant.
+  // La canette n'est plus incluse dans le prix de base des formules — elle
+  // se rajoute en option (+1,50€), jamais l'inverse.
   const prixLigne = (l: LignePanier) =>
-    (l.produit.prix ?? l.prixSaisi ?? 0) - (l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+    (l.produit.prix ?? l.prixSaisi ?? 0) + (l.sansBoisson ? 0 : MONTANT_REDUCTION_SANS_BOISSON);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 

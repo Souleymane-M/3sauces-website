@@ -85,7 +85,10 @@ export function ViandeModalPublique({
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
-  const [sansBoisson, setSansBoisson] = useState(false);
+  // Sans boisson par défaut : la canette n'est plus incluse dans le prix de
+  // base (elle se rajoute en option à +1,50€, cf. MONTANT_REDUCTION_SANS_BOISSON)
+  // — le client coche explicitement s'il en veut une.
+  const [sansBoisson, setSansBoisson] = useState(true);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
   const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
   const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
@@ -350,10 +353,10 @@ export function ViandeModalPublique({
           <label className="mt-5 flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
-              checked={sansBoisson}
-              onChange={(e) => setSansBoisson(e.target.checked)}
+              checked={!sansBoisson}
+              onChange={(e) => setSansBoisson(!e.target.checked)}
             />
-            Sans boisson (-{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
+            + Boisson formule (+{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
           </label>
         )}
 

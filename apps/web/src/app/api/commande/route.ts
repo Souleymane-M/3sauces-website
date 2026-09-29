@@ -471,9 +471,11 @@ export async function POST(request: Request) {
       nom: produit.nom,
       categorie: produit.categorie,
       quantite,
+      // La canette n'est plus incluse dans le prix de base des formules
+      // (Tacos/Barquette/Bowl) — elle se rajoute en option, jamais l'inverse.
       prixUnitaire:
-        produit.canette_incluse && sansBoisson
-          ? Math.round((produit.prix - MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
+        produit.canette_incluse && !sansBoisson
+          ? Math.round((produit.prix + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
           : produit.prix,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
