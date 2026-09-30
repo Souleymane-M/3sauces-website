@@ -76,8 +76,13 @@ export function VitrineModalPublique({
     onValider(choix);
   }
 
-  function ligneStepper(cleItem: string, label: string, prix: number, sousLigne?: string) {
+  function ligneStepper(cleItem: string, label: string, prix: number, sousLigne?: string, pieces = 1) {
     const q = quantites[cleItem] ?? 0;
+    // Le compteur ajuste par unité vendue (paquet), mais affiche le nombre
+    // RÉEL de pièces (ex: 4 paquets de "x3" → affiche 12) pour qu'un client
+    // ou une caissière pressés ne lisent jamais "4" en pensant "4 pièces"
+    // quand il s'agit en réalité de 4 paquets de 3.
+    const nbPieces = q * pieces;
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 py-2 last:border-0">
         <div className="min-w-0 flex-1">
@@ -99,7 +104,7 @@ export function VitrineModalPublique({
           >
             −
           </button>
-          <span className="w-5 text-center text-base font-bold text-gray-900">{q}</span>
+          <span className="w-6 text-center text-base font-bold text-gray-900">{nbPieces}</span>
           <button
             type="button"
             onClick={() => ajuster(cleItem, 1)}
@@ -133,7 +138,7 @@ export function VitrineModalPublique({
                     const pieces = piecesParPaquet(produit.nom);
                     const sousLigne =
                       `${(produit.prix ?? 0).toFixed(2)} €` + (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "");
-                    return ligneStepper(cle(produit.id, null), produit.nom, produit.prix ?? 0, sousLigne);
+                    return ligneStepper(cle(produit.id, null), produit.nom, produit.prix ?? 0, sousLigne, pieces);
                   })}
                 </div>
               )
