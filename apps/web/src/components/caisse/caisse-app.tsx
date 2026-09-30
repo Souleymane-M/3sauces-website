@@ -766,8 +766,7 @@ export function CaisseApp({
     const prix = produit.prix ?? 0;
     const sousLigne =
       `${prix.toFixed(2)} €` +
-      (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "") +
-      (saveur ? ` — ${produit.nom}` : "");
+      (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "");
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
         <div className="min-w-0 flex-1">
@@ -1273,9 +1272,17 @@ export function CaisseApp({
                   <div className="rounded-lg border border-gray-200 bg-white">
                     {section.produits.flatMap((produit) =>
                       produit.nbSaveursMax > 0
-                        ? (produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) =>
-                            ligneAjoutDirect(produit, s.nom)
-                          )
+                        ? [
+                            <div
+                              key={`${produit.id}-titre`}
+                              className="border-b border-gray-100 bg-gray-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-gray-500"
+                            >
+                              {produit.nom}
+                            </div>,
+                            ...(produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) =>
+                              ligneAjoutDirect(produit, s.nom)
+                            ),
+                          ]
                         : [ligneAjoutDirect(produit, null)]
                     )}
                   </div>
