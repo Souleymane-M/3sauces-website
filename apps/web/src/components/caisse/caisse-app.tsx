@@ -22,7 +22,6 @@ import {
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
-import { VitrineModalPublique, type ChoixVitrine } from "@/components/commande-publique/vitrine-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
 import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
@@ -104,12 +103,19 @@ interface Section {
   key: string;
   titre: string;
   couleur: "rouge" | "vert";
-  discret?: boolean;
   produits: ProduitCaisse[];
 }
 
 const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
+
+/**
+ * Ces trois sections n'ont jamais rien à configurer (pas de viande, pas de
+ * sauce, au plus une saveur) — +/- directement sur la page, ajout immédiat
+ * au panier à chaque clic, jamais de fenêtre à ouvrir. Tacos/Barquettes/
+ * Bowls gardent leur configurateur dédié (viande, sauces, canette).
+ */
+const SECTIONS_AJOUT_DIRECT = new Set(["grillade", "accompagnement", "boisson"]);
 
 /**
  * sessionStorage (pas localStorage) : le panier en cours doit survivre à un
@@ -228,7 +234,6 @@ export function CaisseApp({
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
-  const [vitrineOuverte, setVitrineOuverte] = useState(false);
   // Ligne du panier pour laquelle le client vient de changer d'avis sur une
   // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
   // sont possibles, sinon appliqué directement.
@@ -514,7 +519,7 @@ export function CaisseApp({
         titre: "Accompagnements",
         produits: produits.filter((p) => p.categorie === "accompagnement"),
       },
-      { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
+      { key: "boisson", titre: "Boissons", produits: produits.filter((p) => p.categorie === "boisson") },
     ];
     return liste
       .filter((s) => s.produits.length > 0)
@@ -697,27 +702,9 @@ export function CaisseApp({
     setProduitEnQuantite(produit);
   }
 
-  /**
-   * Grillades, accompagnements et boissons s'ouvrent tous dans la même
-   * fenêtre "rayon" (VitrineModalPublique) — la caissière compose un
-   * panier mixte en un seul geste, jamais besoin de rouvrir une fenêtre
-   * par article. Tacos/Barquettes/Bowls/Plats du jour gardent leur
-   * configurateur dédié, jamais concernés par le rayon.
-   */
-  function ouvrirRayon(sectionKey: string, produit: ProduitCaisse) {
-    if (sectionKey === "grillade" || sectionKey === "accompagnement" || sectionKey === "boisson") {
-      setVitrineOuverte(true);
-      return;
-    }
-    surClicProduit(produit);
-  }
-
-  /** Ajoute en une fois tout ce qui a été composé dans la fenêtre "rayon". */
-  function validerVitrine(choix: ChoixVitrine[]) {
-    for (const c of choix) {
-      ajouterAuPanier(c.produit as ProduitCaisse, [], [], c.saveur ? [c.saveur] : [], null, c.quantite);
-    }
-    setVitrineOuverte(false);
+  /** La ligne du panier correspondant à ce produit (+ cette saveur, s'il y en a une), pour afficher/ajuster sa quantité directement sur la page — sections `SECTIONS_AJOUT_DIRECT` uniquement, jamais de viande/sauce/salade sur ces produits. */
+  function ligneAuPanierDirect(produitId: string, saveur: string | null) {
+    return panierActuel.find((l) => l.produit.id === produitId && (l.saveurs[0] ?? null) === saveur);
   }
 
   /**
@@ -762,6 +749,61 @@ export function CaisseApp({
       return;
     }
     setPanierSimple((precedent) => precedent.filter((l) => l.id !== id));
+  }
+
+  /**
+   * Une ligne d'une section `SECTIONS_AJOUT_DIRECT` : +/- directement sur la
+   * page, ajout/retrait immédiat au panier à chaque clic (pas de fenêtre).
+   * `saveur` distingue les parfums d'un même produit (Canette 33cl,
+   * Boisson 2L) — chacun a sa propre ligne et son propre compteur.
+   */
+  function ligneAjoutDirect(produit: ProduitCaisse, saveur: string | null) {
+    const cleItem = saveur ? `${produit.id}::${saveur}` : produit.id;
+    const ligne = ligneAuPanierDirect(produit.id, saveur);
+    const q = ligne?.quantite ?? 0;
+    const pieces = piecesParPaquet(produit.nom);
+    const epuise = produit.stockJour === 0;
+    const prix = produit.prix ?? 0;
+    const sousLigne =
+      `${prix.toFixed(2)} €` +
+      (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "") +
+      (saveur ? ` — ${produit.nom}` : "");
+    return (
+      <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
+        <div className="min-w-0 flex-1">
+          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-400" : "text-gray-900"}`}>
+            {saveur ?? produit.nom}
+          </p>
+          <p className="text-xs text-gray-400">{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {q > 0 && (
+            <span className="min-w-[3.5rem] text-right text-sm font-extrabold text-[#8B2020]">
+              {(prix * q).toFixed(2)} €
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => ligne && modifierQuantite(ligne.id, -1)}
+            disabled={q <= 0}
+            aria-label={`Retirer ${saveur ?? produit.nom}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg font-bold text-gray-700 disabled:opacity-30"
+          >
+            −
+          </button>
+          <span className="w-6 text-center text-base font-bold text-gray-900">{q * pieces}</span>
+          <button
+            type="button"
+            onClick={() => !epuise && ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
+            disabled={epuise}
+            aria-label={`Ajouter ${saveur ?? produit.nom}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg font-bold text-gray-700 disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    );
   }
 
   /**
@@ -1227,27 +1269,22 @@ export function CaisseApp({
                   {section.titre}
                 </div>
 
-                {section.discret ? (
-                  <div className="space-y-1.5">
-                    {section.produits.map((produit) => (
-                      <button
-                        key={produit.id}
-                        onClick={() => ouvrirRayon(section.key, produit)}
-                        className="flex w-full items-center justify-between rounded bg-white px-3 py-2 text-left text-sm text-gray-700 shadow-sm active:bg-gray-50"
-                      >
-                        <span>{produit.nom}</span>
-                        <span className="text-gray-400">
-                          {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
-                        </span>
-                      </button>
-                    ))}
+                {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
+                  <div className="rounded-lg border border-gray-200 bg-white">
+                    {section.produits.flatMap((produit) =>
+                      produit.nbSaveursMax > 0
+                        ? (produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) =>
+                            ligneAjoutDirect(produit, s.nom)
+                          )
+                        : [ligneAjoutDirect(produit, null)]
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {section.produits.map((produit) => (
                       <button
                         key={produit.id}
-                        onClick={() => produit.stockJour !== 0 && ouvrirRayon(section.key, produit)}
+                        onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
                         disabled={produit.stockJour === 0}
                         className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
                           produit.stockJour === 0
@@ -1835,29 +1872,6 @@ export function CaisseApp({
         />
       )}
 
-      {vitrineOuverte &&
-        (() => {
-          const sectionGrillade = sections.find((s) => s.key === "grillade");
-          const sectionAccompagnement = sections.find((s) => s.key === "accompagnement");
-          const sectionBoisson = sections.find((s) => s.key === "boisson");
-          const boissonsSimples = (sectionBoisson?.produits ?? []).filter((p) => p.nbSaveursMax === 0);
-          const boissonsAvecSaveurs = (sectionBoisson?.produits ?? [])
-            .filter((p) => p.nbSaveursMax > 0)
-            .map((p) => ({ produit: p, saveurs: p.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs }));
-          return (
-            <VitrineModalPublique
-              titre="Grillades, accompagnements & boissons"
-              sections={[
-                { titre: "Grillades", produits: sectionGrillade?.produits ?? [] },
-                { titre: "Accompagnements", produits: sectionAccompagnement?.produits ?? [] },
-                { titre: "Boissons", produits: boissonsSimples },
-              ]}
-              produitsAvecSaveurs={boissonsAvecSaveurs}
-              onAnnuler={() => setVitrineOuverte(false)}
-              onValider={validerVitrine}
-            />
-          );
-        })()}
 
       {ligneCorrectionBoisson && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">

@@ -39,7 +39,6 @@ import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
 import { SaveurModalPublique } from "./saveur-modal-publique";
 import { QuantiteModalPublique } from "./quantite-modal-publique";
-import { VitrineModalPublique, type ChoixVitrine } from "./vitrine-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
@@ -84,14 +83,20 @@ interface Section {
   titre: string;
   /** Bandeau de titre pleine largeur, alterné rouge/vert d'une section à l'autre — jamais de section sans bandeau. */
   couleur: "rouge" | "vert";
-  /** Style compact, sans carte proéminente (Boissons, en fin de page) — indépendant de la couleur du bandeau. */
-  discret?: boolean;
   produits: ProduitPublic[];
 }
 
 const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 const FOND_PAGE = "#F5F0E8";
+
+/**
+ * Ces trois sections n'ont jamais rien à configurer (pas de viande, pas de
+ * sauce, au plus une saveur) — +/- directement sur la page, ajout immédiat
+ * au panier à chaque clic, jamais de fenêtre à ouvrir. Tacos/Barquettes/
+ * Bowls gardent leur configurateur dédié (viande, sauces, canette).
+ */
+const SECTIONS_AJOUT_DIRECT = new Set(["grillade", "accompagnement", "boisson"]);
 
 /**
  * sessionStorage (pas localStorage) : le panier en cours doit survivre à un
@@ -136,7 +141,6 @@ export function CommandePubliqueApp({
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
-  const [vitrineOuverte, setVitrineOuverte] = useState(false);
   // Ligne du panier pour laquelle le client vient de cliquer "+ Ajouter la
   // boisson" sur une formule passée en "Sans boisson" : ouvre un choix de
   // saveur si plusieurs sont possibles, sinon appliqué directement.
@@ -252,7 +256,7 @@ export function CommandePubliqueApp({
         titre: "Accompagnements",
         produits: produits.filter((p) => p.categorie === "accompagnement"),
       },
-      { key: "boisson", titre: "Boissons", discret: true, produits: produits.filter((p) => p.categorie === "boisson") },
+      { key: "boisson", titre: "Boissons", produits: produits.filter((p) => p.categorie === "boisson") },
     ];
     // Le bloc Menus/Plats du jour ci-dessus occupe déjà 1 bandeau (Menus
     // seul) ou 2 (Menus + Plats du jour) — on décale la première couleur
@@ -467,32 +471,9 @@ export function CommandePubliqueApp({
     setProduitEnQuantite(produit);
   }
 
-  /**
-   * Grillades, accompagnements et boissons s'ouvrent tous dans la même
-   * fenêtre "rayon" (VitrineModalPublique) — un seul geste pour composer
-   * un panier mixte, jamais besoin de rouvrir une fenêtre par article.
-   * Tacos/Barquettes/Bowls gardent leur configurateur dédié (viande,
-   * sauces, canette), jamais concernés par le rayon.
-   */
-  function ouvrirRayon(sectionKey: string, produit: ProduitPublic) {
-    if (sectionKey === "grillade" || sectionKey === "accompagnement" || sectionKey === "boisson") {
-      setVitrineOuverte(true);
-      return;
-    }
-    surClicProduit(produit);
-  }
-
-  /**
-   * Ajoute en une fois tout ce qui a été composé dans la fenêtre "rayon".
-   * Cast sûr : grillades/accompagnements/boissons publiques n'ont jamais de
-   * prix libre (`ProduitConfigurable` n'existe que pour réutiliser cette
-   * fenêtre telle quelle côté caisse, où un plat du jour peut en avoir un).
-   */
-  function validerVitrine(choix: ChoixVitrine[]) {
-    for (const c of choix) {
-      ajouterAuPanier(c.produit as ProduitPublic, [], [], c.saveur ? [c.saveur] : [], null, c.quantite);
-    }
-    setVitrineOuverte(false);
+  /** La ligne du panier correspondant à ce produit (+ cette saveur, s'il y en a une), pour afficher/ajuster sa quantité directement sur la page — sections `SECTIONS_AJOUT_DIRECT` uniquement, jamais de viande/sauce/salade sur ces produits. */
+  function ligneAuPanierDirect(produitId: string, saveur: string | null) {
+    return panierActuel.find((l) => l.produit.id === produitId && (l.saveurs[0] ?? null) === saveur);
   }
 
   /**
@@ -528,6 +509,60 @@ export function CommandePubliqueApp({
       precedent
         .map((l) => (l.id === id ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + delta) } : l))
         .filter((l) => l.quantite > 0)
+    );
+  }
+
+  /**
+   * Une ligne d'une section `SECTIONS_AJOUT_DIRECT` : +/- directement sur la
+   * page, ajout/retrait immédiat au panier à chaque clic (pas de fenêtre).
+   * `saveur` distingue les parfums d'un même produit (Canette 33cl,
+   * Boisson 2L) — chacun a sa propre ligne et son propre compteur.
+   */
+  function ligneAjoutDirect(produit: ProduitPublic, saveur: string | null) {
+    const cleItem = saveur ? `${produit.id}::${saveur}` : produit.id;
+    const ligne = ligneAuPanierDirect(produit.id, saveur);
+    const q = ligne?.quantite ?? 0;
+    const pieces = piecesParPaquet(produit.nom);
+    const epuise = produit.stockJour === 0;
+    const sousLigne =
+      `${produit.prix.toFixed(2)} €` +
+      (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "") +
+      (saveur ? ` — ${produit.nom}` : "");
+    return (
+      <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
+        <div className="min-w-0 flex-1">
+          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-400" : "text-gray-900"}`}>
+            {saveur ?? produit.nom}
+          </p>
+          <p className="text-xs text-gray-400">{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {q > 0 && (
+            <span className="min-w-[3.5rem] text-right text-sm font-extrabold text-[#8B2020]">
+              {(produit.prix * q).toFixed(2)} €
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => ligne && modifierQuantite(ligne.id, -1)}
+            disabled={q <= 0}
+            aria-label={`Retirer ${saveur ?? produit.nom}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg font-bold text-gray-700 disabled:opacity-30"
+          >
+            −
+          </button>
+          <span className="w-6 text-center text-base font-bold text-gray-900">{q * pieces}</span>
+          <button
+            type="button"
+            onClick={() => !epuise && ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
+            disabled={epuise}
+            aria-label={`Ajouter ${saveur ?? produit.nom}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-lg font-bold text-gray-700 disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -1034,25 +1069,22 @@ export function CommandePubliqueApp({
                     {section.titre}
                   </div>
 
-                  {section.discret ? (
-                    <div className="space-y-1.5">
-                      {section.produits.map((produit) => (
-                        <button
-                          key={produit.id}
-                          onClick={() => ouvrirRayon(section.key, produit)}
-                          className="flex w-full items-center justify-between rounded bg-white px-3 py-2 text-left text-sm text-gray-700 active:bg-gray-50"
-                        >
-                          <span>{produit.nom}</span>
-                          <span className="text-gray-400">{produit.prix.toFixed(2)} €</span>
-                        </button>
-                      ))}
+                  {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
+                    <div className="rounded-lg border border-gray-200 bg-white">
+                      {section.produits.flatMap((produit) =>
+                        produit.nbSaveursMax > 0
+                          ? (produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) =>
+                              ligneAjoutDirect(produit, s.nom)
+                            )
+                          : [ligneAjoutDirect(produit, null)]
+                      )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       {section.produits.map((produit) => (
                         <button
                           key={produit.id}
-                          onClick={() => produit.stockJour !== 0 && ouvrirRayon(section.key, produit)}
+                          onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
                           disabled={produit.stockJour === 0}
                           className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
                             produit.stockJour === 0
@@ -1554,30 +1586,6 @@ export function CommandePubliqueApp({
           }}
         />
       )}
-
-      {vitrineOuverte &&
-        (() => {
-          const sectionGrillade = sections.find((s) => s.key === "grillade");
-          const sectionAccompagnement = sections.find((s) => s.key === "accompagnement");
-          const sectionBoisson = sections.find((s) => s.key === "boisson");
-          const boissonsSimples = (sectionBoisson?.produits ?? []).filter((p) => p.nbSaveursMax === 0);
-          const boissonsAvecSaveurs = (sectionBoisson?.produits ?? [])
-            .filter((p) => p.nbSaveursMax > 0)
-            .map((p) => ({ produit: p, saveurs: p.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs }));
-          return (
-            <VitrineModalPublique
-              titre="Grillades, accompagnements & boissons"
-              sections={[
-                { titre: "Grillades", produits: sectionGrillade?.produits ?? [] },
-                { titre: "Accompagnements", produits: sectionAccompagnement?.produits ?? [] },
-                { titre: "Boissons", produits: boissonsSimples },
-              ]}
-              produitsAvecSaveurs={boissonsAvecSaveurs}
-              onAnnuler={() => setVitrineOuverte(false)}
-              onValider={validerVitrine}
-            />
-          );
-        })()}
 
       {ligneCorrectionBoisson && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
