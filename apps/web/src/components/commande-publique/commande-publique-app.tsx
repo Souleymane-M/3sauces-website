@@ -301,10 +301,15 @@ export function CommandePubliqueApp({
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
   // Prix effectif d'une ligne : le prix catalogue, plus la boisson formule
   // si le client l'a demandée — uniquement pour les produits à canette
-  // incluse (Tacos/Barquette/Bowl). Ne concerne jamais les autres produits
-  // (grillades, accompagnements, boissons vendues seules, etc.).
+  // INCLUSE MAIS OPTIONNELLE (Tacos/Barquette/Bowl : prix de base sans la
+  // boisson, +1,50€ si ajoutée). Le Menu Étudiant a sa boisson incluse
+  // obligatoirement dans son prix de base (8€) — jamais de supplément,
+  // exactement comme `proposeSansBoisson` dans ViandeModalPublique.
   const prixLigne = (l: LignePanierPublique) =>
-    l.produit.prix + (l.produit.canetteIncluse && !l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+    l.produit.prix +
+    (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
+      ? MONTANT_REDUCTION_SANS_BOISSON
+      : 0);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.

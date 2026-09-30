@@ -473,8 +473,10 @@ export async function POST(request: Request) {
       quantite,
       // La canette n'est plus incluse dans le prix de base des formules
       // (Tacos/Barquette/Bowl) — elle se rajoute en option, jamais l'inverse.
+      // Le Menu Étudiant fait exception : sa boisson est incluse
+      // obligatoirement dans son prix de base, jamais de supplément.
       prixUnitaire:
-        produit.canette_incluse && !sansBoisson
+        produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
           ? Math.round((produit.prix + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
           : produit.prix,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique

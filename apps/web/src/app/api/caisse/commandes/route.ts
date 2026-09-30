@@ -219,7 +219,9 @@ async function validerLignesCommande(
     }
     // La canette n'est plus incluse dans le prix de base des formules
     // (Tacos/Barquette/Bowl) — elle se rajoute en option, jamais l'inverse.
-    if (produit.canette_incluse && !sansBoisson) {
+    // Le Menu Étudiant fait exception : sa boisson est incluse
+    // obligatoirement dans son prix de base, jamais de supplément.
+    if (produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson) {
       prixUnitaire = Math.round((prixUnitaire + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
     }
 

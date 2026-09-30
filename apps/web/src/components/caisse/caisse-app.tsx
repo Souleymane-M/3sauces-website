@@ -557,9 +557,15 @@ export function CaisseApp({
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
   // Prix effectif d'une ligne : prix catalogue (ou saisi pour un plat du jour
   // à prix libre), plus la boisson formule si demandée — uniquement pour les
-  // produits à canette incluse (Tacos/Barquette/Bowl), jamais les autres.
+  // produits à canette INCLUSE MAIS OPTIONNELLE (Tacos/Barquette/Bowl). Le
+  // Menu Étudiant a sa boisson incluse obligatoirement dans son prix de
+  // base — jamais de supplément, exactement comme `proposeSansBoisson`
+  // dans ViandeModalPublique.
   const prixLigne = (l: LignePanier) =>
-    (l.produit.prix ?? l.prixSaisi ?? 0) + (l.produit.canetteIncluse && !l.sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0);
+    (l.produit.prix ?? l.prixSaisi ?? 0) +
+    (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
+      ? MONTANT_REDUCTION_SANS_BOISSON
+      : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
