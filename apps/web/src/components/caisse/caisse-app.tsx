@@ -1275,7 +1275,8 @@ export function CaisseApp({
                         ? [
                             <div
                               key={`${produit.id}-titre`}
-                              className="border-b border-gray-100 bg-gray-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-gray-500"
+                              className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
+                              style={{ backgroundColor: "#C2540C" }}
                             >
                               {produit.nom}
                             </div>,
