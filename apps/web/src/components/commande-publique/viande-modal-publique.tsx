@@ -91,11 +91,10 @@ export function ViandeModalPublique({
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
   const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
+  // Aucune case à cocher : le client clique directement une saveur pour
+  // ajouter la boisson (comme l'ajout rapide des plats du jour), ou ne
+  // clique rien pour ne pas en avoir — un seul geste au lieu de deux.
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
-  // Sans boisson par défaut : la canette n'est plus incluse dans le prix de
-  // base (elle se rajoute en option à +1,50€, cf. MONTANT_REDUCTION_SANS_BOISSON)
-  // — le client coche explicitement s'il en veut une.
-  const [sansBoisson, setSansBoisson] = useState(true);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
   const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
   const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
@@ -104,13 +103,24 @@ export function ViandeModalPublique({
   // Le Menu Étudiant n'est jamais éligible à "Sans boisson" — décision
   // explicite du patron, malgré `canetteIncluse: true`.
   const proposeSansBoisson = produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT;
-  const demandeChoixBoisson = produit.canetteIncluse && saveurs.length > 1;
+  // Section boisson affichée dès qu'il y a une vraie décision à prendre :
+  // toujours pour les formules optionnelles (même avec 1 seule saveur, il
+  // faut pouvoir choisir "aucune"), seulement s'il y a plusieurs saveurs
+  // pour les formules à boisson obligatoire (Menu Étudiant).
+  const demandeChoixBoisson = produit.canetteIncluse && (proposeSansBoisson || saveurs.length > 1);
+  const sansBoisson = proposeSansBoisson && boissonChoisie === null;
   const boissonRetenue =
-    !produit.canetteIncluse || (proposeSansBoisson && sansBoisson)
+    !produit.canetteIncluse || sansBoisson
       ? null
       : demandeChoixBoisson
         ? boissonChoisie
         : (saveurs[0]?.nom ?? null);
+
+  function choisirBoisson(nom: string) {
+    // Cliquer la saveur déjà choisie la retire (retour à "sans boisson"),
+    // uniquement pour les formules où la boisson reste optionnelle.
+    setBoissonChoisie((prec) => (proposeSansBoisson && prec === nom ? null : nom));
+  }
   // Tous les accompagnements actifs aujourd'hui (basculés depuis /patron)
   // sont proposés — plus de liste figée par produit, qui obligeait à cocher
   // manuellement chaque nouvel accompagnement sur chaque plat concerné.
@@ -123,7 +133,7 @@ export function ViandeModalPublique({
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
     (!demandeSauce || saucesChoisies.length >= 1) &&
-    (!demandeChoixBoisson || (proposeSansBoisson && sansBoisson) || boissonChoisie !== null) &&
+    (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
     (!demandeAccompagnement || accompagnementsChoisis.length >= 1);
 
@@ -373,26 +383,19 @@ export function ViandeModalPublique({
           </div>
         )}
 
-        {proposeSansBoisson && (
-          <label className="mt-5 flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={!sansBoisson}
-              onChange={(e) => setSansBoisson(!e.target.checked)}
-            />
-            + Boisson formule (+{MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)
-          </label>
-        )}
-
-        {demandeChoixBoisson && !(proposeSansBoisson && sansBoisson) && (
+        {demandeChoixBoisson && (
           <div className="mt-5">
-            <p className="text-sm font-bold text-[#C2540C]">Choisis ta canette incluse</p>
+            <p className="text-sm font-bold text-[#C2540C]">
+              {proposeSansBoisson
+                ? `+ Une boisson avec ? (${MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} € / unité)`
+                : "Choisis ta canette incluse"}
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {saveurs.map((s) => (
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setBoissonChoisie(s.nom)}
+                  onClick={() => choisirBoisson(s.nom)}
                   className={`rounded-full border px-3 py-1.5 text-sm ${
                     boissonChoisie === s.nom
                       ? "border-[#C2540C] bg-[#C2540C] text-white"
@@ -580,7 +583,7 @@ export function ViandeModalPublique({
                 produit.saladeIncluse ? saladeGardee : null,
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
-                proposeSansBoisson && sansBoisson,
+                sansBoisson,
                 quantite,
                 canettesRapides
               )
