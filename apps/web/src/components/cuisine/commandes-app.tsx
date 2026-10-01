@@ -369,6 +369,13 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 ))}
               </ul>
 
+              {/* Montant réel déjà calculé en base (remises comprises) —
+                  jamais à resommer les lignes de tête, qui donnerait le
+                  montant brut et non ce qu'il faut vraiment faire payer. */}
+              <p className="mt-3 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black">
+                Total : {commande.montant.toFixed(2)} €
+              </p>
+
               {statutSuivant && (
                 <div className="mt-4 space-y-2">
                   {demandeLivreur && (

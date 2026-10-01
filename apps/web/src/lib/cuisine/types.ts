@@ -3,9 +3,10 @@ import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 /**
- * Commande affichée sur /commandes (écran cuisine) : jamais de prix, de
- * mode de paiement ni de statistiques — cf. cahier des charges "ce qui
- * n'apparaît pas sur /commandes".
+ * Commande affichée sur /commandes (écran cuisine). Les prix par ligne et
+ * le montant total sont affichés (pour que personne n'ait à resommer de
+ * tête le montant à faire payer) — en revanche, jamais de statistiques de
+ * vente agrégées sur cet écran, qui reste un tableau de bord opérationnel.
  */
 export interface CommandeCuisine {
   id: string;
@@ -13,6 +14,8 @@ export interface CommandeCuisine {
   canal: Canal;
   statut: StatutCommande;
   lignes: LigneCommande[];
+  /** Montant réel à faire payer (remises déjà déduites) — jamais à resommer les lignes, qui donnerait le montant brut. */
+  montant: number;
   nom: string;
   telephone: string | null;
   adresse: string | null;

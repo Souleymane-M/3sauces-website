@@ -12,7 +12,7 @@ import {
 } from "./types";
 
 const SELECT_COMMANDES_CUISINE =
-  "id, numero, canal, statut, contenu, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe";
+  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe";
 
 /** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
 function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
@@ -28,6 +28,7 @@ function versCommandeCuisine(c: {
   canal: CommandeCuisine["canal"];
   statut: CommandeCuisine["statut"];
   contenu: unknown;
+  montant: number;
   nom_livraison: string | null;
   client_telephone: string | null;
   adresse_livraison: string | null;
@@ -44,6 +45,7 @@ function versCommandeCuisine(c: {
     canal: c.canal,
     statut: c.statut,
     lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+    montant: c.montant,
     nom: c.nom_livraison ?? "",
     telephone: c.client_telephone,
     adresse: c.adresse_livraison,
