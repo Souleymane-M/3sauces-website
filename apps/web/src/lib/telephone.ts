@@ -26,16 +26,15 @@ export function normaliserTelephone(saisie: string): string | null {
 
   if (nettoye.startsWith("00")) {
     const reste = nettoye.slice(2);
-    // Zéro(s) superflu(s) devant un numéro local Mayotte/métropole (ex:
-    // "00639123456", ou pire "000639123456") : ni un vrai indicatif "00"
-    // (aucun indicatif pays réel n'est suivi d'un zéro), ni un indicatif
-    // oublié avant un numéro à 9 chiffres — dans les deux cas c'est le
-    // même numéro local qu'en tapant juste "0639123456". Sans ce cas
-    // particulier, il finissait silencieusement accepté comme un faux
-    // indicatif pays (ex: "+639123456", Philippines) sans aucune erreur.
-    if (/^0?\d{9}$/.test(reste)) {
-      return normaliserTelephone(reste);
-    }
+    // "00" suivi d'un numéro qui ressemble à un local Mayotte/métropole à
+    // 9 ou 10 chiffres (ex: "00639123456") : rejeté plutôt que deviné. On
+    // ne peut pas distinguer à coup sûr "un zéro de trop" d'une autre
+    // erreur de saisie (chiffre en trop/en moins ailleurs) — deviner un
+    // numéro par défaut ferait courir le risque, une fois sur deux, de
+    // sauvegarder silencieusement un numéro tout aussi faux mais qui a
+    // l'air valide. Le client doit corriger lui-même (un seul 0, ex:
+    // "0639123456"), jamais de correction automatique sur un cas ambigu.
+    if (/^0?\d{9}$/.test(reste)) return null;
     if (!/^\d{8,15}$/.test(reste)) return null;
     return `+${reste}`.replace(/^(\+\d{1,3})0(\d{8,9})$/, "$1$2");
   }
