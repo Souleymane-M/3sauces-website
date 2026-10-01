@@ -24,7 +24,7 @@ import {
   dateMayotteIso,
   heureActuelleMayotteMinutes,
 } from "@/lib/commande-publique/creneau";
-import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
+import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
   SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
@@ -705,8 +705,8 @@ export function CommandePubliqueApp({
       setErreur("Ton panier est vide.");
       return;
     }
-    if (modeCommande === "groupee" && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) {
-      setErreur("Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.");
+    if (modeCommande === "groupee" && nbPlatsValides < SEUIL_MINIMUM_GROUPE) {
+      setErreur("Ajoutez au moins 2 plats pour une commande groupée, ou repassez en commande simple.");
       return;
     }
     if (modeCommande === "groupee") {
@@ -1209,11 +1209,15 @@ export function CommandePubliqueApp({
                     })}
                   </ul>
 
-                  {nbPlatsValides > 0 && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
+                  {nbPlatsValides > 0 && nbPlatsValides < SEUIL_MINIMUM_GROUPE && (
                     <p className="texte-alerte-pulsant text-sm font-bold text-[#8B2020]">
-                      {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides === 1
-                        ? "Plus qu'un plat pour valider votre commande groupée."
-                        : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour valider votre commande groupée.`}
+                      Plus qu&apos;un plat pour valider votre commande groupée.
+                    </p>
+                  )}
+                  {nbPlatsValides >= SEUIL_MINIMUM_GROUPE && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
+                    <p className="text-sm font-semibold text-orange-600">
+                      Encore {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plat
+                      {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides > 1 ? "s" : ""} pour la livraison prioritaire 🚀
                     </p>
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
@@ -1478,7 +1482,7 @@ export function CommandePubliqueApp({
                   canalLivraisonBloque ||
                   !accepteCgv ||
                   nbArticles === 0 ||
-                  (modeCommande === "groupee" && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) ||
+                  (modeCommande === "groupee" && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
                   (palierGroupeReel === "GROUPE_4" && !boissonOfferteSaveur)
                 }
                 className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"

@@ -14,7 +14,7 @@ import {
   heureActuelleMayotteMinutes,
 } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
-import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
+import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
@@ -292,8 +292,8 @@ async function validerLignesCommande(
   const montantBrut = lignes.reduce((total, l) => total + l.prixUnitaire * l.quantite, 0);
   const nbPlats = compterPlatsGroupes(lignes);
   const modeGroupe = lignes.some((l) => l.platIndex !== null);
-  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
-    throw new ErreurValidation("Une commande groupée doit contenir au moins 3 plats.");
+  if (modeGroupe && nbPlats < SEUIL_MINIMUM_GROUPE) {
+    throw new ErreurValidation("Une commande groupée doit contenir au moins 2 plats.");
   }
   if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
     throw new ErreurValidation("Chaque plat doit atteindre au moins 5€ pour être validé.");

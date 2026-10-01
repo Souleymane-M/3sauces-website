@@ -22,7 +22,7 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { compterPlatsGroupes, SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
+import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { verifierTokenFidelite } from "@/lib/fidelite/session";
@@ -520,9 +520,9 @@ export async function POST(request: Request) {
   // c'est le regroupement lui-même qui est déclaratif).
   const nbPlats = compterPlatsGroupes(lignes);
   const modeGroupe = lignes.some((l) => l.platIndex !== null);
-  if (modeGroupe && nbPlats < SEUIL_COMMANDE_PRIORITAIRE) {
+  if (modeGroupe && nbPlats < SEUIL_MINIMUM_GROUPE) {
     return NextResponse.json(
-      { error: "Une commande groupée doit contenir au moins 3 plats." },
+      { error: "Une commande groupée doit contenir au moins 2 plats." },
       { status: 400 }
     );
   }

@@ -27,7 +27,7 @@ import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
-import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
+import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
   MONTANT_RECOMPENSE,
   SEUIL_RECOMPENSE,
@@ -963,8 +963,8 @@ export function CaisseApp({
 
   /** Vérifications communes à l'encaissement et à la modification — jamais de commande groupée sous le seuil, ni de plat sous 5€. */
   function validerPanierAvantEnvoi(): string | null {
-    if (enModeGroupe && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) {
-      return "Ajoutez au moins 3 plats pour une commande groupée, ou repassez en commande simple.";
+    if (enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE) {
+      return "Ajoutez au moins 2 plats pour une commande groupée, ou repassez en commande simple.";
     }
     if (enModeGroupe) {
       const platsValides = plats.filter((p) => p.lignes.length > 0);
@@ -1485,11 +1485,15 @@ export function CaisseApp({
                     })}
                   </ul>
 
-                  {nbPlatsValides > 0 && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
+                  {nbPlatsValides > 0 && nbPlatsValides < SEUIL_MINIMUM_GROUPE && (
                     <p className="texte-alerte-pulsant mt-2 text-sm font-bold text-[#8B2020]">
-                      {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides === 1
-                        ? "Plus qu'un plat pour valider la commande groupée."
-                        : `Plus que ${SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plats pour valider la commande groupée.`}
+                      Plus qu&apos;un plat pour valider la commande groupée.
+                    </p>
+                  )}
+                  {nbPlatsValides >= SEUIL_MINIMUM_GROUPE && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
+                    <p className="mt-2 text-sm font-semibold text-orange-600">
+                      Encore {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plat
+                      {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides > 1 ? "s" : ""} pour la livraison prioritaire 🚀
                     </p>
                   )}
                   {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
@@ -1785,7 +1789,7 @@ export function CaisseApp({
                 envoiEnCours ||
                 canalLivraisonBloque ||
                 infosClientIncompletes ||
-                (enModeGroupe && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE) ||
+                (enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
                 (palierGroupeReel === "GROUPE_4" && !boissonOfferteSaveur)
               }
               className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"

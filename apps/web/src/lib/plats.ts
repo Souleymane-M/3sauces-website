@@ -3,9 +3,21 @@
  * (badge "PRIORITAIRE 🚀" en cuisine/livreur, mise en avant côté client).
  * Volontairement pas de colonne "prioritaire" en base : toujours dérivé
  * à la volée de `nb_plats` pour ne jamais avoir à migrer si ce seuil
- * change un jour.
+ * change un jour. Un BONUS, jamais une condition pour pouvoir valider —
+ * cf. `SEUIL_MINIMUM_GROUPE` ci-dessous pour ça.
  */
 export const SEUIL_COMMANDE_PRIORITAIRE = 3;
+
+/**
+ * Nombre minimum de plats pour pouvoir valider une commande en mode
+ * "Commande groupée" (en dessous, le client doit repasser en "Commande
+ * simple"). Distinct de `SEUIL_COMMANDE_PRIORITAIRE` : ce seuil-ci ne
+ * débloque qu'un bonus (livraison prioritaire), il ne doit jamais bloquer
+ * la validation elle-même. Avant cette distinction, les deux seuils
+ * étaient confondus et un client à 2 personnes ne pouvait pas du tout
+ * valider sa commande groupée — corrigé le 2026-10-01.
+ */
+export const SEUIL_MINIMUM_GROUPE = 2;
 
 export interface LigneAvecPlat {
   platIndex: number | null;
