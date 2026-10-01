@@ -57,3 +57,36 @@ export function normaliserTelephone(saisie: string): string | null {
   // chiffres, ex: "0639123456"), jamais de correction automatique.
   return null;
 }
+
+export type PaysTelephone = "mayotte" | "france" | "reunion";
+
+/** Indicatif par pays — Mayotte et La Réunion partagent le même +262 (zone Océan Indien), distincts uniquement par la plage de numéros locaux. */
+export const INDICATIF_PAR_PAYS: Record<PaysTelephone, string> = {
+  mayotte: "+262",
+  france: "+33",
+  reunion: "+262",
+};
+
+export const LIBELLE_PAYS_TELEPHONE: Record<PaysTelephone, string> = {
+  mayotte: "Mayotte",
+  france: "France métropolitaine",
+  reunion: "La Réunion",
+};
+
+/**
+ * Compose le numéro à partir du pays choisi explicitement dans le
+ * sélecteur, pour ne plus jamais dépendre de la seule capacité du client à
+ * taper lui-même le bon indicatif (+33, +262...). Si le client a quand même
+ * tapé un indicatif explicite (+ ou 00...), celui-ci prime toujours sur le
+ * sélecteur — jamais de double indicatif ni de correction forcée d'une
+ * saisie déjà explicite. `null` si la saisie locale n'a ni 9 ni 10 chiffres
+ * (même logique stricte que `normaliserTelephone` : jamais de complétion
+ * à l'aveugle d'un numéro qui n'a pas la bonne longueur).
+ */
+export function composerTelephoneAvecPays(saisie: string, pays: PaysTelephone): string | null {
+  const nettoye = saisie.trim().replace(/[\s.\-()]/g, "");
+  if (!nettoye) return null;
+  if (nettoye.startsWith("+") || nettoye.startsWith("00")) return saisie;
+  if (!/^0?\d{9}$/.test(nettoye)) return null;
+  return `${INDICATIF_PAR_PAYS[pays]}${nettoye.replace(/^0/, "")}`;
+}

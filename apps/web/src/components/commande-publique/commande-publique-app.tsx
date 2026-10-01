@@ -45,6 +45,11 @@ import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
+import {
+  composerTelephoneAvecPays,
+  LIBELLE_PAYS_TELEPHONE,
+  type PaysTelephone,
+} from "@/lib/telephone";
 
 interface LignePanierPublique {
   id: string;
@@ -193,6 +198,11 @@ export function CommandePubliqueApp({
 
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
+  // Mayotte par défaut : l'écrasante majorité des clients. Le client choisit
+  // explicitement son pays plutôt que de devoir savoir qu'il doit taper
+  // lui-même +33 — élimine le risque qu'un numéro métropolitain tapé sans
+  // indicatif se retrouve silencieusement enregistré comme mahorais.
+  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
@@ -717,6 +727,11 @@ export function CommandePubliqueApp({
       setErreur("Indique ton numéro de téléphone.");
       return;
     }
+    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    if (!telephoneComplet) {
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      return;
+    }
     if (canal === "livraison") {
       if (!adresse.trim()) {
         setErreur("Indique ton adresse de livraison.");
@@ -778,7 +793,7 @@ export function CommandePubliqueApp({
         body: JSON.stringify({
           canal,
           nom: nom.trim(),
-          telephone: telephone.trim(),
+          telephone: telephoneComplet,
           modePaiement: modePaiementEffectif,
           creneauHeure,
           date: dateCommande,
@@ -1283,15 +1298,31 @@ export function CommandePubliqueApp({
 
               <div>
                 <label className="text-xs text-gray-500">Téléphone</label>
+                <p className="mt-1 rounded bg-orange-50 px-2.5 py-2 text-sm font-semibold text-[#8B2020]">
+                  📍 Choisis d&apos;abord ton pays, puis tape juste ton numéro local (ex: 0639123456) — sans +33 ni indicatif.
+                </p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPaysTelephone(p)}
+                      className={`rounded border py-2 text-xs font-bold uppercase ${
+                        paysTelephone === p
+                          ? "border-[#8B2020] bg-[#8B2020] text-white"
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      {LIBELLE_PAYS_TELEPHONE[p]}
+                    </button>
+                  ))}
+                </div>
                 <input
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
-                  placeholder="0639... (ou +33... pour un numéro métropolitain)"
-                  className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                  placeholder="0639123456"
+                  className="mt-2 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Numéro mahorais : 0639... ou 0692... Numéro d&apos;un autre pays : commence par +, ex. +33...
-                </p>
               </div>
 
               <div>
