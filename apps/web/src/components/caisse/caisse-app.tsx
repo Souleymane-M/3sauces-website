@@ -37,6 +37,11 @@ import {
 } from "@/lib/fidelite/regles";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
+  composerTelephoneAvecPays,
+  LIBELLE_PAYS_TELEPHONE,
+  type PaysTelephone,
+} from "@/lib/telephone";
+import {
   SEUIL_GROUPE_3_MONTANT,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
@@ -302,6 +307,10 @@ export function CaisseApp({
 
   const [modePaiement, setModePaiement] = useState<ModePaiement>(() => commandeExistante?.modePaiement ?? "especes");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
+  // Mayotte par défaut : l'écrasante majorité des clients. Même logique que
+  // /commander — la caissière choisit explicitement le pays du client
+  // plutôt que de devoir se souvenir de taper +33 pour un métropolitain.
+  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const [appliquerRecompense, setAppliquerRecompense] = useState(false);
@@ -917,11 +926,16 @@ export function CaisseApp({
 
   async function rechercherClient() {
     if (!telephone.trim()) return;
+    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    if (!telephoneComplet) {
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      return;
+    }
     setRechercheEnCours(true);
     setClientInfo(null);
     setAppliquerRecompense(false);
     try {
-      const reponse = await fetch(`/api/caisse/clients?telephone=${encodeURIComponent(telephone)}`);
+      const reponse = await fetch(`/api/caisse/clients?telephone=${encodeURIComponent(telephoneComplet)}`);
       const data = await reponse.json();
       if (!reponse.ok) {
         setErreur(data.error ?? "Numéro invalide.");
@@ -991,6 +1005,11 @@ export function CaisseApp({
       setErreur(erreurValidation);
       return;
     }
+    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    if (!telephoneComplet) {
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      return;
+    }
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -1002,7 +1021,7 @@ export function CaisseApp({
         body: JSON.stringify({
           canal,
           modePaiement,
-          clientTelephone: telephone.trim(),
+          clientTelephone: telephoneComplet,
           recompenseAppliquee: appliquerRecompenseEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
@@ -1090,6 +1109,11 @@ export function CaisseApp({
       setErreur(erreurValidation);
       return;
     }
+    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    if (!telephoneComplet) {
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      return;
+    }
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -1101,7 +1125,7 @@ export function CaisseApp({
         body: JSON.stringify({
           commandeId: commandeExistante.id,
           modePaiement,
-          clientTelephone: telephone.trim(),
+          clientTelephone: telephoneComplet,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
           nom: nom.trim(),
@@ -1538,11 +1562,30 @@ export function CaisseApp({
 
             <div>
               <label className="text-xs text-gray-500">Téléphone</label>
-              <div className="mt-1 flex gap-2">
+              <p className="mt-1 rounded bg-orange-50 px-2 py-1.5 text-xs font-semibold text-[#8B2020]">
+                📍 Choisis le pays du client, puis tape juste son numéro local (ex: 0639123456).
+              </p>
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPaysTelephone(p)}
+                    className={`rounded border py-1.5 text-xs font-bold uppercase ${
+                      paysTelephone === p
+                        ? "border-[#8B2020] bg-[#8B2020] text-white"
+                        : "border-gray-300 text-gray-700"
+                    }`}
+                  >
+                    {LIBELLE_PAYS_TELEPHONE[p]}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-1.5 flex gap-2">
                 <input
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
-                  placeholder="0639..."
+                  placeholder="0639123456"
                   className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
                 />
                 <button
@@ -1553,7 +1596,6 @@ export function CaisseApp({
                   🔍
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-400">Numéro d&apos;un autre pays : commence par +, ex. +33...</p>
               {clientInfo && (
                 <div className="mt-2 text-sm text-gray-700">
                   {clientInfo.existe ? (
