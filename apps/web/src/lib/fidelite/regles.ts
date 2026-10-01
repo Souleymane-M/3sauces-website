@@ -58,10 +58,10 @@ export function messageFidelite({
   recompenseDisponible: boolean;
 }): string {
   if (recompenseDisponible) {
-    return "Votre récompense de 10€ est disponible ! Utilisez-la sur cette commande.";
+    return `Votre récompense de ${MONTANT_RECOMPENSE}€ est disponible ! Utilisez-la sur cette commande.`;
   }
   if (montantCumule > SEUIL_AFFICHAGE_EXACT) {
-    return `Plus que ${formaterEuros(SEUIL_RECOMPENSE - montantCumule)} pour votre récompense de 10€ !`;
+    return `Plus que ${formaterEuros(SEUIL_RECOMPENSE - montantCumule)} pour votre récompense de ${MONTANT_RECOMPENSE}€ !`;
   }
-  return "Continuez à commander chez 3 Sauces et gagnez 10€ offerts !";
+  return `Continuez à commander chez 3 Sauces et gagnez ${MONTANT_RECOMPENSE}€ offerts !`;
 }

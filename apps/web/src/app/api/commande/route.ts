@@ -528,7 +528,7 @@ export async function POST(request: Request) {
   }
   if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
     return NextResponse.json(
-      { error: "Chaque plat doit atteindre au moins 5€ pour être validé." },
+      { error: `Chaque plat doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé.` },
       { status: 400 }
     );
   }
@@ -629,7 +629,7 @@ export async function POST(request: Request) {
     }
     if (montant < MONTANT_RECOMPENSE) {
       return NextResponse.json(
-        { error: "Ta récompense s'utilise sur une commande d'au moins 10€." },
+        { error: `Ta récompense s'utilise sur une commande d'au moins ${MONTANT_RECOMPENSE}€.` },
         { status: 400 }
       );
     }

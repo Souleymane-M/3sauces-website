@@ -43,7 +43,9 @@ import {
   type PaysTelephone,
 } from "@/lib/telephone";
 import {
+  SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
+  SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
@@ -888,7 +890,7 @@ export function CaisseApp({
    */
   function platSuivant() {
     if (totalPlat(platActif) < SEUIL_MINIMUM_PLAT) {
-      setErreurPlat("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
+      setErreurPlat(`Ce plat doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé — ajoutez un accompagnement ou une boisson.`);
       return;
     }
     setErreurPlat(null);
@@ -970,7 +972,7 @@ export function CaisseApp({
       const platsValides = plats.filter((p) => p.lignes.length > 0);
       const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
       if (indexPlatSousLeSeuil !== -1) {
-        return `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`;
+        return `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé — ajoutez un accompagnement ou une boisson.`;
       }
     }
     return null;
@@ -1415,8 +1417,9 @@ export function CaisseApp({
               <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
                 <p className="text-sm font-bold">🚀 Commande groupée, avant 11h</p>
                 <p className="text-xs text-white/90">
-                  3 plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
-                  <br />4 plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
+                  {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
+                  <br />
+                  {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
                 </p>
               </div>
 
@@ -1635,7 +1638,7 @@ export function CaisseApp({
                       </p>
                       {clientInfo.recompense_disponible && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
-                          <p>Ce client a 10€ de récompense — appliquer ?</p>
+                          <p>Ce client a {MONTANT_RECOMPENSE}€ de récompense — appliquer ?</p>
                           {clientInfo.date_expiration && (
                             <p className="text-xs font-normal text-red-600">
                               Expire le {new Date(clientInfo.date_expiration).toLocaleDateString("fr-FR")}
@@ -1648,10 +1651,12 @@ export function CaisseApp({
                               disabled={total < MONTANT_RECOMPENSE}
                               onChange={(e) => setAppliquerRecompense(e.target.checked)}
                             />
-                            Appliquer la récompense (-10 €)
+                            Appliquer la récompense (-{MONTANT_RECOMPENSE} €)
                           </label>
                           {total < MONTANT_RECOMPENSE && (
-                            <p className="text-xs font-normal text-red-600">Commande d&apos;au moins 10€ requise.</p>
+                            <p className="text-xs font-normal text-red-600">
+                              Commande d&apos;au moins {MONTANT_RECOMPENSE}€ requise.
+                            </p>
                           )}
                         </div>
                       )}

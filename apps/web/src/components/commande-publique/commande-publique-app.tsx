@@ -643,7 +643,7 @@ export function CommandePubliqueApp({
    */
   function platSuivant() {
     if (totalPlat(platActif) < SEUIL_MINIMUM_PLAT) {
-      setErreurPlat("Ce plat doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.");
+      setErreurPlat(`Ce plat doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé — ajoutez un accompagnement ou une boisson.`);
       return;
     }
     setErreurPlat(null);
@@ -714,7 +714,7 @@ export function CommandePubliqueApp({
       const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
       if (indexPlatSousLeSeuil !== -1) {
         setErreur(
-          `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins 5€ pour être validé — ajoutez un accompagnement ou une boisson.`
+          `Plat ${indexPlatSousLeSeuil + 1} : doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé — ajoutez un accompagnement ou une boisson.`
         );
         return;
       }

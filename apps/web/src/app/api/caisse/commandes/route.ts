@@ -296,7 +296,7 @@ async function validerLignesCommande(
     throw new ErreurValidation("Une commande groupée doit contenir au moins 2 plats.");
   }
   if (modeGroupe && [...totauxParPlat(lignes).values()].some((t) => t < SEUIL_MINIMUM_PLAT)) {
-    throw new ErreurValidation("Chaque plat doit atteindre au moins 5€ pour être validé.");
+    throw new ErreurValidation(`Chaque plat doit atteindre au moins ${SEUIL_MINIMUM_PLAT}€ pour être validé.`);
   }
 
   // Offre "commande groupée" : même règle que le site public (/api/commande)
@@ -491,7 +491,7 @@ export async function POST(request: Request) {
   if (body.recompenseAppliquee) {
     if (montantBrut < MONTANT_RECOMPENSE) {
       return NextResponse.json(
-        { error: "La récompense s'applique sur une commande d'au moins 10€." },
+        { error: `La récompense s'applique sur une commande d'au moins ${MONTANT_RECOMPENSE}€.` },
         { status: 400 }
       );
     }

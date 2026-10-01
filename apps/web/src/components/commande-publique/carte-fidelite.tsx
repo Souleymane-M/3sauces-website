@@ -300,7 +300,7 @@ export function CarteFidelite({
                 Utiliser ma récompense sur cette commande (-10 €)
               </label>
               {!recompenseUtilisable && (
-                <p className="mt-1 text-xs text-gray-500">Disponible à partir de 10€ de commande.</p>
+                <p className="mt-1 text-xs text-gray-500">Disponible à partir de {MONTANT_RECOMPENSE}€ de commande.</p>
               )}
             </div>
           )}
