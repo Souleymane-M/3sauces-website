@@ -41,7 +41,7 @@ export default async function PatronPage() {
 
   if (!session) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F0E8] p-8">
         <PasswordForm />
       </main>
     );
@@ -88,7 +88,7 @@ export default async function PatronPage() {
   ]);
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen bg-[#F5F0E8] p-8 text-gray-900">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Espace Patron — 3 Sauces</h1>
         <LogoutButton />
