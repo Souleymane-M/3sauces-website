@@ -1,6 +1,7 @@
 import type { CommandePourImpression, ConfigImprimante, ResultatImpression } from "./types";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
+import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 
 /**
  * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
@@ -151,10 +152,13 @@ export function construireTicketClientXml(
   xml += ligne(`Client : ${commande.nom}`);
   xml += ligne("--------------------------------");
 
-  for (const l of commande.lignes) {
-    xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, { gras: true });
-    for (const detail of detailLigne(l)) {
-      xml += ligne(`  ${detail}`);
+  for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
+    xml += ligne(groupe.titre, { gras: true });
+    for (const l of groupe.lignes) {
+      xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, { gras: true });
+      for (const detail of detailLigne(l)) {
+        xml += ligne(`  ${detail}`);
+      }
     }
   }
 
@@ -212,13 +216,16 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   xml += styleTexte({ align: "left", gras: false, taille: 1 });
   xml += ligne("--------------------------------");
 
-  for (const l of commande.lignes) {
-    xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, {
-      gras: true,
-      taille: 2,
-    });
-    for (const detail of detailLigne(l)) {
-      xml += ligne(`  ${detail}`, { taille: 1 });
+  for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
+    xml += ligne(groupe.titre, { gras: true, taille: 1 });
+    for (const l of groupe.lignes) {
+      xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, {
+        gras: true,
+        taille: 2,
+      });
+      for (const detail of detailLigne(l)) {
+        xml += ligne(`  ${detail}`, { taille: 1 });
+      }
     }
   }
 

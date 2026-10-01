@@ -6,6 +6,7 @@ import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
+import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
@@ -357,23 +358,46 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 <p className="mt-1 text-lg text-black">Adresse : {commande.adresse}</p>
               )}
 
-              <ul className="mt-3 space-y-2">
-                {commande.lignes.map((ligne, i) => (
-                  <li key={i} className="text-xl text-black">
-                    <span className="font-semibold">
-                      {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
-                    </span>{" "}
-                    <span className="text-lg text-gray-500">
-                      ({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)
-                    </span>
-                    {detailLigne(ligne).map((detail, j) => (
-                      <div key={j} className="text-lg text-gray-700">
-                        {detail}
-                      </div>
-                    ))}
-                  </li>
+              <div className="mt-3 space-y-3">
+                {regrouperLignesParCategorie(commande.lignes).map((groupe) => (
+                  <div key={groupe.categorie}>
+                    <p className="text-sm font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
+                    <ul className="mt-1 space-y-2">
+                      {groupe.lignes.map((ligne, i) => {
+                        // Formule "composée" (menu/tacos/plat du jour) : mise en
+                        // avant visuelle dès qu'il y a un vrai détail attaché
+                        // (viande, boisson incluse...), pour la distinguer d'un
+                        // article simple (une grillade seule, par exemple).
+                        const estFormuleDetaillee =
+                          (groupe.categorie === "menu_special" ||
+                            groupe.categorie === "snacking" ||
+                            groupe.categorie === "plat_du_jour") &&
+                          detailLigne(ligne).length > 0;
+                        return (
+                          <li
+                            key={i}
+                            className={`text-xl text-black ${
+                              estFormuleDetaillee ? "border-l-4 border-[#8B2020] pl-2" : ""
+                            }`}
+                          >
+                            <span className="font-semibold">
+                              {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+                            </span>{" "}
+                            <span className="text-lg text-gray-500">
+                              ({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)
+                            </span>
+                            {detailLigne(ligne).map((detail, j) => (
+                              <div key={j} className="text-lg text-gray-700">
+                                {detail}
+                              </div>
+                            ))}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
 
               {/* Montant réel déjà calculé en base (remises comprises) —
                   jamais à resommer les lignes de tête, qui donnerait le

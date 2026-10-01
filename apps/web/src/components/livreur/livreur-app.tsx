@@ -5,6 +5,7 @@ import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee } from "@/lib/livreur/types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
+import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 
 // Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
 // `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
@@ -184,20 +185,27 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
             <p className="text-lg text-gray-700">{livraison.adresse}</p>
 
             {livraison.lignes.length > 0 && (
-              <ul className="mt-2 space-y-1 border-t border-gray-200 pt-2">
-                {livraison.lignes.map((l, i) => (
-                  <li key={i} className="text-base text-gray-900">
-                    <span className="font-semibold">
-                      {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
-                    </span>
-                    {detailLigne(l).map((detail, j) => (
-                      <div key={j} className="text-sm text-gray-600">
-                        {detail}
-                      </div>
-                    ))}
-                  </li>
+              <div className="mt-2 space-y-2 border-t border-gray-200 pt-2">
+                {regrouperLignesParCategorie(livraison.lignes).map((groupe) => (
+                  <div key={groupe.categorie}>
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
+                    <ul className="mt-0.5 space-y-1">
+                      {groupe.lignes.map((l, i) => (
+                        <li key={i} className="text-base text-gray-900">
+                          <span className="font-semibold">
+                            {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
+                          </span>
+                          {detailLigne(l).map((detail, j) => (
+                            <div key={j} className="text-sm text-gray-600">
+                              {detail}
+                            </div>
+                          ))}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
 
             {livraison.modePaiement === "stripe" ? (
