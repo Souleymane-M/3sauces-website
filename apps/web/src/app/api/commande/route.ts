@@ -35,7 +35,13 @@ const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
 // Anti-spam : cette route est publique, sans authentification. Limite large
 // (pas un login) pour ne pas gêner un client qui corrige une erreur de
 // formulaire, mais bloque un script qui inonderait la table `commandes`.
-const MAX_COMMANDES_PAR_FENETRE = 10;
+// Comptée par IP (`x-forwarded-for`) — à Mayotte, plusieurs clients mobiles
+// distincts partagent très souvent la même IP publique (NAT opérateur) :
+// un seuil trop bas bloque de vrais clients lors d'un simple coup de feu,
+// jamais un seul spammeur isolé. Découvert en session de tests le
+// 2026-10-01 (seuil à 10 atteint en ~2 minutes avec une poignée de tests
+// manuels) suite à des retours clients de difficultés à commander.
+const MAX_COMMANDES_PAR_FENETRE = 30;
 const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 
 // Anti-abus sur le contenu du panier : un panier "normal" ne dépasse jamais
@@ -181,6 +187,21 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+  }
+
+  // Le menu déroulant du client filtre déjà les créneaux déjà passés pour
+  // aujourd'hui, mais rien n'empêche un panier resté ouvert longtemps de
+  // soumettre un créneau qui vient d'expirer entre-temps — jamais de
+  // confiance dans la seule validation côté client pour une info qui
+  // dépend du temps.
+  if (dateCommande === dateMayotteIso()) {
+    const [heureCreneau, minuteCreneau] = creneauHeure.split(":").map(Number);
+    if (heureCreneau * 60 + minuteCreneau < heureActuelleMayotteMinutes()) {
+      return NextResponse.json(
+        { error: "Ce créneau vient de passer. Choisis une heure à venir." },
+        { status: 400 }
+      );
+    }
   }
 
   // --- Validation des lignes / produits (jamais de confiance dans les prix envoyés) ---

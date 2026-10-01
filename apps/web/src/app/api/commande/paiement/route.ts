@@ -4,7 +4,10 @@ import Stripe from "stripe";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 
-const MAX_APPELS_PAR_FENETRE = 10;
+// Même raisonnement que /api/commande (cf. commentaire là-bas) : seuil
+// relevé pour ne pas bloquer plusieurs clients partageant la même IP
+// mobile lors d'un coup de feu.
+const MAX_APPELS_PAR_FENETRE = 30;
 const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
