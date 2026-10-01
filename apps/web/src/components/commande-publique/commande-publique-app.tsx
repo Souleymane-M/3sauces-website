@@ -197,6 +197,7 @@ export function CommandePubliqueApp({
   }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur]);
 
   const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
   const [telephone, setTelephone] = useState("");
   // Mayotte par défaut : l'écrasante majorité des clients. Le client choisit
   // explicitement son pays plutôt que de devoir savoir qu'il doit taper
@@ -719,6 +720,10 @@ export function CommandePubliqueApp({
         return;
       }
     }
+    if (!prenom.trim()) {
+      setErreur("Indique ton prénom.");
+      return;
+    }
     if (!nom.trim()) {
       setErreur("Indique ton nom.");
       return;
@@ -793,6 +798,7 @@ export function CommandePubliqueApp({
         body: JSON.stringify({
           canal,
           nom: nom.trim(),
+          prenom: prenom.trim(),
           telephone: telephoneComplet,
           modePaiement: modePaiementEffectif,
           creneauHeure,
@@ -1291,13 +1297,23 @@ export function CommandePubliqueApp({
                 )}
               </div>
 
-              <div className="border-t border-gray-200 pt-3">
-                <label className="text-xs text-gray-500">Nom</label>
-                <input
-                  value={nom}
-                  onChange={(e) => setNom(e.target.value)}
-                  className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
-                />
+              <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500">Prénom</label>
+                  <input
+                    value={prenom}
+                    onChange={(e) => setPrenom(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Nom</label>
+                  <input
+                    value={nom}
+                    onChange={(e) => setNom(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                  />
+                </div>
               </div>
 
               <div>

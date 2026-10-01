@@ -8,6 +8,7 @@ export interface CommandeAModifier {
   numero: number;
   canal: Canal;
   nom: string;
+  prenom: string;
   telephone: string;
   adresse: string | null;
   zone: string | null;
@@ -35,7 +36,7 @@ export async function chargerCommandePourModification(
   const { data, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, canal, statut, contenu, nom_livraison, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, recompense_appliquee, commande_par"
+      "id, numero, canal, statut, contenu, nom_livraison, prenom, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, recompense_appliquee, commande_par"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -65,12 +66,21 @@ export async function chargerCommandePourModification(
       }).format(new Date(data.heure_souhaitee))
     : "";
 
+  // `nom_livraison` reste "Prénom Nom" concaténé (inchangé pour l'impression) ;
+  // on retire le préfixe prénom pour reconstituer le seul nom de famille dans
+  // le formulaire. Commandes d'avant cette colonne (sans prenom) : tout le
+  // texte reste dans le champ "nom", prénom vide — à compléter manuellement.
+  const prenom = data.prenom ?? "";
+  const nomComplet = data.nom_livraison ?? "";
+  const nom = prenom && nomComplet.startsWith(prenom) ? nomComplet.slice(prenom.length).trim() : nomComplet;
+
   return {
     commande: {
       id: data.id,
       numero: data.numero,
       canal: data.canal,
-      nom: data.nom_livraison ?? "",
+      nom,
+      prenom,
       telephone: data.client_telephone ?? "",
       adresse: data.adresse_livraison,
       zone: data.zone_livraison,

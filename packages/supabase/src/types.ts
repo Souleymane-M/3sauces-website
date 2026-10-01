@@ -219,6 +219,8 @@ export interface Database {
       clients: {
         Row: {
           telephone: string;
+          nom: string | null;
+          prenom: string | null;
           montant_cumule: number;
           tampons_acquis: number;
           recompense_disponible: boolean;
@@ -230,6 +232,8 @@ export interface Database {
         };
         Insert: {
           telephone: string;
+          nom?: string | null;
+          prenom?: string | null;
           montant_cumule?: number;
           recompense_disponible?: boolean;
           date_premier_achat_cycle?: string | null;
@@ -274,6 +278,7 @@ export interface Database {
           cout_matiere_total: number | null;
           recompense_appliquee: boolean;
           nom_livraison: string | null;
+          prenom: string | null;
           adresse_livraison: string | null;
           heure_souhaitee: string | null;
           numero: number;
@@ -302,6 +307,7 @@ export interface Database {
           cout_matiere_total?: number | null;
           recompense_appliquee?: boolean;
           nom_livraison?: string | null;
+          prenom?: string | null;
           adresse_livraison?: string | null;
           heure_souhaitee?: string | null;
           numero?: number;
@@ -494,6 +500,10 @@ export interface Database {
       };
       ajuster_stocks_produits: {
         Args: { anciens: { produitId: string; quantite: number }[]; nouveaux: { produitId: string; quantite: number }[] };
+        Returns: void;
+      };
+      corriger_telephone_client: {
+        Args: { ancien: string; nouveau: string };
         Returns: void;
       };
     };

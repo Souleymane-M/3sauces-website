@@ -340,6 +340,7 @@ export function CaisseApp({
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
   const [nom, setNom] = useState(() => commandeExistante?.nom ?? "");
+  const [prenom, setPrenom] = useState(() => commandeExistante?.prenom ?? "");
   const [adresse, setAdresse] = useState(() => commandeExistante?.adresse ?? "");
   const [zone, setZone] = useState(() => commandeExistante?.zone ?? parametres.zonesActives[0] ?? "");
 
@@ -595,7 +596,7 @@ export function CaisseApp({
   // minimum après avoir coché la case (ex: article retiré), la récompense
   // cesse d'être appliquée sans attendre un second rendu.
   const appliquerRecompenseEffectif = appliquerRecompense && total >= MONTANT_RECOMPENSE;
-  const infosClientIncompletes = !nom.trim() || !telephone.trim();
+  const infosClientIncompletes = !prenom.trim() || !nom.trim() || !telephone.trim();
 
   // Remise de lancement : jamais pour une commande créée ici (toujours
   // `commande_par` non nul dès la création) — ne peut survivre que lors de
@@ -1041,6 +1042,7 @@ export function CaisseApp({
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
           nom: nom.trim(),
+          prenom: prenom.trim(),
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
@@ -1086,7 +1088,7 @@ export function CaisseApp({
         lignes: lignesPourImpression,
         montant: data.montant,
         modePaiement,
-        nom: nom.trim(),
+        nom: `${prenom.trim()} ${nom.trim()}`.trim(),
         adresse: canal === "livraison" ? adresse.trim() : null,
         heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure)?.toISOString() ?? null,
         creeLe: new Date().toISOString(),
@@ -1102,6 +1104,7 @@ export function CaisseApp({
       setClientInfo(null);
       setAppliquerRecompense(false);
       setNom("");
+      setPrenom("");
       setAdresse("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
@@ -1144,6 +1147,7 @@ export function CaisseApp({
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
           nom: nom.trim(),
+          prenom: prenom.trim(),
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
@@ -1571,13 +1575,23 @@ export function CaisseApp({
               )}
             </div>
 
-            <div className="border-t border-gray-200 pt-3">
-              <label className="text-xs text-gray-500">Nom</label>
-              <input
-                value={nom}
-                onChange={(e) => setNom(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
-              />
+            <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500">Prénom</label>
+                <input
+                  value={prenom}
+                  onChange={(e) => setPrenom(e.target.value)}
+                  className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Nom</label>
+                <input
+                  value={nom}
+                  onChange={(e) => setNom(e.target.value)}
+                  className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                />
+              </div>
             </div>
 
             <div>

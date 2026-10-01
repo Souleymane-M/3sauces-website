@@ -88,6 +88,7 @@ export interface CreerCommandePayload {
   // serveur renvoyer une erreur 400 propre plutôt qu'un crash si absents.
   clientTelephone?: string;
   nom?: string;
+  prenom?: string;
   recompenseAppliquee?: boolean;
   /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
   boissonOfferteSaveur?: string;

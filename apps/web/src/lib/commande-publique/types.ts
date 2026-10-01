@@ -115,6 +115,7 @@ export type CanalPublic = Extract<Canal, "sur_place" | "emporter" | "livraison">
 export interface CreerCommandePubliquePayload {
   canal: CanalPublic;
   nom: string;
+  prenom: string;
   telephone: string;
   modePaiement: ModePaiement;
   lignes: LigneCommandePubliquePayload[];

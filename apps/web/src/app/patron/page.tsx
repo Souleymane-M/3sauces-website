@@ -10,6 +10,7 @@ import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-liv
 import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
 import { StatistiquesJourApp } from "@/components/patron/statistiques-jour-app";
 import { ClientsApp } from "@/components/patron/clients-app";
+import { PatronTabs } from "@/components/patron/patron-tabs";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { JoursFermetureApp } from "@/components/patron/jours-fermeture-app";
 import { RemiseLancementApp } from "@/components/patron/remise-lancement-app";
@@ -96,30 +97,75 @@ export default async function PatronPage() {
         Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
         gestion complète de la carte et des options ci-dessous.
       </p>
-      <div className="mb-4 space-y-3">
+      <div className="mb-4">
         <EtatSiteApp ouvertInitial={siteOuvert} />
-        <JoursFermetureApp joursInitiaux={joursFermeture} />
-        <RemiseLancementApp debutInitial={remiseLancement.debut} finInitiale={remiseLancement.fin} />
-        <GroupeMetriquesApp metriques={metriquesGroupe} />
       </div>
-      <StatistiquesJourApp stats={statistiquesJour} />
-      <ClientsApp clientsInitiaux={clients} />
-      <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
-      <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
-      <CommandesHistoriqueApp
-        historiqueInitial={historique}
-        tempsMoyenParEmploye={tempsMoyenParEmploye}
-        profilId={session.profilId}
-        livreursActifs={livreursActifs}
+
+      <PatronTabs
+        onglets={[
+          {
+            id: "aujourdhui",
+            label: "Aujourd'hui",
+            contenu: (
+              <>
+                <StatistiquesJourApp stats={statistiquesJour} />
+                <EncaissementsJourApp totauxJour={encaissementsJour} alertes={alertesEncaissement} />
+                <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
+              </>
+            ),
+          },
+          {
+            id: "clients",
+            label: "Clients & fidélité",
+            contenu: <ClientsApp clientsInitiaux={clients} />,
+          },
+          {
+            id: "commandes",
+            label: "Commandes",
+            contenu: (
+              <>
+                <GroupeMetriquesApp metriques={metriquesGroupe} />
+                <CommandesHistoriqueApp
+                  historiqueInitial={historique}
+                  tempsMoyenParEmploye={tempsMoyenParEmploye}
+                  profilId={session.profilId}
+                  livreursActifs={livreursActifs}
+                />
+              </>
+            ),
+          },
+          {
+            id: "carte",
+            label: "Carte",
+            contenu: (
+              <>
+                <ProduitsApp produitsInitiaux={produits} />
+                <OptionsApp
+                  viandesInitiales={viandes}
+                  saucesInitiales={sauces}
+                  saveursInitiales={saveurs}
+                  parfums2lInitiales={parfums2l}
+                />
+              </>
+            ),
+          },
+          {
+            id: "site",
+            label: "Site",
+            contenu: (
+              <>
+                <JoursFermetureApp joursInitiaux={joursFermeture} />
+                <RemiseLancementApp debutInitial={remiseLancement.debut} finInitiale={remiseLancement.fin} />
+              </>
+            ),
+          },
+          {
+            id: "imprimantes",
+            label: "Imprimantes",
+            contenu: <ImprimantesApp imprimantesInitiales={imprimantes} />,
+          },
+        ]}
       />
-      <ProduitsApp produitsInitiaux={produits} />
-      <OptionsApp
-        viandesInitiales={viandes}
-        saucesInitiales={sauces}
-        saveursInitiales={saveurs}
-        parfums2lInitiales={parfums2l}
-      />
-      <ImprimantesApp imprimantesInitiales={imprimantes} />
     </main>
   );
 }

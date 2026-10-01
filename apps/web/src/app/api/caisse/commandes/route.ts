@@ -402,6 +402,10 @@ export async function POST(request: Request) {
   if (!nom) {
     return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
   }
+  const prenom = (body.prenom ?? "").trim();
+  if (!prenom) {
+    return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
+  }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
@@ -522,6 +526,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
+  // récente — distinct des colonnes fidélité (montant_cumule, tampons...)
+  // qui restent exclusivement écrites par le trigger de paiement.
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
+
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.
   const stockAVerifier = new Map<string, number>();
@@ -568,7 +577,8 @@ export async function POST(request: Request) {
       commande_par: session.profilId,
       cout_matiere_total: coutMatiereTotal,
       recompense_appliquee: recompenseAppliquee,
-      nom_livraison: nom,
+      nom_livraison: `${prenom} ${nom}`,
+      prenom,
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
@@ -664,6 +674,10 @@ export async function PATCH(request: Request) {
   const nom = (body.nom ?? "").trim();
   if (!nom) {
     return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
+  }
+  const prenom = (body.prenom ?? "").trim();
+  if (!prenom) {
+    return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
   }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
@@ -781,6 +795,7 @@ export async function PATCH(request: Request) {
     console.error("[/api/caisse/commandes PATCH] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
 
   // Ajustement atomique du stock du jour : restitue les anciennes quantités
   // (contenu avant modification) puis décompte les nouvelles, dans la même
@@ -823,7 +838,8 @@ export async function PATCH(request: Request) {
       mode_paiement: body.modePaiement,
       client_telephone: clientTelephone,
       cout_matiere_total: coutMatiereTotal,
-      nom_livraison: nom,
+      nom_livraison: `${prenom} ${nom}`,
+      prenom,
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),

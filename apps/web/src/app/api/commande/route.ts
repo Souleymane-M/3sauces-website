@@ -94,6 +94,10 @@ export async function POST(request: Request) {
   if (!nom) {
     return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
   }
+  const prenom = (body.prenom ?? "").trim();
+  if (!prenom) {
+    return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
+  }
 
   const telephone = normaliserTelephone(body.telephone ?? "");
   if (!telephone) {
@@ -691,6 +695,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
+  // récente — distinct des colonnes fidélité (montant_cumule, tampons...)
+  // qui restent exclusivement écrites par le trigger de paiement.
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", telephone);
+
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.
   const stockAVerifier = new Map<string, number>();
@@ -724,7 +733,8 @@ export async function POST(request: Request) {
       paiement_statut: "non_paye",
       mode_paiement: body.modePaiement,
       client_telephone: telephone,
-      nom_livraison: nom,
+      nom_livraison: `${prenom} ${nom}`,
+      prenom,
       adresse_livraison: adresse,
       zone_livraison: zone,
       heure_souhaitee: heureSouhaitee.toISOString(),
