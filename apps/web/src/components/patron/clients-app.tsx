@@ -156,13 +156,17 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                 <button
                   type="button"
                   onClick={() => ouvrirFiche(c)}
-                  className="flex w-full items-center justify-between p-3 text-left"
+                  className="flex w-full items-center justify-between gap-2 p-3 text-left"
                 >
-                  <div>
+                  <span className={`shrink-0 text-gray-400 transition-transform ${ouvert ? "rotate-90" : ""}`}>▶</span>
+                  <div className="flex-1">
                     <p className="font-semibold text-gray-900">{nomAffiche(c)}</p>
                     <p className="text-xs text-gray-500">{c.telephone}</p>
                   </div>
-                  <span className="font-bold text-gray-900">{c.montantCumule.toFixed(2)} €</span>
+                  <div className="text-right">
+                    <span className="block font-bold text-gray-900">{c.montantCumule.toFixed(2)} €</span>
+                    {!ouvert && <span className="text-xs text-[#8B2020] underline">Voir la fiche</span>}
+                  </div>
                 </button>
 
                 {!ouvert && (
