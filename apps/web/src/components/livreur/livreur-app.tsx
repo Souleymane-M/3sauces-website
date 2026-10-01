@@ -159,6 +159,12 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
         const totalGroupeCorrespond = declaration && totalGroupeDeclare === Math.round(livraison.montant * 100) / 100;
 
         const prioritaire = livraison.palierGroupe !== null;
+        // Remise éventuelle (lancement et/ou récompense fidélité) : déduite
+        // de l'écart entre la somme des lignes et le montant réellement dû —
+        // pour que le livreur sache que le client a eu une réduction, pas
+        // juste le montant final à récupérer.
+        const montantBrutLivraison = livraison.lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0);
+        const remiseLivraison = Math.round((montantBrutLivraison - livraison.montant) * 100) / 100;
 
         return (
           <div
@@ -200,7 +206,14 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
                 <p className="text-base font-semibold text-[#2D5A27]">Rien à récupérer — ne rien demander au client</p>
               </div>
             ) : (
-              <p className="mt-2 text-2xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
+              <>
+                {remiseLivraison > 0.009 && (
+                  <p className="mt-2 text-base font-semibold text-[#2D5A27]">
+                    🎁 Remise appliquée : -{remiseLivraison.toFixed(2)} €
+                  </p>
+                )}
+                <p className="mt-1 text-2xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
+              </>
             )}
 
             {!declaration && livraison.modePaiement === "stripe" && (

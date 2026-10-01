@@ -14,6 +14,8 @@ export interface CommandeAModifier {
   creneauHeure: string;
   modePaiement: ModePaiement;
   lignes: LigneCommande[];
+  /** `null` = commande d'origine publique (site) — seule éligible à la remise de lancement, y compris après modification ici. */
+  commandePar: string | null;
 }
 
 /**
@@ -33,7 +35,7 @@ export async function chargerCommandePourModification(
   const { data, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, canal, statut, contenu, nom_livraison, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, recompense_appliquee"
+      "id, numero, canal, statut, contenu, nom_livraison, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, recompense_appliquee, commande_par"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -75,6 +77,7 @@ export async function chargerCommandePourModification(
       creneauHeure,
       modePaiement: data.mode_paiement,
       lignes: Array.isArray(data.contenu) ? (data.contenu as LigneCommande[]) : [],
+      commandePar: data.commande_par,
     },
     erreur: null,
   };

@@ -308,6 +308,12 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
           const livreurSelectionne = livreurChoisi[commande.id] ?? "";
 
           const prioritaire = estPrioritaire(commande);
+          // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
+          // stockée telle quelle en base, déduite de l'écart entre la somme
+          // des lignes et le montant réellement dû — pour que l'équipe voie
+          // que le client a bénéficié d'une réduction, pas juste le total final.
+          const montantBrutCommande = commande.lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0);
+          const remiseCommande = Math.round((montantBrutCommande - commande.montant) * 100) / 100;
 
           return (
             <div
@@ -372,7 +378,12 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
               {/* Montant réel déjà calculé en base (remises comprises) —
                   jamais à resommer les lignes de tête, qui donnerait le
                   montant brut et non ce qu'il faut vraiment faire payer. */}
-              <p className="mt-3 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black">
+              {remiseCommande > 0.009 && (
+                <p className="mt-3 text-center text-lg font-semibold text-[#2D5A27]">
+                  🎁 Remise appliquée : -{remiseCommande.toFixed(2)} €
+                </p>
+              )}
+              <p className={remiseCommande > 0.009 ? "mt-1 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black" : "mt-3 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black"}>
                 Total : {commande.montant.toFixed(2)} €
               </p>
 

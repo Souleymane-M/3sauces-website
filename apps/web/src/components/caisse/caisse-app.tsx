@@ -35,6 +35,7 @@ import {
   progressionFideliteCommande,
   texteProgressionFidelite,
 } from "@/lib/fidelite/regles";
+import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
   composerTelephoneAvecPays,
@@ -593,6 +594,18 @@ export function CaisseApp({
   // cesse d'être appliquée sans attendre un second rendu.
   const appliquerRecompenseEffectif = appliquerRecompense && total >= MONTANT_RECOMPENSE;
   const infosClientIncompletes = !nom.trim() || !telephone.trim();
+
+  // Remise de lancement : jamais pour une commande créée ici (toujours
+  // `commande_par` non nul dès la création) — ne peut survivre que lors de
+  // la modification d'une commande d'origine publique qui l'avait déjà
+  // obtenue, exactement comme recalculé côté serveur (cf. /api/caisse/commandes).
+  // Affichée ici pour que la caissière ne découvre pas un montant final
+  // différent de ce qu'elle a sous les yeux pendant la saisie.
+  const remiseLancementEligible =
+    commandeExistante?.commandePar === null && parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT;
+  const remiseRecompenseEffective = appliquerRecompenseEffectif && clientInfo?.recompense_disponible ? MONTANT_RECOMPENSE : 0;
+  const totalApresRemises =
+    total - (remiseLancementEligible ? MONTANT_REMISE_LANCEMENT : 0) - remiseRecompenseEffective;
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -1743,11 +1756,17 @@ export function CaisseApp({
             </div>
 
             <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
-              Total :{" "}
-              {(appliquerRecompenseEffectif && clientInfo?.recompense_disponible ? total - MONTANT_RECOMPENSE : total).toFixed(
-                2
-              )}{" "}
-              €
+              {remiseLancementEligible && (
+                <p className="text-sm font-semibold text-[#2D5A27]">
+                  🎁 Remise lancement conservée : -{MONTANT_REMISE_LANCEMENT.toFixed(2)} €
+                </p>
+              )}
+              {remiseRecompenseEffective > 0 && (
+                <p className="text-sm font-semibold text-[#2D5A27]">
+                  🎁 Récompense fidélité : -{remiseRecompenseEffective.toFixed(2)} €
+                </p>
+              )}
+              Total : {totalApresRemises.toFixed(2)} €
               {total > 0 && (
                 <p className="mt-1 text-xs font-semibold text-gray-500">
                   {texteProgressionFidelite(
