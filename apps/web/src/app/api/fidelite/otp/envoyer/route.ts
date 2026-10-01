@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { telephone?: string } | null;
   const telephone = normaliserTelephone(body?.telephone ?? "");
   if (!telephone) {
-    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
   if (limiterDebit(`otp-envoi-tel-court:${telephone}`, 1, 60 * 1000)) {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const resultat = await envoyerCodeVerification(telephone);
   if (!resultat.ok) {
     if (resultat.motif === "numero_invalide") {
-      return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+      return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
     }
     if (resultat.motif === "trop_de_tentatives") {
       return NextResponse.json(

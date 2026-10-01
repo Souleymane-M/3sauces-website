@@ -6,11 +6,15 @@
  * automatiquement (Mayotte et la métropole partagent le même format local
  * à 10 chiffres, aucun moyen fiable de les distinguer autrement).
  *
- * Volontairement tolérante aux erreurs de saisie les plus fréquentes
- * (observées en usage réel) plutôt que de rejeter sèchement :
- *  - parenthèses/espaces multiples autour de l'indicatif ;
- *  - le zéro local en trop après un indicatif déjà saisi (+262 0639...) ;
- *  - le zéro initial oublié (639... au lieu de 0639...).
+ * Tolère uniquement les erreurs de FORMATAGE qui ne changent aucun chiffre
+ * du numéro (espaces/points/tirets/parenthèses, zéro local en trop après un
+ * indicatif déjà saisi comme "+262 0639..." — toujours correct à coup sûr).
+ * Rejette en revanche tout ce qui touche au NOMBRE de chiffres (un zéro
+ * manquant ou en trop, "00" suivi d'un numéro local...) : on ne peut jamais
+ * distinguer à coup sûr "un zéro de trop/en moins" d'une autre erreur de
+ * saisie ailleurs dans le numéro — deviner ferait courir le risque de
+ * sauvegarder silencieusement un numéro tout aussi faux mais qui a l'air
+ * valide. Le client doit alors ressaisir son numéro exact.
  */
 export function normaliserTelephone(saisie: string): string | null {
   const nettoye = saisie.trim().replace(/[\s.\-()]/g, "");
@@ -45,11 +49,11 @@ export function normaliserTelephone(saisie: string): string | null {
     return `+262${nettoye.slice(1)}`;
   }
 
-  // Zéro initial oublié (9 chiffres au lieu de 10) — faute de frappe ou
-  // copier-coller courant, on le complète plutôt que de rejeter.
-  if (/^\d{9}$/.test(nettoye)) {
-    return `+262${nettoye}`;
-  }
-
+  // 9 chiffres sans le 0 initial (ex: "639123456") : rejeté plutôt que
+  // deviné, même raisonnement que pour le cas "00" ci-dessus — un chiffre
+  // manquant ailleurs dans le numéro produirait aussi 9 chiffres, et
+  // compléter par défaut risquerait de sauvegarder silencieusement un
+  // numéro tout aussi faux. Le client doit saisir son numéro exact (10
+  // chiffres, ex: "0639123456"), jamais de correction automatique.
   return null;
 }

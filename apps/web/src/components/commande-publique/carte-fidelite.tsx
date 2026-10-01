@@ -127,7 +127,7 @@ export function CarteFidelite({
     setErreur(null);
     const telephone = normaliserTelephone(telephoneSaisi);
     if (!telephone) {
-      setErreur("Numéro de téléphone invalide.");
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     setEnCours(true);

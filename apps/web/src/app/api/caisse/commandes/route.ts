@@ -404,7 +404,7 @@ export async function POST(request: Request) {
   }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
-    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
   const supabase = createServiceSupabaseClient();
@@ -667,7 +667,7 @@ export async function PATCH(request: Request) {
   }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
-    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
   const supabase = createServiceSupabaseClient();

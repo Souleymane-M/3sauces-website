@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const telephoneNormalise = normaliserTelephone(searchParams.get("telephone") ?? "");
   if (!telephoneNormalise) {
-    return NextResponse.json({ error: "Numéro de téléphone invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
   const supabase = createServiceSupabaseClient();
