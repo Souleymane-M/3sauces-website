@@ -893,7 +893,9 @@ export function CommandePubliqueApp({
           </div>
         )}
         {l.accompagnementsInclus.length > 0 && (
-          <div className="text-xs text-gray-400">Accompagnement : {l.accompagnementsInclus.join(" + ")}</div>
+          <div className="text-xs text-gray-400">
+            Accompagnement : {l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}
+          </div>
         )}
         {l.saladeIncluse !== null && (
           <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>

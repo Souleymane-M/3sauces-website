@@ -9,6 +9,7 @@ import type {
 } from "@/lib/commande-publique/types";
 import { GROUPE_ACCOMPAGNEMENT_COMBINABLE, GROUPE_ACCOMPAGNEMENT_EXCLUSIF } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_REDUCTION_SANS_BOISSON, NOM_PRODUIT_MENU_ETUDIANT } from "@/lib/commande-publique/types";
+import { nomSansMultiplicateur } from "@/lib/pieces-produit";
 
 export interface ExtrasChoisis {
   /** Une entrée par unité de viande supplémentaire choisie (doublons autorisés, illimité). */
@@ -375,7 +376,7 @@ export function ViandeModalPublique({
                         : "border-gray-300 text-gray-700 hover:bg-gray-50"
                     } disabled:opacity-30`}
                   >
-                    {a.nom}
+                    {nomSansMultiplicateur(a.nom)}
                   </button>
                 );
               })}
