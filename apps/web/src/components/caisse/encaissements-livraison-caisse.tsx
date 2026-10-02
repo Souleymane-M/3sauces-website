@@ -34,8 +34,9 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
   const [noteEcart, setNoteEcart] = useState<Record<string, string>>({});
   const [signalementOuvert, setSignalementOuvert] = useState<string | null>(null);
   const [saisieManuelleOuverte, setSaisieManuelleOuverte] = useState<string | null>(null);
-  const [modeManuel, setModeManuel] = useState<Record<string, "especes" | "cb">>({});
+  const [modeManuel, setModeManuel] = useState<Record<string, "especes" | "cb" | "mixte">>({});
   const [montantManuel, setMontantManuel] = useState<Record<string, string>>({});
+  const [montantEspecesMixte, setMontantEspecesMixte] = useState<Record<string, string>>({});
 
   async function appeler(commandeId: string, body: Record<string, unknown>) {
     setErreur(null);
@@ -77,17 +78,37 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
   }
 
   async function confirmerSaisieManuelle(livraison: LivraisonAEncaisser) {
-    const montant = Number((montantManuel[livraison.id] ?? "").replace(",", "."));
-    if (!Number.isFinite(montant) || montant <= 0) {
-      setErreur("Montant invalide.");
-      return;
-    }
     const mode = modeManuel[livraison.id] ?? "especes";
+    let paiements: { mode: "especes" | "cb"; montant: number }[];
+
+    if (mode === "mixte") {
+      const especes = Number((montantEspecesMixte[livraison.id] ?? "").replace(",", "."));
+      if (!Number.isFinite(especes) || especes < 0 || especes > livraison.montant) {
+        setErreur("Montant espèces invalide.");
+        return;
+      }
+      const cb = Math.round((livraison.montant - especes) * 100) / 100;
+      paiements = [];
+      if (especes > 0) paiements.push({ mode: "especes", montant: especes });
+      if (cb > 0) paiements.push({ mode: "cb", montant: cb });
+      if (paiements.length === 0) {
+        setErreur("Renseigne au moins un montant.");
+        return;
+      }
+    } else {
+      const montant = Number((montantManuel[livraison.id] ?? "").replace(",", "."));
+      if (!Number.isFinite(montant) || montant <= 0) {
+        setErreur("Montant invalide.");
+        return;
+      }
+      paiements = [{ mode, montant }];
+    }
+
     const precedentes = livraisons;
     setLivraisons((prec) => prec.filter((l) => l.id !== livraison.id));
     const ok = await appeler(livraison.id, {
       action: "declarer_et_valider",
-      paiements: [{ mode, montant }],
+      paiements,
     });
     if (ok) {
       setSaisieManuelleOuverte(null);
@@ -144,34 +165,67 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <p className="text-sm text-gray-400">Le livreur n&apos;a pas déclaré ce paiement.</p>
                 {saisieManuelleOuverte === l.id ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <select
-                      value={modeManuel[l.id] ?? "especes"}
-                      onChange={(e) =>
-                        setModeManuel((prec) => ({ ...prec, [l.id]: e.target.value as "especes" | "cb" }))
-                      }
-                      className="rounded border border-gray-300 p-2 text-sm text-gray-900"
-                    >
-                      <option value="especes">Espèces</option>
-                      <option value="cb">Carte</option>
-                    </select>
-                    <input
-                      value={montantManuel[l.id] ?? ""}
-                      onChange={(e) => setMontantManuel((prec) => ({ ...prec, [l.id]: e.target.value }))}
-                      inputMode="decimal"
-                      placeholder={l.montant.toFixed(2)}
-                      className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
-                    />
-                    <button
-                      onClick={() => confirmerSaisieManuelle(l)}
-                      disabled={enCours === l.id}
-                      className="rounded bg-[#8B2020] px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                    >
-                      Confirmer
-                    </button>
-                    <button onClick={() => setSaisieManuelleOuverte(null)} className="text-sm text-gray-500 underline">
-                      Annuler
-                    </button>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={modeManuel[l.id] ?? "especes"}
+                        onChange={(e) =>
+                          setModeManuel((prec) => ({ ...prec, [l.id]: e.target.value as "especes" | "cb" | "mixte" }))
+                        }
+                        className="rounded border border-gray-300 p-2 text-sm text-gray-900"
+                      >
+                        <option value="especes">Espèces</option>
+                        <option value="cb">Carte</option>
+                        <option value="mixte">Mixte (espèces + carte)</option>
+                      </select>
+                      {(modeManuel[l.id] ?? "especes") !== "mixte" && (
+                        <input
+                          value={montantManuel[l.id] ?? ""}
+                          onChange={(e) => setMontantManuel((prec) => ({ ...prec, [l.id]: e.target.value }))}
+                          inputMode="decimal"
+                          placeholder={l.montant.toFixed(2)}
+                          className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
+                        />
+                      )}
+                    </div>
+
+                    {modeManuel[l.id] === "mixte" && (
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                        <label className="flex items-center gap-1">
+                          Espèces
+                          <input
+                            value={montantEspecesMixte[l.id] ?? ""}
+                            onChange={(e) => setMontantEspecesMixte((prec) => ({ ...prec, [l.id]: e.target.value }))}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
+                          />
+                        </label>
+                        <span>
+                          Carte :{" "}
+                          {Math.max(
+                            0,
+                            Math.round(
+                              (l.montant - (Number((montantEspecesMixte[l.id] ?? "").replace(",", ".")) || 0)) * 100
+                            ) / 100
+                          ).toFixed(2)}{" "}
+                          € (calculé)
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => confirmerSaisieManuelle(l)}
+                        disabled={enCours === l.id}
+                        className="rounded bg-[#8B2020] px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                      >
+                        Confirmer
+                      </button>
+                      <button onClick={() => setSaisieManuelleOuverte(null)} className="text-sm text-gray-500 underline">
+                        Annuler
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
