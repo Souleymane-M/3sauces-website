@@ -83,11 +83,14 @@ export async function corrigerClientAdmin({
   nouveauTelephone,
   nom,
   prenom,
+  email,
 }: {
   telephone: string;
   nouveauTelephone?: string;
   nom?: string;
   prenom?: string;
+  /** `undefined` = ne touche pas à l'email ; `null`/chaîne = le remplace (y compris pour l'effacer). */
+  email?: string | null;
 }): Promise<{ erreur: string | null }> {
   const supabase = createServiceSupabaseClient();
 
@@ -103,10 +106,11 @@ export async function corrigerClientAdmin({
     telephoneActuel = nouveauTelephone;
   }
 
-  if (nom !== undefined || prenom !== undefined) {
-    const maj: { nom?: string; prenom?: string } = {};
+  if (nom !== undefined || prenom !== undefined || email !== undefined) {
+    const maj: { nom?: string; prenom?: string; email?: string | null } = {};
     if (nom !== undefined) maj.nom = nom;
     if (prenom !== undefined) maj.prenom = prenom;
+    if (email !== undefined) maj.email = email;
     const { error } = await supabase.from("clients").update(maj).eq("telephone", telephoneActuel);
     if (error) {
       return { erreur: error.message };

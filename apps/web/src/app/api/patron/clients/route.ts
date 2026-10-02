@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
 import { listerCommandesParClient, corrigerClientAdmin } from "@/lib/patron/clients";
+import { normaliserEmail } from "@/lib/email";
 
 /** Historique des commandes d'un client — chargé à la demande depuis la fiche sur /patron. */
 export async function GET(request: Request) {
@@ -34,6 +35,7 @@ export async function PATCH(request: Request) {
     nouveauTelephone?: string;
     nom?: string;
     prenom?: string;
+    email?: string | null;
   } | null;
 
   if (!body?.telephone) {
@@ -48,12 +50,24 @@ export async function PATCH(request: Request) {
   if (body.prenom !== undefined && !body.prenom.trim()) {
     return NextResponse.json({ error: "Le prénom ne peut pas être vide." }, { status: 400 });
   }
+  let email: string | null | undefined;
+  if (body.email !== undefined) {
+    if (body.email === null) {
+      email = null;
+    } else {
+      email = normaliserEmail(body.email);
+      if (!email) {
+        return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
+      }
+    }
+  }
 
   const { erreur } = await corrigerClientAdmin({
     telephone: body.telephone,
     nouveauTelephone: body.nouveauTelephone?.trim(),
     nom: body.nom?.trim(),
     prenom: body.prenom?.trim(),
+    email,
   });
 
   if (erreur) {

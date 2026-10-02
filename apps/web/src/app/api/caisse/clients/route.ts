@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data: client, error } = await supabase
     .from("clients")
-    .select("telephone, montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
+    .select("telephone, nom, prenom, email, montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
     .eq("telephone", telephoneNormalise)
     .maybeSingle();
 

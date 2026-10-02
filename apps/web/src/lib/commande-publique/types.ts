@@ -116,6 +116,8 @@ export interface CreerCommandePubliquePayload {
   canal: CanalPublic;
   nom: string;
   prenom: string;
+  /** `null` = laissé vide par un client déjà connu de ce numéro (garde l'email déjà enregistré), jamais pour un nouveau client. */
+  email: string | null;
   telephone: string;
   modePaiement: ModePaiement;
   lignes: LigneCommandePubliquePayload[];

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ClientAdmin, CommandeClientAdmin } from "@/lib/patron/clients";
 import { MONTANT_RECOMPENSE, SEUIL_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { normaliserEmail } from "@/lib/email";
 
 interface ClientsAppProps {
   clientsInitiaux: ClientAdmin[];
@@ -32,7 +33,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
   const [clients, setClients] = useState(clientsInitiaux);
   const [recherche, setRecherche] = useState("");
   const [telephoneOuvert, setTelephoneOuvert] = useState<string | null>(null);
-  const [edition, setEdition] = useState<{ prenom: string; nom: string; telephone: string } | null>(null);
+  const [edition, setEdition] = useState<{ prenom: string; nom: string; telephone: string; email: string } | null>(null);
   const [erreurEdition, setErreurEdition] = useState<string | null>(null);
   const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
   const [historiques, setHistoriques] = useState<Record<string, CommandeClientAdmin[] | "chargement" | "erreur">>({});
@@ -62,7 +63,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
       return;
     }
     setTelephoneOuvert(c.telephone);
-    setEdition({ prenom: c.prenom ?? "", nom: c.nom ?? "", telephone: c.telephone });
+    setEdition({ prenom: c.prenom ?? "", nom: c.nom ?? "", telephone: c.telephone, email: c.email ?? "" });
     setErreurEdition(null);
   }
 
@@ -86,6 +87,14 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
       setErreurEdition("Prénom, nom et téléphone sont obligatoires.");
       return;
     }
+    let email: string | null = null;
+    if (edition.email.trim()) {
+      email = normaliserEmail(edition.email);
+      if (!email) {
+        setErreurEdition("Adresse email invalide.");
+        return;
+      }
+    }
     setEnregistrementEnCours(true);
     try {
       const reponse = await fetch("/api/patron/clients", {
@@ -96,6 +105,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
           nouveauTelephone: edition.telephone.trim() !== ancienTelephone ? edition.telephone.trim() : undefined,
           prenom: edition.prenom.trim(),
           nom: edition.nom.trim(),
+          email,
         }),
       });
       const data = await reponse.json();
@@ -106,7 +116,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
       setClients((prev) =>
         prev.map((c) =>
           c.telephone === ancienTelephone
-            ? { ...c, telephone: edition.telephone.trim(), prenom: edition.prenom.trim(), nom: edition.nom.trim() }
+            ? { ...c, telephone: edition.telephone.trim(), prenom: edition.prenom.trim(), nom: edition.nom.trim(), email }
             : c
         )
       );
@@ -190,6 +200,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                       </span>
                       {c.dateExpiration && <span>Expire le {formaterDate(c.dateExpiration)}</span>}
                     </div>
+                    <p className="text-xs text-gray-500">{c.email ?? "Pas d'email enregistré"}</p>
 
                     {c.recompenseDisponible ? (
                       <p className="text-xs font-bold text-[#2D5A27]">🎁 Récompense de {MONTANT_RECOMPENSE}€ disponible !</p>
@@ -224,6 +235,13 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                       <p className="text-xs text-gray-400">
                         Changer le téléphone déplace ses commandes et son historique fidélité vers le nouveau numéro.
                       </p>
+                      <input
+                        type="email"
+                        value={edition?.email ?? ""}
+                        onChange={(e) => setEdition((ed) => (ed ? { ...ed, email: e.target.value } : ed))}
+                        placeholder="Email (vide si inconnu)"
+                        className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                      />
                       {erreurEdition && <p className="text-xs text-red-600">{erreurEdition}</p>}
                       <button
                         type="button"

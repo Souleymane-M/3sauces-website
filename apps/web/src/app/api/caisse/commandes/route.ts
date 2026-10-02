@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
@@ -440,7 +441,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
+  // Email : requis, sauf si ce numéro a déjà un email enregistré et que la
+  // caissière a volontairement laissé le champ vide pour le garder.
+  const emailSaisiBrut = (body.email ?? "").trim();
+  let email: string | null = null;
+  if (emailSaisiBrut) {
+    email = normaliserEmail(emailSaisiBrut);
+    if (!email) {
+      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
+    }
+  }
+
   const supabase = createServiceSupabaseClient();
+
+  if (!email) {
+    const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", clientTelephone).maybeSingle();
+    if (!clientExistant?.email) {
+      return NextResponse.json({ error: "Adresse email requise." }, { status: 400 });
+    }
+  }
 
   // --- Paramètres de livraison (mêmes règles que le site public, cf.
   // /api/commande) : une livraison prise au téléphone par la caisse a
@@ -558,7 +577,10 @@ export async function POST(request: Request) {
   // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
   // récente — distinct des colonnes fidélité (montant_cumule, tampons...)
   // qui restent exclusivement écrites par le trigger de paiement.
-  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
+  await supabase
+    .from("clients")
+    .update({ nom, prenom, ...(email ? { email } : {}) })
+    .eq("telephone", clientTelephone);
 
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.
@@ -723,7 +745,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
+  const emailSaisiBrut = (body.email ?? "").trim();
+  let email: string | null = null;
+  if (emailSaisiBrut) {
+    email = normaliserEmail(emailSaisiBrut);
+    if (!email) {
+      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
+    }
+  }
+
   const supabase = createServiceSupabaseClient();
+
+  if (!email) {
+    const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", clientTelephone).maybeSingle();
+    if (!clientExistant?.email) {
+      return NextResponse.json({ error: "Adresse email requise." }, { status: 400 });
+    }
+  }
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")
@@ -851,7 +889,10 @@ export async function PATCH(request: Request) {
     console.error("[/api/caisse/commandes PATCH] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
-  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
+  await supabase
+    .from("clients")
+    .update({ nom, prenom, ...(email ? { email } : {}) })
+    .eq("telephone", clientTelephone);
 
   // Ajustement atomique du stock du jour : restitue les anciennes quantités
   // (contenu avant modification) puis décompte les nouvelles, dans la même

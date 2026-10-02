@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 import {
   construireHeureSouhaiteeUtc,
   creneauDansPlage,
@@ -104,6 +105,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
+  // Email : requis, sauf si ce numéro a déjà un email enregistré et que le
+  // client a volontairement laissé le champ vide pour le garder — jamais
+  // une saisie non vide mais invalide, toujours rejetée.
+  const emailSaisiBrut = (body.email ?? "").trim();
+  let email: string | null = null;
+  if (emailSaisiBrut) {
+    email = normaliserEmail(emailSaisiBrut);
+    if (!email) {
+      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 });
+    }
+  }
+
   const creneauHeure = body.creneauHeure;
   if (typeof creneauHeure !== "string" || !creneauHeure) {
     return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
@@ -120,6 +133,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
+
+  if (!email) {
+    const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
+    if (!clientExistant?.email) {
+      return NextResponse.json({ error: "Adresse email requise." }, { status: 400 });
+    }
+  }
 
   // --- Paramètres de livraison (source de vérité : jamais codés en dur) ---
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] =
@@ -697,8 +717,13 @@ export async function POST(request: Request) {
 
   // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
   // récente — distinct des colonnes fidélité (montant_cumule, tampons...)
-  // qui restent exclusivement écrites par le trigger de paiement.
-  await supabase.from("clients").update({ nom, prenom }).eq("telephone", telephone);
+  // qui restent exclusivement écrites par le trigger de paiement. L'email
+  // n'est inclus que s'il a été resaisi : un champ laissé vide par un
+  // client déjà connu ne doit jamais effacer l'email déjà enregistré.
+  await supabase
+    .from("clients")
+    .update({ nom, prenom, ...(email ? { email } : {}) })
+    .eq("telephone", telephone);
 
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.

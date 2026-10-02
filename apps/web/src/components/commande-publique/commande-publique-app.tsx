@@ -50,6 +50,7 @@ import {
   LIBELLE_PAYS_TELEPHONE,
   type PaysTelephone,
 } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 
 interface LignePanierPublique {
   id: string;
@@ -198,12 +199,43 @@ export function CommandePubliqueApp({
 
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
+  const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
   // Mayotte par défaut : l'écrasante majorité des clients. Le client choisit
   // explicitement son pays plutôt que de devoir savoir qu'il doit taper
   // lui-même +33 — élimine le risque qu'un numéro métropolitain tapé sans
   // indicatif se retrouve silencieusement enregistré comme mahorais.
   const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
+  const [emailDejaConnu, setEmailDejaConnu] = useState(false);
+
+  // Un client déjà passé commande n'a pas à retaper son email à chaque
+  // fois : dès que son numéro est complet, on vérifie discrètement si un
+  // email est déjà enregistré pour lui (jamais l'email lui-même, juste
+  // oui/non, cf. /api/commande/email-connu) pour ne pas bloquer la
+  // validation s'il laisse le champ vide.
+  useEffect(() => {
+    let annule = false;
+    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const minuteur = setTimeout(async () => {
+      if (!telephoneComplet) {
+        if (!annule) setEmailDejaConnu(false);
+        return;
+      }
+      try {
+        const reponse = await fetch(`/api/commande/email-connu?telephone=${encodeURIComponent(telephoneComplet)}`);
+        if (annule) return;
+        const data = await reponse.json();
+        setEmailDejaConnu(Boolean(data.emailConnu));
+      } catch {
+        // Échec silencieux : le pire cas est de redemander l'email, jamais bloquant.
+      }
+    }, 400);
+    return () => {
+      annule = true;
+      clearTimeout(minuteur);
+    };
+  }, [telephone, paysTelephone]);
+
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
@@ -728,6 +760,17 @@ export function CommandePubliqueApp({
       setErreur("Indique ton nom.");
       return;
     }
+    let emailValide: string | null = null;
+    if (email.trim()) {
+      emailValide = normaliserEmail(email);
+      if (!emailValide) {
+        setErreur("Indique une adresse email valide.");
+        return;
+      }
+    } else if (!emailDejaConnu) {
+      setErreur("Indique ton adresse email.");
+      return;
+    }
     if (!telephone.trim()) {
       setErreur("Indique ton numéro de téléphone.");
       return;
@@ -799,6 +842,7 @@ export function CommandePubliqueApp({
           canal,
           nom: nom.trim(),
           prenom: prenom.trim(),
+          email: emailValide,
           telephone: telephoneComplet,
           modePaiement: modePaiementEffectif,
           creneauHeure,
@@ -1316,6 +1360,22 @@ export function CommandePubliqueApp({
                     className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={emailDejaConnu ? "Laisse vide pour garder ton email déjà enregistré" : "toi@exemple.com"}
+                  className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                />
+                {emailDejaConnu && (
+                  <p className="mt-1 text-xs text-[#2D5A27]">
+                    ✅ On a déjà un email enregistré pour ce numéro — laisse vide pour le garder.
+                  </p>
+                )}
               </div>
 
               <div>

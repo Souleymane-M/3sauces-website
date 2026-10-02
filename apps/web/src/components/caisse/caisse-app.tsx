@@ -42,6 +42,7 @@ import {
   LIBELLE_PAYS_TELEPHONE,
   type PaysTelephone,
 } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 import {
   SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
@@ -135,6 +136,9 @@ const CLE_PANIER_CAISSE = "3sauces_caisse_panier";
 interface ClientInfo {
   existe: boolean;
   telephone: string;
+  nom?: string | null;
+  prenom?: string | null;
+  email?: string | null;
   montant_cumule?: number;
   tampons_acquis?: number;
   recompense_disponible?: boolean;
@@ -342,6 +346,7 @@ export function CaisseApp({
   );
   const [nom, setNom] = useState(() => commandeExistante?.nom ?? "");
   const [prenom, setPrenom] = useState(() => commandeExistante?.prenom ?? "");
+  const [email, setEmail] = useState("");
   const [adresse, setAdresse] = useState(() => commandeExistante?.adresse ?? "");
   const [zone, setZone] = useState(() => commandeExistante?.zone ?? parametres.zonesActives[0] ?? "");
 
@@ -960,6 +965,13 @@ export function CaisseApp({
       }
       setClientInfo(data);
       setErreur(null);
+      // Préremplit identité/email pour un client déjà connu — jamais
+      // n'écrase une saisie déjà commencée par la caissière.
+      if (data.existe) {
+        if (!prenom.trim() && data.prenom) setPrenom(data.prenom);
+        if (!nom.trim() && data.nom) setNom(data.nom);
+        if (!email.trim() && data.email) setEmail(data.email);
+      }
     } finally {
       setRechercheEnCours(false);
     }
@@ -1038,6 +1050,26 @@ export function CaisseApp({
     return paiements;
   }
 
+  /**
+   * `null` = laisse volontairement vide pour garder l'email déjà enregistré
+   * sur ce numéro (jamais pour un numéro inconnu/sans email en fiche, où
+   * c'est alors refusé) — jamais une saisie non vide mais invalide.
+   */
+  function validerEmailSaisi(): { email: string | null } | null {
+    const saisie = email.trim();
+    if (!saisie) {
+      if (clientInfo?.existe && clientInfo.email) return { email: null };
+      setErreur("Indique l'adresse email du client.");
+      return null;
+    }
+    const normalise = normaliserEmail(saisie);
+    if (!normalise) {
+      setErreur("Adresse email invalide.");
+      return null;
+    }
+    return { email: normalise };
+  }
+
   async function encaisser() {
     if (panierActuel.length === 0) return;
     const erreurValidation = validerPanierAvantEnvoi();
@@ -1050,6 +1082,8 @@ export function CaisseApp({
       setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
+    const resultatEmail = validerEmailSaisi();
+    if (!resultatEmail) return;
     let paiementsMixte: { mode: ModePaiement; montant: number }[] | undefined;
     if (modePaiement === "mixte") {
       const resultat = construirePaiementsMixte(totalApresRemises);
@@ -1074,6 +1108,7 @@ export function CaisseApp({
           creneauHeure,
           nom: nom.trim(),
           prenom: prenom.trim(),
+          email: resultatEmail.email,
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
@@ -1136,6 +1171,7 @@ export function CaisseApp({
       setAppliquerRecompense(false);
       setNom("");
       setPrenom("");
+      setEmail("");
       setAdresse("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
@@ -1163,6 +1199,8 @@ export function CaisseApp({
       setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
+    const resultatEmail = validerEmailSaisi();
+    if (!resultatEmail) return;
     let paiementsMixte: { mode: ModePaiement; montant: number }[] | undefined;
     if (modePaiement === "mixte") {
       const resultat = construirePaiementsMixte(totalApresRemises);
@@ -1186,6 +1224,7 @@ export function CaisseApp({
           creneauHeure,
           nom: nom.trim(),
           prenom: prenom.trim(),
+          email: resultatEmail.email,
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
@@ -1725,6 +1764,22 @@ export function CaisseApp({
                   🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_RECOMPENSE / MONTANT_RECOMPENSE} tampons ={" "}
                   {MONTANT_RECOMPENSE}€ offerts.
                 </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={
+                  clientInfo?.existe && clientInfo.email ? "Laisse vide pour garder l'email déjà enregistré" : "client@exemple.com"
+                }
+                className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+              />
+              {clientInfo?.existe && clientInfo.email && (
+                <p className="mt-1 text-xs text-[#2D5A27]">✅ Email déjà enregistré pour ce numéro — laisse vide pour le garder.</p>
               )}
             </div>
 
