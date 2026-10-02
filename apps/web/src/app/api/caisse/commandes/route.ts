@@ -21,7 +21,36 @@ import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
-const MODES_PAIEMENT_CAISSE = ["especes", "cb"] as const;
+const MODES_PAIEMENT_CAISSE = ["especes", "cb", "mixte"] as const;
+const TOLERANCE_ARRONDI_PAIEMENT = 0.01;
+
+/**
+ * "Mixte" n'est jamais une valeur de `paiements.mode` (toujours especes/cb
+ * individuellement) — seulement de `commandes.mode_paiement`. Revérifie que
+ * chaque part est positive, d'un mode réel, et que leur somme correspond
+ * exactement au montant dû (± arrondi) : jamais confiance dans le total
+ * calculé côté client.
+ */
+function validerPaiementsMixte(
+  paiementsBruts: unknown,
+  montantAttendu: number
+): { mode: "especes" | "cb"; montant: number }[] | null {
+  if (!Array.isArray(paiementsBruts) || paiementsBruts.length === 0) return null;
+  const paiements: { mode: "especes" | "cb"; montant: number }[] = [];
+  for (const p of paiementsBruts) {
+    const mode = (p as { mode?: unknown })?.mode;
+    const montant = Number((p as { montant?: unknown })?.montant);
+    if ((mode !== "especes" && mode !== "cb") || !Number.isFinite(montant) || montant <= 0) {
+      return null;
+    }
+    paiements.push({ mode, montant: Math.round(montant * 100) / 100 });
+  }
+  const somme = Math.round(paiements.reduce((t, p) => t + p.montant, 0) * 100) / 100;
+  if (Math.abs(somme - Math.round(montantAttendu * 100) / 100) > TOLERANCE_ARRONDI_PAIEMENT) {
+    return null;
+  }
+  return paiements;
+}
 
 // Même plafonds anti-abus que le site public (cf. /api/commande) — un
 // panier caisse "normal" ne les dépasse jamais.
@@ -565,6 +594,17 @@ export async function POST(request: Request) {
   // livreur, ce qui déclenche alors le trigger de fidélité au bon moment.
   const paiementStatut = body.canal === "livraison" ? "non_paye" : "paye";
 
+  let paiementsMixte: { mode: "especes" | "cb"; montant: number }[] | null = null;
+  if (body.modePaiement === "mixte") {
+    paiementsMixte = validerPaiementsMixte(body.paiements, montant);
+    if (!paiementsMixte) {
+      return NextResponse.json(
+        { error: "Paiement mixte invalide : vérifie que les montants espèces + carte correspondent au total." },
+        { status: 400 }
+      );
+    }
+  }
+
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
@@ -616,11 +656,10 @@ export async function POST(request: Request) {
   // encore payée (cf. plus haut) — le paiement sera inséré au moment de
   // l'encaissement réel, depuis /patron.
   if (paiementStatut === "paye") {
-    const { error: erreurPaiement } = await supabase.from("paiements").insert({
-      commande_id: commande.id,
-      montant,
-      mode: body.modePaiement,
-    });
+    const lignesPaiement = paiementsMixte ?? [{ mode: body.modePaiement as "especes" | "cb", montant }];
+    const { error: erreurPaiement } = await supabase
+      .from("paiements")
+      .insert(lignesPaiement.map((p) => ({ commande_id: commande.id, montant: p.montant, mode: p.mode })));
 
     if (erreurPaiement) {
       console.error("[/api/caisse/commandes] échec insertion paiement :", erreurPaiement.message);
@@ -788,6 +827,23 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Une livraison n'est payée qu'à la remise (cf. POST plus haut) : son
+  // mode de paiement ne peut donc pas être "mixte" ici, aucun paiement
+  // n'existe encore à ce stade pour cette commande.
+  let paiementsMixte: { mode: "especes" | "cb"; montant: number }[] | null = null;
+  if (body.modePaiement === "mixte") {
+    if (canal === "livraison") {
+      return NextResponse.json({ error: "Le paiement mixte ne s'applique pas à une livraison non encore payée." }, { status: 400 });
+    }
+    paiementsMixte = validerPaiementsMixte(body.paiements, montant);
+    if (!paiementsMixte) {
+      return NextResponse.json(
+        { error: "Paiement mixte invalide : vérifie que les montants espèces + carte correspondent au total." },
+        { status: 400 }
+      );
+    }
+  }
+
   const { error: erreurUpsertClient } = await supabase
     .from("clients")
     .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
@@ -850,6 +906,32 @@ export async function PATCH(request: Request) {
   if (erreurMaj) {
     console.error("[/api/caisse/commandes PATCH] échec mise à jour :", erreurMaj.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // Sur place/à emporter sont payés dès la création (cf. POST) : la
+  // modification peut changer le mode et/ou le montant, donc les lignes de
+  // `paiements` déjà enregistrées sont remplacées pour rester cohérentes —
+  // jamais pour une livraison, dont le paiement n'existe pas encore ici.
+  if (canal !== "livraison") {
+    const { error: erreurSuppressionPaiements } = await supabase.from("paiements").delete().eq("commande_id", body.commandeId);
+    if (erreurSuppressionPaiements) {
+      console.error("[/api/caisse/commandes PATCH] échec suppression anciens paiements :", erreurSuppressionPaiements.message);
+      return NextResponse.json(
+        { error: "Commande modifiée mais échec de la mise à jour du paiement. Préviens le patron.", commandeId: body.commandeId },
+        { status: 500 }
+      );
+    }
+    const lignesPaiement = paiementsMixte ?? [{ mode: body.modePaiement as "especes" | "cb", montant }];
+    const { error: erreurPaiement } = await supabase
+      .from("paiements")
+      .insert(lignesPaiement.map((p) => ({ commande_id: body.commandeId, montant: p.montant, mode: p.mode })));
+    if (erreurPaiement) {
+      console.error("[/api/caisse/commandes PATCH] échec insertion paiement :", erreurPaiement.message);
+      return NextResponse.json(
+        { error: "Commande modifiée mais échec de la mise à jour du paiement. Préviens le patron.", commandeId: body.commandeId },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, commandeId: body.commandeId, montant, coutMatiereTotal, coutIncomplet });

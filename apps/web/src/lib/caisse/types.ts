@@ -1,4 +1,4 @@
-import type { Canal, Categorie, ModePaiement } from "@3sauces/supabase";
+import type { Canal, Categorie, ModePaiement, ModePaiementCommande } from "@3sauces/supabase";
 import type { ProduitPublic } from "@/lib/commande-publique/types";
 
 /**
@@ -81,7 +81,9 @@ export interface LigneCommandePayload {
 
 export interface CreerCommandePayload {
   canal: Canal;
-  modePaiement: ModePaiement;
+  modePaiement: ModePaiementCommande;
+  /** Détail espèces/carte si modePaiement === "mixte" — ignoré sinon. Les montants doivent sommer exactement au total de la commande, revérifié côté serveur. */
+  paiements?: { mode: ModePaiement; montant: number }[];
   lignes: LigneCommandePayload[];
   // Obligatoires pour tous les canaux (comme nom/téléphone sur le site
   // public, cf. /api/commande) ; optionnels ici uniquement pour laisser le

@@ -53,6 +53,7 @@ function libelleCanal(canal: CommandePourImpression["canal"]): string {
 function libelleModePaiement(mode: CommandePourImpression["modePaiement"]): string {
   if (mode === "cb") return "Carte";
   if (mode === "stripe") return "En ligne";
+  if (mode === "mixte") return "Mixte (espèces + carte)";
   return "Espèces";
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Canal, ModePaiement } from "@3sauces/supabase";
+import type { Canal, ModePaiement, ModePaiementCommande } from "@3sauces/supabase";
 import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse, LigneCommande } from "@/lib/caisse/types";
 import type { CommandeAModifier } from "@/lib/caisse/modification";
 import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
@@ -308,7 +308,8 @@ export function CaisseApp({
     boissonOfferteSaveur,
   ]);
 
-  const [modePaiement, setModePaiement] = useState<ModePaiement>(() => commandeExistante?.modePaiement ?? "especes");
+  const [modePaiement, setModePaiement] = useState<ModePaiementCommande>(() => commandeExistante?.modePaiement ?? "especes");
+  const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
   // Mayotte par défaut : l'écrasante majorité des clients. Même logique que
   // /commander — la caissière choisit explicitement le pays du client
@@ -1014,6 +1015,29 @@ export function CaisseApp({
         }));
   }
 
+  /**
+   * "Mixte" n'est jamais stocké sur une ligne de paiement individuelle —
+   * seulement sur `commandes.mode_paiement`. On ne demande que la part
+   * espèces ; la part carte se déduit du total, jamais saisie à la main
+   * (évite tout écart d'arrondi entre les deux montants).
+   */
+  function construirePaiementsMixte(total: number): { mode: ModePaiement; montant: number }[] | null {
+    const especes = Number(montantEspecesMixte.replace(",", "."));
+    if (!Number.isFinite(especes) || especes < 0 || especes > total) {
+      setErreur("Montant espèces invalide.");
+      return null;
+    }
+    const cb = Math.round((total - especes) * 100) / 100;
+    const paiements: { mode: ModePaiement; montant: number }[] = [];
+    if (especes > 0) paiements.push({ mode: "especes", montant: especes });
+    if (cb > 0) paiements.push({ mode: "cb", montant: cb });
+    if (paiements.length === 0) {
+      setErreur("Renseigne au moins un montant.");
+      return null;
+    }
+    return paiements;
+  }
+
   async function encaisser() {
     if (panierActuel.length === 0) return;
     const erreurValidation = validerPanierAvantEnvoi();
@@ -1026,6 +1050,12 @@ export function CaisseApp({
       setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
+    let paiementsMixte: { mode: ModePaiement; montant: number }[] | undefined;
+    if (modePaiement === "mixte") {
+      const resultat = construirePaiementsMixte(totalApresRemises);
+      if (!resultat) return;
+      paiementsMixte = resultat;
+    }
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -1037,6 +1067,7 @@ export function CaisseApp({
         body: JSON.stringify({
           canal,
           modePaiement,
+          paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
           recompenseAppliquee: appliquerRecompenseEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
@@ -1132,6 +1163,12 @@ export function CaisseApp({
       setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
+    let paiementsMixte: { mode: ModePaiement; montant: number }[] | undefined;
+    if (modePaiement === "mixte") {
+      const resultat = construirePaiementsMixte(totalApresRemises);
+      if (!resultat) return;
+      paiementsMixte = resultat;
+    }
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -1143,6 +1180,7 @@ export function CaisseApp({
         body: JSON.stringify({
           commandeId: commandeExistante.id,
           modePaiement,
+          paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
@@ -1770,12 +1808,35 @@ export function CaisseApp({
               <label className="text-xs text-gray-500">Paiement</label>
               <select
                 value={modePaiement}
-                onChange={(e) => setModePaiement(e.target.value as ModePaiement)}
+                onChange={(e) => setModePaiement(e.target.value as ModePaiementCommande)}
                 className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
               >
                 <option value="especes">Espèces</option>
                 <option value="cb">Carte (SumUp)</option>
+                <option value="mixte">Mixte (espèces + carte)</option>
               </select>
+              {modePaiement === "mixte" && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-1">
+                    Espèces
+                    <input
+                      value={montantEspecesMixte}
+                      onChange={(e) => setMontantEspecesMixte(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
+                    />
+                  </label>
+                  <span>
+                    Carte :{" "}
+                    {Math.max(
+                      0,
+                      Math.round((totalApresRemises - (Number(montantEspecesMixte.replace(",", ".")) || 0)) * 100) / 100
+                    ).toFixed(2)}{" "}
+                    € (calculé)
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">

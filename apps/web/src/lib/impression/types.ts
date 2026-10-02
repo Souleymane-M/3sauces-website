@@ -1,4 +1,4 @@
-import type { Canal, ModePaiement } from "@3sauces/supabase";
+import type { Canal, ModePaiementCommande } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 
 /**
@@ -15,7 +15,7 @@ export interface CommandePourImpression {
   canal: Canal;
   lignes: LigneCommande[];
   montant: number;
-  modePaiement: ModePaiement;
+  modePaiement: ModePaiementCommande;
   nom: string;
   adresse: string | null;
   heureSouhaitee: string | null;

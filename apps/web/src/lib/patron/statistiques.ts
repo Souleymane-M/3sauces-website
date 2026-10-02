@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import type { Canal, ModePaiement } from "@3sauces/supabase";
+import type { Canal, ModePaiementCommande } from "@3sauces/supabase";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 
 export interface CaParCanal {
@@ -25,7 +25,7 @@ export interface ProduitRentable {
 }
 
 export interface RepartitionPaiement {
-  mode: ModePaiement;
+  mode: ModePaiementCommande;
   montant: number;
   nbCommandes: number;
 }
@@ -40,13 +40,14 @@ export interface StatistiquesJour {
   repartitionPaiement: RepartitionPaiement[];
 }
 
-const LIBELLE_MODE: Record<ModePaiement, string> = {
+const LIBELLE_MODE: Record<ModePaiementCommande, string> = {
   especes: "Espèces",
   cb: "Carte (comptoir/livreur)",
   stripe: "En ligne (Stripe)",
+  mixte: "Mixte (espèces + carte)",
 };
 
-export function libelleModePaiementStat(mode: ModePaiement): string {
+export function libelleModePaiementStat(mode: ModePaiementCommande): string {
   return LIBELLE_MODE[mode];
 }
 
@@ -88,7 +89,7 @@ export async function chargerStatistiquesJour(): Promise<StatistiquesJour> {
   const lignes = commandes ?? [];
 
   const parCanal = new Map<Canal, { nbCommandes: number; ca: number }>();
-  const parMode = new Map<ModePaiement, { nbCommandes: number; montant: number }>();
+  const parMode = new Map<ModePaiementCommande, { nbCommandes: number; montant: number }>();
   for (const c of lignes) {
     const canalActuel = parCanal.get(c.canal) ?? { nbCommandes: 0, ca: 0 };
     canalActuel.nbCommandes += 1;

@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import type { Canal, ModePaiement } from "@3sauces/supabase";
+import type { Canal, ModePaiementCommande } from "@3sauces/supabase";
 import type { LigneCommande } from "./types";
 
 export interface CommandeAModifier {
@@ -13,7 +13,7 @@ export interface CommandeAModifier {
   adresse: string | null;
   zone: string | null;
   creneauHeure: string;
-  modePaiement: ModePaiement;
+  modePaiement: ModePaiementCommande;
   lignes: LigneCommande[];
   /** `null` = commande d'origine publique (site) — seule éligible à la remise de lancement, y compris après modification ici. */
   commandePar: string | null;

@@ -26,6 +26,7 @@ function libelleModePaiement(mode: CommandeHistorique["modePaiement"]): string {
   if (mode === "cb") return "Carte";
   if (mode === "stripe") return "En ligne";
   if (mode === "especes") return "Espèces";
+  if (mode === "mixte") return "Mixte (espèces + carte)";
   return "?";
 }
 

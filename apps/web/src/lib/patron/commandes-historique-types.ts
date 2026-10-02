@@ -1,4 +1,4 @@
-import type { Canal, ModePaiement, StatutCommande } from "@3sauces/supabase";
+import type { Canal, ModePaiementCommande, StatutCommande } from "@3sauces/supabase";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import type { LigneCommande } from "@/lib/caisse/types";
 
@@ -25,7 +25,7 @@ export interface CommandeHistorique {
   /** Contenu de la commande — jamais affiché sur /commandes (cuisine), mais utile ici pour un suivi à distance complet. */
   lignes: LigneCommande[];
   montant: number;
-  modePaiement: ModePaiement | null;
+  modePaiement: ModePaiementCommande | null;
   /** Renseigné uniquement si la commande a été annulée. */
   motifAnnulation: string | null;
 }

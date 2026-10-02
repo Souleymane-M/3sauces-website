@@ -1,4 +1,4 @@
-import type { Canal, ModePaiement, StatutCommande } from "@3sauces/supabase";
+import type { Canal, ModePaiementCommande, StatutCommande } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
@@ -20,7 +20,7 @@ export interface CommandeCuisine {
   telephone: string | null;
   adresse: string | null;
   /** "stripe" = déjà réglée en ligne — rien à faire payer au client. */
-  modePaiement: ModePaiement | null;
+  modePaiement: ModePaiementCommande | null;
   heureSouhaitee: string | null;
   creeLe: string;
   nbPlats: number;

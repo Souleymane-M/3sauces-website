@@ -26,6 +26,11 @@ export type Canal = "sur_place" | "emporter" | "livraison" | "en_ligne";
 // (paiement en ligne sur 3sauces.fr, confirmé par webhook).
 export type ModePaiement = "especes" | "cb" | "stripe";
 
+// `commandes.mode_paiement` seul accepte en plus "mixte" (paiement comptoir
+// espèces + carte) — jamais `paiements.mode`, qui reste une ligne par mode
+// réellement encaissé (migration 20261002000000_mode_paiement_mixte.sql).
+export type ModePaiementCommande = ModePaiement | "mixte";
+
 // Contrainte CHECK `commandes_statut_check` (migration
 // 20260908090000_tracabilite_commandes.sql) : flux complet en_attente ->
 // en_preparation -> pret -> remis_au_client (sur place/à emporter) ou
@@ -270,7 +275,7 @@ export interface Database {
           montant: number;
           statut: StatutCommande;
           paiement_statut: "non_paye" | "declare" | "paye" | "remboursee" | string;
-          mode_paiement: ModePaiement | null;
+          mode_paiement: ModePaiementCommande | null;
           zone_livraison: string | null;
           created_at: string;
           client_telephone: string | null;
@@ -300,7 +305,7 @@ export interface Database {
           montant: number;
           statut?: StatutCommande;
           paiement_statut?: "non_paye" | "declare" | "paye" | "remboursee" | string;
-          mode_paiement?: ModePaiement | null;
+          mode_paiement?: ModePaiementCommande | null;
           zone_livraison?: string | null;
           client_telephone?: string | null;
           commande_par?: string | null;
