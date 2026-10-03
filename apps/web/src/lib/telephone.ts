@@ -88,5 +88,17 @@ export function composerTelephoneAvecPays(saisie: string, pays: PaysTelephone): 
   if (!nettoye) return null;
   if (nettoye.startsWith("+") || nettoye.startsWith("00")) return saisie;
   if (!/^0?\d{9}$/.test(nettoye)) return null;
+  // "07..." n'existe pas à Mayotte/La Réunion (mobiles uniquement en
+  // "06..."), contrairement à la métropole où 06 et 07 coexistent — seul
+  // cas où Mayotte/métropole sont réellement distinguables sans indicatif
+  // explicite. Rejeté plutôt que deviné quand même, pour forcer le client
+  // à choisir "France métropolitaine" au lieu de composer un faux +262.
+  if ((pays === "mayotte" || pays === "reunion") && /^07\d{8}$/.test(nettoye)) return null;
   return `${INDICATIF_PAR_PAYS[pays]}${nettoye.replace(/^0/, "")}`;
+}
+
+/** Numéro local en "07..." avec Mayotte/La Réunion sélectionné — ce préfixe n'existe pas là-bas, presque sûrement un numéro métropolitain mal aiguillé. */
+export function ressembleAFranceMetropolitaine(saisie: string, pays: PaysTelephone): boolean {
+  const nettoye = saisie.trim().replace(/[\s.\-()]/g, "");
+  return (pays === "mayotte" || pays === "reunion") && /^07\d{8}$/.test(nettoye);
 }

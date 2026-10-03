@@ -81,7 +81,9 @@ function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe, canal
     }
     return (
       `<p>La prochaine fois, commande directement sur 3sauces.fr avant de venir — tu évites la queue.<br>` +
-      `Et si vous êtes plusieurs, commandez en groupe : même avantage, moins d'attente pour tout le monde.</p>`
+      `Et si vous êtes plusieurs, commandez en groupe pour une préparation prioritaire :<br>` +
+      `Dès 3 plats et 30€ → commande prioritaire.<br>` +
+      `Dès 4 plats et 40€ → commande prioritaire + une boisson 2L offerte.</p>`
     );
   }
   if (palierGroupe === "GROUPE_4") {

@@ -40,6 +40,7 @@ import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces
 import {
   composerTelephoneAvecPays,
   LIBELLE_PAYS_TELEPHONE,
+  ressembleAFranceMetropolitaine,
   type PaysTelephone,
 } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
@@ -950,7 +951,11 @@ export function CaisseApp({
     if (!telephone.trim()) return;
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
     if (!telephoneComplet) {
-      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      setErreur(
+        ressembleAFranceMetropolitaine(telephone, paysTelephone)
+          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
+          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
+      );
       return;
     }
     setRechercheEnCours(true);
@@ -1079,7 +1084,11 @@ export function CaisseApp({
     }
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
     if (!telephoneComplet) {
-      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      setErreur(
+        ressembleAFranceMetropolitaine(telephone, paysTelephone)
+          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
+          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
+      );
       return;
     }
     const resultatEmail = validerEmailSaisi();
@@ -1196,7 +1205,11 @@ export function CaisseApp({
     }
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
     if (!telephoneComplet) {
-      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      setErreur(
+        ressembleAFranceMetropolitaine(telephone, paysTelephone)
+          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
+          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
+      );
       return;
     }
     const resultatEmail = validerEmailSaisi();
