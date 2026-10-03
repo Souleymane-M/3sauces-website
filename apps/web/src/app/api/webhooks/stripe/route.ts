@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
+import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 
 /**
  * Seule source de vérité pour le passage d'une commande Stripe à "paye" —
@@ -65,6 +66,8 @@ export async function POST(request: Request) {
         console.error("[/api/webhooks/stripe] échec mise à jour commande :", erreurMaj.message);
         return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
       }
+
+      await notifierPaiementConfirme(paiement.commande_id);
     }
   } else if (evenement.type === "checkout.session.expired") {
     // La commande reste "non_paye" par design — le client peut réessayer.

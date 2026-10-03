@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { ModePaiement } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
+import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import type { EncaissementsJour, LivraisonAEncaisser } from "./encaissements-livraison-types";
 
 /**
@@ -109,6 +110,8 @@ export async function marquerLivraisonEncaissee(commandeId: string): Promise<voi
   if (erreurMaj) {
     throw new Error(`Impossible de valider l'encaissement : ${erreurMaj.message}`);
   }
+
+  await notifierPaiementConfirme(commandeId);
 }
 
 interface PaiementManuel {
@@ -191,6 +194,8 @@ export async function declarerEtValiderManuellement(
   if (commande.statut === "pris_par_livreur") {
     await changerStatutCommande({ commandeId, statut: "livre", profilId });
   }
+
+  await notifierPaiementConfirme(commandeId);
 }
 
 export async function signalerEcartLivraison(commandeId: string, note: string, profilId: string): Promise<void> {

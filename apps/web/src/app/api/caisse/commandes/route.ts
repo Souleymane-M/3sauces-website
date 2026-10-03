@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
+import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
@@ -693,6 +694,8 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    await notifierPaiementConfirme(commande.id);
   }
 
   return NextResponse.json({
