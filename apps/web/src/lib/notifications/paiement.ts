@@ -28,14 +28,14 @@ function construireBlocFidelite(
 ): { html: string; texteBouton: string } {
   if (recompenseAppliquee) {
     return {
-      html: `<p>✅ Ta récompense de ${MONTANT_RECOMPENSE}€ a bien été utilisée sur cette commande — merci de ta fidélité !</p>`,
+      html: `<p>Ta récompense de ${MONTANT_RECOMPENSE}€ a bien été utilisée sur cette commande — merci de ta fidélité !</p>`,
       texteBouton: "Retourner sur le site",
     };
   }
 
   if (client.recompense_disponible) {
     return {
-      html: `<p>🎉 Tu as ${MONTANT_RECOMPENSE}€ à utiliser dès ta prochaine commande !</p>`,
+      html: `<p>Tu as ${MONTANT_RECOMPENSE}€ à utiliser dès ta prochaine commande !</p>`,
       texteBouton: "Commander maintenant",
     };
   }
@@ -43,7 +43,7 @@ function construireBlocFidelite(
   if (client.montant_cumule > SEUIL_AFFICHAGE_EXACT) {
     const restant = (SEUIL_RECOMPENSE - client.montant_cumule).toFixed(2);
     return {
-      html: `<p>🎁 Plus que ${restant}€ et tu débloques ${MONTANT_RECOMPENSE}€ offerts !</p>`,
+      html: `<p>Plus que ${restant}€ et tu débloques ${MONTANT_RECOMPENSE}€ offerts !</p>`,
       texteBouton: "Retourner sur le site",
     };
   }
@@ -55,8 +55,8 @@ function construireBlocFidelite(
   const { tamponsGagnes, montantProchainTampon } = progressionFideliteCommande(montantCommande, montantCumuleAvant);
   const html =
     tamponsGagnes > 0
-      ? `<p>🎁 +${tamponsGagnes} tampon${tamponsGagnes > 1 ? "s" : ""} avec cette commande ! Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts.</p>`
-      : `<p>🎁 Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts — encore ${montantProchainTampon.toFixed(2)}€ pour ton prochain tampon.</p>`;
+      ? `<p>+${tamponsGagnes} tampon${tamponsGagnes > 1 ? "s" : ""} avec cette commande ! Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts.</p>`
+      : `<p>Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts — encore ${montantProchainTampon.toFixed(2)}€ pour ton prochain tampon.</p>`;
   return { html, texteBouton: "Retourner sur le site" };
 }
 
@@ -69,16 +69,16 @@ function construireBlocFidelite(
 function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe): string | null {
   if (nbPlats === 0) {
     return (
-      `<p>👥 La prochaine fois, commande en groupe avant 11h :<br>` +
+      `<p>La prochaine fois, commande en groupe avant 11h :<br>` +
       `Dès 3 plats et 30€ → livraison prioritaire.<br>` +
       `Dès 4 plats et 40€ → priorité + une boisson 2L offerte.</p>`
     );
   }
   if (palierGroupe === "GROUPE_4") {
-    return `<p>✅ Livraison prioritaire + boisson 2L offerte activées pour cette commande.</p>`;
+    return `<p>Livraison prioritaire + boisson 2L offerte activées pour cette commande.</p>`;
   }
   if (palierGroupe === "GROUPE_3") {
-    return `<p>✅ Livraison prioritaire activée pour cette commande.</p>`;
+    return `<p>Livraison prioritaire activée pour cette commande.</p>`;
   }
   return null;
 }
