@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
+import type { Canal } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { MONTANT_RECOMPENSE, SEUIL_AFFICHAGE_EXACT, SEUIL_RECOMPENSE, progressionFideliteCommande } from "@/lib/fidelite/regles";
@@ -64,14 +65,23 @@ function construireBlocFidelite(
  * Bloc commande groupée — incite à essayer la prochaine fois si ce n'était
  * pas le cas, confirme l'avantage obtenu si le palier a été atteint, ne dit
  * rien si la commande était groupée mais sous le seuil (jamais souligner un
- * bonus manqué juste après le paiement).
+ * bonus manqué juste après le paiement). L'incitation "prochaine fois"
+ * dépend du canal : "livraison prioritaire" n'a de sens que pour une
+ * livraison — pour quelqu'un venu sur place/à emporter, l'argument qui
+ * compte est d'éviter la queue en commandant depuis le site à l'avance.
  */
-function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe): string | null {
+function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe, canal: Canal): string | null {
   if (nbPlats === 0) {
+    if (canal === "livraison") {
+      return (
+        `<p>La prochaine fois, commande en groupe avant 11h :<br>` +
+        `Dès 3 plats et 30€ → livraison prioritaire.<br>` +
+        `Dès 4 plats et 40€ → priorité + une boisson 2L offerte.</p>`
+      );
+    }
     return (
-      `<p>La prochaine fois, commande en groupe avant 11h :<br>` +
-      `Dès 3 plats et 30€ → livraison prioritaire.<br>` +
-      `Dès 4 plats et 40€ → priorité + une boisson 2L offerte.</p>`
+      `<p>La prochaine fois, commande directement sur 3sauces.fr avant de venir — tu évites la queue.<br>` +
+      `Et si vous êtes plusieurs, commandez en groupe : même avantage, moins d'attente pour tout le monde.</p>`
     );
   }
   if (palierGroupe === "GROUPE_4") {
@@ -97,7 +107,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
   const { data: commande, error } = await supabase
     .from("commandes")
     .select(
-      "numero, montant, contenu, nom_livraison, client_telephone, recompense_appliquee, nb_plats, palier_groupe, mode_paiement"
+      "numero, montant, contenu, nom_livraison, client_telephone, recompense_appliquee, nb_plats, palier_groupe, mode_paiement, canal"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -127,7 +137,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
 
   if (client?.email) {
     const blocFidelite = construireBlocFidelite(client, commande.montant, commande.recompense_appliquee);
-    const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe);
+    const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
 
     // Un paiement en ligne (Stripe) est bien une confirmation pour le
     // client — il ne sait pas encore que ça a abouti. Payé en personne
