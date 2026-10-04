@@ -1126,6 +1126,29 @@ export function CaisseApp({
   }
 
   /**
+   * Bloque l'encaissement tant que la caissière n'a pas saisi ce que le
+   * client lui a donné en espèces — c'est justement le but du champ
+   * "Reçu du client" : si on le laisse facultatif, personne ne s'en sert et
+   * le calcul mental reste nécessaire. Pour "mixte", seule la part espèces
+   * compte (la part CB n'a pas de monnaie à rendre).
+   */
+  function validerMontantRecuEspeces(): string | null {
+    if (modePaiement !== "especes" && modePaiement !== "mixte") return null;
+    const du = modePaiement === "mixte" ? Number(montantEspecesMixte.replace(",", ".")) || 0 : totalApresRemises;
+    if (du <= 0) return null;
+    const recu = Number(montantRecuEspeces.replace(",", "."));
+    if (!montantRecuEspeces.trim() || !Number.isFinite(recu)) {
+      setErreur("Indique le montant reçu du client en espèces.");
+      return null;
+    }
+    if (recu < du) {
+      setErreur(`Montant insuffisant, il manque ${(du - recu).toFixed(2)} €.`);
+      return null;
+    }
+    return "ok";
+  }
+
+  /**
    * `null` = laisse volontairement vide pour garder l'email déjà enregistré
    * sur ce numéro (jamais pour un numéro inconnu/sans email en fiche, où
    * c'est alors refusé) — jamais une saisie non vide mais invalide.
@@ -1169,6 +1192,7 @@ export function CaisseApp({
       if (!resultat) return;
       paiementsMixte = resultat;
     }
+    if (!validerMontantRecuEspeces()) return;
     setEnvoiEnCours(true);
     setErreur(null);
     try {
@@ -1291,6 +1315,7 @@ export function CaisseApp({
       if (!resultat) return;
       paiementsMixte = resultat;
     }
+    if (!validerMontantRecuEspeces()) return;
     setEnvoiEnCours(true);
     setErreur(null);
     try {
