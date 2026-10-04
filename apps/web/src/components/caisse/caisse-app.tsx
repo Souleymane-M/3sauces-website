@@ -530,6 +530,11 @@ export function CaisseApp({
     );
 
     const liste: Omit<Section, "couleur">[] = [
+      {
+        key: "petit_dejeuner",
+        titre: "Petit déjeuner",
+        produits: produits.filter((p) => p.categorie === "petit_dejeuner"),
+      },
       { key: "menus", titre: "Menus spéciaux", produits: produits.filter((p) => p.categorie === "menu_special") },
       {
         key: "plat_du_jour",

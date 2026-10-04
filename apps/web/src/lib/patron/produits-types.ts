@@ -8,6 +8,7 @@ import type { Categorie } from "@3sauces/supabase";
  * navigateur.
  */
 export const CATEGORIES: { valeur: Categorie; libelle: string }[] = [
+  { valeur: "petit_dejeuner", libelle: "Petit déjeuner" },
   { valeur: "plat_du_jour", libelle: "Plat du jour" },
   { valeur: "menu_special", libelle: "Menu spécial" },
   { valeur: "snacking", libelle: "Snacking" },
