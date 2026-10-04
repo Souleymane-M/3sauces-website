@@ -315,6 +315,11 @@ export function CaisseApp({
 
   const [modePaiement, setModePaiement] = useState<ModePaiementCommande>(() => commandeExistante?.modePaiement ?? "especes");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
+  // Pur calcul d'appoint à l'écran, jamais envoyé au serveur ni enregistré —
+  // seul le montant réellement dû (totalApresRemises / part espèces du
+  // mixte) compte pour l'encaissement, ce champ n'existe que pour éviter le
+  // calcul mental de la monnaie à rendre.
+  const [montantRecuEspeces, setMontantRecuEspeces] = useState("");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
   // Mayotte par défaut : l'écrasante majorité des clients. Même logique que
   // /commander — la caissière choisit explicitement le pays du client
@@ -1247,6 +1252,7 @@ export function CaisseApp({
       setPrenom("");
       setEmail("");
       setAdresse("");
+      setMontantRecuEspeces("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -1955,6 +1961,32 @@ export function CaisseApp({
                     ).toFixed(2)}{" "}
                     € (calculé)
                   </span>
+                </div>
+              )}
+              {(modePaiement === "especes" || modePaiement === "mixte") && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-1">
+                    Reçu du client (espèces)
+                    <input
+                      value={montantRecuEspeces}
+                      onChange={(e) => setMontantRecuEspeces(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
+                    />
+                  </label>
+                  {montantRecuEspeces.trim() &&
+                    (() => {
+                      const du =
+                        modePaiement === "mixte" ? Number(montantEspecesMixte.replace(",", ".")) || 0 : totalApresRemises;
+                      const recu = Number(montantRecuEspeces.replace(",", ".")) || 0;
+                      const rendu = Math.round((recu - du) * 100) / 100;
+                      return rendu >= 0 ? (
+                        <span className="font-bold text-[#2D5A27]">Monnaie à rendre : {rendu.toFixed(2)} €</span>
+                      ) : (
+                        <span className="font-bold text-red-600">Il manque {(-rendu).toFixed(2)} €</span>
+                      );
+                    })()}
                 </div>
               )}
             </div>
