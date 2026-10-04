@@ -614,6 +614,69 @@ export function CommandePubliqueApp({
     );
   }
 
+  /** Rendu d'une section générique (bandeau de titre + grille de produits ou liste +/-) — réutilisé pour afficher deux sections côte à côte. */
+  function afficherSection(section: Section, produitsAAfficher: ProduitPublic[] = section.produits) {
+    return (
+      <div key={section.key}>
+        <div
+          className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+          style={{ backgroundColor: section.couleur === "rouge" ? ROUGE : VERT }}
+        >
+          {section.titre}
+        </div>
+
+        {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
+          afficherGroupeAjoutDirect(produitsAAfficher, `${section.key}-liste`)
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {produitsAAfficher.map((produit) => (
+              <button
+                key={produit.id}
+                onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
+                disabled={produit.stockJour === 0}
+                className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
+                  produit.stockJour === 0
+                    ? "border-gray-200 bg-gray-100 opacity-60"
+                    : "border-gray-200 bg-white active:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium text-gray-900">{produit.nom}</div>
+                {produit.description && <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>}
+                <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
+                {produit.stockJour === 0 && <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>}
+                {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
+                  <div className="mt-1 text-xs font-semibold text-orange-600">Plus que {produit.stockJour} !</div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /** Liste "+/-" (grillades, accompagnements, boissons) — un bandeau orange par produit à choix de saveur (ex: "Boisson 2L"), sinon une simple ligne. */
+  function afficherGroupeAjoutDirect(produits: ProduitPublic[], cle: string) {
+    return (
+      <div key={cle} className="rounded-lg border border-gray-200 bg-white">
+        {produits.flatMap((produit) =>
+          produit.nbSaveursMax > 0
+            ? [
+                <div
+                  key={`${produit.id}-titre`}
+                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
+                  style={{ backgroundColor: "#C2540C" }}
+                >
+                  {produit.nom}
+                </div>,
+                ...(produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) => ligneAjoutDirect(produit, s.nom)),
+              ]
+            : [ligneAjoutDirect(produit, null)]
+        )}
+      </div>
+    );
+  }
+
   function retirerLigne(id: string) {
     if (modeCommande === "groupee") {
       setPlats((precedent) => precedent.map((plat) => ({ ...plat, lignes: plat.lignes.filter((l) => l.id !== id) })));
@@ -1136,66 +1199,54 @@ export function CommandePubliqueApp({
                 </div>
               )}
 
-              {sections.map((section) => (
-                <div key={section.key}>
-                  <div
-                    className="mb-2 rounded px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
-                    style={{ backgroundColor: section.couleur === "rouge" ? ROUGE : VERT }}
-                  >
-                    {section.titre}
-                  </div>
+              {(() => {
+                const parKey = new Map(sections.map((s) => [s.key, s]));
+                const tacos = parKey.get("tacos");
+                const barquettesBowls = parKey.get("barquettes_bowls");
+                const grillade = parKey.get("grillade");
+                const accompagnement = parKey.get("accompagnement");
+                const boisson = parKey.get("boisson");
 
-                  {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
-                    <div className="rounded-lg border border-gray-200 bg-white">
-                      {section.produits.flatMap((produit) =>
-                        produit.nbSaveursMax > 0
-                          ? [
-                              <div
-                                key={`${produit.id}-titre`}
-                                className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
-                                style={{ backgroundColor: "#C2540C" }}
-                              >
-                                {produit.nom}
-                              </div>,
-                              ...(produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) =>
-                                ligneAjoutDirect(produit, s.nom)
-                              ),
-                            ]
-                          : [ligneAjoutDirect(produit, null)]
-                      )}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {section.produits.map((produit) => (
-                        <button
-                          key={produit.id}
-                          onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
-                          disabled={produit.stockJour === 0}
-                          className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
-                            produit.stockJour === 0
-                              ? "border-gray-200 bg-gray-100 opacity-60"
-                              : "border-gray-200 bg-white active:bg-gray-50"
-                          }`}
-                        >
-                          <div className="font-medium text-gray-900">{produit.nom}</div>
-                          {produit.description && (
-                            <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
-                          )}
-                          <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
-                          {produit.stockJour === 0 && (
-                            <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>
-                          )}
-                          {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
-                            <div className="mt-1 text-xs font-semibold text-orange-600">
-                              Plus que {produit.stockJour} !
-                            </div>
-                          )}
-                        </button>
+                // Même principe que Menus Spéciaux/Plats du jour ci-dessus :
+                // deux sections côte à côte pour que le client voie tout
+                // d'un coup d'œil, sans grille forcée si une des deux est
+                // vide (ex: pas de Barquettes & Bowls ce jour-là).
+                const indexCanette = boisson?.produits.findIndex((p) => p.nom === "Canette 33cl") ?? -1;
+                const [boissons2L, canettes] =
+                  boisson && indexCanette > 0
+                    ? [boisson.produits.slice(0, indexCanette), boisson.produits.slice(indexCanette)]
+                    : [boisson?.produits ?? [], []];
+
+                return (
+                  <>
+                    {(tacos || barquettesBowls) && (
+                      <div className={tacos && barquettesBowls ? "grid grid-cols-2 gap-3" : ""}>
+                        {tacos && afficherSection(tacos)}
+                        {barquettesBowls && afficherSection(barquettesBowls)}
+                      </div>
+                    )}
+                    {/* grid-cols-1 : les noms de produits de ces listes compactes (+/-)
+                        se tronquent illisiblement en 2 colonnes sur mobile,
+                        contrairement aux grandes cartes Tacos/Barquettes —
+                        2 colonnes seulement à partir d'un écran plus large. */}
+                    {(grillade || accompagnement) && (
+                      <div className={grillade && accompagnement ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
+                        {grillade && afficherSection(grillade)}
+                        {accompagnement && afficherSection(accompagnement)}
+                      </div>
+                    )}
+                    {boisson &&
+                      (canettes.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {afficherGroupeAjoutDirect(boissons2L, "boisson-2l")}
+                          {afficherGroupeAjoutDirect(canettes, "boisson-canette")}
+                        </div>
+                      ) : (
+                        afficherSection(boisson)
                       ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                  </>
+                );
+              })()}
             </div>
 
             <div id="panier-recap" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
