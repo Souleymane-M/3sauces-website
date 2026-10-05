@@ -1,30 +1,37 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import { lireTokenFideliteDepuisHeader } from "@/lib/fidelite/session";
+import { normaliserTelephone } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 
 /**
- * Solde fidélité du titulaire du jeton (jamais d'un téléphone pris en
- * paramètre de requête — sinon le jeton ne protège plus rien). Un client
- * jamais vu en base est un état légitime (nouveau client), pas une erreur.
+ * Solde fidélité par téléphone + email — remplace l'ancienne vérification
+ * par code SMS (abandonnée le 2026-10-05 : trop de clientes ne recevaient
+ * jamais le SMS). Les deux doivent correspondre à la même fiche client :
+ * moins robuste qu'un vrai code à usage unique, mais suffisant pour un
+ * simple affichage de solde (aucun montant en jeu ici) — demandé
+ * explicitement par le patron pour ne plus dépendre d'un envoi externe.
  */
-export async function GET(request: Request) {
-  const telephone = await lireTokenFideliteDepuisHeader(request);
-  if (!telephone) {
-    return NextResponse.json(
-      { error: "Session fidélité expirée, revérifie ton numéro." },
-      { status: 401 }
-    );
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => null)) as { telephone?: string; email?: string } | null;
+  if (!body) {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
-  if (limiterDebit(`fidelite-solde:${telephone}`, 30, 5 * 60 * 1000)) {
-    return NextResponse.json({ error: "Trop de requêtes, réessaie plus tard." }, { status: 429 });
+  const telephone = normaliserTelephone(body.telephone ?? "");
+  const email = normaliserEmail(body.email ?? "");
+  if (!telephone || !email) {
+    return NextResponse.json({ error: "Numéro de téléphone ou email invalide." }, { status: 400 });
+  }
+
+  if (limiterDebit(`fidelite-solde:${telephone}`, 10, 5 * 60 * 1000)) {
+    return NextResponse.json({ error: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
 
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
+    .select("email, montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
     .eq("telephone", telephone)
     .maybeSingle();
 
@@ -33,11 +40,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Même message générique que le numéro soit inconnu ou que l'email ne
+  // corresponde pas — jamais révéler laquelle des deux infos est fausse.
+  if (!data || !data.email || data.email.toLowerCase() !== email) {
+    return NextResponse.json({ error: "Numéro de téléphone ou email incorrect." }, { status: 404 });
+  }
+
   return NextResponse.json({
     telephone,
-    montantCumule: data?.montant_cumule ?? 0,
-    tamponsAcquis: data?.tampons_acquis ?? 0,
-    recompenseDisponible: data?.recompense_disponible ?? false,
-    dateExpiration: data?.date_expiration ?? null,
+    montantCumule: data.montant_cumule,
+    tamponsAcquis: data.tampons_acquis,
+    recompenseDisponible: data.recompense_disponible,
+    dateExpiration: data.date_expiration,
   });
 }

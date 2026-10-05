@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
+import { normaliserEmail } from "@/lib/email";
 import { MONTANT_RECOMPENSE, SEUIL_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
 
-const CLE_LOCALSTORAGE = "3sauces_fidelite";
-const DUREE_COOLDOWN_RENVOI = 60;
+const CLE_LOCALSTORAGE = "3sauces_fidelite_identite";
 
 interface SoldeFidelite {
   montantCumule: number;
@@ -15,45 +15,42 @@ interface SoldeFidelite {
   dateExpiration: string | null;
 }
 
-interface JetonStocke {
-  token: string;
+interface IdentiteStockee {
   telephone: string;
-  expireLe: string;
+  email: string;
 }
 
-type Etape = "repliee" | "saisie" | "envoi" | "code" | "verifie" | "indisponible";
+type Etape = "repliee" | "saisie" | "verifie" | "introuvable";
 
 interface CarteFideliteProps {
-  telephoneCommande: string;
   montantPanier: number;
   utiliserRecompense: boolean;
   onChangeUtiliserRecompense: (valeur: boolean) => void;
-  onTokenChange: (token: string | null) => void;
+  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string) => void;
   onPrefillTelephone: (telephone: string) => void;
 }
 
 /**
- * Contexte fidélité séparé du formulaire de commande : numéro de téléphone
- * dédié + OTP, jamais requis pour passer une commande classique. Une fois
- * vérifié, le jeton (30 jours) est gardé en localStorage — un échec Twilio
- * n'empêche jamais de commander, la carte reste simplement repliable.
+ * Solde fidélité par téléphone + email, affiché directement sur le site —
+ * plus de code reçu par SMS (abandonné le 2026-10-05 : trop de clientes ne
+ * recevaient jamais le SMS, "distraction" inutile pour un simple affichage
+ * de solde). La dernière identité saisie est gardée en localStorage pour
+ * un réaffichage immédiat à la prochaine visite — rien de sensible à
+ * protéger ici (pas de jeton, juste un confort de pré-remplissage).
  */
 export function CarteFidelite({
-  telephoneCommande,
   montantPanier,
   utiliserRecompense,
   onChangeUtiliserRecompense,
-  onTokenChange,
+  onSoldeVerifie,
   onPrefillTelephone,
 }: CarteFideliteProps) {
   const [etape, setEtape] = useState<Etape>("repliee");
   const [telephoneSaisi, setTelephoneSaisi] = useState("");
-  const [code, setCode] = useState("");
-  const [telephoneVerifie, setTelephoneVerifie] = useState<string | null>(null);
+  const [emailSaisi, setEmailSaisi] = useState("");
   const [solde, setSolde] = useState<SoldeFidelite | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
   const dejaMonte = useRef(false);
 
   useEffect(() => {
@@ -62,11 +59,9 @@ export function CarteFidelite({
     try {
       const brut = localStorage.getItem(CLE_LOCALSTORAGE);
       if (!brut) return;
-      const donnees = JSON.parse(brut) as JetonStocke;
-      if (new Date(donnees.expireLe).getTime() > Date.now()) {
-        chargerSolde(donnees.token, donnees.telephone);
-      } else {
-        localStorage.removeItem(CLE_LOCALSTORAGE);
+      const identite = JSON.parse(brut) as IdentiteStockee;
+      if (identite.telephone && identite.email) {
+        chargerSolde(identite.telephone, identite.email);
       }
     } catch {
       // localStorage indisponible (navigation privée stricte, quota) : on
@@ -75,115 +70,49 @@ export function CarteFidelite({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const minuteur = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(minuteur);
-  }, [cooldown]);
-
-  // Si le numéro vérifié diffère de celui de la commande, on ne laisse pas
-  // consommer la récompense avec cette incohérence — le serveur la
-  // revérifie de toute façon, mais autant prévenir tout de suite.
-  useEffect(() => {
-    if (etape !== "verifie" || !telephoneVerifie) return;
-    const telCommandeNormalise = normaliserTelephone(telephoneCommande);
-    if (telCommandeNormalise && telCommandeNormalise !== telephoneVerifie && utiliserRecompense) {
-      onChangeUtiliserRecompense(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telephoneCommande, telephoneVerifie, etape]);
-
-  async function chargerSolde(token: string, telephone: string) {
-    setEnCours(true);
+  async function chargerSolde(telephoneBrut: string, emailBrut: string) {
     setErreur(null);
+    setTelephoneSaisi(telephoneBrut);
+    setEmailSaisi(emailBrut);
+    const telephone = normaliserTelephone(telephoneBrut);
+    const email = normaliserEmail(emailBrut);
+    if (!telephone || !email) {
+      setErreur("Numéro de téléphone ou email invalide.");
+      setEtape("saisie");
+      return;
+    }
+    setEnCours(true);
     try {
-      const reponse = await fetch("/api/fidelite/solde", { headers: { Authorization: `Bearer ${token}` } });
+      const reponse = await fetch("/api/fidelite/solde", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telephone, email }),
+      });
+      const data = await reponse.json();
       if (!reponse.ok) {
-        localStorage.removeItem(CLE_LOCALSTORAGE);
-        onTokenChange(null);
-        setEtape("repliee");
+        setErreur(data.error ?? "Numéro de téléphone ou email incorrect.");
+        setEtape("introuvable");
+        onSoldeVerifie(false);
         return;
       }
-      const data = await reponse.json();
       setSolde({
         montantCumule: data.montantCumule,
         tamponsAcquis: data.tamponsAcquis,
         recompenseDisponible: data.recompenseDisponible,
         dateExpiration: data.dateExpiration,
       });
-      setTelephoneVerifie(telephone);
-      onTokenChange(token);
-      if (!telephoneCommande.trim()) onPrefillTelephone(telephone);
+      try {
+        localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
+      } catch {
+        // Rien de bloquant : juste pas de pré-remplissage la prochaine fois.
+      }
+      onPrefillTelephone(telephone);
+      onSoldeVerifie(true, telephone, email);
       setEtape("verifie");
     } catch {
-      setEtape("indisponible");
-      setErreur("Impossible de récupérer ton solde fidélité pour le moment.");
-    } finally {
-      setEnCours(false);
-    }
-  }
-
-  async function envoyerCode() {
-    setErreur(null);
-    const telephone = normaliserTelephone(telephoneSaisi);
-    if (!telephone) {
-      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
-      return;
-    }
-    setEnCours(true);
-    setEtape("envoi");
-    try {
-      const reponse = await fetch("/api/fidelite/otp/envoyer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telephone }),
-      });
-      const data = await reponse.json();
-      if (!reponse.ok) {
-        setErreur(data.error ?? "Impossible d'envoyer le code, réessaie.");
-        setEtape("saisie");
-        return;
-      }
-      setCooldown(DUREE_COOLDOWN_RENVOI);
-      setEtape("code");
-    } catch {
       setErreur("Erreur réseau, réessaie.");
-      setEtape("saisie");
-    } finally {
-      setEnCours(false);
-    }
-  }
-
-  async function verifierCode() {
-    setErreur(null);
-    const telephone = normaliserTelephone(telephoneSaisi);
-    if (!telephone || !/^\d{4,6}$/.test(code)) {
-      setErreur("Code invalide.");
-      return;
-    }
-    setEnCours(true);
-    try {
-      const reponse = await fetch("/api/fidelite/otp/verifier", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telephone, code }),
-      });
-      const data = await reponse.json();
-      if (!reponse.ok) {
-        setErreur(data.error ?? "Code incorrect.");
-        return;
-      }
-      try {
-        localStorage.setItem(
-          CLE_LOCALSTORAGE,
-          JSON.stringify({ token: data.token, telephone: data.telephone, expireLe: data.expireLe })
-        );
-      } catch {
-        // Rien de bloquant : la session ne survivra juste pas au rechargement.
-      }
-      await chargerSolde(data.token, data.telephone);
-    } catch {
-      setErreur("Erreur réseau, réessaie.");
+      setEtape("introuvable");
+      onSoldeVerifie(false);
     } finally {
       setEnCours(false);
     }
@@ -214,64 +143,31 @@ export function CarteFidelite({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
-      {(etape === "saisie" || etape === "envoi") && (
+      {(etape === "saisie" || etape === "introuvable") && (
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-gray-900">Vérifie ton numéro pour voir tes tampons</p>
+          <p className="text-sm font-semibold text-gray-900">Ton numéro et ton email pour voir tes tampons</p>
           <input
             value={telephoneSaisi}
             onChange={(e) => setTelephoneSaisi(e.target.value)}
             placeholder="0639... (ou +33... pour un numéro métropolitain)"
             className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
           />
-          {erreur && <p className="text-sm text-red-600">{erreur}</p>}
-          <button
-            type="button"
-            onClick={envoyerCode}
-            disabled={enCours}
-            className="w-full rounded bg-[#8B2020] py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {etape === "envoi" ? "Envoi du code…" : "Recevoir mon code par SMS"}
-          </button>
-        </div>
-      )}
-
-      {etape === "code" && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-gray-900">Code reçu par SMS</p>
           <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="123456"
-            className="w-full rounded border border-gray-300 bg-white p-2 text-sm tracking-widest text-gray-900"
+            value={emailSaisi}
+            onChange={(e) => setEmailSaisi(e.target.value)}
+            type="email"
+            placeholder="ton@email.com"
+            className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
           />
           {erreur && <p className="text-sm text-red-600">{erreur}</p>}
           <button
             type="button"
-            onClick={verifierCode}
+            onClick={() => chargerSolde(telephoneSaisi, emailSaisi)}
             disabled={enCours}
             className="w-full rounded bg-[#8B2020] py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Valider
+            {enCours ? "Vérification…" : "Voir mon solde"}
           </button>
-          <div className="flex justify-between text-xs">
-            <button
-              type="button"
-              onClick={() => setEtape("saisie")}
-              className="text-gray-500 underline"
-            >
-              Modifier mon numéro
-            </button>
-            <button
-              type="button"
-              onClick={envoyerCode}
-              disabled={cooldown > 0}
-              className="text-gray-500 underline disabled:opacity-40"
-            >
-              {cooldown > 0 ? `Renvoyer un code (${cooldown}s)` : "Renvoyer un code"}
-            </button>
-          </div>
         </div>
       )}
 
@@ -307,15 +203,6 @@ export function CarteFidelite({
           <Link href="/fidelite" className="text-xs text-gray-500 underline">
             Comment ça marche ?
           </Link>
-        </div>
-      )}
-
-      {etape === "indisponible" && (
-        <div className="space-y-2">
-          <p className="text-sm text-red-600">{erreur ?? "Service fidélité indisponible pour le moment."}</p>
-          <button type="button" onClick={() => setEtape("saisie")} className="text-sm font-semibold text-[#8B2020] underline">
-            Réessayer
-          </button>
         </div>
       )}
     </div>

@@ -40,9 +40,8 @@ export default function FidelitePage() {
           compteur repart à zéro.
         </p>
         <p>
-          → Sur 3sauces.fr, un code de vérification par SMS peut vous être demandé la première fois, pour
-          confirmer que vous êtes bien le titulaire du numéro utilisé — une seule fois par appareil,
-          valable 30 jours.
+          → Sur 3sauces.fr, votre solde s&apos;affiche directement en saisissant votre numéro de téléphone
+          et votre email — aucun SMS ni email de vérification n&apos;est envoyé.
         </p>
         <p>
           → En cas de doute sur l&apos;identité du porteur de la carte fidélité, 3 Sauces se réserve le

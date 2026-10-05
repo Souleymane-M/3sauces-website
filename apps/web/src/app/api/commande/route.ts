@@ -26,7 +26,6 @@ import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
-import { verifierTokenFidelite } from "@/lib/fidelite/session";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
 import { notifierCommandeRecue } from "@/lib/notifications/paiement";
@@ -638,18 +637,19 @@ export async function POST(request: Request) {
   let recompenseAppliquee = false;
   let montantFinal = montant;
   if (body.utiliserRecompense === true) {
-    const fideliteToken = typeof body.fideliteToken === "string" ? body.fideliteToken : null;
-    const session = fideliteToken ? await verifierTokenFidelite(fideliteToken) : null;
-    if (!session) {
+    // Plus de jeton SMS (abandonné le 2026-10-05) : la preuve d'identité
+    // est le couple téléphone + email saisi dans la carte fidélité, revérifié
+    // ici contre la fiche client — jamais de confiance dans le seul état
+    // affiché côté client. Le téléphone doit être celui de cette commande
+    // (comme avant), l'email peut différer de celui du formulaire de
+    // commande (ex: client déjà connu qui a laissé ce champ vide).
+    const fideliteTelephone =
+      typeof body.fideliteTelephone === "string" ? normaliserTelephone(body.fideliteTelephone) : null;
+    const fideliteEmail = typeof body.fideliteEmail === "string" ? normaliserEmail(body.fideliteEmail) : null;
+    if (!fideliteTelephone || !fideliteEmail || fideliteTelephone !== telephone) {
       return NextResponse.json(
-        { error: "Vérification du numéro expirée. Revérifie ton numéro pour utiliser ta récompense." },
+        { error: "Revérifie ton solde fidélité pour utiliser ta récompense." },
         { status: 401 }
-      );
-    }
-    if (session.telephone !== telephone) {
-      return NextResponse.json(
-        { error: "Le numéro de fidélité doit être le même que celui de la commande." },
-        { status: 400 }
       );
     }
     if (montant < MONTANT_RECOMPENSE) {
@@ -661,14 +661,20 @@ export async function POST(request: Request) {
 
     const { data: client, error: erreurClient } = await supabase
       .from("clients")
-      .select("recompense_disponible")
+      .select("email, recompense_disponible")
       .eq("telephone", telephone)
       .maybeSingle();
     if (erreurClient) {
       console.error("[/api/commande] échec lecture client fidélité :", erreurClient.message);
       return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
     }
-    if (!client?.recompense_disponible) {
+    if (!client?.email || client.email.toLowerCase() !== fideliteEmail) {
+      return NextResponse.json(
+        { error: "Revérifie ton solde fidélité pour utiliser ta récompense." },
+        { status: 401 }
+      );
+    }
+    if (!client.recompense_disponible) {
       return NextResponse.json({ error: "Cette récompense n'est plus disponible." }, { status: 409 });
     }
 

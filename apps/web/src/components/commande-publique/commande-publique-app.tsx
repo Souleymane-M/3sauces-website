@@ -247,7 +247,7 @@ export function CommandePubliqueApp({
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
   const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
-  const [fideliteToken, setFideliteToken] = useState<string | null>(null);
+  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string } | null>(null);
   const [utiliserRecompense, setUtiliserRecompense] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [accepteCgv, setAccepteCgv] = useState(false);
@@ -919,8 +919,9 @@ export function CommandePubliqueApp({
           zone: canal === "livraison" ? zone : undefined,
           consentementCgv: accepteCgv,
           lignes,
-          fideliteToken: utiliserRecompense ? fideliteToken : undefined,
-          utiliserRecompense: utiliserRecompense && Boolean(fideliteToken),
+          fideliteTelephone: utiliserRecompense ? fideliteVerifiee?.telephone : undefined,
+          fideliteEmail: utiliserRecompense ? fideliteVerifiee?.email : undefined,
+          utiliserRecompense: utiliserRecompense && Boolean(fideliteVerifiee),
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
         }),
       });
@@ -1043,11 +1044,12 @@ export function CommandePubliqueApp({
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
         <CarteFidelite
-          telephoneCommande={telephone}
           montantPanier={total}
           utiliserRecompense={utiliserRecompense}
           onChangeUtiliserRecompense={setUtiliserRecompense}
-          onTokenChange={setFideliteToken}
+          onSoldeVerifie={(verifie, tel, email) =>
+            setFideliteVerifiee(verifie && tel && email ? { telephone: tel, email } : null)
+          }
           onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
         />
 
@@ -1378,7 +1380,7 @@ export function CommandePubliqueApp({
 
               <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
                 Total : {total.toFixed(2)} €
-                {utiliserRecompense && fideliteToken ? (
+                {utiliserRecompense && fideliteVerifiee ? (
                   <div className="mt-1 text-sm font-semibold text-[#2D5A27]">
                     Récompense fidélité : −{MONTANT_RECOMPENSE.toFixed(2)} € · Total à payer :{" "}
                     {Math.max(0, total - MONTANT_RECOMPENSE).toFixed(2)} €

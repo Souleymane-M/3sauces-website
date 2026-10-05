@@ -1,11 +1,8 @@
 import "server-only";
 
 /**
- * Envoi de SMS libres via l'API Messages de Twilio — distinct du service
- * Verify utilisé pour l'OTP fidélité (cf. lib/fidelite/twilio-verify.ts),
- * qui ne peut envoyer que des codes numériques, jamais un texte libre.
- * Nécessite un numéro Twilio dédié à l'envoi (capacité SMS), configuré via
- * `TWILIO_PHONE_NUMBER` — indépendant du service Verify.
+ * Envoi de SMS libres via l'API Messages de Twilio. Nécessite un numéro
+ * Twilio dédié à l'envoi (capacité SMS), configuré via `TWILIO_PHONE_NUMBER`.
  *
  * Toujours "best effort" : un échec d'envoi (numéro non configuré, panne
  * Twilio) ne doit jamais faire échouer le traitement d'une commande ou d'un
