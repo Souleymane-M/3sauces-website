@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
-import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
+import { notifierPaiementConfirme, notifierCommandeRecue } from "@/lib/notifications/paiement";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
@@ -696,6 +696,14 @@ export async function POST(request: Request) {
     }
 
     await notifierPaiementConfirme(commande.id);
+  } else {
+    // Livraison prise par téléphone, non payée à cet instant : même
+    // confirmation immédiate que sur le site public (notifierCommandeRecue),
+    // sinon le client n'a aucune nouvelle avant l'encaissement réel par le
+    // livreur, potentiellement des heures plus tard.
+    await notifierCommandeRecue(commande.id).catch((e) =>
+      console.error("[/api/caisse/commandes] échec notification réception :", e)
+    );
   }
 
   return NextResponse.json({
