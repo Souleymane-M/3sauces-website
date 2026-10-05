@@ -1136,8 +1136,14 @@ export function CaisseApp({
    * "Reçu du client" : si on le laisse facultatif, personne ne s'en sert et
    * le calcul mental reste nécessaire. Pour "mixte", seule la part espèces
    * compte (la part CB n'a pas de monnaie à rendre).
+   *
+   * Jamais pour une livraison : le mode de paiement choisi ici n'est qu'une
+   * déclaration, l'argent n'est encaissé par le livreur qu'au moment de la
+   * remise (cf. "Commande enregistrée" vs "Commande encaissée" plus bas) —
+   * aucune espèce n'est donnée à la caissière à cette étape.
    */
   function validerMontantRecuEspeces(): string | null {
+    if (canal === "livraison") return null;
     if (modePaiement !== "especes" && modePaiement !== "mixte") return null;
     const du = modePaiement === "mixte" ? Number(montantEspecesMixte.replace(",", ".")) || 0 : totalApresRemises;
     if (du <= 0) return null;
@@ -1993,7 +1999,7 @@ export function CaisseApp({
                   </span>
                 </div>
               )}
-              {(modePaiement === "especes" || modePaiement === "mixte") && (
+              {canal !== "livraison" && (modePaiement === "especes" || modePaiement === "mixte") && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
                   <label className="flex items-center gap-1">
                     Reçu du client (espèces)
