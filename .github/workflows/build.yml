@@ -1,0 +1,31 @@
+name: Build
+
+# Vérifie que le site compile avant que ça n'arrive en production — sans
+# ça, un build cassé peut rester invisible pendant des heures : Vercel ne
+# déploie jamais un build en échec, il garde silencieusement l'ancienne
+# version en ligne (incident vécu le 2026-10-05, ~24h de correctifs jamais
+# mis en ligne sans que personne ne le sache). Aucune variable
+# d'environnement n'est nécessaire : vérifié que `pnpm build` réussit sans
+# aucun secret configuré.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
