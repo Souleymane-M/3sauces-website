@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
-import { notifierPaiementConfirme, notifierCommandeRecue } from "@/lib/notifications/paiement";
+import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
@@ -985,6 +985,10 @@ export async function PATCH(request: Request) {
       );
     }
   }
+
+  await notifierCommandeModifiee(body.commandeId).catch((e) =>
+    console.error("[/api/caisse/commandes PATCH] échec notification modification :", e)
+  );
 
   return NextResponse.json({ ok: true, commandeId: body.commandeId, montant, coutMatiereTotal, coutIncomplet });
 }

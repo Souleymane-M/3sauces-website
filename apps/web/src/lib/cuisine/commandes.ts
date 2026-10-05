@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import { notifierCommandeAnnulee } from "@/lib/notifications/paiement";
 import {
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
@@ -314,4 +315,8 @@ export async function annulerCommande({ commandeId, profilId, motif }: Annulatio
   if (erreurEvenement) {
     console.error("[cuisine/commandes] échec journalisation annulation :", erreurEvenement.message);
   }
+
+  await notifierCommandeAnnulee(commandeId, motif?.trim() || null).catch((e) =>
+    console.error("[cuisine/commandes] échec notification annulation :", e)
+  );
 }

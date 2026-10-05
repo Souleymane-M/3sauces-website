@@ -245,3 +245,136 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
     }
   }
 }
+
+/**
+ * Notifie l'annulation d'une commande — n'existait pas jusqu'ici, un client
+ * n'était prévenu par aucun canal (repéré le 2026-10-06, en même temps que
+ * le trou sur la modification). Le remboursement réel (espèces ou carte)
+ * reste entièrement manuel, hors de l'app (cf. lib/cuisine/commandes.ts) —
+ * cet email prévient seulement, il ne déclenche ni ne suit aucun
+ * remboursement. Si la commande était déjà payée, le restaurant reçoit un
+ * rappel explicite pour ne pas l'oublier.
+ */
+export async function notifierCommandeAnnulee(commandeId: string, motif: string | null): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: commande, error } = await supabase
+    .from("commandes")
+    .select("numero, montant, contenu, nom_livraison, client_telephone, paiement_statut, mode_paiement")
+    .eq("id", commandeId)
+    .maybeSingle();
+
+  if (error || !commande) {
+    console.error("[notifications/paiement] commande introuvable (annulation) :", commandeId, error?.message);
+    return;
+  }
+
+  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
+  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
+  const montantAffiche = commande.montant.toFixed(2);
+  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
+  const dejaPayee = commande.paiement_statut === "paye";
+
+  const envois: Promise<{ ok: boolean; erreur?: string }>[] = [];
+
+  if (commande.client_telephone) {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("email")
+      .eq("telephone", commande.client_telephone)
+      .maybeSingle();
+
+    if (client?.email) {
+      envois.push(
+        envoyerEmail(
+          client.email,
+          `Commande annulée — commande #${commande.numero}`,
+          construireEmailClientHtml(
+            `<p>Ta commande #${commande.numero} (<strong>${montantAffiche} €</strong>) a été annulée.</p>` +
+              `<p>${resume}</p>` +
+              (motif ? `<p>Motif : ${motif}</p>` : "") +
+              (dejaPayee
+                ? `<p>Elle avait déjà été payée — le remboursement sera traité séparément par le restaurant.</p>`
+                : ""),
+            "Retourner sur le site"
+          ),
+          emailRestaurant ?? undefined
+        )
+      );
+    }
+  }
+
+  if (emailRestaurant) {
+    envois.push(
+      envoyerEmail(
+        emailRestaurant,
+        `Commande annulée — commande #${commande.numero}`,
+        `<p><strong>Commande annulée.</strong></p>` +
+          `<p>Commande #${commande.numero} — ${montantAffiche} €</p>` +
+          `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
+          `<p>${resume}</p>` +
+          (motif ? `<p>Motif : ${motif}</p>` : "") +
+          (dejaPayee
+            ? `<p><strong>IMPORTANT : déjà payée (${commande.mode_paiement}) — penser au remboursement manuel.</strong></p>`
+            : "")
+      )
+    );
+  }
+
+  const resultats = await Promise.allSettled(envois);
+  for (const resultat of resultats) {
+    if (resultat.status === "fulfilled" && !resultat.value.ok) {
+      console.error("[notifications/paiement] échec envoi annulation :", resultat.value.erreur);
+    } else if (resultat.status === "rejected") {
+      console.error("[notifications/paiement] envoi annulation rejeté :", resultat.reason);
+    }
+  }
+}
+
+/**
+ * Notifie la modification d'une commande — même constat que l'annulation :
+ * n'existait pas jusqu'ici. Un seul email au client (avec le restaurant en
+ * copie via Reply-To comme `notifierCommandeRecue`), pas d'email interne
+ * séparé : contrairement à une annulation, c'est toujours l'équipe
+ * elle-même qui modifie depuis /caisse — elle est donc déjà au courant.
+ */
+export async function notifierCommandeModifiee(commandeId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: commande, error } = await supabase
+    .from("commandes")
+    .select("numero, montant, contenu, client_telephone")
+    .eq("id", commandeId)
+    .maybeSingle();
+
+  if (error || !commande) {
+    console.error("[notifications/paiement] commande introuvable (modification) :", commandeId, error?.message);
+    return;
+  }
+
+  if (!commande.client_telephone) return;
+  const { data: client } = await supabase
+    .from("clients")
+    .select("email")
+    .eq("telephone", commande.client_telephone)
+    .maybeSingle();
+  if (!client?.email) return;
+
+  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
+  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
+  const montantAffiche = commande.montant.toFixed(2);
+  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
+
+  const resultat = await envoyerEmail(
+    client.email,
+    `Commande modifiée — commande #${commande.numero}`,
+    construireEmailClientHtml(
+      `<p>Ta commande #${commande.numero} a été modifiée.</p>` +
+        `<p>${resume}</p>` +
+        `<p>Nouveau total : <strong>${montantAffiche} €</strong></p>`,
+      "Retourner sur le site"
+    ),
+    emailRestaurant ?? undefined
+  );
+  if (!resultat.ok) {
+    console.error("[notifications/paiement] échec envoi modification :", resultat.erreur);
+  }
+}
