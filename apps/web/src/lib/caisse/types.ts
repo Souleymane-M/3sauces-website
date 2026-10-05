@@ -104,11 +104,11 @@ export interface CreerCommandePayload {
 
 /**
  * Modification du contenu d'une commande existante encore "en_attente" —
- * mêmes champs que la création, sauf `canal` (jamais modifiable ici : ça
- * toucherait la logique de paiement/livraison déjà figée à la création,
- * cf. /api/caisse/commandes PATCH — pour changer de canal, on annule et on
- * recrée) et `recompenseAppliquee` (jamais togglable via une modification).
+ * mêmes champs que la création, `recompenseAppliquee` en moins (jamais
+ * togglable via une modification). `canal` peut changer, sauf dans un sens
+ * (vers "livraison" depuis un canal déjà payé) — revérifié et bloqué côté
+ * serveur, cf. /api/caisse/commandes PATCH.
  */
-export interface ModifierCommandePayload extends Omit<CreerCommandePayload, "canal" | "recompenseAppliquee"> {
+export interface ModifierCommandePayload extends Omit<CreerCommandePayload, "recompenseAppliquee"> {
   commandeId: string;
 }

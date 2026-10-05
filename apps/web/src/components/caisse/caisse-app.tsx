@@ -245,6 +245,19 @@ export function CaisseApp({
   const [platDeplie, setPlatDeplie] = useState<string | null>(plats[0]?.id ?? null);
   const [platActifId, setPlatActifId] = useState<string>(plats[0].id);
 
+  // Articles d'une commande en cours de modification dont le produit a
+  // depuis été désactivé/supprimé du catalogue : `ligneDepuisCommande` les
+  // exclut silencieusement du panier rechargé (rien à éditer dessus, le
+  // produit n'existe plus) — sans cet avertissement explicite, l'employé ne
+  // se rend compte de rien et peut valider une commande qui a perdu des
+  // articles par rapport à ce que le client avait commandé.
+  const articlesDisparus = useMemo(() => {
+    if (!enModeEdition) return [];
+    return commandeExistante.lignes
+      .filter((l) => l.nom !== NOM_PRODUIT_BOISSON_OFFERTE && !produits.some((p) => p.id === l.produitId))
+      .map((l) => l.nom);
+  }, [enModeEdition, commandeExistante, produits]);
+
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
   // Ligne du panier pour laquelle le client vient de changer d'avis sur une
@@ -252,6 +265,14 @@ export function CaisseApp({
   // sont possibles, sinon appliqué directement.
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanier | null>(null);
   const [canal, setCanal] = useState<Canal>(() => commandeExistante?.canal ?? "sur_place");
+  // Canal au chargement de la modification — jamais réassigné ensuite, sert
+  // uniquement à savoir d'où on part pour décider ce qui reste interdit
+  // (passer à "livraison" une commande qui était sur place/à emporter,
+  // donc déjà payée : il faudrait "dépayer" et reverser la fidélité déjà
+  // créditée, trop risqué depuis cet écran — annule et recrée dans ce
+  // seul cas). L'autre sens (livraison non payée -> sur place/à emporter,
+  // paiement collecté maintenant) est sans risque et donc autorisé.
+  const canalOriginalEdition = useRef(commandeExistante?.canal ?? null).current;
   const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
 
   // Restauration du panier après un rechargement accidentel de l'iPad : on
@@ -1296,11 +1317,12 @@ export function CaisseApp({
   }
 
   /**
-   * Enregistre les modifications d'une commande existante (PATCH) — jamais
-   * de canal ni de récompense fidélité dans le payload (verrouillés côté
-   * serveur, cf. lib/caisse/modification.ts), et pas d'impression ni d'écran
-   * de confirmation avec ticket : on revient simplement sur /commandes une
-   * fois enregistré.
+   * Enregistre les modifications d'une commande existante (PATCH). Le canal
+   * peut changer (sauf vers "livraison" depuis un canal déjà payé, verrouillé
+   * côté UI et revérifié côté serveur) ; la récompense fidélité, elle,
+   * reste toujours hors payload (jamais togglable via une modification, cf.
+   * lib/caisse/modification.ts). Pas d'impression ni d'écran de confirmation
+   * avec ticket : on revient simplement sur /commandes une fois enregistré.
    */
   async function enregistrerModification() {
     if (!commandeExistante || panierActuel.length === 0) return;
@@ -1337,6 +1359,7 @@ export function CaisseApp({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           commandeId: commandeExistante.id,
+          canal,
           modePaiement,
           paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
@@ -1483,17 +1506,26 @@ export function CaisseApp({
       ) : (
         <div className="space-y-4">
           {enModeEdition ? (
-            <div className="flex items-center justify-between rounded-lg border border-[#8B2020] bg-[#8B2020]/5 px-3 py-2">
-              <p className="text-sm font-semibold text-[#8B2020]">
-                ✏️ Modification de la commande n°{commandeExistante.numero}
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/commandes")}
-                className="text-sm font-semibold text-gray-500 underline"
-              >
-                Annuler la modification
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-lg border border-[#8B2020] bg-[#8B2020]/5 px-3 py-2">
+                <p className="text-sm font-semibold text-[#8B2020]">
+                  ✏️ Modification de la commande n°{commandeExistante.numero}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push("/commandes")}
+                  className="text-sm font-semibold text-gray-500 underline"
+                >
+                  Annuler la modification
+                </button>
+              </div>
+              {articlesDisparus.length > 0 && (
+                <p className="rounded-lg border border-orange-400 bg-orange-50 px-3 py-2 text-sm text-orange-700">
+                  ⚠️ {articlesDisparus.length > 1 ? "Ces articles ne sont" : "Cet article n'est"} plus dans la carte
+                  et {articlesDisparus.length > 1 ? "ont" : "a"} été retiré{articlesDisparus.length > 1 ? "s" : ""} du
+                  panier : {articlesDisparus.join(", ")}. Ajoute un équivalent si besoin avant d&apos;enregistrer.
+                </p>
+              )}
             </div>
           ) : (
             <button
@@ -1893,7 +1925,6 @@ export function CaisseApp({
               <div className="mt-1 grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setCanal("sur_place")}
-                  disabled={enModeEdition}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
@@ -1902,7 +1933,6 @@ export function CaisseApp({
                 </button>
                 <button
                   onClick={() => setCanal("emporter")}
-                  disabled={enModeEdition}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
@@ -1911,7 +1941,7 @@ export function CaisseApp({
                 </button>
                 <button
                   onClick={() => setCanal("livraison")}
-                  disabled={enModeEdition || !livraisonPossible}
+                  disabled={!livraisonPossible || (enModeEdition && canalOriginalEdition !== "livraison")}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
@@ -1919,9 +1949,14 @@ export function CaisseApp({
                   Livraison
                 </button>
               </div>
-              {enModeEdition && (
+              {enModeEdition && canalOriginalEdition !== "livraison" && (
                 <p className="mt-2 text-xs text-gray-400">
-                  Canal non modifiable ici — pour en changer, annule la commande et recrée-la.
+                  Passage à &quot;Livraison&quot; impossible ici (commande déjà payée) — annule et recrée-la si besoin.
+                </p>
+              )}
+              {enModeEdition && canalOriginalEdition === "livraison" && canal !== "livraison" && (
+                <p className="mt-2 text-xs text-[#2D5A27]">
+                  Le paiement sera encaissé maintenant pour ce nouveau mode de récupération.
                 </p>
               )}
               {canal === "livraison" && !minimumAtteint && (

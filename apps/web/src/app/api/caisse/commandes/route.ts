@@ -720,14 +720,19 @@ export async function POST(request: Request) {
 /**
  * Modifie le contenu d'une commande existante encore "en_attente" — mêmes
  * règles de validation que la création (POST), via `validerLignesCommande`.
- * Le canal n'est jamais modifiable ici (cf. `ModifierCommandePayload`) :
- * `paiement_statut` et `recompense_appliquee` restent donc toujours
- * inchangés, seul le contenu (et donc le montant) peut changer. Si la
- * commande était déjà payée, le trigger DB `commandes_appliquer_fidelite`
- * ajuste l'accumulation déjà créditée par la différence de montant.
- * Le stock du jour déjà décompté est ajusté atomiquement (restitution des
- * anciennes quantités + décompte des nouvelles, annulé en bloc si le stock
- * est insuffisant pour la nouvelle composition).
+ * `recompense_appliquee` reste toujours inchangé (jamais togglable ici).
+ * Le canal peut changer, sauf vers "livraison" depuis un canal déjà payé
+ * (sur place/à emporter) — refusé explicitement, ça impliquerait de
+ * "dépayer" et reverser la fidélité déjà créditée, trop risqué depuis cet
+ * écran (annule et recrée dans ce cas précis). L'autre sens (livraison non
+ * payée -> sur place/à emporter) est permis : le paiement est alors
+ * collecté immédiatement (`paiement_statut` passe à "paye", ce qui
+ * déclenche le trigger DB `commandes_appliquer_fidelite` au bon moment).
+ * Si la commande était déjà payée et reste sur le même canal, ce même
+ * trigger ajuste simplement l'accumulation déjà créditée par la différence
+ * de montant. Le stock du jour déjà décompté est ajusté atomiquement
+ * (restitution des anciennes quantités + décompte des nouvelles, annulé en
+ * bloc si le stock est insuffisant pour la nouvelle composition).
  */
 export async function PATCH(request: Request) {
   const session = await requireRole(["employe"]);
@@ -776,7 +781,7 @@ export async function PATCH(request: Request) {
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")
-    .select("id, canal, statut, contenu, montant, recompense_appliquee, commande_par")
+    .select("id, canal, statut, contenu, montant, paiement_statut, recompense_appliquee, commande_par")
     .eq("id", body.commandeId)
     .maybeSingle();
   if (erreurExistante || !commandeExistante) {
@@ -854,9 +859,29 @@ export async function PATCH(request: Request) {
     montant = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
   }
 
-  // Canal jamais modifiable ici (cf. doc du payload) — toujours celui de la
-  // commande existante.
-  const canal = commandeExistante.canal;
+  // Le canal peut changer, sauf dans un sens : une commande sur place/à
+  // emporter est toujours déjà payée (paiement_statut="paye" dès la
+  // création, cf. POST) — en faire une livraison impliquerait de "dépayer"
+  // et reverser la fidélité déjà créditée, trop risqué depuis cet écran.
+  // L'autre sens (livraison non payée -> sur place/à emporter) est sans
+  // risque : le paiement est simplement collecté maintenant, cf. plus bas.
+  const ancienCanal = commandeExistante.canal;
+  const canalDemande = typeof body.canal === "string" ? body.canal : ancienCanal;
+  if (!CANAUX_CAISSE.includes(canalDemande as (typeof CANAUX_CAISSE)[number])) {
+    return NextResponse.json({ error: "Canal invalide." }, { status: 400 });
+  }
+  const canal = canalDemande as (typeof CANAUX_CAISSE)[number];
+  if (canal === "livraison" && ancienCanal !== "livraison") {
+    return NextResponse.json(
+      {
+        error:
+          "Cette commande est déjà payée — impossible de la transformer en livraison depuis cet écran. Annule-la et recrée-la si besoin.",
+      },
+      { status: 400 }
+    );
+  }
+  const passageVersRetrait = ancienCanal === "livraison" && canal !== "livraison";
+
   let adresse: string | null = null;
   let zone: string | null = null;
   if (canal === "livraison") {
@@ -941,8 +966,15 @@ export async function PATCH(request: Request) {
   const { error: erreurMaj } = await supabase
     .from("commandes")
     .update({
+      canal,
       contenu: lignes,
       montant,
+      // Passage livraison -> sur place/à emporter : le paiement est
+      // collecté maintenant (cf. bloc paiements plus bas), donc "paye" dès
+      // cette mise à jour — déclenche au passage le trigger de fidélité
+      // (jamais touché dans les autres cas, pour ne pas perturber un statut
+      // déjà correct).
+      ...(passageVersRetrait ? { paiement_statut: "paye" as const } : {}),
       mode_paiement: body.modePaiement,
       client_telephone: clientTelephone,
       cout_matiere_total: coutMatiereTotal,
@@ -958,6 +990,17 @@ export async function PATCH(request: Request) {
   if (erreurMaj) {
     console.error("[/api/caisse/commandes PATCH] échec mise à jour :", erreurMaj.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // Passage livraison -> sur place/à emporter : supprime le suivi livreur
+  // devenu sans objet (plus de QR à flasher pour une commande qui n'est
+  // plus livrée). Best effort, comme à la création — ne doit jamais faire
+  // échouer une modification déjà enregistrée.
+  if (passageVersRetrait) {
+    const { error: erreurSuppressionLivraison } = await supabase.from("livraisons").delete().eq("commande_id", body.commandeId);
+    if (erreurSuppressionLivraison) {
+      console.error("[/api/caisse/commandes PATCH] échec suppression suivi livraison :", erreurSuppressionLivraison.message);
+    }
   }
 
   // Sur place/à emporter sont payés dès la création (cf. POST) : la
@@ -986,9 +1029,20 @@ export async function PATCH(request: Request) {
     }
   }
 
-  await notifierCommandeModifiee(body.commandeId).catch((e) =>
-    console.error("[/api/caisse/commandes PATCH] échec notification modification :", e)
-  );
+  // Le paiement vient d'être confirmé (passage livraison -> retrait) : même
+  // notification qu'un paiement comptoir classique, avec le bloc fidélité à
+  // jour (le trigger a tourné sur la mise à jour de paiement_statut
+  // ci-dessus) — pas la notification générique de modification, qui ne
+  // reflèterait pas cette confirmation de paiement.
+  if (passageVersRetrait) {
+    await notifierPaiementConfirme(body.commandeId).catch((e) =>
+      console.error("[/api/caisse/commandes PATCH] échec notification paiement :", e)
+    );
+  } else {
+    await notifierCommandeModifiee(body.commandeId).catch((e) =>
+      console.error("[/api/caisse/commandes PATCH] échec notification modification :", e)
+    );
+  }
 
   return NextResponse.json({ ok: true, commandeId: body.commandeId, montant, coutMatiereTotal, coutIncomplet });
 }
