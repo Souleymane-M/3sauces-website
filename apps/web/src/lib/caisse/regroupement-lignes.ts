@@ -9,6 +9,7 @@ import type { Categorie } from "@3sauces/supabase";
  * écran.
  */
 const ORDRE_CATEGORIES: Categorie[] = [
+  "petit_dejeuner",
   "menu_special",
   "plat_du_jour",
   "snacking",
@@ -19,6 +20,7 @@ const ORDRE_CATEGORIES: Categorie[] = [
 ];
 
 export const LIBELLE_CATEGORIE: Record<Categorie, string> = {
+  petit_dejeuner: "Petit déjeuner",
   menu_special: "Menus",
   plat_du_jour: "Plats du jour",
   snacking: "Tacos & formules",

@@ -96,6 +96,68 @@ function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe, canal
 }
 
 /**
+ * Confirme la bonne réception d'une commande du site public payée en
+ * personne (espèces/CB au comptoir ou à la livraison) — jamais pour
+ * Stripe, où la confirmation n'a de sens qu'une fois le paiement réellement
+ * passé (cf. `notifierPaiementConfirme`, déclenché par le webhook).
+ *
+ * Distincte de `notifierPaiementConfirme` : appelée tout de suite à la
+ * création, donc AVANT que le trigger de fidélité n'ait tourné (il ne se
+ * déclenche qu'au passage de `paiement_statut` à "paye", qui pour une
+ * commande payée en personne n'arrive que plus tard, à l'encaissement réel).
+ * Pas de bloc fidélité ici pour ne jamais afficher un cumul pas encore à
+ * jour — seulement la confirmation + le bloc commande groupée, qui ne
+ * dépend d'aucune donnée mise à jour par le trigger.
+ *
+ * Sans cet envoi immédiat, un client payant en espèces ne recevait aucun
+ * email avant l'encaissement réel (parfois des heures plus tard pour une
+ * livraison) — repéré le 2026-10-05 après une vague de commandes sans
+ * aucune confirmation reçue.
+ */
+export async function notifierCommandeRecue(commandeId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: commande, error } = await supabase
+    .from("commandes")
+    .select("numero, montant, contenu, client_telephone, nb_plats, palier_groupe, canal")
+    .eq("id", commandeId)
+    .maybeSingle();
+
+  if (error || !commande) {
+    console.error("[notifications/paiement] commande introuvable (réception) :", commandeId, error?.message);
+    return;
+  }
+
+  if (!commande.client_telephone) return;
+  const { data: client } = await supabase
+    .from("clients")
+    .select("email")
+    .eq("telephone", commande.client_telephone)
+    .maybeSingle();
+  if (!client?.email) return;
+
+  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
+  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
+  const montantAffiche = commande.montant.toFixed(2);
+  const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
+  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
+
+  const resultat = await envoyerEmail(
+    client.email,
+    `Commande reçue — commande #${commande.numero}`,
+    construireEmailClientHtml(
+      `<p>Merci, ta commande #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
+        `<p>${resume}</p>` +
+        (blocGroupe ?? ""),
+      "Retourner sur le site"
+    ),
+    emailRestaurant ?? undefined
+  );
+  if (!resultat.ok) {
+    console.error("[notifications/paiement] échec envoi réception :", resultat.erreur);
+  }
+}
+
+/**
  * Notifie un paiement confirmé (comptoir, livraison, ou en ligne via le
  * webhook Stripe) — appelé après que `commandes.paiement_statut` soit
  * effectivement passé à "paye" (donc après que le trigger de fidélité ait

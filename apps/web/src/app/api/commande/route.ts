@@ -29,6 +29,7 @@ import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { verifierTokenFidelite } from "@/lib/fidelite/session";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
+import { notifierCommandeRecue } from "@/lib/notifications/paiement";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_PUBLICS = ["especes", "cb", "stripe"] as const;
@@ -795,6 +796,18 @@ export async function POST(request: Request) {
     } else {
       qrCode = livraison.qr_code;
     }
+  }
+
+  // Confirmation immédiate par email — jamais pour Stripe, où le paiement
+  // n'est pas encore acquis à ce stade (webhook séparé une fois payé).
+  // Best effort, ne doit jamais faire échouer une commande déjà enregistrée
+  // — mais on l'attend (plutôt qu'un fire-and-forget) car une fonction
+  // serverless peut être arrêtée dès la réponse envoyée, avant qu'une
+  // promesse encore en vol n'ait eu le temps de s'exécuter.
+  if (body.modePaiement !== "stripe") {
+    await notifierCommandeRecue(commande.id).catch((e) =>
+      console.error("[/api/commande] échec notification réception :", e)
+    );
   }
 
   return NextResponse.json({
