@@ -127,33 +127,62 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
     return;
   }
 
-  if (!commande.client_telephone) return;
-  const { data: client } = await supabase
-    .from("clients")
-    .select("email")
-    .eq("telephone", commande.client_telephone)
-    .maybeSingle();
-  if (!client?.email) return;
-
   const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
   const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
   const montantAffiche = commande.montant.toFixed(2);
   const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
   const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
 
-  const resultat = await envoyerEmail(
-    client.email,
-    `Commande reçue — commande #${commande.numero}`,
-    construireEmailClientHtml(
-      `<p>Merci, ta commande #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
-        `<p>${resume}</p>` +
-        (blocGroupe ?? ""),
-      "Retourner sur le site"
-    ),
-    emailRestaurant ?? undefined
-  );
-  if (!resultat.ok) {
-    console.error("[notifications/paiement] échec envoi réception :", resultat.erreur);
+  const envois: Promise<{ ok: boolean; erreur?: string }>[] = [];
+
+  if (commande.client_telephone) {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("email")
+      .eq("telephone", commande.client_telephone)
+      .maybeSingle();
+
+    if (client?.email) {
+      envois.push(
+        envoyerEmail(
+          client.email,
+          `Commande reçue — commande #${commande.numero}`,
+          construireEmailClientHtml(
+            `<p>Merci, ta commande #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
+              `<p>${resume}</p>` +
+              (blocGroupe ?? ""),
+            "Retourner sur le site"
+          ),
+          emailRestaurant ?? undefined
+        )
+      );
+    }
+  }
+
+  // Jusqu'ici le restaurant n'apparaissait qu'en Reply-To de l'email client
+  // (ça n'envoie rien dans sa boîte) — aucune commande non encore payée
+  // (livraison, site public) ne lui était donc jamais signalée par email.
+  // Repéré le 2026-10-06 : seules les commandes déjà payées apparaissaient
+  // dans la boîte du restaurant.
+  if (emailRestaurant) {
+    envois.push(
+      envoyerEmail(
+        emailRestaurant,
+        `Nouvelle commande — commande #${commande.numero}`,
+        `<p><strong>Nouvelle commande reçue (pas encore payée).</strong></p>` +
+          `<p>Commande #${commande.numero} — ${montantAffiche} €</p>` +
+          `<p>${resume}</p>`
+      )
+    );
+  }
+
+  const resultats = await Promise.allSettled(envois);
+  for (const resultat of resultats) {
+    if (resultat.status === "fulfilled" && !resultat.value.ok) {
+      console.error("[notifications/paiement] échec envoi réception :", resultat.value.erreur);
+    } else if (resultat.status === "rejected") {
+      console.error("[notifications/paiement] envoi réception rejeté :", resultat.reason);
+    }
   }
 }
 
