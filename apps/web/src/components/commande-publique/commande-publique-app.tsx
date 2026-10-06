@@ -1073,8 +1073,10 @@ export function CommandePubliqueApp({
           </div>
         )}
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
-          <p className="font-bold">🚀 Commandez à plusieurs, avant 11h :</p>
+          <p className="font-bold">🚀 Vous êtes plusieurs ? Commandez en groupe, avant 11h :</p>
           <p className="mt-1 text-sm text-white/90">
+            Dès {SEUIL_MINIMUM_GROUPE} plats → commande groupée (un seul passage en caisse/livraison).
+            <br />
             {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
             <br />
             {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
@@ -1085,20 +1087,26 @@ export function CommandePubliqueApp({
           <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-center font-semibold text-gray-900">Vous commandez pour vous, ou en groupe ?</p>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setModeCommande("simple")}
-                className="bouton-choix-mode rounded py-3 text-sm font-bold uppercase text-white"
-                style={{ backgroundColor: VERT }}
-              >
-                Commande simple
-              </button>
-              <button
-                onClick={() => setModeCommande("groupee")}
-                className="bouton-choix-mode rounded bg-[#8B2020] py-3 text-sm font-bold uppercase text-white"
-                style={{ animationDelay: "0.3s" }}
-              >
-                Commande groupée
-              </button>
+              <div>
+                <button
+                  onClick={() => setModeCommande("simple")}
+                  className="bouton-choix-mode w-full rounded py-3 text-sm font-bold uppercase text-white"
+                  style={{ backgroundColor: VERT }}
+                >
+                  Commande simple
+                </button>
+                <p className="mt-1 text-center text-xs text-gray-500">Pour une seule personne</p>
+              </div>
+              <div>
+                <button
+                  onClick={() => setModeCommande("groupee")}
+                  className="bouton-choix-mode w-full rounded bg-[#8B2020] py-3 text-sm font-bold uppercase text-white"
+                  style={{ animationDelay: "0.3s" }}
+                >
+                  Commande groupée
+                </button>
+                <p className="mt-1 text-center text-xs text-gray-500">Dès {SEUIL_MINIMUM_GROUPE} personnes/plats</p>
+              </div>
             </div>
           </div>
         ) : (
@@ -1269,6 +1277,31 @@ export function CommandePubliqueApp({
                 <>
                   {panierSimple.length === 0 && <p className="text-sm text-gray-400">Vide.</p>}
                   <ul className="space-y-2">{panierSimple.map(ligneJsx)}</ul>
+                  {/* Beaucoup de clients commandent à plusieurs en "Commande simple" sans jamais
+                      découvrir les avantages du mode groupé (livraison prioritaire, boisson offerte) —
+                      repéré le 2026-10-07 sur une commande à ~60€ passée en simple. Le nudge
+                      apparaît tôt (dès 2 articles) pour que le changement de mode, qui vide le
+                      panier, coûte le moins possible si le client décide de basculer. */}
+                  {panierSimple.length >= 2 && (
+                    <div className="rounded-lg border border-[#2D5A27] bg-[#2D5A27]/5 p-3 text-sm">
+                      <p className="font-semibold text-[#2D5A27]">
+                        🚀 Vous commandez pour plusieurs personnes ? Passez en <strong>Commande groupée</strong> (dès
+                        2 plats) pour débloquer livraison prioritaire dès 3 plats/30€, et une boisson 2L offerte dès
+                        4 plats/40€.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm("Passer en commande groupée videra le panier en cours. Continuer ?")) return;
+                          setPanierSimple([]);
+                          setModeCommande("groupee");
+                        }}
+                        className="mt-2 text-xs font-bold text-[#2D5A27] underline"
+                      >
+                        Passer en commande groupée
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
