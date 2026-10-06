@@ -28,6 +28,9 @@ interface CarteFideliteProps {
   onChangeUtiliserRecompense: (valeur: boolean) => void;
   onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string) => void;
   onPrefillTelephone: (telephone: string) => void;
+  /** Téléphone/email déjà saisis dans le formulaire de commande (E.164 pour le téléphone, brut pour l'email) — dès que les deux sont valides, on vérifie discrètement en arrière-plan si un solde existe, sans attendre que le client pense à cliquer "Voir mon solde". */
+  telephoneCommande: string;
+  emailCommande: string;
 }
 
 /**
@@ -44,6 +47,8 @@ export function CarteFidelite({
   onChangeUtiliserRecompense,
   onSoldeVerifie,
   onPrefillTelephone,
+  telephoneCommande,
+  emailCommande,
 }: CarteFideliteProps) {
   const [etape, setEtape] = useState<Etape>("repliee");
   const [telephoneSaisi, setTelephoneSaisi] = useState("");
@@ -69,6 +74,52 @@ export function CarteFidelite({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Vérification silencieuse dès que le client a rempli téléphone + email
+  // dans le formulaire de commande lui-même — jamais d'erreur affichée ici
+  // (un nouveau client sans historique n'a rien fait de "faux"), juste un
+  // passage direct à "verifie" si un solde existe. Ne se déclenche que tant
+  // que le client n'a pas commencé à interagir manuellement avec la carte
+  // fidélité (etape encore "repliee"), pour ne jamais interférer avec une
+  // saisie en cours dans le petit formulaire dédié.
+  useEffect(() => {
+    if (etape !== "repliee") return;
+    const telephone = normaliserTelephone(telephoneCommande);
+    const email = normaliserEmail(emailCommande);
+    if (!telephone || !email) return;
+    let annule = false;
+    const minuteur = setTimeout(async () => {
+      if (annule) return;
+      try {
+        const reponse = await fetch("/api/fidelite/solde", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ telephone, email }),
+        });
+        if (annule || !reponse.ok) return;
+        const data = await reponse.json();
+        if (annule) return;
+        setSolde({
+          montantCumule: data.montantCumule,
+          tamponsAcquis: data.tamponsAcquis,
+          recompenseDisponible: data.recompenseDisponible,
+          dateExpiration: data.dateExpiration,
+        });
+        setTelephoneSaisi(telephone);
+        setEmailSaisi(email);
+        onSoldeVerifie(true, telephone, email);
+        setEtape("verifie");
+      } catch {
+        // Échec silencieux : la carte reste repliée, le client peut toujours
+        // vérifier manuellement via "Voir mon solde fidélité".
+      }
+    }, 500);
+    return () => {
+      annule = true;
+      clearTimeout(minuteur);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telephoneCommande, emailCommande, etape]);
 
   async function chargerSolde(telephoneBrut: string, emailBrut: string) {
     setErreur(null);

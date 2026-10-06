@@ -1051,6 +1051,8 @@ export function CommandePubliqueApp({
             setFideliteVerifiee(verifie && tel && email ? { telephone: tel, email } : null)
           }
           onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
+          telephoneCommande={composerTelephoneAvecPays(telephone, paysTelephone) ?? ""}
+          emailCommande={email}
         />
 
         {parametres.remiseLancementActive && (
