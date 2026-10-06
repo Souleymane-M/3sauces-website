@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 import { limiterDebit } from "@/lib/auth/rate-limit";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 
 /**
  * Solde fidélité par téléphone + email — remplace l'ancienne vérification
@@ -29,11 +30,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase
-    .from("clients")
-    .select("email, montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
-    .eq("telephone", telephone)
-    .maybeSingle();
+  const { data, error } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
 
   if (error) {
     console.error("[/api/fidelite/solde] échec lecture client :", error.message);
@@ -46,11 +43,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone ou email incorrect." }, { status: 404 });
   }
 
+  const tampons = await compterTamponsDisponibles(supabase, telephone);
+
   return NextResponse.json({
     telephone,
-    montantCumule: data.montant_cumule,
-    tamponsAcquis: data.tampons_acquis,
-    recompenseDisponible: data.recompense_disponible,
-    dateExpiration: data.date_expiration,
+    tamponsDisponibles: tampons.nombre,
+    prochaineExpiration: tampons.prochaineExpiration,
   });
 }

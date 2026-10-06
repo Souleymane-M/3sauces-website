@@ -26,6 +26,7 @@ import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
 import { notifierCommandeRecue } from "@/lib/notifications/paiement";
@@ -630,13 +631,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
 
-  // --- Récompense fidélité (site public uniquement) ---
+  // --- Tampons fidélité (site public uniquement) ---
   // Le solde affiché au client a pu changer entre-temps (passage en caisse,
   // double onglet) : tout est revérifié ici, jamais de confiance dans le
-  // seul état affiché côté client.
-  let recompenseAppliquee = false;
+  // seul état affiché côté client. La sélection FIFO réelle des tampons et
+  // leur marquage comme utilisés restent différés au trigger de paiement
+  // (cf. migration tampons_fidelite) — ici on ne fait que vérifier qu'assez
+  // de tampons sont disponibles et poser l'intention sur la commande.
+  let tamponsUtilises = 0;
   let montantFinal = montant;
-  if (body.utiliserRecompense === true) {
+  const nbTamponsDemandes = typeof body.nbTampons === "number" ? Math.floor(body.nbTampons) : 0;
+  if (nbTamponsDemandes > 0) {
     // Plus de jeton SMS (abandonné le 2026-10-05) : la preuve d'identité
     // est le couple téléphone + email saisi dans la carte fidélité, revérifié
     // ici contre la fiche client — jamais de confiance dans le seul état
@@ -648,20 +653,14 @@ export async function POST(request: Request) {
     const fideliteEmail = typeof body.fideliteEmail === "string" ? normaliserEmail(body.fideliteEmail) : null;
     if (!fideliteTelephone || !fideliteEmail || fideliteTelephone !== telephone) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser ta récompense." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
         { status: 401 }
-      );
-    }
-    if (montant < MONTANT_RECOMPENSE) {
-      return NextResponse.json(
-        { error: `Ta récompense s'utilise sur une commande d'au moins ${MONTANT_RECOMPENSE}€.` },
-        { status: 400 }
       );
     }
 
     const { data: client, error: erreurClient } = await supabase
       .from("clients")
-      .select("email, recompense_disponible")
+      .select("email")
       .eq("telephone", telephone)
       .maybeSingle();
     if (erreurClient) {
@@ -670,35 +669,22 @@ export async function POST(request: Request) {
     }
     if (!client?.email || client.email.toLowerCase() !== fideliteEmail) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser ta récompense." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
         { status: 401 }
       );
     }
-    if (!client.recompense_disponible) {
-      return NextResponse.json({ error: "Cette récompense n'est plus disponible." }, { status: 409 });
-    }
 
-    // Empêche deux onglets/tentatives de consommer la même récompense deux
-    // fois : le trigger de fidélité ne se déclenche qu'au paiement, donc
-    // rien d'autre ne départage deux commandes créées coup sur coup.
-    const { data: commandeEnCours } = await supabase
-      .from("commandes")
-      .select("id")
-      .eq("client_telephone", telephone)
-      .eq("recompense_appliquee", true)
-      .neq("paiement_statut", "paye")
-      .gt("created_at", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .limit(1)
-      .maybeSingle();
-    if (commandeEnCours) {
+    const { nombre: tamponsDisponibles } = await compterTamponsDisponibles(supabase, telephone);
+    const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montant / MONTANT_RECOMPENSE));
+    if (nbTamponsDemandes > maxUtilisable) {
       return NextResponse.json(
-        { error: "Une commande en cours utilise déjà ta récompense." },
+        { error: "Tu n'as pas assez de tampons disponibles pour ce montant." },
         { status: 409 }
       );
     }
 
-    recompenseAppliquee = true;
-    montantFinal = Math.round((montant - MONTANT_RECOMPENSE) * 100) / 100;
+    tamponsUtilises = nbTamponsDemandes;
+    montantFinal = Math.round((montant - tamponsUtilises * MONTANT_RECOMPENSE) * 100) / 100;
   } else if (
     remiseLancementActive(parametres.remise_lancement_debut, parametres.remise_lancement_fin, dateMayotteIso()) &&
     montant >= SEUIL_REMISE_LANCEMENT
@@ -773,7 +759,7 @@ export async function POST(request: Request) {
       consentement_cgv_le: new Date().toISOString(),
       nb_plats: nbPlats,
       palier_groupe: palierGroupe,
-      recompense_appliquee: recompenseAppliquee,
+      tampons_utilises: tamponsUtilises,
     })
     .select("id, numero")
     .single();

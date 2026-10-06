@@ -36,7 +36,7 @@ export async function chargerCommandePourModification(
   const { data, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, canal, statut, contenu, nom_livraison, prenom, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, recompense_appliquee, commande_par"
+      "id, numero, canal, statut, contenu, nom_livraison, prenom, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, tampons_utilises, commande_par"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -47,11 +47,11 @@ export async function chargerCommandePourModification(
   if (data.statut !== "en_attente") {
     return { commande: null, erreur: 'Seules les commandes encore "En attente" peuvent être modifiées.' };
   }
-  if (data.recompense_appliquee) {
+  if (data.tampons_utilises > 0) {
     return {
       commande: null,
       erreur:
-        "Cette commande a utilisé une récompense fidélité et ne peut pas être modifiée ici — annule-la et recrée-la.",
+        "Cette commande a utilisé des tampons fidélité et ne peut pas être modifiée ici — annule-la et recrée-la.",
     };
   }
   if (!data.mode_paiement) {

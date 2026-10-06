@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 
 /**
- * Recherche fidélité par téléphone, pour afficher le statut (tampons,
- * récompense disponible) avant encaissement. Ne crée rien : la création du
- * client se fait automatiquement par le trigger DB au premier paiement.
+ * Recherche fidélité par téléphone, pour afficher le statut (tampons
+ * disponibles) avant encaissement. Ne crée rien : la création du client se
+ * fait automatiquement par le trigger DB au premier paiement.
  */
 export async function GET(request: Request) {
   const session = await requireRole(["employe"]);
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data: client, error } = await supabase
     .from("clients")
-    .select("telephone, nom, prenom, email, montant_cumule, tampons_acquis, recompense_disponible, date_expiration")
+    .select("telephone, nom, prenom, email")
     .eq("telephone", telephoneNormalise)
     .maybeSingle();
 
@@ -35,5 +36,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ existe: false, telephone: telephoneNormalise });
   }
 
-  return NextResponse.json({ existe: true, ...client });
+  const tampons = await compterTamponsDisponibles(supabase, telephoneNormalise);
+
+  return NextResponse.json({
+    existe: true,
+    ...client,
+    tamponsDisponibles: tampons.nombre,
+    prochaineExpiration: tampons.prochaineExpiration,
+  });
 }

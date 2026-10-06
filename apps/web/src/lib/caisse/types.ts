@@ -93,7 +93,8 @@ export interface CreerCommandePayload {
   prenom?: string;
   /** `null` = laissé vide par la caissière pour garder l'email déjà enregistré sur ce numéro. */
   email?: string | null;
-  recompenseAppliquee?: boolean;
+  /** Nombre de tampons fidélité (10€ chacun) à utiliser sur cette commande — revérifié intégralement côté serveur (disponibilité réelle, FIFO). */
+  nbTampons?: number;
   /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
   boissonOfferteSaveur?: string;
   // Livraison uniquement (même règles que le site public, cf. /api/commande) :
@@ -104,11 +105,11 @@ export interface CreerCommandePayload {
 
 /**
  * Modification du contenu d'une commande existante encore "en_attente" —
- * mêmes champs que la création, `recompenseAppliquee` en moins (jamais
- * togglable via une modification). `canal` peut changer, sauf dans un sens
- * (vers "livraison" depuis un canal déjà payé) — revérifié et bloqué côté
+ * mêmes champs que la création, `nbTampons` en moins (jamais togglable via
+ * une modification). `canal` peut changer, sauf dans un sens (vers
+ * "livraison" depuis un canal déjà payé) — revérifié et bloqué côté
  * serveur, cf. /api/caisse/commandes PATCH.
  */
-export interface ModifierCommandePayload extends Omit<CreerCommandePayload, "recompenseAppliquee"> {
+export interface ModifierCommandePayload extends Omit<CreerCommandePayload, "nbTampons"> {
   commandeId: string;
 }

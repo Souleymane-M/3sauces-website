@@ -19,6 +19,7 @@ import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, Modifie
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
@@ -514,7 +515,7 @@ export async function POST(request: Request) {
   }
   const { lignes, montantBrut, nbPlats, palierGroupe, coutMatiereTotal, coutIncomplet, produitParId } = validation;
 
-  let recompenseAppliquee = false;
+  let tamponsUtilises = 0;
   let montant = Math.round(montantBrut * 100) / 100;
 
   // --- Règles spécifiques à la livraison (mêmes que /api/commande) ---
@@ -541,25 +542,15 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.recompenseAppliquee) {
-    if (montantBrut < MONTANT_RECOMPENSE) {
-      return NextResponse.json(
-        { error: `La récompense s'applique sur une commande d'au moins ${MONTANT_RECOMPENSE}€.` },
-        { status: 400 }
-      );
+  const nbTamponsDemandes = typeof body.nbTampons === "number" ? Math.floor(body.nbTampons) : 0;
+  if (nbTamponsDemandes > 0) {
+    const { nombre: tamponsDisponibles } = await compterTamponsDisponibles(supabase, clientTelephone);
+    const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montantBrut / MONTANT_RECOMPENSE));
+    if (nbTamponsDemandes > maxUtilisable) {
+      return NextResponse.json({ error: "Ce client n'a pas assez de tampons disponibles pour ce montant." }, { status: 400 });
     }
-
-    const { data: client } = await supabase
-      .from("clients")
-      .select("recompense_disponible")
-      .eq("telephone", clientTelephone)
-      .maybeSingle();
-
-    if (!client?.recompense_disponible) {
-      return NextResponse.json({ error: "Ce client n'a pas de récompense disponible." }, { status: 400 });
-    }
-    recompenseAppliquee = true;
-    montant = Math.round((montantBrut - MONTANT_RECOMPENSE) * 100) / 100;
+    tamponsUtilises = nbTamponsDemandes;
+    montant = Math.round((montantBrut - tamponsUtilises * MONTANT_RECOMPENSE) * 100) / 100;
   }
 
   // Le trigger DB `commandes_appliquer_fidelite` crée le client automatiquement,
@@ -639,7 +630,7 @@ export async function POST(request: Request) {
       client_telephone: clientTelephone,
       commande_par: session.profilId,
       cout_matiere_total: coutMatiereTotal,
-      recompense_appliquee: recompenseAppliquee,
+      tampons_utilises: tamponsUtilises,
       nom_livraison: `${prenom} ${nom}`,
       prenom,
       adresse_livraison: adresse,
@@ -720,7 +711,7 @@ export async function POST(request: Request) {
 /**
  * Modifie le contenu d'une commande existante encore "en_attente" — mêmes
  * règles de validation que la création (POST), via `validerLignesCommande`.
- * `recompense_appliquee` reste toujours inchangé (jamais togglable ici).
+ * `tampons_utilises` reste toujours inchangé (jamais togglable ici).
  * Le canal peut changer, sauf vers "livraison" depuis un canal déjà payé
  * (sur place/à emporter) — refusé explicitement, ça impliquerait de
  * "dépayer" et reverser la fidélité déjà créditée, trop risqué depuis cet
@@ -781,7 +772,7 @@ export async function PATCH(request: Request) {
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")
-    .select("id, canal, statut, contenu, montant, paiement_statut, recompense_appliquee, commande_par")
+    .select("id, canal, statut, contenu, montant, paiement_statut, tampons_utilises, commande_par")
     .eq("id", body.commandeId)
     .maybeSingle();
   if (erreurExistante || !commandeExistante) {
@@ -793,9 +784,9 @@ export async function PATCH(request: Request) {
       { status: 400 }
     );
   }
-  if (commandeExistante.recompense_appliquee) {
+  if (commandeExistante.tampons_utilises > 0) {
     return NextResponse.json(
-      { error: "Cette commande a utilisé une récompense fidélité et ne peut pas être modifiée ici." },
+      { error: "Cette commande a utilisé des tampons fidélité et ne peut pas être modifiée ici." },
       { status: 400 }
     );
   }

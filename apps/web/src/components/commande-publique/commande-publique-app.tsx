@@ -247,8 +247,10 @@ export function CommandePubliqueApp({
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
   const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
-  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string } | null>(null);
-  const [utiliserRecompense, setUtiliserRecompense] = useState(false);
+  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number } | null>(
+    null
+  );
+  const [nbTampons, setNbTampons] = useState(0);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -362,6 +364,11 @@ export function CommandePubliqueApp({
   const panierActuel = modeCommande === "groupee" ? plats.flatMap((p) => p.lignes) : panierSimple;
   const total = panierActuel.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
+  // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
+  // nombre de tampons choisis (ex: article retiré), le nombre effectif
+  // redescend sans attendre un second rendu.
+  const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
+  const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
   // Le palier (quantité/montant) est le même quel que soit le canal — seule
   // la priorité livraison, gérée à l'affichage ci-dessous, dépend du canal.
   const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, heureActuelleMayotteMinutes());
@@ -919,9 +926,9 @@ export function CommandePubliqueApp({
           zone: canal === "livraison" ? zone : undefined,
           consentementCgv: accepteCgv,
           lignes,
-          fideliteTelephone: utiliserRecompense ? fideliteVerifiee?.telephone : undefined,
-          fideliteEmail: utiliserRecompense ? fideliteVerifiee?.email : undefined,
-          utiliserRecompense: utiliserRecompense && Boolean(fideliteVerifiee),
+          fideliteTelephone: nbTamponsEffectif > 0 ? fideliteVerifiee?.telephone : undefined,
+          fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
+          nbTampons: nbTamponsEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
         }),
       });
@@ -1045,10 +1052,12 @@ export function CommandePubliqueApp({
       <div className="mx-auto max-w-lg space-y-6 p-4">
         <CarteFidelite
           montantPanier={total}
-          utiliserRecompense={utiliserRecompense}
-          onChangeUtiliserRecompense={setUtiliserRecompense}
-          onSoldeVerifie={(verifie, tel, email) =>
-            setFideliteVerifiee(verifie && tel && email ? { telephone: tel, email } : null)
+          nbTampons={nbTamponsEffectif}
+          onChangeNbTampons={setNbTampons}
+          onSoldeVerifie={(verifie, tel, email, tamponsDisponibles) =>
+            setFideliteVerifiee(
+              verifie && tel && email ? { telephone: tel, email, tamponsDisponibles: tamponsDisponibles ?? 0 } : null
+            )
           }
           onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
           telephoneCommande={composerTelephoneAvecPays(telephone, paysTelephone) ?? ""}
@@ -1382,10 +1391,11 @@ export function CommandePubliqueApp({
 
               <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
                 Total : {total.toFixed(2)} €
-                {utiliserRecompense && fideliteVerifiee ? (
+                {nbTamponsEffectif > 0 ? (
                   <div className="mt-1 text-sm font-semibold text-[#2D5A27]">
-                    Récompense fidélité : −{MONTANT_RECOMPENSE.toFixed(2)} € · Total à payer :{" "}
-                    {Math.max(0, total - MONTANT_RECOMPENSE).toFixed(2)} €
+                    {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""} fidélité : −
+                    {(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} € · Total à payer :{" "}
+                    {Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €
                   </div>
                 ) : (
                   parametres.remiseLancementActive &&
@@ -1398,7 +1408,7 @@ export function CommandePubliqueApp({
                 )}
                 {total > 0 && (
                   <p className="mt-1 text-xs font-semibold text-gray-500">
-                    {texteProgressionFidelite(progressionFideliteCommande(total))}
+                    {texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif))}
                   </p>
                 )}
               </div>

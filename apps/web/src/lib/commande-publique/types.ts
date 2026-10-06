@@ -130,11 +130,11 @@ export interface CreerCommandePubliquePayload {
   date: string;
   /** Case "J'accepte les CGV et la politique de confidentialité" — obligatoire, revérifié serveur. */
   consentementCgv: boolean;
-  /** Téléphone + email tels que saisis dans la carte fidélité pour voir le solde — requis si utiliserRecompense est true, revérifiés contre la fiche client côté serveur. */
+  /** Téléphone + email tels que saisis dans la carte fidélité pour voir le solde — requis si nbTampons > 0, revérifiés contre la fiche client côté serveur. */
   fideliteTelephone?: string;
   fideliteEmail?: string;
-  /** Case "Utiliser ma récompense sur cette commande" — revérifiée intégralement côté serveur. */
-  utiliserRecompense?: boolean;
+  /** Nombre de tampons fidélité (10€ chacun) à utiliser sur cette commande — revérifié intégralement côté serveur (disponibilité réelle, FIFO). */
+  nbTampons?: number;
   /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
   boissonOfferteSaveur?: string;
 }

@@ -28,13 +28,7 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import {
-  MONTANT_RECOMPENSE,
-  SEUIL_RECOMPENSE,
-  messageFidelite,
-  progressionFideliteCommande,
-  texteProgressionFidelite,
-} from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, messageFidelite, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
@@ -140,10 +134,8 @@ interface ClientInfo {
   nom?: string | null;
   prenom?: string | null;
   email?: string | null;
-  montant_cumule?: number;
-  tampons_acquis?: number;
-  recompense_disponible?: boolean;
-  date_expiration?: string | null;
+  tamponsDisponibles?: number;
+  prochaineExpiration?: string | null;
 }
 
 function platVide(numero: number): PlatGroupeCaisse {
@@ -348,7 +340,7 @@ export function CaisseApp({
   const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
-  const [appliquerRecompense, setAppliquerRecompense] = useState(false);
+  const [nbTamponsAUtiliser, setNbTamponsAUtiliser] = useState(0);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   // Erreur spécifique à la navigation entre plats (seuil de 5€ non atteint) —
@@ -631,9 +623,10 @@ export function CaisseApp({
   const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
-  // minimum après avoir coché la case (ex: article retiré), la récompense
-  // cesse d'être appliquée sans attendre un second rendu.
-  const appliquerRecompenseEffectif = appliquerRecompense && total >= MONTANT_RECOMPENSE;
+  // nombre de tampons choisis (ex: article retiré), le nombre effectif
+  // redescend sans attendre un second rendu.
+  const maxTamponsUtilisables = Math.min(clientInfo?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
+  const nbTamponsEffectif = Math.min(nbTamponsAUtiliser, maxTamponsUtilisables);
   const infosClientIncompletes = !prenom.trim() || !nom.trim() || !telephone.trim();
 
   // Remise de lancement : jamais pour une commande créée ici (toujours
@@ -644,7 +637,7 @@ export function CaisseApp({
   // différent de ce qu'elle a sous les yeux pendant la saisie.
   const remiseLancementEligible =
     commandeExistante?.commandePar === null && parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT;
-  const remiseRecompenseEffective = appliquerRecompenseEffectif && clientInfo?.recompense_disponible ? MONTANT_RECOMPENSE : 0;
+  const remiseRecompenseEffective = nbTamponsEffectif * MONTANT_RECOMPENSE;
   const totalApresRemises =
     total - (remiseLancementEligible ? MONTANT_REMISE_LANCEMENT : 0) - remiseRecompenseEffective;
 
@@ -1056,7 +1049,7 @@ export function CaisseApp({
     }
     setRechercheEnCours(true);
     setClientInfo(null);
-    setAppliquerRecompense(false);
+    setNbTamponsAUtiliser(0);
     try {
       const reponse = await fetch(`/api/caisse/clients?telephone=${encodeURIComponent(telephoneComplet)}`);
       const data = await reponse.json();
@@ -1238,7 +1231,7 @@ export function CaisseApp({
           modePaiement,
           paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
-          recompenseAppliquee: appliquerRecompenseEffectif,
+          nbTampons: nbTamponsEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           creneauHeure,
           nom: nom.trim(),
@@ -1303,7 +1296,7 @@ export function CaisseApp({
       setModeCommande(null);
       setTelephone("");
       setClientInfo(null);
-      setAppliquerRecompense(false);
+      setNbTamponsAUtiliser(0);
       setNom("");
       setPrenom("");
       setEmail("");
@@ -1850,42 +1843,43 @@ export function CaisseApp({
                 <div className="mt-2 text-sm text-gray-700">
                   {clientInfo.existe ? (
                     <>
-                      <div className="flex gap-1">
-                        {Array.from({ length: 10 }).map((_, i) => (
-                          <span
-                            key={i}
-                            className={`h-3 w-3 rounded-full ${
-                              i < (clientInfo.tampons_acquis ?? 0) ? "bg-[#8B2020]" : "bg-gray-200"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p className="mt-1 font-semibold">
+                      <p className="font-semibold">
                         {messageFidelite({
-                          montantCumule: clientInfo.montant_cumule ?? 0,
-                          recompenseDisponible: clientInfo.recompense_disponible ?? false,
+                          nombre: clientInfo.tamponsDisponibles ?? 0,
+                          prochaineExpiration: clientInfo.prochaineExpiration ?? null,
                         })}
                       </p>
-                      {clientInfo.recompense_disponible && (
+                      {(clientInfo.tamponsDisponibles ?? 0) > 0 && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
-                          <p>Ce client a {MONTANT_RECOMPENSE}€ de récompense — appliquer ?</p>
-                          {clientInfo.date_expiration && (
-                            <p className="text-xs font-normal text-red-600">
-                              Expire le {new Date(clientInfo.date_expiration).toLocaleDateString("fr-FR")}
-                            </p>
-                          )}
-                          <label className="mt-1 flex items-center gap-2 font-normal">
-                            <input
-                              type="checkbox"
-                              checked={appliquerRecompense}
-                              disabled={total < MONTANT_RECOMPENSE}
-                              onChange={(e) => setAppliquerRecompense(e.target.checked)}
-                            />
-                            Appliquer la récompense (-{MONTANT_RECOMPENSE} €)
-                          </label>
+                          <p>
+                            {clientInfo.tamponsDisponibles} tampon{(clientInfo.tamponsDisponibles ?? 0) > 1 ? "s" : ""} disponible
+                            {(clientInfo.tamponsDisponibles ?? 0) > 1 ? "s" : ""} — combien utiliser ?
+                          </p>
+                          <div className="mt-1 flex items-center gap-2 font-normal">
+                            <button
+                              type="button"
+                              onClick={() => setNbTamponsAUtiliser((n) => Math.max(0, n - 1))}
+                              disabled={nbTamponsEffectif === 0}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border border-red-400 text-red-700 disabled:opacity-30"
+                            >
+                              -
+                            </button>
+                            <span className="w-16 text-center">
+                              {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setNbTamponsAUtiliser((n) => Math.min(maxTamponsUtilisables, n + 1))}
+                              disabled={nbTamponsEffectif >= maxTamponsUtilisables}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border border-red-400 text-red-700 disabled:opacity-30"
+                            >
+                              +
+                            </button>
+                            {nbTamponsEffectif > 0 && <span>(-{(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €)</span>}
+                          </div>
                           {total < MONTANT_RECOMPENSE && (
                             <p className="text-xs font-normal text-red-600">
-                              Commande d&apos;au moins {MONTANT_RECOMPENSE}€ requise.
+                              Commande d&apos;au moins {MONTANT_RECOMPENSE}€ requise pour utiliser un tampon.
                             </p>
                           )}
                         </div>
@@ -1898,8 +1892,7 @@ export function CaisseApp({
               )}
               {!clientInfo && (
                 <p className="mt-2 text-xs text-gray-500">
-                  🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_RECOMPENSE / MONTANT_RECOMPENSE} tampons ={" "}
-                  {MONTANT_RECOMPENSE}€ offerts.
+                  🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois.
                 </p>
               )}
             </div>
@@ -2076,9 +2069,7 @@ export function CaisseApp({
               Total : {totalApresRemises.toFixed(2)} €
               {total > 0 && (
                 <p className="mt-1 text-xs font-semibold text-gray-500">
-                  {texteProgressionFidelite(
-                    progressionFideliteCommande(total, clientInfo?.existe ? (clientInfo.montant_cumule ?? 0) : 0)
-                  )}
+                  {texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif))}
                 </p>
               )}
             </div>

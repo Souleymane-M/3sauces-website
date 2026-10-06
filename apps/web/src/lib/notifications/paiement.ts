@@ -3,62 +3,51 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { Canal } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
-import { MONTANT_RECOMPENSE, SEUIL_AFFICHAGE_EXACT, SEUIL_RECOMPENSE, progressionFideliteCommande } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { envoyerEmail } from "./email";
 import { construireEmailClientHtml } from "./template";
-
-interface ClientFidelite {
-  email: string | null;
-  montant_cumule: number;
-  recompense_disponible: boolean;
-}
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@3sauces/supabase";
 
 /**
  * Bloc fidélité de l'email de confirmation — jamais un message générique
  * identique pour tout le monde, toujours le vrai statut du client juste
  * après cette commande (répond à "une cliente a 17 tampons sans le
- * savoir"). `recompenseAppliquee` prime sur tout le reste : après avoir
- * consommé sa récompense, `montant_cumule` vient d'être remis à 0 par le
- * trigger, donc "+1 tampon" ou "plus que Xx€" n'aurait aucun sens ici.
+ * savoir"). Appelée après que le trigger de paiement ait tourné : les
+ * tampons consommés/obtenus par CETTE commande sont déjà reflétés dans
+ * `fidelite_tampons`/`clients.montant_cumule`.
  */
-function construireBlocFidelite(
-  client: ClientFidelite,
-  montantCommande: number,
-  recompenseAppliquee: boolean
-): { html: string; texteBouton: string } {
-  if (recompenseAppliquee) {
+async function construireBlocFidelite(
+  supabase: SupabaseClient<Database>,
+  telephone: string,
+  tamponsUtilises: number
+): Promise<{ html: string; texteBouton: string }> {
+  if (tamponsUtilises > 0) {
+    const { nombre } = await compterTamponsDisponibles(supabase, telephone);
+    const reste = nombre > 0 ? `<p>Il te reste ${nombre} tampon${nombre > 1 ? "s" : ""} disponible${nombre > 1 ? "s" : ""}.</p>` : "";
     return {
-      html: `<p>Ta récompense de ${MONTANT_RECOMPENSE}€ a bien été utilisée sur cette commande — merci de ta fidélité !</p>`,
+      html: `<p>Tu as utilisé ${tamponsUtilises} tampon${tamponsUtilises > 1 ? "s" : ""} (-${(tamponsUtilises * MONTANT_RECOMPENSE).toFixed(2)}€) sur cette commande — merci de ta fidélité !</p>${reste}`,
       texteBouton: "Retourner sur le site",
     };
   }
 
-  if (client.recompense_disponible) {
+  const { nombre, prochaineExpiration } = await compterTamponsDisponibles(supabase, telephone);
+  if (nombre > 0) {
     return {
-      html: `<p>Tu as ${MONTANT_RECOMPENSE}€ à utiliser dès ta prochaine commande !</p>`,
+      html: `<p>${messageFidelite({ nombre, prochaineExpiration })}</p>`,
       texteBouton: "Commander maintenant",
     };
   }
 
-  if (client.montant_cumule > SEUIL_AFFICHAGE_EXACT) {
-    const restant = (SEUIL_RECOMPENSE - client.montant_cumule).toFixed(2);
-    return {
-      html: `<p>Plus que ${restant}€ et tu débloques ${MONTANT_RECOMPENSE}€ offerts !</p>`,
-      texteBouton: "Retourner sur le site",
-    };
-  }
-
-  // Estimation à partir du cumul déjà à jour (après cette commande) — jamais
-  // exacte en cas de commandes concurrentes, mais une approximation très
-  // largement suffisante pour un seul restaurant.
-  const montantCumuleAvant = Math.max(0, client.montant_cumule - montantCommande);
-  const { tamponsGagnes, montantProchainTampon } = progressionFideliteCommande(montantCommande, montantCumuleAvant);
-  const html =
-    tamponsGagnes > 0
-      ? `<p>+${tamponsGagnes} tampon${tamponsGagnes > 1 ? "s" : ""} avec cette commande ! Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts.</p>`
-      : `<p>Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts — encore ${montantProchainTampon.toFixed(2)}€ pour ton prochain tampon.</p>`;
-  return { html, texteBouton: "Retourner sur le site" };
+  const { data: clientRow } = await supabase.from("clients").select("montant_cumule").eq("telephone", telephone).maybeSingle();
+  const reliquat = clientRow?.montant_cumule ?? 0;
+  const montantProchainTampon = reliquat === 0 ? MONTANT_RECOMPENSE : MONTANT_RECOMPENSE - reliquat;
+  return {
+    html: `<p>Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts — encore ${montantProchainTampon.toFixed(2)}€ pour ton prochain tampon.</p>`,
+    texteBouton: "Retourner sur le site",
+  };
 }
 
 /**
@@ -200,7 +189,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
   const { data: commande, error } = await supabase
     .from("commandes")
     .select(
-      "numero, montant, contenu, nom_livraison, client_telephone, recompense_appliquee, nb_plats, palier_groupe, mode_paiement, canal"
+      "numero, montant, contenu, nom_livraison, client_telephone, tampons_utilises, nb_plats, palier_groupe, mode_paiement, canal"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -216,20 +205,16 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
 
   const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
 
-  let client: ClientFidelite | null = null;
+  let clientEmail: string | null = null;
   if (commande.client_telephone) {
-    const { data } = await supabase
-      .from("clients")
-      .select("email, montant_cumule, recompense_disponible")
-      .eq("telephone", commande.client_telephone)
-      .maybeSingle();
-    client = data;
+    const { data } = await supabase.from("clients").select("email").eq("telephone", commande.client_telephone).maybeSingle();
+    clientEmail = data?.email ?? null;
   }
 
   const envois: Promise<{ ok: boolean; erreur?: string }>[] = [];
 
-  if (client?.email) {
-    const blocFidelite = construireBlocFidelite(client, commande.montant, commande.recompense_appliquee);
+  if (clientEmail && commande.client_telephone) {
+    const blocFidelite = await construireBlocFidelite(supabase, commande.client_telephone, commande.tampons_utilises);
     const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
 
     // Un paiement en ligne (Stripe) est bien une confirmation pour le
@@ -244,7 +229,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
 
     envois.push(
       envoyerEmail(
-        client.email,
+        clientEmail,
         sujet,
         construireEmailClientHtml(intro + `<p>${resume}</p>` + blocFidelite.html + (blocGroupe ?? ""), blocFidelite.texteBouton),
         emailRestaurant ?? undefined

@@ -227,11 +227,8 @@ export interface Database {
           telephone: string;
           nom: string | null;
           prenom: string | null;
+          /** Reliquat (< 10€) pas encore converti en tampon — plus le cumul total. Voir `fidelite_tampons`. */
           montant_cumule: number;
-          tampons_acquis: number;
-          recompense_disponible: boolean;
-          date_premier_achat_cycle: string | null;
-          date_expiration: string | null;
           email: string | null;
           created_at: string;
           updated_at: string;
@@ -241,9 +238,6 @@ export interface Database {
           nom?: string | null;
           prenom?: string | null;
           montant_cumule?: number;
-          recompense_disponible?: boolean;
-          date_premier_achat_cycle?: string | null;
-          date_expiration?: string | null;
           email?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>;
@@ -254,16 +248,42 @@ export interface Database {
         Row: {
           id: string;
           client_telephone: string;
-          type: "accumulation" | "recompense_disponible" | "recompense_utilisee" | "expiration";
+          type: "accumulation" | "tampon_obtenu" | "tampon_utilise" | "expiration" | "annulation" | "modification";
           montant: number | null;
           commande_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["fidelite_mouvements"]["Row"]> & {
           client_telephone: string;
-          type: "accumulation" | "recompense_disponible" | "recompense_utilisee" | "expiration";
+          type: "accumulation" | "tampon_obtenu" | "tampon_utilise" | "expiration" | "annulation" | "modification";
         };
         Update: Partial<Database["public"]["Tables"]["fidelite_mouvements"]["Row"]>;
+        Relationships: [];
+      };
+
+      /** Un tampon = 10€ de récompense, individuellement daté et expirable (3 mois depuis son obtention). Disponible = `!utilise && date_expiration > now()`. */
+      fidelite_tampons: {
+        Row: {
+          id: string;
+          client_telephone: string;
+          montant: number;
+          date_obtention: string;
+          date_expiration: string;
+          utilise: boolean;
+          commande_obtention_id: string | null;
+          commande_utilisation_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_telephone: string;
+          montant?: number;
+          date_obtention?: string;
+          date_expiration: string;
+          utilise?: boolean;
+          commande_obtention_id?: string | null;
+          commande_utilisation_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["fidelite_tampons"]["Insert"]>;
         Relationships: [];
       };
 
@@ -282,7 +302,8 @@ export interface Database {
           client_telephone: string | null;
           commande_par: string | null;
           cout_matiere_total: number | null;
-          recompense_appliquee: boolean;
+          /** Nombre de tampons fidélité demandés sur cette commande — revérifié et effectivement consommés (FIFO) par le trigger au paiement confirmé. */
+          tampons_utilises: number;
           nom_livraison: string | null;
           prenom: string | null;
           adresse_livraison: string | null;
@@ -311,7 +332,7 @@ export interface Database {
           client_telephone?: string | null;
           commande_par?: string | null;
           cout_matiere_total?: number | null;
-          recompense_appliquee?: boolean;
+          tampons_utilises?: number;
           nom_livraison?: string | null;
           prenom?: string | null;
           adresse_livraison?: string | null;

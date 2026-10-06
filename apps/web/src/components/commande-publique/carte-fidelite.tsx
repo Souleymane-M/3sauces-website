@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
-import { MONTANT_RECOMPENSE, SEUIL_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
 
 const CLE_LOCALSTORAGE = "3sauces_fidelite_identite";
 
-interface SoldeFidelite {
-  montantCumule: number;
-  tamponsAcquis: number;
-  recompenseDisponible: boolean;
-  dateExpiration: string | null;
+interface SoldeTampons {
+  nombre: number;
+  prochaineExpiration: string | null;
 }
 
 interface IdentiteStockee {
@@ -24,9 +22,9 @@ type Etape = "repliee" | "saisie" | "verifie" | "introuvable";
 
 interface CarteFideliteProps {
   montantPanier: number;
-  utiliserRecompense: boolean;
-  onChangeUtiliserRecompense: (valeur: boolean) => void;
-  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string) => void;
+  nbTampons: number;
+  onChangeNbTampons: (valeur: number) => void;
+  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number) => void;
   onPrefillTelephone: (telephone: string) => void;
   /** Téléphone/email déjà saisis dans le formulaire de commande (E.164 pour le téléphone, brut pour l'email) — dès que les deux sont valides, on vérifie discrètement en arrière-plan si un solde existe, sans attendre que le client pense à cliquer "Voir mon solde". */
   telephoneCommande: string;
@@ -40,11 +38,15 @@ interface CarteFideliteProps {
  * de solde). La dernière identité saisie est gardée en localStorage pour
  * un réaffichage immédiat à la prochaine visite — rien de sensible à
  * protéger ici (pas de jeton, juste un confort de pré-remplissage).
+ *
+ * Depuis la refonte du 2026-10-06 : chaque tampon de 10€ est individuel,
+ * le client choisit combien il en utilise sur cette commande (pas
+ * forcément tous d'un coup).
  */
 export function CarteFidelite({
   montantPanier,
-  utiliserRecompense,
-  onChangeUtiliserRecompense,
+  nbTampons,
+  onChangeNbTampons,
   onSoldeVerifie,
   onPrefillTelephone,
   telephoneCommande,
@@ -53,7 +55,7 @@ export function CarteFidelite({
   const [etape, setEtape] = useState<Etape>("repliee");
   const [telephoneSaisi, setTelephoneSaisi] = useState("");
   const [emailSaisi, setEmailSaisi] = useState("");
-  const [solde, setSolde] = useState<SoldeFidelite | null>(null);
+  const [solde, setSolde] = useState<SoldeTampons | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const dejaMonte = useRef(false);
@@ -99,15 +101,10 @@ export function CarteFidelite({
         if (annule || !reponse.ok) return;
         const data = await reponse.json();
         if (annule) return;
-        setSolde({
-          montantCumule: data.montantCumule,
-          tamponsAcquis: data.tamponsAcquis,
-          recompenseDisponible: data.recompenseDisponible,
-          dateExpiration: data.dateExpiration,
-        });
+        setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration });
         setTelephoneSaisi(telephone);
         setEmailSaisi(email);
-        onSoldeVerifie(true, telephone, email);
+        onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
         setEtape("verifie");
       } catch {
         // Échec silencieux : la carte reste repliée, le client peut toujours
@@ -146,19 +143,14 @@ export function CarteFidelite({
         onSoldeVerifie(false);
         return;
       }
-      setSolde({
-        montantCumule: data.montantCumule,
-        tamponsAcquis: data.tamponsAcquis,
-        recompenseDisponible: data.recompenseDisponible,
-        dateExpiration: data.dateExpiration,
-      });
+      setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration });
       try {
         localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
       } catch {
         // Rien de bloquant : juste pas de pré-remplissage la prochaine fois.
       }
       onPrefillTelephone(telephone);
-      onSoldeVerifie(true, telephone, email);
+      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
       setEtape("verifie");
     } catch {
       setErreur("Erreur réseau, réessaie.");
@@ -169,15 +161,13 @@ export function CarteFidelite({
     }
   }
 
-  const recompenseUtilisable = montantPanier >= MONTANT_RECOMPENSE;
+  const maxUtilisable = Math.min(solde?.nombre ?? 0, Math.floor(montantPanier / MONTANT_RECOMPENSE));
+  const nbTamponsEffectif = Math.min(nbTampons, maxUtilisable);
 
   if (etape === "repliee") {
     return (
       <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
-        <p className="font-bold">
-          🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_RECOMPENSE / MONTANT_RECOMPENSE} tampons ={" "}
-          {MONTANT_RECOMPENSE}€ offerts.
-        </p>
+        <p className="font-bold">🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon de {MONTANT_RECOMPENSE}€ offert.</p>
         <button
           type="button"
           onClick={() => setEtape("saisie")}
@@ -224,29 +214,39 @@ export function CarteFidelite({
 
       {etape === "verifie" && solde && (
         <div className="space-y-2">
-          <div className="flex gap-1">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <span
-                key={i}
-                className={`h-3 w-3 rounded-full ${i < solde.tamponsAcquis ? "bg-[#8B2020]" : "bg-gray-200"}`}
-              />
-            ))}
-          </div>
           <p className="text-sm font-semibold text-gray-900">
-            {messageFidelite({ montantCumule: solde.montantCumule, recompenseDisponible: solde.recompenseDisponible })}
+            {messageFidelite({ nombre: solde.nombre, prochaineExpiration: solde.prochaineExpiration })}
           </p>
-          {solde.recompenseDisponible && (
+          {solde.nombre > 0 && (
             <div className="rounded border border-[#2D5A27] bg-white p-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-[#2D5A27]">
-                <input
-                  type="checkbox"
-                  checked={utiliserRecompense}
-                  disabled={!recompenseUtilisable}
-                  onChange={(e) => onChangeUtiliserRecompense(e.target.checked)}
-                />
-                Utiliser ma récompense sur cette commande (-10 €)
-              </label>
-              {!recompenseUtilisable && (
+              <p className="text-sm font-semibold text-[#2D5A27]">Combien utiliser sur cette commande ?</p>
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onChangeNbTampons(Math.max(0, nbTamponsEffectif - 1))}
+                  disabled={nbTamponsEffectif === 0}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#2D5A27] text-[#2D5A27] disabled:opacity-30"
+                >
+                  -
+                </button>
+                <span className="w-20 text-center text-sm font-semibold">
+                  {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onChangeNbTampons(Math.min(maxUtilisable, nbTamponsEffectif + 1))}
+                  disabled={nbTamponsEffectif >= maxUtilisable}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#2D5A27] text-[#2D5A27] disabled:opacity-30"
+                >
+                  +
+                </button>
+                {nbTamponsEffectif > 0 && (
+                  <span className="text-sm font-semibold text-[#2D5A27]">
+                    (-{(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €)
+                  </span>
+                )}
+              </div>
+              {maxUtilisable === 0 && (
                 <p className="mt-1 text-xs text-gray-500">Disponible à partir de {MONTANT_RECOMPENSE}€ de commande.</p>
               )}
             </div>
