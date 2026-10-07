@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ClientAdmin, CommandeClientAdmin } from "@/lib/patron/clients";
-import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, formaterEuros, messageFidelite, progressionTampons } from "@/lib/fidelite/regles";
 import { normaliserEmail } from "@/lib/email";
 
 interface ClientsAppProps {
@@ -53,7 +53,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
     );
   }, [clients, recherche]);
 
-  const nbTamponsDisponiblesTotal = clients.reduce((total, c) => total + c.tamponsDisponibles, 0);
+  const nbTamponsProgressionTotal = clients.reduce((total, c) => total + progressionTampons(c.montantCumule, c.tamponsDisponibles), 0);
 
   function ouvrirFiche(c: ClientAdmin) {
     if (telephoneOuvert === c.telephone) {
@@ -132,9 +132,9 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Clients fidélité</h2>
       <p className="text-xs text-gray-500">
-        {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois depuis son obtention.
-        Cumulable sans limite, utilisable par tampon. Calculé automatiquement à chaque paiement (comptoir, livraison,
-        site) — rien à saisir ici.
+        {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_TAMPON}€ cumulés (10 tampons) débloquent {MONTANT_RECOMPENSE}€
+        offerts, valables 3 mois depuis leur obtention. Cumulable sans limite. Calculé automatiquement à chaque paiement
+        (comptoir, livraison, site) — rien à saisir ici.
       </p>
 
       <div className="flex gap-4 rounded border border-gray-300 p-3 text-sm">
@@ -143,8 +143,8 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
           <p className="text-lg font-bold">{clients.length}</p>
         </div>
         <div>
-          <p className="text-gray-500">Tampons disponibles</p>
-          <p className="text-lg font-bold">{nbTamponsDisponiblesTotal}</p>
+          <p className="text-gray-500">Tampons (tous clients)</p>
+          <p className="text-lg font-bold">{nbTamponsProgressionTotal}</p>
         </div>
       </div>
 
@@ -162,6 +162,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
           {clientsFiltres.map((c) => {
             const ouvert = telephoneOuvert === c.telephone;
             const historique = historiques[c.telephone];
+            const tampons = progressionTampons(c.montantCumule, c.tamponsDisponibles);
             return (
               <li key={c.telephone} className="rounded border border-gray-200 text-sm">
                 <button
@@ -176,7 +177,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                   </div>
                   <div className="text-right">
                     <span className="block font-bold text-gray-900">
-                      {c.tamponsDisponibles} tampon{c.tamponsDisponibles > 1 ? "s" : ""}
+                      {tampons} tampon{tampons > 1 ? "s" : ""}
                     </span>
                     {!ouvert && <span className="text-xs text-[#8B2020] underline">Voir la fiche</span>}
                   </div>
@@ -185,8 +186,8 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                 {!ouvert && (
                   <div className="flex items-center justify-between px-3 pb-3 text-xs text-gray-500">
                     <span>
-                      {c.tamponsDisponibles > 0
-                        ? "🎁".repeat(Math.min(c.tamponsDisponibles, 10)) + (c.tamponsDisponibles > 10 ? ` +${c.tamponsDisponibles - 10}` : "")
+                      {tampons > 0
+                        ? "🎁".repeat(Math.min(tampons, 10)) + (tampons > 10 ? ` +${tampons - 10}` : "")
                         : "Aucun tampon pour l'instant"}
                     </span>
                     {c.prochaineExpiration && <span>Prochaine expiration : {formaterDate(c.prochaineExpiration)}</span>}
@@ -197,8 +198,8 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                   <div className="space-y-3 border-t border-gray-200 p-3">
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>
-                        {c.tamponsDisponibles > 0
-                          ? "🎁".repeat(Math.min(c.tamponsDisponibles, 10)) + (c.tamponsDisponibles > 10 ? ` +${c.tamponsDisponibles - 10}` : "")
+                        {tampons > 0
+                          ? "🎁".repeat(Math.min(tampons, 10)) + (tampons > 10 ? ` +${tampons - 10}` : "")
                           : "Aucun tampon pour l'instant"}
                       </span>
                       {c.prochaineExpiration && <span>Prochaine expiration : {formaterDate(c.prochaineExpiration)}</span>}
@@ -206,7 +207,9 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                     <p className="text-xs text-gray-500">{c.email ?? "Pas d'email enregistré"}</p>
 
                     <p className={`text-xs ${c.tamponsDisponibles > 0 ? "font-bold text-[#2D5A27]" : "text-gray-400"}`}>
-                      {messageFidelite({ nombre: c.tamponsDisponibles, prochaineExpiration: c.prochaineExpiration })}
+                      {c.tamponsDisponibles > 0
+                        ? messageFidelite({ nombre: c.tamponsDisponibles, prochaineExpiration: c.prochaineExpiration })
+                        : `Encore ${formaterEuros(SEUIL_TAMPON - c.montantCumule)} pour débloquer ${MONTANT_RECOMPENSE}€ offerts.`}
                     </p>
 
                     <div className="space-y-2 rounded border border-gray-200 bg-gray-50 p-2">

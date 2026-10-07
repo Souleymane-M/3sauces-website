@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { Canal } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
-import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, formaterEuros, messageFidelite, progressionTampons } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { envoyerEmail } from "./email";
@@ -26,9 +26,9 @@ async function construireBlocFidelite(
 ): Promise<{ html: string; texteBouton: string }> {
   if (tamponsUtilises > 0) {
     const { nombre } = await compterTamponsDisponibles(supabase, telephone);
-    const reste = nombre > 0 ? `<p>Il te reste ${nombre} tampon${nombre > 1 ? "s" : ""} disponible${nombre > 1 ? "s" : ""}.</p>` : "";
+    const reste = nombre > 0 ? `<p>Il te reste ${formaterEuros(nombre * MONTANT_RECOMPENSE)} de récompense disponible.</p>` : "";
     return {
-      html: `<p>Tu as utilisé ${tamponsUtilises} tampon${tamponsUtilises > 1 ? "s" : ""} (-${(tamponsUtilises * MONTANT_RECOMPENSE).toFixed(2)}€) sur cette commande — merci de ta fidélité !</p>${reste}`,
+      html: `<p>Tu as utilisé ${formaterEuros(tamponsUtilises * MONTANT_RECOMPENSE)} de récompense sur cette commande — merci de ta fidélité !</p>${reste}`,
       texteBouton: "Retourner sur le site",
     };
   }
@@ -43,9 +43,10 @@ async function construireBlocFidelite(
 
   const { data: clientRow } = await supabase.from("clients").select("montant_cumule").eq("telephone", telephone).maybeSingle();
   const reliquat = clientRow?.montant_cumule ?? 0;
-  const montantProchainTampon = reliquat === 0 ? MONTANT_RECOMPENSE : MONTANT_RECOMPENSE - reliquat;
+  const tampons = progressionTampons(reliquat, 0);
+  const montantProchainTampon = SEUIL_TAMPON - reliquat;
   return {
-    html: `<p>Continue à cumuler pour débloquer ${MONTANT_RECOMPENSE}€ offerts — encore ${montantProchainTampon.toFixed(2)}€ pour ton prochain tampon.</p>`,
+    html: `<p>Tu as ${tampons} tampon${tampons > 1 ? "s" : ""} — encore ${montantProchainTampon.toFixed(2)}€ pour débloquer ${MONTANT_RECOMPENSE}€ offerts.</p>`,
     texteBouton: "Retourner sur le site",
   };
 }

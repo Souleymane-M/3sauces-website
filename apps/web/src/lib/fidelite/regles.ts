@@ -6,19 +6,21 @@
 // client (comptoir + livraison + site), jamais par commande individuelle —
 // ne jamais écrire "10€ minimum par commande pour un tampon", c'est faux.
 //
-// RÈGLE DU PROGRAMME (ne jamais confondre ces deux montants) :
-// 10€ dépensés = 1 tampon (simple marqueur de progression).
-// 10 tampons (donc 100€ cumulés) = 1 tampon RÉCOMPENSE de 10€, individuel,
-// expirable 3 mois après son obtention, utilisable par tranche (le client
-// n'est jamais obligé de tout dépenser d'un coup), consommé du plus proche
-// de l'expiration en premier (FIFO). Un tampon-récompense ne vaut donc
-// JAMAIS 10€ tous les 10€ dépensés — uniquement tous les 100€. Une erreur
-// sur ce point le 2026-10-06 a fait miner un tampon-récompense tous les
-// 10€ au lieu de 100€ (10x trop généreux), corrigée le 2026-10-07 —
-// voir supabase/migrations/20261007090000_corrige_seuil_tampon_fidelite.sql.
+// RÈGLE DU PROGRAMME (confirmée explicitement par le patron le 2026-10-07
+// avec l'exemple de Mouna, 76€ dépensés → 7 tampons) :
+// 10€ dépensés = 1 tampon (simple marqueur de progression, affiché partout,
+// y compris avant d'avoir débloqué quoi que ce soit — ex: Mouna à 76€ doit
+// voir "7 tampons", pas "0 tampon").
+// 10 tampons (donc 100€ cumulés) débloquent une récompense de 10€,
+// individuelle, expirable 3 mois après son obtention, utilisable par
+// tranche de 10 tampons à la fois (le client n'est jamais obligé de tout
+// dépenser d'un coup), consommée du plus proche de l'expiration en premier
+// (FIFO). Chaque ligne `fidelite_tampons` en base vaut 10€ et correspond à
+// UN groupe de 10 tampons affichés — jamais confondre la ligne technique
+// (10€, groupe de 10) avec le tampon affiché (1 unité = 10€ de progression).
 
 export const MONTANT_RECOMPENSE = 10;
-/** Montant cumulé nécessaire pour qu'un tampon-récompense se forme — jamais confondre avec MONTANT_RECOMPENSE (sa valeur une fois obtenu). */
+/** Montant cumulé nécessaire pour qu'une récompense se forme. */
 export const SEUIL_TAMPON = 100;
 export const TAGLINE_FIDELITE = "Chaque euro compte chez 3 Sauces";
 
@@ -28,25 +30,38 @@ export function formaterEuros(montant: number): string {
   return `${texte}€`;
 }
 
+/**
+ * Nombre total de tampons de PROGRESSION à afficher pour un client (ex:
+ * fiche /patron) : montant cumulé pas encore converti en récompense
+ * (`montantCumule`, < 100€) + les récompenses déjà débloquées et pas
+ * encore utilisées (`tamponsDisponibles`, en lignes `fidelite_tampons` de
+ * 10€/10 tampons chacune). Mouna (76€, 0 récompense) → 7. Un client avec
+ * 115€ cumulés dont 1 récompense déjà débloquée (reliquat 15€) → 1 + 10 =
+ * 11 tampons.
+ */
+export function progressionTampons(montantCumule: number, tamponsDisponibles: number): number {
+  return Math.floor(montantCumule / MONTANT_RECOMPENSE) + tamponsDisponibles * (SEUIL_TAMPON / MONTANT_RECOMPENSE);
+}
+
 export interface ProgressionFidelite {
-  /** Nombre de nouveaux tampons que cette commande fait gagner (jamais sur le montant brut si des tampons sont utilisés, cf. nouveauxTamponsGagnes). */
+  /** Nombre de nouvelles récompenses (groupes de 10 tampons) que cette commande fait gagner. */
   tamponsGagnes: number;
-  /** Montant restant à ajouter pour obtenir un tampon de plus. */
+  /** Montant restant à ajouter pour débloquer la prochaine récompense. */
   montantProchainTampon: number;
 }
 
 /**
- * Calcule ce qu'une commande apporte en NOUVEAUX tampons — à partir du
+ * Calcule ce qu'une commande apporte en NOUVELLES récompenses — à partir du
  * reliquat juste avant cette commande (0 si inconnu, ex: client non
- * identifié sur le site public) et du nombre de tampons utilisés sur
- * cette même commande. Un tampon se forme tous les SEUIL_TAMPON (100€)
- * cumulés, jamais tous les MONTANT_RECOMPENSE (10€, qui est seulement sa
- * valeur une fois formé).
+ * identifié sur le site public) et du nombre de récompenses utilisées sur
+ * cette même commande. Une récompense se forme tous les SEUIL_TAMPON (100€)
+ * cumulés.
  *
- * Seul le montant réellement payé en plus des tampons utilisés compte :
- * une commande de 20€ qui utilise 1 tampon (10€) ne doit faire gagner de
- * nouveau tampon que sur ces 10€ net, jamais sur les 20€ bruts — sinon
- * utiliser une récompense permettrait d'en regagner une quasi gratuitement.
+ * Seul le montant réellement payé en plus des récompenses utilisées compte :
+ * une commande de 20€ qui utilise 1 récompense (10€) ne doit faire gagner
+ * de nouvelle récompense que sur ces 10€ net, jamais sur les 20€ bruts —
+ * sinon utiliser une récompense permettrait d'en regagner une quasi
+ * gratuitement.
  */
 export function progressionFideliteCommande(
   totalCommande: number,
@@ -66,25 +81,26 @@ export function progressionFideliteCommande(
 /** Texte prêt à afficher juste à côté du total (site public et caisse) — jamais le même message vague partout. */
 export function texteProgressionFidelite({ tamponsGagnes, montantProchainTampon }: ProgressionFidelite): string {
   if (tamponsGagnes > 0) {
-    return `🎁 Cette commande vous rapporte ${tamponsGagnes} tampon${tamponsGagnes > 1 ? "s" : ""} ! Encore ${formaterEuros(montantProchainTampon)} pour le suivant.`;
+    return `🎁 Cette commande vous rapporte ${tamponsGagnes * (SEUIL_TAMPON / MONTANT_RECOMPENSE)} tampons ! Encore ${formaterEuros(montantProchainTampon)} pour la récompense suivante.`;
   }
-  return `🎁 Encore ${formaterEuros(montantProchainTampon)} pour votre prochain tampon fidélité.`;
+  return `🎁 Encore ${formaterEuros(montantProchainTampon)} pour votre prochaine récompense fidélité.`;
 }
 
 export interface SoldeTampons {
+  /** Nombre de récompenses disponibles (groupes de 10 tampons / 10€), pas le nombre de tampons. */
   nombre: number;
-  /** Date d'expiration du tampon disponible le plus proche d'expirer (le premier consommé, FIFO) — null si aucun tampon disponible. */
+  /** Date d'expiration de la récompense disponible la plus proche d'expirer (la première consommée, FIFO) — null si aucune récompense disponible. */
   prochaineExpiration: string | null;
 }
 
-/** Message prêt à afficher pour le solde de tampons d'un client (site public, caisse, email). */
+/** Message prêt à afficher pour le solde de récompenses disponibles d'un client (site public, caisse, email) — utilisable immédiatement comme réduction. */
 export function messageFidelite({ nombre, prochaineExpiration }: SoldeTampons): string {
   if (nombre > 0) {
     const montant = formaterEuros(nombre * MONTANT_RECOMPENSE);
     const expiration = prochaineExpiration
       ? ` Le plus proche expire le ${new Date(prochaineExpiration).toLocaleDateString("fr-FR")}.`
       : "";
-    return `Vous avez ${nombre} tampon${nombre > 1 ? "s" : ""} disponible${nombre > 1 ? "s" : ""} (${montant}) !${expiration}`;
+    return `Vous avez ${montant} de récompense disponible${nombre > 1 ? "s" : ""} à utiliser sur votre prochaine commande !${expiration}`;
   }
-  return `Continuez à commander chez 3 Sauces et gagnez ${formaterEuros(MONTANT_RECOMPENSE)} offerts tous les ${formaterEuros(SEUIL_TAMPON)} cumulés !`;
+  return `Continuez à commander chez 3 Sauces et débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts tous les ${formaterEuros(SEUIL_TAMPON)} cumulés !`;
 }

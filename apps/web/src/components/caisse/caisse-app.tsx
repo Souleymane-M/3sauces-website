@@ -1851,10 +1851,7 @@ export function CaisseApp({
                       </p>
                       {(clientInfo.tamponsDisponibles ?? 0) > 0 && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
-                          <p>
-                            {clientInfo.tamponsDisponibles} tampon{(clientInfo.tamponsDisponibles ?? 0) > 1 ? "s" : ""} disponible
-                            {(clientInfo.tamponsDisponibles ?? 0) > 1 ? "s" : ""} — combien utiliser ?
-                          </p>
+                          <p>Combien de réduction utiliser sur cette commande ?</p>
                           <div className="mt-1 flex items-center gap-2 font-normal">
                             <button
                               type="button"
@@ -1864,9 +1861,7 @@ export function CaisseApp({
                             >
                               -
                             </button>
-                            <span className="w-16 text-center">
-                              {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""}
-                            </span>
+                            <span className="w-20 text-center">{(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €</span>
                             <button
                               type="button"
                               onClick={() => setNbTamponsAUtiliser((n) => Math.min(maxTamponsUtilisables, n + 1))}
@@ -1875,11 +1870,10 @@ export function CaisseApp({
                             >
                               +
                             </button>
-                            {nbTamponsEffectif > 0 && <span>(-{(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €)</span>}
                           </div>
                           {total < MONTANT_RECOMPENSE && (
                             <p className="text-xs font-normal text-red-600">
-                              Commande d&apos;au moins {MONTANT_RECOMPENSE}€ requise pour utiliser un tampon.
+                              Commande d&apos;au moins {MONTANT_RECOMPENSE}€ requise pour utiliser une réduction.
                             </p>
                           )}
                         </div>
@@ -1892,7 +1886,7 @@ export function CaisseApp({
               )}
               {!clientInfo && (
                 <p className="mt-2 text-xs text-gray-500">
-                  🎁 {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois.
+                  🎁 {SEUIL_TAMPON}€ cumulés = {MONTANT_RECOMPENSE}€ offerts, valables 3 mois.
                 </p>
               )}
             </div>

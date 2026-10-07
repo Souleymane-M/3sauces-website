@@ -167,7 +167,7 @@ export function CarteFidelite({
   if (etape === "repliee") {
     return (
       <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
-        <p className="font-bold">🎁 {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert.</p>
+        <p className="font-bold">🎁 {SEUIL_TAMPON}€ cumulés = {MONTANT_RECOMPENSE}€ offerts.</p>
         <button
           type="button"
           onClick={() => setEtape("saisie")}
@@ -229,8 +229,8 @@ export function CarteFidelite({
                 >
                   -
                 </button>
-                <span className="w-20 text-center text-sm font-semibold">
-                  {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""}
+                <span className="w-24 text-center text-sm font-semibold">
+                  {(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €
                 </span>
                 <button
                   type="button"
@@ -240,11 +240,6 @@ export function CarteFidelite({
                 >
                   +
                 </button>
-                {nbTamponsEffectif > 0 && (
-                  <span className="text-sm font-semibold text-[#2D5A27]">
-                    (-{(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €)
-                  </span>
-                )}
               </div>
               {maxUtilisable === 0 && (
                 <p className="mt-1 text-xs text-gray-500">Disponible à partir de {MONTANT_RECOMPENSE}€ de commande.</p>
