@@ -357,7 +357,7 @@ export function CaisseApp({
   // séparée de `erreur` (formulaire, tout en bas) pour s'afficher juste
   // au-dessus du bouton "Plat suivant".
   const [erreurPlat, setErreurPlat] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal } | null>(
+  const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal; encaisse: boolean } | null>(
     null
   );
 
@@ -385,6 +385,19 @@ export function CaisseApp({
   const [creneauHeure, setCreneauHeure] = useState(
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
+  const commandeAvance = dateCommande !== aujourdHui;
+
+  // Un client présent au comptoir, pour aujourd'hui, peut payer tout de
+  // suite ("Encaisser") — mais une commande prise par téléphone ou
+  // réservée pour un autre jour doit rester non payée jusqu'à
+  // l'encaissement réel, personne ne pouvant remettre des espèces à
+  // distance ou pour plus tard (repéré le 2026-10-07 : jusqu'ici TOUT
+  // sur place/à emporter était marqué payé dès la création, y compris une
+  // simple réservation téléphonique). Jamais pour une livraison, qui
+  // reste toujours payée à la remise, pas à la prise de commande.
+  const [encaisserMaintenant, setEncaisserMaintenant] = useState(true);
+  const paiementImmediatPossible = canal !== null && canal !== "livraison" && !commandeAvance;
+  const encaisserEffectif = paiementImmediatPossible && encaisserMaintenant;
 
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
@@ -1179,26 +1192,26 @@ export function CaisseApp({
    * le calcul mental reste nécessaire. Pour "mixte", seule la part espèces
    * compte (la part CB n'a pas de monnaie à rendre).
    *
-   * Jamais pour une livraison : le mode de paiement choisi ici n'est qu'une
-   * déclaration, l'argent n'est encaissé par le livreur qu'au moment de la
-   * remise (cf. "Commande enregistrée" vs "Commande encaissée" plus bas) —
-   * aucune espèce n'est donnée à la caissière à cette étape.
+   * Jamais quand ce n'est pas encaissé tout de suite (livraison, commande
+   * à l'avance, ou "Valider sans encaisser" choisi explicitement) : le mode
+   * de paiement choisi ici n'est alors qu'une déclaration, rien n'est
+   * remis à la caissière à cette étape.
    */
-  function validerMontantRecuEspeces(): string | null {
-    if (canal === "livraison") return null;
-    if (modePaiement !== "especes" && modePaiement !== "mixte") return null;
+  function validerMontantRecuEspeces(): boolean {
+    if (!encaisserEffectif) return true;
+    if (modePaiement !== "especes" && modePaiement !== "mixte") return true;
     const du = modePaiement === "mixte" ? Number(montantEspecesMixte.replace(",", ".")) || 0 : totalApresRemises;
-    if (du <= 0) return null;
+    if (du <= 0) return true;
     const recu = Number(montantRecuEspeces.replace(",", "."));
     if (!montantRecuEspeces.trim() || !Number.isFinite(recu)) {
       setErreur("Indique le montant reçu du client en espèces.");
-      return null;
+      return false;
     }
     if (recu < du) {
       setErreur(`Montant insuffisant, il manque ${(du - recu).toFixed(2)} €.`);
-      return null;
+      return false;
     }
-    return "ok";
+    return true;
   }
 
   /**
@@ -1270,6 +1283,7 @@ export function CaisseApp({
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
           date: dateCommande,
+          encaisserMaintenant: encaisserEffectif,
           creneauHeure,
           nom: nom.trim(),
           prenom: prenom.trim(),
@@ -1284,7 +1298,7 @@ export function CaisseApp({
         setErreur(data.error ?? "Échec de l'encaissement.");
         return;
       }
-      setConfirmation({ commandeId: data.commandeId, montant: data.montant, canal });
+      setConfirmation({ commandeId: data.commandeId, montant: data.montant, canal, encaisse: encaisserEffectif });
 
       // Impression immédiate, sans bloquer l'écran de confirmation : une
       // imprimante non configurée ou hors ligne n'empêche jamais
@@ -1342,6 +1356,7 @@ export function CaisseApp({
       setCanal(null);
       setPaysTelephone(null);
       setDateCommande(datesOuvertes[0] ?? aujourdHui);
+      setEncaisserMaintenant(true);
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -1432,12 +1447,14 @@ export function CaisseApp({
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
         <p className="text-2xl font-bold text-gray-900">
-          {confirmation.canal === "livraison" ? "Commande enregistrée ✅" : "Commande encaissée ✅"}
+          {confirmation.encaisse ? "Commande encaissée ✅" : "Commande enregistrée ✅"}
         </p>
         <p className="text-gray-600">
-          {confirmation.canal === "livraison"
-            ? `À encaisser au retour du livreur : ${confirmation.montant.toFixed(2)} €`
-            : `Montant : ${confirmation.montant.toFixed(2)} €`}
+          {confirmation.encaisse
+            ? `Montant : ${confirmation.montant.toFixed(2)} €`
+            : confirmation.canal === "livraison"
+              ? `À encaisser au retour du livreur : ${confirmation.montant.toFixed(2)} €`
+              : `À encaisser plus tard : ${confirmation.montant.toFixed(2)} €`}
         </p>
         <button
           onClick={() => setConfirmation(null)}
@@ -2049,6 +2066,40 @@ export function CaisseApp({
               label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
             />
 
+            {canal !== null && canal !== "livraison" && (
+              <div>
+                <label className="text-xs text-gray-500">Quand ce paiement est-il encaissé ?</label>
+                {paiementImmediatPossible ? (
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEncaisserMaintenant(true)}
+                      className={`rounded border py-2 text-xs font-bold uppercase ${
+                        encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Maintenant (client présent)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEncaisserMaintenant(false)}
+                      className={`rounded border py-2 text-xs font-bold uppercase ${
+                        !encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Plus tard
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-1 rounded bg-gray-100 p-2 text-xs text-gray-600">
+                    {commandeAvance
+                      ? "Commande réservée pour un autre jour : le paiement sera encaissé plus tard."
+                      : "Le paiement sera encaissé plus tard."}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-xs text-gray-500">Paiement</label>
               <select
@@ -2082,7 +2133,7 @@ export function CaisseApp({
                   </span>
                 </div>
               )}
-              {canal !== "livraison" && (modePaiement === "especes" || modePaiement === "mixte") && (
+              {encaisserEffectif && (modePaiement === "especes" || modePaiement === "mixte") && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
                   <label className="flex items-center gap-1">
                     Reçu du client (espèces)
@@ -2147,9 +2198,9 @@ export function CaisseApp({
                 ? "Envoi…"
                 : enModeEdition
                   ? "Enregistrer les modifications"
-                  : canal === "livraison"
-                    ? "Valider la commande"
-                    : "Encaisser"}
+                  : encaisserEffectif
+                    ? "Encaisser"
+                    : "Valider la commande"}
             </button>
           </div>
           </div>

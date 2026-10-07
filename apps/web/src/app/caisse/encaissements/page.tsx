@@ -7,7 +7,7 @@ import { EncaissementsLivraisonCaisse } from "@/components/caisse/encaissements-
 import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
 
 export const metadata: Metadata = {
-  title: "Encaissements livraison — 3 Sauces",
+  title: "Encaissements — 3 Sauces",
 };
 
 export default async function CaisseEncaissementsPage() {
@@ -26,7 +26,7 @@ export default async function CaisseEncaissementsPage() {
   return (
     <main className="min-h-screen bg-[#F5F0E8] p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Encaissements livraison</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Encaissements</h1>
         <LogoutButton />
       </div>
       <p className="mt-1 mb-6 text-sm text-gray-600">

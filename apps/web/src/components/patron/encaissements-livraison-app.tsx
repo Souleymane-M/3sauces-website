@@ -21,10 +21,18 @@ function libelleMode(mode: string): string {
   return mode === "cb" ? "Carte" : "Espèces";
 }
 
+function libelleCanal(canal: string): string {
+  if (canal === "livraison") return "Livraison";
+  if (canal === "emporter") return "À emporter";
+  return "Sur place";
+}
+
 /**
  * Une livraison prise par téléphone n'est payée qu'à la remise. Le
  * livreur déclare depuis son écran ce qu'il a récupéré (lib/livreur/) ;
- * cette liste régularise ça à distance — même donnée et même API que
+ * cette liste régularise ça à distance. Depuis le 2026-10-07, couvre
+ * aussi toute commande sur place/à emporter restée non payée (prise par
+ * téléphone ou réservée à l'avance) — même donnée et même API que
  * components/caisse/encaissements-livraison-caisse.tsx (contrôle sur
  * place), juste en thème sombre pour coller au reste de /patron.
  */
@@ -136,14 +144,16 @@ export function EncaissementsLivraisonApp({ livraisonsInitiales }: Encaissements
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
-      <h2 className="text-lg font-bold">Encaissements livraison</h2>
+      <h2 className="text-lg font-bold">Encaissements</h2>
       <p className="text-xs text-gray-500">
-        Le livreur déclare ce qu&apos;il a récupéré depuis son écran — contrôle et valide chaque livraison ici.
+        Livraisons : le livreur déclare ce qu&apos;il a récupéré depuis son écran — contrôle et valide ici. Sur
+        place/à emporter non encore payé (pris par téléphone ou réservé à l&apos;avance) : saisis directement ce qui
+        a été remis.
       </p>
       {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
       {succes && <p className="text-xs font-semibold text-green-400">✅ {succes}</p>}
 
-      {livraisons.length === 0 && <p className="text-sm text-gray-500">Aucune livraison en attente d&apos;encaissement.</p>}
+      {livraisons.length === 0 && <p className="text-sm text-gray-500">Aucune commande en attente d&apos;encaissement.</p>}
 
       <ul className="space-y-2">
         {livraisons.map((l) => (
@@ -151,10 +161,14 @@ export function EncaissementsLivraisonApp({ livraisonsInitiales }: Encaissements
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">
-                  Commande #{l.numero} — {l.nom || "?"}
+                  Commande #{l.numero} — {l.nom || "?"}{" "}
+                  <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs font-normal text-gray-400">
+                    {libelleCanal(l.canal)}
+                  </span>
                 </p>
                 <p className="text-xs text-gray-400">
-                  {l.adresse} — {formaterDateHeure(l.creeLe)}
+                  {l.adresse ? `${l.adresse} — ` : ""}
+                  {formaterDateHeure(l.creeLe)}
                 </p>
               </div>
               <span className="text-sm font-semibold">{l.montant.toFixed(2)} €</span>
@@ -164,7 +178,9 @@ export function EncaissementsLivraisonApp({ livraisonsInitiales }: Encaissements
 
             {l.statutPaiement === "non_paye" ? (
               <div className="mt-2 border-t border-gray-800 pt-2">
-                <p className="text-xs text-gray-500">Le livreur n&apos;a pas déclaré ce paiement.</p>
+                <p className="text-xs text-gray-500">
+                  {l.canal === "livraison" ? "Le livreur n'a pas déclaré ce paiement." : "Pas encore encaissé."}
+                </p>
                 {saisieManuelleOuverte === l.id ? (
                   <div className="mt-2 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">

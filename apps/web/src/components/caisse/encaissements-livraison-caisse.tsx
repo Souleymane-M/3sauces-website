@@ -21,10 +21,19 @@ function libelleMode(mode: string): string {
   return mode === "cb" ? "Carte" : "Espèces";
 }
 
+function libelleCanal(canal: string): string {
+  if (canal === "livraison") return "Livraison";
+  if (canal === "emporter") return "À emporter";
+  return "Sur place";
+}
+
 /**
  * Même donnée et même API que components/patron/encaissements-livraison-app.tsx
  * (contrôle à distance) — ici en thème clair pour le responsable de caisse
- * qui valide sur place, après contrôle, au retour du livreur.
+ * qui valide sur place. Couvre les livraisons (après contrôle, au retour du
+ * livreur) mais aussi, depuis le 2026-10-07, toute commande sur place/à
+ * emporter restée non payée (prise par téléphone ou réservée à l'avance,
+ * cf. lib/encaissements-livraison.ts).
  */
 export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: EncaissementsLivraisonCaisseProps) {
   const [livraisons, setLivraisons] = useState<LivraisonAEncaisser[]>(livraisonsInitiales);
@@ -135,12 +144,14 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        Le livreur déclare ce qu&apos;il a récupéré depuis son écran — contrôle et valide chaque livraison ici.
+        Livraisons : le livreur déclare ce qu&apos;il a récupéré depuis son écran — contrôle et valide ici. Sur
+        place/à emporter non encore payé (pris par téléphone ou réservé à l&apos;avance) : saisis directement ce qui
+        a été remis.
       </p>
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
       {succes && <p className="text-sm font-semibold text-[#2D5A27]">✅ {succes}</p>}
 
-      {livraisons.length === 0 && <p className="text-lg text-gray-400">Aucune livraison en attente d&apos;encaissement.</p>}
+      {livraisons.length === 0 && <p className="text-lg text-gray-400">Aucune commande en attente d&apos;encaissement.</p>}
 
       <ul className="space-y-3">
         {livraisons.map((l) => (
@@ -148,10 +159,14 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-gray-900">
-                  Commande #{l.numero} — {l.nom || "?"}
+                  Commande #{l.numero} — {l.nom || "?"}{" "}
+                  <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal text-gray-600">
+                    {libelleCanal(l.canal)}
+                  </span>
                 </p>
                 <p className="text-sm text-gray-500">
-                  {l.adresse} — {formaterDateHeure(l.creeLe)}
+                  {l.adresse ? `${l.adresse} — ` : ""}
+                  {formaterDateHeure(l.creeLe)}
                 </p>
               </div>
               <span className="text-lg font-bold text-gray-900">{l.montant.toFixed(2)} €</span>
@@ -163,7 +178,9 @@ export function EncaissementsLivraisonCaisse({ livraisonsInitiales }: Encaisseme
 
             {l.statutPaiement === "non_paye" ? (
               <div className="mt-3 border-t border-gray-100 pt-3">
-                <p className="text-sm text-gray-400">Le livreur n&apos;a pas déclaré ce paiement.</p>
+                <p className="text-sm text-gray-400">
+                  {l.canal === "livraison" ? "Le livreur n'a pas déclaré ce paiement." : "Pas encore encaissé."}
+                </p>
                 {saisieManuelleOuverte === l.id ? (
                   <div className="mt-2 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">

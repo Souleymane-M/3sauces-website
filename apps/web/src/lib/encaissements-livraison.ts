@@ -11,8 +11,16 @@ import type { EncaissementsJour, LivraisonAEncaisser } from "./encaissements-liv
  * remise, pas la caisse à la prise de commande. Le livreur déclare ensuite
  * ce qu'il a récupéré depuis /livreur (lib/livreur/commandes.ts,
  * `declarerLivraison`) — la commande passe alors à "declare", avec ses
- * lignes `paiements` déjà enregistrées. Cette régularisation est
- * accessible à la fois côté caisse
+ * lignes `paiements` déjà enregistrées.
+ *
+ * Depuis le 2026-10-07, une commande sur place/à emporter peut elle aussi
+ * rester "non_paye" à la création — prise par téléphone, ou réservée pour
+ * un autre jour (cf. /api/caisse/commandes, `encaisserMaintenant`) — sans
+ * jamais passer par un livreur ni par l'étape "declare" : elle apparaît
+ * donc ici directement à "non_paye", réglée par la même saisie manuelle
+ * que le filet de secours livraison (`declarerEtValiderManuellement`).
+ *
+ * Cette régularisation est accessible à la fois côté caisse
  * (components/caisse/encaissements-livraison-caisse.tsx, contrôle sur
  * place par le responsable de caisse) et côté patron
  * (components/patron/encaissements-livraison-app.tsx, contrôle à
@@ -27,10 +35,10 @@ export async function listerLivraisonsAEncaisser(): Promise<LivraisonAEncaisser[
   const { data, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, nom_livraison, adresse_livraison, montant, mode_paiement, created_at, paiement_statut, alerte_signalee, alerte_note"
+      "id, numero, canal, nom_livraison, adresse_livraison, montant, mode_paiement, created_at, paiement_statut, alerte_signalee, alerte_note"
     )
-    .eq("canal", "livraison")
     .neq("paiement_statut", "paye")
+    .neq("statut", "annulee")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -61,6 +69,7 @@ export async function listerLivraisonsAEncaisser(): Promise<LivraisonAEncaisser[
   return data.map((c) => ({
     id: c.id,
     numero: c.numero,
+    canal: c.canal,
     nom: c.nom_livraison ?? "",
     adresse: c.adresse_livraison,
     montant: c.montant,
@@ -121,16 +130,17 @@ interface PaiementManuel {
 }
 
 /**
- * Filet de secours quand le livreur n'est jamais passé par /livreur pour
- * déclarer ce qu'il a récupéré (cas très fréquent en pratique — la
- * livraison reste alors bloquée indéfiniment à "non_paye" sans que rien
- * n'atteigne jamais l'étape "à valider"). Permet à la caisse/au patron de
- * saisir directement ce qui a été remis, sans dépendre du livreur.
- * Contrairement à `marquerLivraisonEncaissee`, insère elle-même les lignes
- * `paiements` (jamais encore enregistrées ici) et fait aussi passer la
- * commande à "livre" si elle ne l'était pas déjà — la caisse ne fait ça que
- * pour une livraison dont elle sait, par un autre moyen (le livreur de
- * retour, un appel client), qu'elle a bien été remise.
+ * Filet de secours pour toute commande restée "non_paye" sans jamais passer
+ * par une déclaration livreur — à l'origine pensé pour une livraison dont
+ * le livreur n'est jamais passé par /livreur (cas très fréquent en
+ * pratique), étendu depuis le 2026-10-07 à une commande sur place/à
+ * emporter prise par téléphone ou réservée à l'avance (cf.
+ * /api/caisse/commandes, `encaisserMaintenant`) : ni l'une ni l'autre
+ * n'atteint jamais l'étape "declare" par elle-même. Permet à la caisse/au
+ * patron de saisir directement ce qui a été remis. Contrairement à
+ * `marquerLivraisonEncaissee`, insère elle-même les lignes `paiements`
+ * (jamais encore enregistrées ici) et fait aussi passer une livraison à
+ * "livre" si elle ne l'était pas déjà (sans effet pour les autres canaux).
  */
 export async function declarerEtValiderManuellement(
   commandeId: string,
@@ -155,9 +165,6 @@ export async function declarerEtValiderManuellement(
     .maybeSingle();
   if (erreurLecture || !commande) {
     throw new Error("Commande introuvable.");
-  }
-  if (commande.canal !== "livraison") {
-    throw new Error("Cette commande n'est pas une livraison.");
   }
   if (commande.paiement_statut === "paye") {
     throw new Error("Cette commande est déjà marquée comme encaissée.");

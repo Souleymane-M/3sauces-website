@@ -1,4 +1,4 @@
-import type { ModePaiement, ModePaiementCommande } from "@3sauces/supabase";
+import type { Canal, ModePaiement, ModePaiementCommande } from "@3sauces/supabase";
 
 export interface PaiementDeclareDetail {
   mode: ModePaiement;
@@ -6,9 +6,11 @@ export interface PaiementDeclareDetail {
   payeur: string | null;
 }
 
+/** Malgré son nom (historique), couvre depuis le 2026-10-07 toute commande non payée à encaisser plus tard — pas seulement une livraison, cf. lib/encaissements-livraison.ts. */
 export interface LivraisonAEncaisser {
   id: string;
   numero: number;
+  canal: Canal;
   nom: string;
   adresse: string | null;
   montant: number;

@@ -103,6 +103,8 @@ export interface CreerCommandePayload {
   creneauHeure?: string;
   /** Date de retrait/livraison "YYYY-MM-DD" — absente ou omise = aujourd'hui, jamais de prépaiement exigé ici contrairement au site public. */
   date?: string;
+  /** Sur place/à emporter uniquement, pour aujourd'hui : le client est présent et paie tout de suite. Toujours ignoré pour une livraison ou une commande à l'avance (forcément "non_paye"). */
+  encaisserMaintenant?: boolean;
 }
 
 /**

@@ -88,7 +88,7 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
             href="/caisse/encaissements"
             className="flex items-center gap-2 rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white shadow-sm"
           >
-            Encaissements livraison
+            Encaissements
             {livraisonsAEncaisser.length > 0 && (
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[#8B2020]">
                 {livraisonsAEncaisser.length}

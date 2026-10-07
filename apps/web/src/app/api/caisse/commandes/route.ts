@@ -621,14 +621,19 @@ export async function POST(request: Request) {
   // et téléphone sont obligatoires partout) et pas seulement pour la
   // livraison — même convention que /api/commande.
   //
-  // Une livraison prise par téléphone n'est PAS payée à cet instant : le
-  // client paie le livreur à la remise, pas la caisse à la prise de
-  // commande (contrairement à sur place/à emporter, payés immédiatement au
-  // comptoir). `paiement_statut` reste donc "non_paye" ici, exactement
-  // comme une livraison passée sur le site public — elle est régularisée
-  // plus tard depuis /caisse/encaissements ou /patron au retour du
-  // livreur, ce qui déclenche alors le trigger de fidélité au bon moment.
-  const paiementStatut = body.canal === "livraison" ? "non_paye" : "paye";
+  // Une livraison n'est jamais payée à cet instant (le client paie le
+  // livreur à la remise), jamais le choix de la caissière. Pour les deux
+  // autres canaux en revanche, ce n'est PAS automatique : un client présent
+  // au comptoir qui commande pour aujourd'hui peut payer tout de suite,
+  // mais une commande prise par téléphone (ou réservée pour un autre jour,
+  // où personne ne peut physiquement remettre des espèces maintenant) doit
+  // rester "non_paye" jusqu'à l'encaissement réel — régularisée plus tard
+  // depuis /caisse/encaissements (repéré le 2026-10-07 : jusqu'ici tout
+  // sur_place/à emporter était marqué payé immédiatement à la création,
+  // même une simple réservation téléphonique). Jamais pour une commande à
+  // l'avance, quel que soit ce que la caissière a coché côté client.
+  const encaisserMaintenant = body.canal !== "livraison" && dateCommande === dateMayotteIso() && body.encaisserMaintenant === true;
+  const paiementStatut = encaisserMaintenant ? "paye" : "non_paye";
 
   let paiementsMixte: { mode: "especes" | "cb"; montant: number }[] | null = null;
   if (body.modePaiement === "mixte") {
