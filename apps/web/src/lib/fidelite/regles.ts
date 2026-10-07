@@ -78,10 +78,23 @@ export function progressionFideliteCommande(
   };
 }
 
-/** Texte prêt à afficher juste à côté du total (site public et caisse) — jamais le même message vague partout. */
-export function texteProgressionFidelite({ tamponsGagnes, montantProchainTampon }: ProgressionFidelite): string {
+/** Sous ce montant restant, le message "encore X€" devient utile ; au-delà, il n'est qu'une distraction trop loin du but. */
+export const SEUIL_AFFICHAGE_PROGRESSION = 30;
+
+/**
+ * Texte prêt à afficher juste à côté du total (site public et caisse) —
+ * jamais le même message vague partout. `null` quand il reste plus de
+ * `SEUIL_AFFICHAGE_PROGRESSION` à parcourir et qu'aucune récompense n'est
+ * gagnée sur cette commande : annoncer "encore 76,50€" à quelqu'un qui vient
+ * de commander pour 10€ n'incite à rien, ça n'affiche qu'à partir du moment
+ * où la récompense devient concrètement proche.
+ */
+export function texteProgressionFidelite({ tamponsGagnes, montantProchainTampon }: ProgressionFidelite): string | null {
   if (tamponsGagnes > 0) {
     return `🎁 Cette commande vous rapporte ${tamponsGagnes * (SEUIL_TAMPON / MONTANT_RECOMPENSE)} tampons ! Encore ${formaterEuros(montantProchainTampon)} pour la récompense suivante.`;
+  }
+  if (montantProchainTampon > SEUIL_AFFICHAGE_PROGRESSION) {
+    return null;
   }
   return `🎁 Encore ${formaterEuros(montantProchainTampon)} pour votre prochaine récompense fidélité.`;
 }

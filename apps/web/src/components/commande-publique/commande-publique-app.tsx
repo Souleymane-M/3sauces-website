@@ -1454,11 +1454,11 @@ export function CommandePubliqueApp({
                     </div>
                   )
                 )}
-                {total > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-gray-500">
-                    {texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif))}
-                  </p>
-                )}
+                {total > 0 &&
+                  (() => {
+                    const texte = texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif));
+                    return texte && <p className="mt-1 text-xs font-semibold text-gray-500">{texte}</p>;
+                  })()}
               </div>
 
               <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">

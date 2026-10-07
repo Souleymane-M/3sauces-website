@@ -2061,11 +2061,11 @@ export function CaisseApp({
                 </p>
               )}
               Total : {totalApresRemises.toFixed(2)} €
-              {total > 0 && (
-                <p className="mt-1 text-xs font-semibold text-gray-500">
-                  {texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif))}
-                </p>
-              )}
+              {total > 0 &&
+                (() => {
+                  const texte = texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif));
+                  return texte && <p className="mt-1 text-xs font-semibold text-gray-500">{texte}</p>;
+                })()}
             </div>
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
