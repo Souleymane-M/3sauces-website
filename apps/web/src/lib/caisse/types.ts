@@ -101,6 +101,8 @@ export interface CreerCommandePayload {
   adresse?: string;
   zone?: string;
   creneauHeure?: string;
+  /** Date de retrait/livraison "YYYY-MM-DD" — absente ou omise = aujourd'hui, jamais de prépaiement exigé ici contrairement au site public. */
+  date?: string;
 }
 
 /**

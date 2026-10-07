@@ -12,8 +12,10 @@ import {
 import {
   construireHeureSouhaiteeUtc,
   creneauDansPlage,
+  dateIsoValide,
   dateMayotteIso,
   heureActuelleMayotteMinutes,
+  prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
@@ -467,7 +469,7 @@ export async function POST(request: Request) {
   // /api/commande) : une livraison prise au téléphone par la caisse a
   // besoin des mêmes informations qu'une livraison passée en ligne. ---
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
-    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande").eq("id", true).single(),
+    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande, jours_fermeture").eq("id", true).single(),
     supabase.from("zones_livraison").select("commune").eq("actif", true),
   ]);
 
@@ -498,7 +500,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+  // Commande à l'avance prise par téléphone (ex: pour vendredi) : la caisse
+  // n'exige jamais de prépaiement en ligne contrairement au site public
+  // (/api/commande) — c'est l'équipe elle-même qui encaisse, en personne ou
+  // plus tard, donc rien à sécuriser par Stripe. Par défaut (pas de `date`
+  // envoyée), on reste sur aujourd'hui, comme avant ce changement.
+  const dateCommande = typeof body.date === "string" && body.date ? body.date : dateMayotteIso();
+  const datesOuvertes = prochainesDatesOuvertes(parametres.jours_fermeture, parametres.heure_debut, parametres.heure_fin);
+  if (!dateIsoValide(dateCommande) || !datesOuvertes.includes(dateCommande)) {
+    return NextResponse.json(
+      { error: "Date de retrait indisponible : choisis une date parmi les prochains jours d'ouverture." },
+      { status: 400 }
+    );
+  }
+  if (dateCommande === dateMayotteIso()) {
+    const [heureCreneau, minuteCreneau] = creneauHeure.split(":").map(Number);
+    if (heureCreneau * 60 + minuteCreneau < heureActuelleMayotteMinutes()) {
+      return NextResponse.json({ error: "Ce créneau vient de passer. Choisis une heure à venir." }, { status: 400 });
+    }
+  }
+
+  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
   if (!heureSouhaitee) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }
@@ -794,7 +816,7 @@ export async function PATCH(request: Request) {
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
     supabase
       .from("parametres_livraison")
-      .select("heure_debut, heure_fin, minimum_commande, remise_lancement_debut, remise_lancement_fin")
+      .select("heure_debut, heure_fin, minimum_commande, jours_fermeture, remise_lancement_debut, remise_lancement_fin")
       .eq("id", true)
       .single(),
     supabase.from("zones_livraison").select("commune").eq("actif", true),
@@ -819,7 +841,23 @@ export async function PATCH(request: Request) {
       { status: 400 }
     );
   }
-  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure);
+
+  const dateCommande = typeof body.date === "string" && body.date ? body.date : dateMayotteIso();
+  const datesOuvertes = prochainesDatesOuvertes(parametres.jours_fermeture, parametres.heure_debut, parametres.heure_fin);
+  if (!dateIsoValide(dateCommande) || !datesOuvertes.includes(dateCommande)) {
+    return NextResponse.json(
+      { error: "Date de retrait indisponible : choisis une date parmi les prochains jours d'ouverture." },
+      { status: 400 }
+    );
+  }
+  if (dateCommande === dateMayotteIso()) {
+    const [heureCreneau, minuteCreneau] = creneauHeure.split(":").map(Number);
+    if (heureCreneau * 60 + minuteCreneau < heureActuelleMayotteMinutes()) {
+      return NextResponse.json({ error: "Ce créneau vient de passer. Choisis une heure à venir." }, { status: 400 });
+    }
+  }
+
+  const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
   if (!heureSouhaitee) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
   }

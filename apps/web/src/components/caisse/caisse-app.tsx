@@ -14,15 +14,18 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
-  genererCreneaux,
   prochainCreneauValide,
   construireHeureSouhaiteeUtc,
   heureActuelleMayotteMinutes,
+  creneauxPourDate,
+  prochainesDatesOuvertes,
+  dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
+import { DatePicker } from "@/components/commande-publique/date-picker";
 import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
 import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
@@ -256,7 +259,11 @@ export function CaisseApp({
   // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
   // sont possibles, sinon appliqué directement.
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanier | null>(null);
-  const [canal, setCanal] = useState<Canal>(() => commandeExistante?.canal ?? "sur_place");
+  // Pas de canal présélectionné pour une nouvelle commande, même raison que
+  // /commander : la caissière doit cliquer explicitement un choix plutôt
+  // que de laisser "Sur place" coché sans le remarquer (2026-10-07). En
+  // modification, on garde le canal déjà enregistré.
+  const [canal, setCanal] = useState<Canal | null>(() => commandeExistante?.canal ?? null);
   // Canal au chargement de la modification — jamais réassigné ensuite, sert
   // uniquement à savoir d'où on part pour décider ce qui reste interdit
   // (passer à "livraison" une commande qui était sur place/à emporter,
@@ -293,7 +300,9 @@ export function CaisseApp({
           if (Array.isArray(etat.plats) && etat.plats.length > 0) setPlats(etat.plats);
           if (etat.platDeplie !== undefined) setPlatDeplie(etat.platDeplie);
           if (etat.platActifId) setPlatActifId(etat.platActifId);
-          if (etat.canal) setCanal(etat.canal);
+          // `canal` n'est jamais restauré, volontairement — même raison que
+          // /commander : la caissière doit recliquer à chaque nouvelle
+          // commande, jamais un choix resté "collé" en session.
           if (etat.boissonOfferteSaveur !== undefined) setBoissonOfferteSaveur(etat.boissonOfferteSaveur);
         }
       } catch {
@@ -309,7 +318,7 @@ export function CaisseApp({
     try {
       sessionStorage.setItem(
         CLE_PANIER_CAISSE,
-        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur })
+        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveur })
       );
     } catch {
       // Stockage plein ou indisponible : la session continue simplement sans persistance.
@@ -322,7 +331,6 @@ export function CaisseApp({
     plats,
     platDeplie,
     platActifId,
-    canal,
     boissonOfferteSaveur,
   ]);
 
@@ -334,10 +342,12 @@ export function CaisseApp({
   // calcul mental de la monnaie à rendre.
   const [montantRecuEspeces, setMontantRecuEspeces] = useState("");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
-  // Mayotte par défaut : l'écrasante majorité des clients. Même logique que
-  // /commander — la caissière choisit explicitement le pays du client
-  // plutôt que de devoir se souvenir de taper +33 pour un métropolitain.
-  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
+  // Pas de pays présélectionné pour une nouvelle commande, même raison que
+  // /commander — la caissière doit choisir explicitement plutôt que de
+  // risquer un numéro métropolitain enregistré comme mahorais sans s'en
+  // rendre compte. En modification, le numéro est déjà valide : pas besoin
+  // de reforcer un choix.
+  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone | null>(() => (enModeEdition ? "mayotte" : null));
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const [nbTamponsAUtiliser, setNbTamponsAUtiliser] = useState(0);
@@ -351,18 +361,36 @@ export function CaisseApp({
     null
   );
 
+  // Date de retrait/livraison : aujourd'hui par défaut, mais modifiable —
+  // une commande prise par téléphone pour un autre jour (ex: un groupe qui
+  // réserve pour vendredi) doit pouvoir être saisie à l'avance, sans jamais
+  // exiger de prépaiement en ligne contrairement au site public : c'est
+  // l'équipe elle-même qui encaisse, en personne ou plus tard (2026-10-07).
+  const aujourdHui = useMemo(() => dateMayotteIso(), []);
+  const datesOuvertes = useMemo(
+    () => prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin),
+    [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin]
+  );
+  const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
+
   // Créneau souhaité pour tous les canaux (comme le site public : "Heure de
   // passage souhaitée" pour sur place/à emporter, "Créneau de livraison
   // souhaité" pour la livraison) ; adresse/zone restent propres à la
   // livraison. Nom et téléphone sont obligatoires pour tous les canaux,
   // comme sur le site public.
   const creneauxValides = useMemo(
-    () => genererCreneaux(parametres.heureDebut, parametres.heureFin),
-    [parametres.heureDebut, parametres.heureFin]
+    () => creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
+    [dateCommande, parametres.heureDebut, parametres.heureFin]
   );
   const [creneauHeure, setCreneauHeure] = useState(
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
+
+  function changerDate(nouvelleDate: string) {
+    setDateCommande(nouvelleDate);
+    const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
+  }
   const [nom, setNom] = useState(() => commandeExistante?.nom ?? "");
   const [prenom, setPrenom] = useState(() => commandeExistante?.prenom ?? "");
   const [email, setEmail] = useState("");
@@ -1200,6 +1228,14 @@ export function CaisseApp({
       setErreur(erreurValidation);
       return;
     }
+    if (!paysTelephone) {
+      setErreur("Choisis le pays du client (Mayotte, France métropolitaine ou La Réunion).");
+      return;
+    }
+    if (!canal) {
+      setErreur("Choisis comment le client récupère sa commande : sur place, à emporter ou en livraison.");
+      return;
+    }
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
     if (!telephoneComplet) {
       setErreur(
@@ -1233,6 +1269,7 @@ export function CaisseApp({
           clientTelephone: telephoneComplet,
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
+          date: dateCommande,
           creneauHeure,
           nom: nom.trim(),
           prenom: prenom.trim(),
@@ -1284,7 +1321,7 @@ export function CaisseApp({
         modePaiement,
         nom: `${prenom.trim()} ${nom.trim()}`.trim(),
         adresse: canal === "livraison" ? adresse.trim() : null,
-        heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure)?.toISOString() ?? null,
+        heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure, dateCommande)?.toISOString() ?? null,
         creeLe: new Date().toISOString(),
         qrCode: canal === "livraison" ? (data.qrCode ?? null) : null,
         nbPlats: enModeGroupe ? nbPlatsValides : 0,
@@ -1302,6 +1339,9 @@ export function CaisseApp({
       setEmail("");
       setAdresse("");
       setMontantRecuEspeces("");
+      setCanal(null);
+      setPaysTelephone(null);
+      setDateCommande(datesOuvertes[0] ?? aujourdHui);
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -1322,6 +1362,14 @@ export function CaisseApp({
     const erreurValidation = validerPanierAvantEnvoi();
     if (erreurValidation) {
       setErreur(erreurValidation);
+      return;
+    }
+    if (!paysTelephone) {
+      setErreur("Choisis le pays du client (Mayotte, France métropolitaine ou La Réunion).");
+      return;
+    }
+    if (!canal) {
+      setErreur("Choisis comment le client récupère sa commande : sur place, à emporter ou en livraison.");
       return;
     }
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
@@ -1357,6 +1405,7 @@ export function CaisseApp({
           paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
           boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
+          date: dateCommande,
           creneauHeure,
           nom: nom.trim(),
           prenom: prenom.trim(),
@@ -1808,7 +1857,7 @@ export function CaisseApp({
               <p className="mt-1 rounded bg-orange-50 px-2 py-1.5 text-xs font-semibold text-[#8B2020]">
                 📍 Choisis le pays du client, puis tape juste son numéro local (ex: 0639123456).
               </p>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+              <div className={`mt-1.5 grid grid-cols-3 gap-1.5 rounded-lg ${paysTelephone ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                 {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
                   <button
                     key={p}
@@ -1909,8 +1958,9 @@ export function CaisseApp({
 
             <div className="border-t border-gray-200 pt-3">
               <label className="text-xs text-gray-500">Comment récupérer la commande ?</label>
-              <div className="mt-1 grid grid-cols-3 gap-2">
+              <div className={`mt-1 grid grid-cols-3 gap-2 rounded-lg ${canal ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                 <button
+                  type="button"
                   onClick={() => setCanal("sur_place")}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
@@ -1919,6 +1969,7 @@ export function CaisseApp({
                   Sur place
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCanal("emporter")}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
@@ -1927,6 +1978,7 @@ export function CaisseApp({
                   À emporter
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCanal("livraison")}
                   disabled={!livraisonPossible || (enModeEdition && canalOriginalEdition !== "livraison")}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
@@ -1936,6 +1988,7 @@ export function CaisseApp({
                   Livraison
                 </button>
               </div>
+              {!canal && <p className="mt-2 text-xs text-[#8B2020]">👆 Choisis une option avant d&apos;encaisser.</p>}
               {enModeEdition && canalOriginalEdition !== "livraison" && (
                 <p className="mt-2 text-xs text-gray-400">
                   Passage à &quot;Livraison&quot; impossible ici (commande déjà payée) — annule et recrée-la si besoin.
@@ -1980,6 +2033,14 @@ export function CaisseApp({
                 </div>
               </div>
             )}
+
+            <DatePicker
+              dates={datesOuvertes}
+              aujourdHui={aujourdHui}
+              valeur={dateCommande}
+              onChange={changerDate}
+              label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
+            />
 
             <CreneauPicker
               creneauxValides={creneauxValides}
