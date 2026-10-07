@@ -180,7 +180,10 @@ export function CommandePubliqueApp({
           if (Array.isArray(etat.plats) && etat.plats.length > 0) setPlats(etat.plats);
           if (etat.platDeplie !== undefined) setPlatDeplie(etat.platDeplie);
           if (etat.platActifId) setPlatActifId(etat.platActifId);
-          if (etat.canal) setCanal(etat.canal);
+          // `canal` n'est jamais restauré, volontairement : un client qui
+          // recharge la page doit recliquer son mode de retrait à chaque
+          // fois, sinon un choix fait il y a 20 minutes (ou avant même ce
+          // correctif) reste "collé" sans qu'il ne le revoie (2026-10-07).
           if (etat.boissonOfferteSaveur !== undefined) setBoissonOfferteSaveur(etat.boissonOfferteSaveur);
         }
       } catch {
@@ -195,12 +198,12 @@ export function CommandePubliqueApp({
     try {
       sessionStorage.setItem(
         CLE_PANIER_PUBLIC,
-        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur })
+        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveur })
       );
     } catch {
       // Stockage plein ou indisponible : la session continue simplement sans persistance.
     }
-  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, canal, boissonOfferteSaveur]);
+  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveur]);
 
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
