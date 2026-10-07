@@ -152,7 +152,11 @@ export function CommandePubliqueApp({
   // boisson" sur une formule passée en "Sans boisson" : ouvre un choix de
   // saveur si plusieurs sont possibles, sinon appliqué directement.
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanierPublique | null>(null);
-  const [canal, setCanal] = useState<CanalPublic>("sur_place");
+  // Pas de canal présélectionné : des clients laissaient "Sur place" coché
+  // par défaut sans le remarquer et attendaient ensuite une livraison qui
+  // n'avait jamais été demandée — le client doit cliquer explicitement sur
+  // un des trois choix avant de pouvoir valider (2026-10-07).
+  const [canal, setCanal] = useState<CanalPublic | null>(null);
   const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
 
   // Restauration du panier après un rechargement accidentel de l'onglet : on
@@ -206,7 +210,10 @@ export function CommandePubliqueApp({
   // explicitement son pays plutôt que de devoir savoir qu'il doit taper
   // lui-même +33 — élimine le risque qu'un numéro métropolitain tapé sans
   // indicatif se retrouve silencieusement enregistré comme mahorais.
-  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone>("mayotte");
+  // Pas de pays présélectionné non plus, même raison que le canal — un
+  // client qui ne regarde pas se retrouvait avec un numéro métropolitain
+  // enregistré comme mahorais (ou l'inverse) sans jamais s'en rendre compte.
+  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone | null>(null);
   const [emailDejaConnu, setEmailDejaConnu] = useState(false);
 
   // Un client déjà passé commande n'a pas à retaper son email à chaque
@@ -842,8 +849,16 @@ export function CommandePubliqueApp({
       setErreur("Indique ton adresse email.");
       return;
     }
+    if (!paysTelephone) {
+      setErreur("Choisis ton pays (Mayotte, France métropolitaine ou La Réunion).");
+      return;
+    }
     if (!telephone.trim()) {
       setErreur("Indique ton numéro de téléphone.");
+      return;
+    }
+    if (!canal) {
+      setErreur("Choisis comment récupérer ta commande : sur place, à emporter ou en livraison.");
       return;
     }
     const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
@@ -1486,7 +1501,7 @@ export function CommandePubliqueApp({
                 <p className="mt-1 rounded bg-orange-50 px-2.5 py-2 text-sm font-semibold text-[#8B2020]">
                   📍 Choisis d&apos;abord ton pays, puis tape juste ton numéro local (ex: 0639123456) — sans +33 ni indicatif.
                 </p>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className={`mt-2 grid grid-cols-3 gap-2 rounded-lg ${paysTelephone ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                   {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
                     <button
                       key={p}
@@ -1511,9 +1526,10 @@ export function CommandePubliqueApp({
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Comment récupérer ta commande ?</label>
-                <div className="mt-1 grid grid-cols-3 gap-2">
+                <label className="text-xs text-gray-500">Comment récupérer ta commande ? (obligatoire)</label>
+                <div className={`mt-1 grid grid-cols-3 gap-2 rounded-lg ${canal ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                   <button
+                    type="button"
                     onClick={() => setCanal("sur_place")}
                     className={`rounded border py-2 text-sm font-bold uppercase ${
                       canal === "sur_place" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
@@ -1522,6 +1538,7 @@ export function CommandePubliqueApp({
                     Sur place
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCanal("emporter")}
                     className={`rounded border py-2 text-sm font-bold uppercase ${
                       canal === "emporter" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
@@ -1530,6 +1547,7 @@ export function CommandePubliqueApp({
                     À emporter
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCanal("livraison")}
                     disabled={!livraisonPossible}
                     className={`rounded border py-2 text-sm font-bold uppercase disabled:opacity-30 ${
@@ -1539,6 +1557,9 @@ export function CommandePubliqueApp({
                     Livraison
                   </button>
                 </div>
+                {!canal && (
+                  <p className="mt-2 text-xs text-[#8B2020]">👆 Choisis une option avant de valider ta commande.</p>
+                )}
                 {canal === "livraison" && !minimumAtteint && (
                   <p className="mt-2 text-xs text-orange-600">
                     Minimum {parametres.minimumCommande.toFixed(2)} € pour la livraison — ajoute des articles ou

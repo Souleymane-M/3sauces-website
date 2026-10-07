@@ -83,10 +83,11 @@ export const LIBELLE_PAYS_TELEPHONE: Record<PaysTelephone, string> = {
  * (même logique stricte que `normaliserTelephone` : jamais de complétion
  * à l'aveugle d'un numéro qui n'a pas la bonne longueur).
  */
-export function composerTelephoneAvecPays(saisie: string, pays: PaysTelephone): string | null {
+export function composerTelephoneAvecPays(saisie: string, pays: PaysTelephone | null): string | null {
   const nettoye = saisie.trim().replace(/[\s.\-()]/g, "");
   if (!nettoye) return null;
   if (nettoye.startsWith("+") || nettoye.startsWith("00")) return saisie;
+  if (!pays) return null;
   if (!/^0?\d{9}$/.test(nettoye)) return null;
   // "07..." n'existe pas à Mayotte/La Réunion (mobiles uniquement en
   // "06..."), contrairement à la métropole où 06 et 07 coexistent — seul
@@ -98,7 +99,7 @@ export function composerTelephoneAvecPays(saisie: string, pays: PaysTelephone): 
 }
 
 /** Numéro local en "07..." avec Mayotte/La Réunion sélectionné — ce préfixe n'existe pas là-bas, presque sûrement un numéro métropolitain mal aiguillé. */
-export function ressembleAFranceMetropolitaine(saisie: string, pays: PaysTelephone): boolean {
+export function ressembleAFranceMetropolitaine(saisie: string, pays: PaysTelephone | null): boolean {
   const nettoye = saisie.trim().replace(/[\s.\-()]/g, "");
   return (pays === "mayotte" || pays === "reunion") && /^07\d{8}$/.test(nettoye);
 }
