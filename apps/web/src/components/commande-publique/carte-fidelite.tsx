@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
-import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite } from "@/lib/fidelite/regles";
 
 const CLE_LOCALSTORAGE = "3sauces_fidelite_identite";
 
@@ -167,7 +167,7 @@ export function CarteFidelite({
   if (etape === "repliee") {
     return (
       <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
-        <p className="font-bold">🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon de {MONTANT_RECOMPENSE}€ offert.</p>
+        <p className="font-bold">🎁 {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert.</p>
         <button
           type="button"
           onClick={() => setEtape("saisie")}

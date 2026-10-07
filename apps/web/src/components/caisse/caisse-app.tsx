@@ -28,7 +28,7 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import { MONTANT_RECOMPENSE, messageFidelite, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import {
@@ -1892,7 +1892,7 @@ export function CaisseApp({
               )}
               {!clientInfo && (
                 <p className="mt-2 text-xs text-gray-500">
-                  🎁 {MONTANT_RECOMPENSE}€ dépensés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois.
+                  🎁 {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois.
                 </p>
               )}
             </div>

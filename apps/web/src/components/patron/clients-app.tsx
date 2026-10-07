@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ClientAdmin, CommandeClientAdmin } from "@/lib/patron/clients";
-import { MONTANT_RECOMPENSE, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite } from "@/lib/fidelite/regles";
 import { normaliserEmail } from "@/lib/email";
 
 interface ClientsAppProps {
@@ -132,7 +132,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Clients fidélité</h2>
       <p className="text-xs text-gray-500">
-        {MONTANT_RECOMPENSE}€ dépensés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois depuis son obtention.
+        {SEUIL_TAMPON}€ cumulés = 1 tampon de {MONTANT_RECOMPENSE}€ offert, valable 3 mois depuis son obtention.
         Cumulable sans limite, utilisable par tampon. Calculé automatiquement à chaque paiement (comptoir, livraison,
         site) — rien à saisir ici.
       </p>

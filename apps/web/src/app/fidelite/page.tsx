@@ -31,13 +31,16 @@ export default function FidelitePage() {
           quel que soit le montant de chaque commande individuelle.
         </p>
         <p>
-          → La récompense de 10€ est utilisable en une seule fois, sur une commande d&apos;un montant
-          minimum de 10€.
+          → Vous pouvez cumuler plusieurs tampons sans limite, et choisir d&apos;en utiliser un ou plusieurs
+          sur une même commande — jamais obligé de tout dépenser d&apos;un coup.
         </p>
-        <p>→ Elle n&apos;est pas fractionnable : elle ne peut pas être répartie sur plusieurs commandes.</p>
         <p>
-          → La récompense est valable 3 mois à partir de son obtention. Passé ce délai, elle expire et le
-          compteur repart à zéro.
+          → Chaque tampon est utilisable en une seule fois (non fractionnable) et vaut 10€, sur une commande
+          d&apos;un montant minimum de 10€ par tampon utilisé.
+        </p>
+        <p>
+          → Chaque tampon est valable 3 mois à partir de sa propre date d&apos;obtention. Passé ce délai, seul
+          ce tampon expire — les autres restent valables selon leur propre date.
         </p>
         <p>
           → Sur 3sauces.fr, votre solde s&apos;affiche directement en saisissant votre numéro de téléphone
