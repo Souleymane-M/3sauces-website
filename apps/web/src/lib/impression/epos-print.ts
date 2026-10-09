@@ -241,17 +241,31 @@ export async function envoyerImpression(xml: string, config: ConfigImprimante): 
   const minuteur = setTimeout(() => controleur.abort(), TIMEOUT_MS);
 
   try {
-    const reponse = await fetch(url, {
+    // Les imprimantes Epson TM ne renvoient jamais les en-têtes CORS
+    // (Access-Control-Allow-Origin) sur ce service — un site public
+    // (3sauces.fr) qui lui parle en HTTPS déclenche donc un préflight que
+    // l'imprimante ne sait pas satisfaire, et Chrome/Safari bloquent tout
+    // purement et simplement (repéré le 2026-10-08 : "blocked by CORS
+    // policy" dans la console, sur tous les appareils, quel que soit le
+    // certificat déjà accepté — un problème de CORS, jamais réglé par le
+    // certificat TLS). Pour éviter de déclencher ce préflight, on envoie
+    // en `mode: "no-cors"`, sans l'en-tête SOAPAction (non standard, donc
+    // non "safelisted") et avec un Content-Type volontairement générique
+    // ("text/plain" plutôt que "text/xml", qui n'est pas non plus
+    // safelisted) — l'imprimante analyse le corps XML indépendamment du
+    // Content-Type déclaré, elle imprime quand même. Contrepartie
+    // acceptée : en mode no-cors la réponse est "opaque", impossible à
+    // lire (`success="true"` ou un message d'erreur imprimante précis) —
+    // on ne peut plus distinguer un vrai succès d'un échec silencieux côté
+    // imprimante (ticket épuisé, bourrage...), seulement détecter une
+    // imprimante injoignable (IP fausse, hors tension, autre réseau).
+    await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: "" },
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: xml,
       signal: controleur.signal,
     });
-
-    const texte = await reponse.text();
-    if (!reponse.ok || !texte.includes('success="true"')) {
-      return { ok: false, erreur: `Réponse imprimante inattendue (HTTP ${reponse.status}).` };
-    }
     return { ok: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";
