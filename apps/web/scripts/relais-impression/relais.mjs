@@ -120,6 +120,7 @@ async function traiterRequete(req, res) {
 
       const resultat = await relayerVersImprimante(url, xml);
       console.log(`[relais] ${url} -> HTTP ${resultat.status}`);
+      console.log(`[relais] corps de la réponse imprimante : ${resultat.corps}`);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, status: resultat.status, corps: resultat.corps }));
     } catch (e) {
