@@ -11,15 +11,21 @@ interface Brouillon {
   nom: string;
   adresseIp: string;
   port: string;
+  relaisUrl: string;
 }
 
 function versBrouillon(i: ImprimanteAdmin): Brouillon {
-  return { nom: i.nom, adresseIp: i.adresseIp ?? "", port: String(i.port) };
+  return { nom: i.nom, adresseIp: i.adresseIp ?? "", port: String(i.port), relaisUrl: i.relaisUrl ?? "" };
 }
 
 function estModifie(brouillon: Brouillon, i: ImprimanteAdmin): boolean {
   const reference = versBrouillon(i);
-  return brouillon.nom !== reference.nom || brouillon.adresseIp !== reference.adresseIp || brouillon.port !== reference.port;
+  return (
+    brouillon.nom !== reference.nom ||
+    brouillon.adresseIp !== reference.adresseIp ||
+    brouillon.port !== reference.port ||
+    brouillon.relaisUrl !== reference.relaisUrl
+  );
 }
 
 /**
@@ -59,6 +65,7 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       setErreur("Adresse IP invalide (ex: 192.168.1.50).");
       return;
     }
+    const relaisUrl = brouillon.relaisUrl.trim() || null;
 
     setErreur(null);
     setEnregistrementEnCours(imprimante.id);
@@ -66,14 +73,14 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       const reponse = await fetch("/api/patron/imprimantes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: imprimante.id, nom, adresseIp, port }),
+        body: JSON.stringify({ id: imprimante.id, nom, adresseIp, port, relaisUrl }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
         setErreur(data.error ?? "Échec de l'enregistrement.");
         return;
       }
-      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, adresseIp, port };
+      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, adresseIp, port, relaisUrl };
       setImprimantes((precedent) => precedent.map((i) => (i.id === imprimante.id ? imprimanteMiseAJour : i)));
       setBrouillons((precedent) => ({ ...precedent, [imprimante.id]: versBrouillon(imprimanteMiseAJour) }));
     } finally {
@@ -116,6 +123,16 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
                 inputMode="numeric"
                 className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
               />
+              <input
+                value={brouillon.relaisUrl}
+                onChange={(e) => modifierBrouillon(imprimante.id, "relaisUrl", e.target.value)}
+                placeholder="Adresse du relais d'impression"
+                className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+              />
+              <p className="text-xs text-gray-500">
+                Optionnel — adresse du petit relais local qui contourne le blocage CORS de l&apos;imprimante (ex:
+                https://192.168.x.x:8099). Laisser vide pour une tentative d&apos;impression directe.
+              </p>
 
               {modifie && (
                 <button

@@ -235,30 +235,29 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   return enveloppeEposPrint(xml);
 }
 
-export async function envoyerImpression(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
+/**
+ * Les imprimantes Epson TM ne renvoient jamais les en-têtes CORS
+ * (Access-Control-Allow-Origin) sur leur service ePOS-Print, et n'offrent
+ * aucun réglage pour l'activer (vérifié exhaustivement le 2026-10-09 dans
+ * tous les onglets de leur Web Config, modèle TM-m30III). Un site public
+ * (3sauces.fr) qui leur parle en HTTPS depuis le navigateur se heurte donc
+ * systématiquement à un préflight que l'imprimante ne sait pas satisfaire
+ * ("blocked by CORS policy"). Un contournement purement client (mode
+ * "no-cors", Content-Type générique pour éviter le préflight) part bien
+ * mais l'imprimante ignore alors silencieusement la requête : elle attend
+ * un vrai `text/xml`, qui lui, redéclenche le préflight — cul-de-sac.
+ *
+ * `envoyerDirectement` : ancien comportement, conservé comme repli quand
+ * aucun relais n'est configuré (`config.relaisUrl` null) — souvent sans
+ * effet avec ces imprimantes pour la raison ci-dessus, mais jamais
+ * bloquant pour la commande elle-même.
+ */
+async function envoyerDirectement(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
   const url = `https://${config.adresseIp}:${config.port}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
   const controleur = new AbortController();
   const minuteur = setTimeout(() => controleur.abort(), TIMEOUT_MS);
 
   try {
-    // Les imprimantes Epson TM ne renvoient jamais les en-têtes CORS
-    // (Access-Control-Allow-Origin) sur ce service — un site public
-    // (3sauces.fr) qui lui parle en HTTPS déclenche donc un préflight que
-    // l'imprimante ne sait pas satisfaire, et Chrome/Safari bloquent tout
-    // purement et simplement (repéré le 2026-10-08 : "blocked by CORS
-    // policy" dans la console, sur tous les appareils, quel que soit le
-    // certificat déjà accepté — un problème de CORS, jamais réglé par le
-    // certificat TLS). Pour éviter de déclencher ce préflight, on envoie
-    // en `mode: "no-cors"`, sans l'en-tête SOAPAction (non standard, donc
-    // non "safelisted") et avec un Content-Type volontairement générique
-    // ("text/plain" plutôt que "text/xml", qui n'est pas non plus
-    // safelisted) — l'imprimante analyse le corps XML indépendamment du
-    // Content-Type déclaré, elle imprime quand même. Contrepartie
-    // acceptée : en mode no-cors la réponse est "opaque", impossible à
-    // lire (`success="true"` ou un message d'erreur imprimante précis) —
-    // on ne peut plus distinguer un vrai succès d'un échec silencieux côté
-    // imprimante (ticket épuisé, bourrage...), seulement détecter une
-    // imprimante injoignable (IP fausse, hors tension, autre réseau).
     await fetch(url, {
       method: "POST",
       mode: "no-cors",
@@ -273,4 +272,48 @@ export async function envoyerImpression(xml: string, config: ConfigImprimante): 
   } finally {
     clearTimeout(minuteur);
   }
+}
+
+/**
+ * Passe par le petit relais local (cf. scripts/relais-impression/), qui
+ * tourne sur un ordinateur du réseau du restaurant : lui répond avec les
+ * bons en-têtes CORS (qu'on contrôle, contrairement au firmware Epson),
+ * puis retransmet la requête à l'imprimante en serveur-à-serveur — jamais
+ * soumis aux restrictions CORS du navigateur. Avantage sur l'envoi direct :
+ * la vraie réponse de l'imprimante redevient lisible, `success="true"` est
+ * donc revérifié comme avant ce blocage.
+ */
+async function envoyerViaRelais(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
+  const urlCible = `https://${config.adresseIp}:${config.port}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => controleur.abort(), TIMEOUT_MS);
+
+  try {
+    const reponse = await fetch(`${config.relaisUrl!.replace(/\/$/, "")}/print`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: urlCible, xml }),
+      signal: controleur.signal,
+    });
+    const data = await reponse.json().catch(() => null);
+    if (!reponse.ok || !data?.ok) {
+      return { ok: false, erreur: data?.erreur ?? `Relais ou imprimante en erreur (HTTP ${reponse.status}).` };
+    }
+    if (!(data.corps as string | undefined)?.includes('success="true"')) {
+      return { ok: false, erreur: "Réponse imprimante inattendue via le relais." };
+    }
+    return { ok: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Erreur inconnue.";
+    return { ok: false, erreur: `Relais d'impression injoignable (${config.relaisUrl}) : ${message}` };
+  } finally {
+    clearTimeout(minuteur);
+  }
+}
+
+export async function envoyerImpression(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
+  if (config.relaisUrl) {
+    return envoyerViaRelais(xml, config);
+  }
+  return envoyerDirectement(xml, config);
 }

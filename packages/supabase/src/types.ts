@@ -429,6 +429,7 @@ export interface Database {
           nom: string;
           adresse_ip: string | null;
           port: number;
+          relais_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -438,6 +439,7 @@ export interface Database {
           nom: string;
           adresse_ip?: string | null;
           port?: number;
+          relais_url?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["imprimantes"]["Insert"]>;
         Relationships: [];

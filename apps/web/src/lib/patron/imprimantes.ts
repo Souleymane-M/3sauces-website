@@ -15,6 +15,7 @@ function versImprimanteAdmin(i: {
   nom: string;
   adresse_ip: string | null;
   port: number;
+  relais_url: string | null;
 }): ImprimanteAdmin {
   return {
     id: i.id,
@@ -22,6 +23,7 @@ function versImprimanteAdmin(i: {
     nom: i.nom,
     adresseIp: i.adresse_ip,
     port: i.port,
+    relaisUrl: i.relais_url,
   };
 }
 
@@ -29,7 +31,7 @@ export async function listerImprimantesAdmin(): Promise<ImprimanteAdmin[]> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("imprimantes")
-    .select("id, role, nom, adresse_ip, port")
+    .select("id, role, nom, adresse_ip, port, relais_url")
     .order("role", { ascending: true });
 
   if (error) {
@@ -40,10 +42,11 @@ export async function listerImprimantesAdmin(): Promise<ImprimanteAdmin[]> {
 
 export async function mettreAJourImprimante(id: string, patch: ImprimanteAdminPatch): Promise<void> {
   const supabase = createServiceSupabaseClient();
-  const update: { nom?: string; adresse_ip?: string | null; port?: number } = {};
+  const update: { nom?: string; adresse_ip?: string | null; port?: number; relais_url?: string | null } = {};
   if (patch.nom !== undefined) update.nom = patch.nom;
   if (patch.adresseIp !== undefined) update.adresse_ip = patch.adresseIp;
   if (patch.port !== undefined) update.port = patch.port;
+  if (patch.relaisUrl !== undefined) update.relais_url = patch.relaisUrl;
 
   const { error } = await supabase.from("imprimantes").update(update).eq("id", id);
 

@@ -9,10 +9,12 @@ export interface ImprimanteAdmin {
   nom: string;
   adresseIp: string | null;
   port: number;
+  relaisUrl: string | null;
 }
 
 export interface ImprimanteAdminPatch {
   nom?: string;
   adresseIp?: string | null;
   port?: number;
+  relaisUrl?: string | null;
 }

@@ -102,7 +102,7 @@ function versConfigImprimantes(liste: ImprimanteAdmin[]): ConfigImprimantes {
   const comptoir = liste.find((i) => i.role === "comptoir");
   const cuisine = liste.find((i) => i.role === "cuisine");
   const config = (i: ImprimanteAdmin | undefined): ConfigImprimante | null =>
-    i?.adresseIp ? { adresseIp: i.adresseIp, port: i.port } : null;
+    i?.adresseIp ? { adresseIp: i.adresseIp, port: i.port, relaisUrl: i.relaisUrl } : null;
   return { comptoir: config(comptoir), cuisine: config(cuisine) };
 }
 
