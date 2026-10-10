@@ -56,6 +56,31 @@ https://<IP-du-Mac>:8099
 
 Enregistrez. L'impression passe maintenant par le relais.
 
+## Impression automatique des commandes du site public
+
+Depuis le 2026-10-10, le relais va lui-même vérifier toutes les quelques
+secondes si une commande du site public attend d'être imprimée, et
+l'imprime directement — **sans dépendre d'aucun onglet ouvert** (`/caisse`
+ou `/commandes` peuvent rester fermés, ça fonctionne quand même).
+
+Pour l'activer, il faut donner au relais le même "mot de passe secret"
+interne que le site (`AUTH_SECRET`, déjà présent dans `apps/web/.env.local`
+— jamais à inventer ni communiquer à qui que ce soit d'autre) :
+
+```bash
+grep AUTH_SECRET ~/3sauces-website/apps/web/.env.local | cut -d= -f2- > auth-secret.txt
+```
+
+Relancez le relais (`Ctrl+C` puis `node relais.mjs`). Vous devez voir :
+
+```
+[relais][auto] impression automatique activée, vérifie https://www.3sauces.fr toutes les 8s.
+```
+
+Sans ce fichier, le relais continue de fonctionner normalement pour
+l'impression manuelle depuis `/caisse` — seule l'impression automatique des
+commandes du site public est désactivée.
+
 ## Garder le relais toujours actif
 
 Fermer le Terminal arrête le relais, et donc l'impression. Deux options :
