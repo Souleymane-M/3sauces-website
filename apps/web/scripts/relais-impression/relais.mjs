@@ -246,7 +246,11 @@ async function cyclePolling(jeton) {
 // automatique via launchd, qui n'hérite pas forcément des variables
 // d'environnement du Terminal) — voir README.md.
 const cheminSecret = path.join(DOSSIER, "auth-secret.txt");
-const authSecret = process.env.AUTH_SECRET ?? (fs.existsSync(cheminSecret) ? fs.readFileSync(cheminSecret, "utf-8").trim() : null);
+// Pas de .trim() ici : la valeur stockée sur Vercel contient elle-même un
+// retour à la ligne final (collé tel quel depuis le presse-papier) — un
+// .trim() local produirait un secret différent de celui que le site
+// compare, et renverrait HTTP 401 (vécu le 2026-10-11).
+const authSecret = process.env.AUTH_SECRET ?? (fs.existsSync(cheminSecret) ? fs.readFileSync(cheminSecret, "utf-8") : null);
 
 if (!authSecret) {
   console.warn(

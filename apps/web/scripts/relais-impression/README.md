@@ -64,12 +64,27 @@ l'imprime directement — **sans dépendre d'aucun onglet ouvert** (`/caisse`
 ou `/commandes` peuvent rester fermés, ça fonctionne quand même).
 
 Pour l'activer, il faut donner au relais le même "mot de passe secret"
-interne que le site (`AUTH_SECRET`, déjà présent dans `apps/web/.env.local`
-— jamais à inventer ni communiquer à qui que ce soit d'autre) :
+interne que le site en production (`AUTH_SECRET`). **Important** : ce n'est
+*pas* la valeur de `apps/web/.env.local` (confirmé le 2026-10-11 : les deux
+diffèrent, le fichier `.env.local` sert seulement au développement local).
+Il faut la valeur exacte configurée sur Vercel :
 
-```bash
-grep AUTH_SECRET ~/3sauces-website/apps/web/.env.local | cut -d= -f2- > auth-secret.txt
-```
+1. Sur vercel.com → projet 3sauces-website → **Settings** → **Environment
+   Variables**.
+2. `AUTH_SECRET` est une variable "Sensitive" (cadenas 🔒) : Vercel ne
+   permet jamais de revoir sa valeur une fois enregistrée. Il faut donc en
+   créer une nouvelle plutôt que d'essayer de récupérer l'ancienne :
+   ```bash
+   openssl rand -base64 32 | tee auth-secret.txt | pbcopy
+   ```
+   (écrit la nouvelle valeur dans `auth-secret.txt` et la copie dans le
+   presse-papier en même temps).
+3. Sur la ligne `AUTH_SECRET` dans Vercel → "Edit" → collez (Cmd+V) → Save.
+4. Allez dans l'onglet **Deployments** → "..." sur le déploiement le plus
+   récent → **Redeploy** (un changement de variable ne s'applique qu'au
+   prochain déploiement, jamais tout seul). Attendez "Ready".
+5. En changeant `AUTH_SECRET`, tout le monde connecté à `/caisse` ou
+   `/patron` est déconnecté et devra se reconnecter — c'est normal.
 
 Relancez le relais (`Ctrl+C` puis `node relais.mjs`). Vous devez voir :
 
