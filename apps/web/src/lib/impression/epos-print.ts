@@ -264,21 +264,17 @@ function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourIm
   b.ligne(`${commande.nbPlats} plat${commande.nbPlats > 1 ? "s" : ""}`, { align: "center", gras: true, taille: 1 });
 }
 
-function rendreTampons(n: number): string {
-  const pleins = Math.min(n, 10);
-  const points = "●".repeat(pleins) + "○".repeat(10 - pleins);
-  return n > 10 ? `${points} (+${n - 10})` : points;
-}
-
 const URL_SITE = "https://3sauces.fr";
 
 function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
   separateur(b);
   b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 1 });
-  b.ligne("10€ dépensés = 1 tampon · 10 tampons = 10€ offerts", { align: "center", gras: false, taille: 1 });
+  b.ligne("10€ dépensés = 1 tampon", { align: "center", gras: false, taille: 1 });
+  b.ligne("10 tampons = 10€ offerts", { align: "center", gras: false, taille: 1 });
 
   if (commande.clientTelephone && commande.tamponsAffiches !== null) {
-    b.ligne(rendreTampons(commande.tamponsAffiches), { align: "center", gras: true, taille: 2 });
+    const tampon = commande.tamponsAffiches > 1 ? "tampons" : "tampon";
+    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon}`, { align: "center", gras: true, taille: 2 });
     if (commande.recompenseDisponible) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
@@ -288,8 +284,9 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   }
 }
 
-/** Max 4 lignes : message du moment (si actif), QR vers le site (jamais en livraison, pour ne pas le confondre avec le QR livreur), Instagram. */
+/** Message du moment (si actif) + QR vers le site (jamais en livraison, pour ne pas le confondre avec le QR livreur). */
 function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  if (!commande.messageDuMoment && commande.canal === "livraison") return;
   separateur(b);
   if (commande.messageDuMoment) {
     b.ligne(commande.messageDuMoment, { align: "center", gras: false, taille: 1 });
@@ -299,7 +296,6 @@ function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePour
     b.brut(styleTexte({ align: "center" }));
     b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(URL_SITE)}</symbol>`);
   }
-  b.ligne("Instagram : @3sauces.mayotte", { align: "center", gras: false, taille: 1 });
 }
 
 function enveloppeEposPrint(contenu: string): string {
@@ -352,13 +348,15 @@ export function construireTicketClientXml(
   const heureLabel = commande.heureSouhaitee ? libelleHeureSouhaitee(commande.heureSouhaitee) : null;
   b.ligne(`${libelleCanal(commande.canal).toUpperCase()}${heureLabel ? ` · ${heureLabel}` : ""}`, {
     align: "left",
-    gras: false,
+    gras: true,
     taille: 1,
   });
 
+  // Infos de livraison mises en évidence (gras) — doivent sauter aux yeux
+  // du livreur, pas se fondre dans le reste du ticket en police normale.
   if (commande.canal === "livraison") {
-    if (commande.adresse) b.ligne(`Adresse : ${commande.adresse}`, { gras: false, taille: 1 });
-    if (commande.clientTelephone) b.ligne(`Tél : ${commande.clientTelephone}`, { gras: false, taille: 1 });
+    if (commande.adresse) b.ligne(`Adresse : ${commande.adresse}`, { gras: true, taille: 1 });
+    if (commande.clientTelephone) b.ligne(`Tél : ${commande.clientTelephone}`, { gras: true, taille: 1 });
     if (commande.qrCode) {
       b.brut(`<feed line="1"/>`);
       b.brut(styleTexte({ align: "center" }));
