@@ -21,7 +21,8 @@ import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, Modifie
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
-import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
+import { compterTamponsDisponibles, calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
+import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 
@@ -724,6 +725,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Pour l'impression immédiate côté navigateur (pas d'accès Supabase
+  // direct là-bas) : le trigger fidélité a déjà tourné au-dessus (insertion
+  // du paiement), ce compte reflète donc déjà cette commande.
+  const [soldeTicket, messageMoment] = await Promise.all([
+    clientTelephone ? calculerTamponsPourTicket(supabase, clientTelephone) : null,
+    chargerMessageDuMoment(),
+  ]);
+
   return NextResponse.json({
     ok: true,
     commandeId: commande.id,
@@ -732,6 +741,9 @@ export async function POST(request: Request) {
     coutMatiereTotal,
     coutIncomplet,
     qrCode,
+    tamponsAffiches: soldeTicket?.tampons ?? null,
+    recompenseDisponible: soldeTicket?.recompenseDisponible ?? false,
+    messageDuMoment: messageMoment.actif && messageMoment.texte ? messageMoment.texte : null,
   });
 }
 

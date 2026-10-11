@@ -14,10 +14,11 @@ import { PatronTabs } from "@/components/patron/patron-tabs";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { JoursFermetureApp } from "@/components/patron/jours-fermeture-app";
 import { RemiseLancementApp } from "@/components/patron/remise-lancement-app";
+import { MessageMomentApp } from "@/components/patron/message-moment-app";
 import { GroupeMetriquesApp } from "@/components/patron/groupe-metriques-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { calculerMetriquesGroupe } from "@/lib/patron/groupe-metriques";
-import { chargerEtatSite, chargerJoursFermeture, chargerRemiseLancement } from "@/lib/patron/parametres";
+import { chargerEtatSite, chargerJoursFermeture, chargerRemiseLancement, chargerMessageDuMoment } from "@/lib/patron/parametres";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
@@ -66,6 +67,7 @@ export default async function PatronPage() {
     livreursActifs,
     statistiquesJour,
     clients,
+    messageMoment,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -85,6 +87,7 @@ export default async function PatronPage() {
     listerLivreursActifs(),
     chargerStatistiquesJour(),
     listerClientsAdmin(),
+    chargerMessageDuMoment(),
   ]);
 
   return (
@@ -162,7 +165,12 @@ export default async function PatronPage() {
           {
             id: "imprimantes",
             label: "Imprimantes",
-            contenu: <ImprimantesApp imprimantesInitiales={imprimantes} />,
+            contenu: (
+              <>
+                <ImprimantesApp imprimantesInitiales={imprimantes} />
+                <MessageMomentApp texteInitial={messageMoment.texte} actifInitial={messageMoment.actif} />
+              </>
+            ),
           },
         ]}
       />

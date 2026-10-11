@@ -87,3 +87,33 @@ export async function definirRemiseLancement(debut: string | null, fin: string |
     throw new Error(`Impossible de mettre à jour la remise de lancement : ${error.message}`);
   }
 }
+
+/**
+ * Message du moment imprimé sur les reçus clients (pas le bon de cuisine) —
+ * un seul message actif à la fois, inactif ou vide = aucune ligne imprimée.
+ */
+export async function chargerMessageDuMoment(): Promise<{ texte: string | null; actif: boolean }> {
+  const supabase = createServiceSupabaseClient();
+  const { data, error } = await supabase
+    .from("parametres_livraison")
+    .select("message_moment, message_moment_actif")
+    .eq("id", true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Impossible de charger le message du moment : ${error?.message ?? "introuvable"}`);
+  }
+  return { texte: data.message_moment, actif: data.message_moment_actif };
+}
+
+export async function definirMessageDuMoment(texte: string | null, actif: boolean): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { error } = await supabase
+    .from("parametres_livraison")
+    .update({ message_moment: texte, message_moment_actif: actif })
+    .eq("id", true);
+
+  if (error) {
+    throw new Error(`Impossible de mettre à jour le message du moment : ${error.message}`);
+  }
+}

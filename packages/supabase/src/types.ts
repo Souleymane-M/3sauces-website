@@ -390,6 +390,8 @@ export interface Database {
           jours_fermeture: number[]; // 0 = dimanche ... 6 = samedi
           remise_lancement_debut: string | null; // "YYYY-MM-DD"
           remise_lancement_fin: string | null;
+          message_moment: string | null;
+          message_moment_actif: boolean;
           updated_at: string;
         };
         Insert: {
@@ -401,6 +403,8 @@ export interface Database {
           jours_fermeture?: number[];
           remise_lancement_debut?: string | null;
           remise_lancement_fin?: string | null;
+          message_moment?: string | null;
+          message_moment_actif?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["parametres_livraison"]["Insert"]>;
         Relationships: [];

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import type { LigneCommande } from "@/lib/caisse/types";
-import type { CommandePourImpression } from "@/lib/impression/types";
 import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
-import { marquerTicketImprime } from "@/lib/caisse/nouvelles-commandes";
+import { marquerTicketImprime, construireCommandesPourImpression } from "@/lib/caisse/nouvelles-commandes";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 
 const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, heure_souhaitee, created_at, nb_plats";
+  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats";
 
 /**
  * Pensé pour le relais d'impression (scripts/relais-impression/), qui
@@ -58,35 +56,7 @@ export async function GET() {
       throw new Error(`Impossible de charger les commandes à imprimer : ${error.message}`);
     }
 
-    const idsLivraison = (commandes ?? []).filter((c) => c.canal === "livraison").map((c) => c.id);
-    const qrCodeParCommandeId = new Map<string, string>();
-    if (idsLivraison.length > 0) {
-      const { data: livraisons, error: erreurLivraisons } = await supabase
-        .from("livraisons")
-        .select("commande_id, qr_code")
-        .in("commande_id", idsLivraison);
-      if (erreurLivraisons) {
-        throw new Error(`Impossible de charger les QR de livraison : ${erreurLivraisons.message}`);
-      }
-      for (const l of livraisons ?? []) {
-        qrCodeParCommandeId.set(l.commande_id, l.qr_code);
-      }
-    }
-
-    const commandesPourImpression: CommandePourImpression[] = (commandes ?? []).map((c) => ({
-      id: c.id,
-      numero: c.numero,
-      canal: c.canal,
-      lignes: (c.contenu as LigneCommande[]) ?? [],
-      montant: c.montant,
-      modePaiement: c.mode_paiement ?? "especes",
-      nom: c.nom_livraison ?? "",
-      adresse: c.adresse_livraison,
-      heureSouhaitee: c.heure_souhaitee,
-      creeLe: c.created_at,
-      qrCode: qrCodeParCommandeId.get(c.id) ?? null,
-      nbPlats: c.nb_plats,
-    }));
+    const commandesPourImpression = await construireCommandesPourImpression(supabase, commandes ?? []);
 
     const imprimantes = await listerImprimantesAdmin();
     const comptoir = imprimantes.find((i) => i.role === "comptoir");

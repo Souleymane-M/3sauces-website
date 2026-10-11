@@ -1270,9 +1270,11 @@ export function CaisseApp({
       // discret (cf. imprimerEtSignaler).
       const lignesPourImpression: LigneCommande[] = (
         enModeGroupe
-          ? plats.flatMap((plat) => plat.lignes.map((l) => ({ ligne: l, pourQui: plat.pourQui.trim() || null })))
-          : panierSimple.map((l) => ({ ligne: l, pourQui: null }))
-      ).map(({ ligne: l, pourQui }) => ({
+          ? plats.flatMap((plat, index) =>
+              plat.lignes.map((l) => ({ ligne: l, pourQui: plat.pourQui.trim() || null, platIndex: index }))
+            )
+          : panierSimple.map((l) => ({ ligne: l, pourQui: null, platIndex: null }))
+      ).map(({ ligne: l, pourQui, platIndex }) => ({
         produitId: l.produit.id,
         nom: l.produit.nom,
         categorie: l.produit.categorie,
@@ -1288,7 +1290,7 @@ export function CaisseApp({
         saladeIncluse: l.saladeIncluse,
         accompagnementsInclus: l.accompagnementsInclus,
         pourQui,
-        platIndex: null,
+        platIndex,
       }));
       imprimerEtSignaler({
         id: data.commandeId,
@@ -1303,6 +1305,10 @@ export function CaisseApp({
         creeLe: new Date().toISOString(),
         qrCode: canal === "livraison" ? (data.qrCode ?? null) : null,
         nbPlats: enModeGroupe ? nbPlatsValides : 0,
+        clientTelephone: telephoneComplet || null,
+        tamponsAffiches: data.tamponsAffiches ?? null,
+        recompenseDisponible: data.recompenseDisponible ?? false,
+        messageDuMoment: data.messageDuMoment ?? null,
       });
 
       setPanierSimple([]);

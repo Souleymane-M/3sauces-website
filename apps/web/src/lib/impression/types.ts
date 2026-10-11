@@ -22,6 +22,14 @@ export interface CommandePourImpression {
   creeLe: string;
   qrCode: string | null;
   nbPlats: number;
+  /** Téléphone du client, pour le bloc fidélité du reçu — null si non identifié. */
+  clientTelephone: string | null;
+  /** Nombre de tampons à afficher (0-10+), déjà résolu par l'appelant (jamais calculé dans epos-print.ts, qui reste pur) — null si client non identifié. */
+  tamponsAffiches: number | null;
+  /** Une récompense (10 tampons) est disponible et pas encore utilisée. */
+  recompenseDisponible: boolean;
+  /** Message du moment actif à imprimer sur le reçu client — null si inactif/vide. */
+  messageDuMoment: string | null;
 }
 
 export interface ConfigImprimante {

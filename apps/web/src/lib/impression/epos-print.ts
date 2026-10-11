@@ -2,6 +2,8 @@ import type { CommandePourImpression, ConfigImprimante, ResultatImpression } fro
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
+import type { LigneCommande } from "@/lib/caisse/types";
+import { TAGLINE_FIDELITE } from "@/lib/fidelite/regles";
 
 /**
  * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
@@ -31,7 +33,9 @@ function echapperXml(texte: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function styleTexte(opts: { align?: "left" | "center" | "right"; gras?: boolean; taille?: 1 | 2 | 3 } = {}): string {
+type StyleLigne = { align?: "left" | "center" | "right"; gras?: boolean; taille?: 1 | 2 | 3 };
+
+function styleTexte(opts: StyleLigne = {}): string {
   const attrs: string[] = [];
   if (opts.align) attrs.push(`align="${opts.align}"`);
   if (opts.gras !== undefined) attrs.push(`em="${opts.gras}"`);
@@ -39,9 +43,81 @@ function styleTexte(opts: { align?: "left" | "center" | "right"; gras?: boolean;
   return attrs.length > 0 ? `<text ${attrs.join(" ")}/>` : "";
 }
 
-/** Une ligne de texte imprimée, avec un style optionnel appliqué juste avant. */
-function ligne(texte: string, style?: Parameters<typeof styleTexte>[0]): string {
-  return `${styleTexte(style ?? {})}<text>${echapperXml(texte)}\n</text>`;
+/**
+ * Colonnes disponibles par taille de police (Epson TM-m30III, Font A,
+ * papier 80mm) — la largeur double/triple divise le nombre de caractères
+ * par ligne d'autant, c'est ce décalage non pris en compte qui coupait des
+ * mots en plein milieu ("S / ur place") avant ce correctif.
+ */
+const COLONNES: Record<1 | 2 | 3, number> = { 1: 42, 2: 21, 3: 14 };
+
+/** Découpe un texte en sous-lignes sans jamais couper un mot — repli caractère par caractère uniquement si un seul mot dépasse la largeur. */
+function decouperEnLignes(texte: string, colonnes: number): string[] {
+  const mots = texte.split(" ");
+  const lignes: string[] = [];
+  let courante = "";
+
+  for (const mot of mots) {
+    if (mot.length > colonnes) {
+      if (courante) {
+        lignes.push(courante);
+        courante = "";
+      }
+      let reste = mot;
+      while (reste.length > colonnes) {
+        lignes.push(reste.slice(0, colonnes));
+        reste = reste.slice(colonnes);
+      }
+      courante = reste;
+      continue;
+    }
+    const essai = courante ? `${courante} ${mot}` : mot;
+    if (essai.length > colonnes) {
+      lignes.push(courante);
+      courante = mot;
+    } else {
+      courante = essai;
+    }
+  }
+  if (courante) lignes.push(courante);
+  return lignes.length > 0 ? lignes : [""];
+}
+
+/**
+ * Accumulateur de XML qui garde la trace de la taille de police en cours
+ * (le protocole ePOS-Print est stateful : un `<text .../>` de style reste
+ * actif tant qu'il n'est pas remplacé) pour savoir sur combien de colonnes
+ * découper chaque ligne, même quand un appel ne repasse pas de style.
+ */
+function creerConstructeurTicket() {
+  let xml = "";
+  let tailleCourante: 1 | 2 | 3 = 1;
+
+  function brut(fragment: string) {
+    xml += fragment;
+  }
+
+  function ligne(texte: string, style?: StyleLigne, indent = "") {
+    if (style) {
+      xml += styleTexte(style);
+      if (style.taille !== undefined) tailleCourante = style.taille;
+    }
+    const colonnes = Math.max(1, COLONNES[tailleCourante] - indent.length);
+    for (const sousLigne of decouperEnLignes(texte, colonnes)) {
+      xml += `<text>${echapperXml(indent + sousLigne)}\n</text>`;
+    }
+  }
+
+  return { ligne, brut, xml: () => xml };
+}
+
+type ConstructeurTicket = ReturnType<typeof creerConstructeurTicket>;
+
+const SEPARATEUR = "-".repeat(32);
+
+/** Remet systématiquement le style à gauche/normal avant un séparateur, pour ne jamais hériter d'un gros titre précédent. */
+function separateur(b: ConstructeurTicket): void {
+  b.ligne(SEPARATEUR, { align: "left", gras: false, taille: 1 });
 }
 
 function libelleCanal(canal: CommandePourImpression["canal"]): string {
@@ -127,6 +203,105 @@ function estPrioritaire(commande: CommandePourImpression): boolean {
   return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
 }
 
+/** Clé d'égalité pour fusionner deux lignes identiques sur le bon de cuisine — jamais à travers deux plats/convives différents d'une commande groupée. */
+function cleLigne(l: LigneCommande): string {
+  return JSON.stringify([
+    l.nom,
+    [...l.viandes].sort(),
+    [...(l.sauces ?? [])].sort(),
+    [...(l.saveurs ?? [])].sort(),
+    l.boissonIncluse ?? null,
+    l.sansBoisson ?? false,
+    [...(l.accompagnementsInclus ?? [])].sort(),
+    l.pourQui ?? null,
+    l.platIndex,
+  ]);
+}
+
+/** "3x Kebab" au lieu de 3 lignes identiques — bon de cuisine uniquement (le reçu client garde une ligne par article, avec son prix). */
+function fusionnerLignesIdentiques(lignes: LigneCommande[]): LigneCommande[] {
+  const parCle = new Map<string, LigneCommande>();
+  for (const l of lignes) {
+    const cle = cleLigne(l);
+    const existante = parCle.get(cle);
+    if (existante) {
+      existante.quantite += l.quantite;
+    } else {
+      parCle.set(cle, { ...l });
+    }
+  }
+  return [...parCle.values()];
+}
+
+function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+  for (const groupe of regrouperLignesParCategorie(fusionnerLignesIdentiques(lignes))) {
+    b.ligne(groupe.titre, { gras: true, taille: 1 });
+    for (const l of groupe.lignes) {
+      b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
+      for (const detail of detailLigne(l)) {
+        b.ligne(detail, { gras: false, taille: 1 }, "  ");
+      }
+    }
+  }
+}
+
+/** Commande groupée (au moins une ligne avec `platIndex`) : un bloc "PLAT N" par convive plutôt qu'un classement par catégorie. */
+function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  const estGroupee = commande.lignes.some((l) => l.platIndex !== null);
+  if (!estGroupee) {
+    imprimerGroupeCategorieCuisine(b, commande.lignes);
+    return;
+  }
+
+  const indices = [...new Set(commande.lignes.map((l) => l.platIndex).filter((i): i is number => i !== null))].sort((a, bb) => a - bb);
+  for (const indexPlat of indices) {
+    const lignesPlat = commande.lignes.filter((l) => l.platIndex === indexPlat);
+    const pourQui = lignesPlat.find((l) => l.pourQui)?.pourQui;
+    b.ligne(`PLAT ${indexPlat + 1}${pourQui ? ` — ${pourQui}` : ""}`, { align: "left", gras: true, taille: 2 });
+    imprimerGroupeCategorieCuisine(b, lignesPlat);
+  }
+  separateur(b);
+  b.ligne(`${commande.nbPlats} plat${commande.nbPlats > 1 ? "s" : ""}`, { align: "center", gras: true, taille: 1 });
+}
+
+function rendreTampons(n: number): string {
+  const pleins = Math.min(n, 10);
+  const points = "●".repeat(pleins) + "○".repeat(10 - pleins);
+  return n > 10 ? `${points} (+${n - 10})` : points;
+}
+
+const URL_SITE = "https://3sauces.fr";
+
+function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  separateur(b);
+  b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 1 });
+  b.ligne("10€ dépensés = 1 tampon · 10 tampons = 10€ offerts", { align: "center", gras: false, taille: 1 });
+
+  if (commande.clientTelephone && commande.tamponsAffiches !== null) {
+    b.ligne(rendreTampons(commande.tamponsAffiches), { align: "center", gras: true, taille: 2 });
+    if (commande.recompenseDisponible) {
+      b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
+    }
+  } else {
+    b.ligne(TAGLINE_FIDELITE, { align: "center", gras: false, taille: 1 });
+    b.ligne("Suivez vos tampons sur 3sauces.fr/fidelite", { align: "center", gras: false, taille: 1 });
+  }
+}
+
+/** Max 4 lignes : message du moment (si actif), QR vers le site (jamais en livraison, pour ne pas le confondre avec le QR livreur), Instagram. */
+function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  separateur(b);
+  if (commande.messageDuMoment) {
+    b.ligne(commande.messageDuMoment, { align: "center", gras: false, taille: 1 });
+  }
+  if (commande.canal !== "livraison") {
+    b.brut(`<feed line="1"/>`);
+    b.brut(styleTexte({ align: "center" }));
+    b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(URL_SITE)}</symbol>`);
+  }
+  b.ligne("Instagram : @3sauces.mayotte", { align: "center", gras: false, taille: 1 });
+}
+
 function enveloppeEposPrint(contenu: string): string {
   return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">${contenu}</epos-print></s:Body></s:Envelope>`;
 }
@@ -135,104 +310,99 @@ export function construireTicketClientXml(
   commande: CommandePourImpression,
   logo: { base64: string; largeur: number; hauteur: number } | null
 ): string {
-  let xml = "";
+  const b = creerConstructeurTicket();
 
   if (logo) {
-    xml += `<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`;
+    b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
   }
 
-  xml += ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
-  xml += ligne(`Commande ${formaterNumeroTicket(commande.numero)}`, { align: "center", gras: true });
+  b.ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
+  b.ligne(formaterNumeroTicket(commande.numero), { align: "center", gras: true, taille: 2 });
+  b.ligne(formaterDateHeure(commande.creeLe), { align: "center", gras: false, taille: 1 });
 
   if (commande.modePaiement === "stripe") {
-    xml += ligne("*** DEJA PAYEE EN LIGNE ***", { align: "center", gras: true, taille: 2 });
-    xml += ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
+    b.ligne("*** DEJA PAYEE EN LIGNE ***", { align: "center", gras: true, taille: 2 });
+    b.ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
   }
 
-  xml += styleTexte({ align: "left", gras: false, taille: 1 });
-  xml += ligne(formaterDateHeure(commande.creeLe));
-  xml += ligne(`Client : ${commande.nom}`);
-  xml += ligne("--------------------------------");
+  b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  separateur(b);
 
   for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
-    xml += ligne(groupe.titre, { gras: true });
+    b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
-      xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, { gras: true });
+      const prixLigne = l.quantite * l.prixUnitaire;
+      b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)} - ${prixLigne.toFixed(2)} €`, {
+        gras: true,
+        taille: 1,
+      });
       for (const detail of detailLigne(l)) {
-        xml += ligne(`  ${detail}`);
+        b.ligne(detail, { gras: false, taille: 1 }, "  ");
       }
     }
   }
 
-  xml += ligne("--------------------------------");
-  xml += ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
-  xml += ligne(`Mode de récupération : ${libelleCanal(commande.canal)}`);
+  separateur(b);
+  b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
+  b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.modePaiement === "stripe", taille: 1 });
+  if (commande.modePaiement === "stripe") {
+    b.ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
+  }
 
-  const commandeAvance = commande.heureSouhaitee ? !estAujourdhuiMayotte(commande.heureSouhaitee) : false;
+  const heureLabel = commande.heureSouhaitee ? libelleHeureSouhaitee(commande.heureSouhaitee) : null;
+  b.ligne(`${libelleCanal(commande.canal).toUpperCase()}${heureLabel ? ` · ${heureLabel}` : ""}`, {
+    align: "left",
+    gras: false,
+    taille: 1,
+  });
 
   if (commande.canal === "livraison") {
-    if (commande.adresse) xml += ligne(`Adresse : ${commande.adresse}`);
-  }
-  // Une commande à l'avance garde une trace écrite du jour de retrait sur le
-  // ticket, quel que soit le canal — pas seulement en livraison.
-  if (commande.heureSouhaitee && (commande.canal === "livraison" || commandeAvance)) {
-    xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`);
-  }
-
-  xml += ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.modePaiement === "stripe" });
-  if (commande.modePaiement === "stripe") {
-    xml += ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
+    if (commande.adresse) b.ligne(`Adresse : ${commande.adresse}`, { gras: false, taille: 1 });
+    if (commande.clientTelephone) b.ligne(`Tél : ${commande.clientTelephone}`, { gras: false, taille: 1 });
+    if (commande.qrCode) {
+      b.brut(`<feed line="1"/>`);
+      b.brut(styleTexte({ align: "center" }));
+      b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`);
+    }
   }
 
-  if (commande.canal === "livraison" && commande.qrCode) {
-    xml += `<feed line="1"/>`;
-    xml += styleTexte({ align: "center" });
-    xml += `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`;
-  }
+  imprimerBlocFidelite(b, commande);
+  imprimerBlocCommunication(b, commande);
 
-  xml += `<feed line="1"/>`;
-  xml += ligne("--------------------------------");
-  xml += ligne("Fidelite : chaque euro compte !", { align: "center", gras: true });
-  xml += ligne("Suivez vos tampons sur 3sauces.fr/fidelite", { align: "center" });
-  xml += ligne("--------------------------------");
-  xml += ligne(MENTION_LEGALE, { align: "center" });
+  separateur(b);
+  b.ligne(MENTION_LEGALE, { align: "center", gras: false, taille: 1 });
 
-  xml += `<feed line="2"/><cut type="feed"/>`;
-  return enveloppeEposPrint(xml);
+  b.brut(`<feed line="2"/><cut type="feed"/>`);
+  return enveloppeEposPrint(b.xml());
 }
 
 export function construireBonCuisineXml(commande: CommandePourImpression): string {
-  let xml = "";
+  const b = creerConstructeurTicket();
 
   if (estPrioritaire(commande)) {
-    xml += ligne("*** PRIORITAIRE ***", { align: "center", gras: true, taille: 2 });
+    b.ligne("★ PRIORITAIRE ★", { align: "center", gras: true, taille: 2 });
   }
-  xml += ligne(`Commande #${commande.numero}`, { align: "center", gras: true, taille: 2 });
+
+  b.ligne(`${formaterNumeroTicket(commande.numero)} - ${libelleCanal(commande.canal).toUpperCase()}`, {
+    align: "center",
+    gras: true,
+    taille: 2,
+  });
+
   if (commande.modePaiement === "stripe") {
-    xml += ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true });
+    b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
   }
   if (commande.heureSouhaitee) {
-    xml += ligne(`Heure souhaitée : ${libelleHeureSouhaitee(commande.heureSouhaitee)}`, { align: "center", gras: true });
-  }
-  xml += ligne(libelleCanal(commande.canal), { align: "center" });
-  xml += styleTexte({ align: "left", gras: false, taille: 1 });
-  xml += ligne("--------------------------------");
-
-  for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
-    xml += ligne(groupe.titre, { gras: true, taille: 1 });
-    for (const l of groupe.lignes) {
-      xml += ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)}`, {
-        gras: true,
-        taille: 2,
-      });
-      for (const detail of detailLigne(l)) {
-        xml += ligne(`  ${detail}`, { taille: 1 });
-      }
-    }
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: false, taille: 1 });
   }
 
-  xml += `<feed line="2"/><cut type="feed"/>`;
-  return enveloppeEposPrint(xml);
+  b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
+  separateur(b);
+
+  imprimerArticlesCuisine(b, commande);
+
+  b.brut(`<feed line="2"/><cut type="feed"/>`);
+  return enveloppeEposPrint(b.xml());
 }
 
 /**
