@@ -4,6 +4,7 @@ import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { TAGLINE_FIDELITE } from "@/lib/fidelite/regles";
+import { formaterTelephoneAffichage } from "@/lib/telephone";
 
 /**
  * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
@@ -382,7 +383,9 @@ export function construireTicketClientXml(
   // du livreur, pas se fondre dans le reste du ticket en police normale.
   if (commande.canal === "livraison") {
     if (commande.adresse) b.ligne(`Adresse : ${commande.adresse}`, { gras: true, taille: 1 });
-    if (commande.clientTelephone) b.ligne(`Tél : ${commande.clientTelephone}`, { gras: true, taille: 1 });
+    if (commande.clientTelephone) {
+      b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { gras: true, taille: 1 });
+    }
     if (commande.qrCode) {
       b.brut(`<feed line="1"/>`);
       b.brut(styleTexte({ align: "center" }));
@@ -422,7 +425,7 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
 
   b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
   if (commande.canal === "livraison" && commande.clientTelephone) {
-    b.ligne(`Tél : ${commande.clientTelephone}`, { align: "center", gras: true, taille: 1 });
+    b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
   }
   separateur(b);
 

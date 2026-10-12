@@ -58,3 +58,17 @@ export function normaliserTelephone(saisie: string): string | null {
   return null;
 }
 
+/**
+ * Format court pour l'affichage (tickets imprimés, notamment) : "+262639123456"
+ * → "0639123456" — l'indicatif reste nécessaire en base (identifiant unique
+ * du client pour la fidélité, numéro réellement composable), mais prend de
+ * la place inutilement sur un ticket déjà étroit, où seul le numéro local
+ * compte pour rappeler le client. +262 (Mayotte/Réunion) et +33 (métropole)
+ * redeviennent un 0 local ; tout autre indicatif (rare) reste affiché tel
+ * quel, faute de convention locale à 0 fiable pour le reconstituer.
+ */
+export function formaterTelephoneAffichage(telephone: string): string {
+  const local = /^\+(262|33)(\d{9})$/.exec(telephone);
+  return local ? `0${local[2]}` : telephone;
+}
+
