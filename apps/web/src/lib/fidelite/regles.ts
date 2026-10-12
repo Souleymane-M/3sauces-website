@@ -43,61 +43,14 @@ export function progressionTampons(montantCumule: number, tamponsDisponibles: nu
   return Math.floor(montantCumule / MONTANT_RECOMPENSE) + tamponsDisponibles * (SEUIL_TAMPON / MONTANT_RECOMPENSE);
 }
 
-export interface ProgressionFidelite {
-  /** Nombre de nouvelles récompenses (groupes de 10 tampons) que cette commande fait gagner. */
-  tamponsGagnes: number;
-  /** Montant restant à ajouter pour débloquer la prochaine récompense. */
-  montantProchainTampon: number;
-}
+/** Nombre de tampons qui forment une récompense — toujours "10 tampons", jamais un montant en €, dans toute accroche visible par un client (demande explicite du patron, 2026-10-12 : "100€"/"cumulés" freinent, l'unité visible est le tampon). */
+export const NB_TAMPONS_RECOMPENSE = SEUIL_TAMPON / MONTANT_RECOMPENSE;
 
-/**
- * Calcule ce qu'une commande apporte en NOUVELLES récompenses — à partir du
- * reliquat juste avant cette commande (0 si inconnu, ex: client non
- * identifié sur le site public) et du nombre de récompenses utilisées sur
- * cette même commande. Une récompense se forme tous les SEUIL_TAMPON (100€)
- * cumulés.
- *
- * Seul le montant réellement payé en plus des récompenses utilisées compte :
- * une commande de 20€ qui utilise 1 récompense (10€) ne doit faire gagner
- * de nouvelle récompense que sur ces 10€ net, jamais sur les 20€ bruts —
- * sinon utiliser une récompense permettrait d'en regagner une quasi
- * gratuitement.
- */
-export function progressionFideliteCommande(
-  totalCommande: number,
-  reliquatAvant: number = 0,
-  tamponsUtilises: number = 0
-): ProgressionFidelite {
-  const net = Math.max(0, totalCommande - tamponsUtilises * MONTANT_RECOMPENSE);
-  const totalApres = reliquatAvant + net;
-  const tamponsGagnes = Math.floor(totalApres / SEUIL_TAMPON);
-  const reste = totalApres % SEUIL_TAMPON;
-  return {
-    tamponsGagnes,
-    montantProchainTampon: reste === 0 ? SEUIL_TAMPON : SEUIL_TAMPON - reste,
-  };
-}
-
-/** Sous ce montant restant, le message "encore X€" devient utile ; au-delà, il n'est qu'une distraction trop loin du but. */
+/** Sous ce montant restant avant la prochaine récompense, l'accroche "vous débloquez 10€ offerts" devient utile ; au-delà, "plus que X€ pour votre prochain tampon" suffit. */
 export const SEUIL_AFFICHAGE_PROGRESSION = 30;
 
-/**
- * Texte prêt à afficher juste à côté du total (site public et caisse) —
- * jamais le même message vague partout. `null` quand il reste plus de
- * `SEUIL_AFFICHAGE_PROGRESSION` à parcourir et qu'aucune récompense n'est
- * gagnée sur cette commande : annoncer "encore 76,50€" à quelqu'un qui vient
- * de commander pour 10€ n'incite à rien, ça n'affiche qu'à partir du moment
- * où la récompense devient concrètement proche.
- */
-export function texteProgressionFidelite({ tamponsGagnes, montantProchainTampon }: ProgressionFidelite): string | null {
-  if (tamponsGagnes > 0) {
-    return `🎁 Cette commande vous rapporte ${tamponsGagnes * (SEUIL_TAMPON / MONTANT_RECOMPENSE)} tampons ! Encore ${formaterEuros(montantProchainTampon)} pour la récompense suivante.`;
-  }
-  if (montantProchainTampon > SEUIL_AFFICHAGE_PROGRESSION) {
-    return null;
-  }
-  return `🎁 Encore ${formaterEuros(montantProchainTampon)} pour votre prochaine récompense fidélité.`;
-}
+export const MESSAGE_GENERIQUE_FIDELITE = `🎁 ${formaterEuros(MONTANT_RECOMPENSE)} dépensés = 1 tampon. ${NB_TAMPONS_RECOMPENSE} tampons = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
+const MESSAGE_RECOMPENSE_DISPONIBLE = `🎉 ${formaterEuros(MONTANT_RECOMPENSE)} offerts à utiliser dès votre prochaine commande !`;
 
 export interface SoldeTampons {
   /** Nombre de récompenses disponibles (groupes de 10 tampons / 10€), pas le nombre de tampons. */
@@ -106,14 +59,76 @@ export interface SoldeTampons {
   prochaineExpiration: string | null;
 }
 
-/** Message prêt à afficher pour le solde de récompenses disponibles d'un client (site public, caisse, email) — utilisable immédiatement comme réduction. */
-export function messageFidelite({ nombre, prochaineExpiration }: SoldeTampons): string {
-  if (nombre > 0) {
-    const montant = formaterEuros(nombre * MONTANT_RECOMPENSE);
-    const expiration = prochaineExpiration
-      ? ` Le plus proche expire le ${new Date(prochaineExpiration).toLocaleDateString("fr-FR")}.`
-      : "";
-    return `Vous avez ${montant} de récompense disponible${nombre > 1 ? "s" : ""} à utiliser sur votre prochaine commande !${expiration}`;
+/**
+ * Message de solde hors contexte d'une commande en cours (page "Voir mon
+ * solde fidélité", fiche client /patron, email générique) : jamais de
+ * mention de "100€"/"cumulés", uniquement le tampon comme unité, et un
+ * message de progression ("plus que X€") toujours affiché plutôt qu'un
+ * silence quand aucune récompense n'est encore débloquée.
+ */
+export function messageSoldeFidelite(reliquat: number, solde: SoldeTampons): string {
+  if (solde.nombre > 0) return MESSAGE_RECOMPENSE_DISPONIBLE;
+  const resteRecompense = SEUIL_TAMPON - reliquat;
+  if (resteRecompense <= SEUIL_AFFICHAGE_PROGRESSION) {
+    return `🎁 Plus que ${formaterEuros(resteRecompense)} et vous débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts !`;
   }
-  return `Continuez à commander chez 3 Sauces et débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts tous les ${formaterEuros(SEUIL_TAMPON)} cumulés !`;
+  const resteTampon = MONTANT_RECOMPENSE - (reliquat % MONTANT_RECOMPENSE);
+  return `🎁 Plus que ${formaterEuros(resteTampon)} pour votre prochain tampon.`;
+}
+
+export interface ProgressionCommande {
+  /** Tampons (10€ chacun) que cette commande fait gagner — jamais confondu avec une récompense (groupe de 10). */
+  tamponsGagnes: number;
+  /** Une récompense reste disponible (ou vient d'être débloquée) une fois cette commande prise en compte. */
+  recompenseDisponibleApres: boolean;
+  resteProchaineRecompense: number;
+  resteProchainTampon: number;
+}
+
+/**
+ * Calcule ce qu'une commande apporte en tampons — à partir du reliquat et
+ * du nombre de récompenses déjà disponibles juste avant cette commande (0
+ * si inconnu, ex: client non identifié sur le site public) et du nombre de
+ * récompenses utilisées sur cette même commande.
+ *
+ * Seul le montant réellement payé en plus des récompenses utilisées compte :
+ * une commande de 20€ qui utilise 1 récompense (10€) ne doit faire gagner
+ * de nouveaux tampons que sur ces 10€ net, jamais sur les 20€ bruts —
+ * sinon utiliser une récompense permettrait d'en regagner une quasi
+ * gratuitement.
+ */
+export function calculerProgressionCommande(
+  totalCommande: number,
+  reliquatAvant: number = 0,
+  tamponsDisponiblesAvant: number = 0,
+  tamponsUtilises: number = 0
+): ProgressionCommande {
+  const net = Math.max(0, totalCommande - tamponsUtilises * MONTANT_RECOMPENSE);
+  const totalApres = reliquatAvant + net;
+  const reliquatApres = totalApres % SEUIL_TAMPON;
+  const recompensesGagnees = Math.floor(totalApres / SEUIL_TAMPON);
+  return {
+    tamponsGagnes: Math.floor(totalApres / MONTANT_RECOMPENSE) - Math.floor(reliquatAvant / MONTANT_RECOMPENSE),
+    recompenseDisponibleApres: tamponsDisponiblesAvant - tamponsUtilises + recompensesGagnees > 0,
+    resteProchaineRecompense: SEUIL_TAMPON - reliquatApres,
+    resteProchainTampon: MONTANT_RECOMPENSE - (reliquatApres % MONTANT_RECOMPENSE),
+  };
+}
+
+/**
+ * Texte prêt à afficher juste à côté du total (site public et caisse) ou
+ * dans l'email de confirmation — toujours un message, jamais `null` : même
+ * loin de toute récompense, "plus que X€ pour votre prochain tampon" reste
+ * informatif (contrairement à l'ancien comportement qui n'affichait rien
+ * tant qu'on n'approchait pas d'une récompense complète).
+ */
+export function texteProgressionCommande(p: ProgressionCommande): string {
+  if (p.recompenseDisponibleApres) return MESSAGE_RECOMPENSE_DISPONIBLE;
+  if (p.tamponsGagnes > 0) {
+    return `🎁 +${p.tamponsGagnes} tampon${p.tamponsGagnes > 1 ? "s" : ""} avec cette commande ! ${NB_TAMPONS_RECOMPENSE} tampons = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
+  }
+  if (p.resteProchaineRecompense <= SEUIL_AFFICHAGE_PROGRESSION) {
+    return `🎁 Plus que ${formaterEuros(p.resteProchaineRecompense)} et vous débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts !`;
+  }
+  return `🎁 Plus que ${formaterEuros(p.resteProchainTampon)} pour votre prochain tampon.`;
 }

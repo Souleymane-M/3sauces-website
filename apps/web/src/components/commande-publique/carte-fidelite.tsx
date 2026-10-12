@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
-import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, MESSAGE_GENERIQUE_FIDELITE, messageSoldeFidelite } from "@/lib/fidelite/regles";
 
 const CLE_LOCALSTORAGE = "3sauces_fidelite_identite";
 
 interface SoldeTampons {
   nombre: number;
   prochaineExpiration: string | null;
+  montantCumule: number;
 }
 
 interface IdentiteStockee {
@@ -101,7 +102,7 @@ export function CarteFidelite({
         if (annule || !reponse.ok) return;
         const data = await reponse.json();
         if (annule) return;
-        setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration });
+        setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
         setTelephoneSaisi(telephone);
         setEmailSaisi(email);
         onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
@@ -143,7 +144,7 @@ export function CarteFidelite({
         onSoldeVerifie(false);
         return;
       }
-      setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration });
+      setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
       try {
         localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
       } catch {
@@ -167,7 +168,7 @@ export function CarteFidelite({
   if (etape === "repliee") {
     return (
       <div className="rounded-lg p-4 text-white" style={{ backgroundColor: "#2D5A27" }}>
-        <p className="font-bold">🎁 {SEUIL_TAMPON}€ cumulés = {MONTANT_RECOMPENSE}€ offerts.</p>
+        <p className="font-bold">{MESSAGE_GENERIQUE_FIDELITE}</p>
         <button
           type="button"
           onClick={() => setEtape("saisie")}
@@ -215,7 +216,7 @@ export function CarteFidelite({
       {etape === "verifie" && solde && (
         <div className="space-y-2">
           <p className="text-sm font-semibold text-gray-900">
-            {messageFidelite({ nombre: solde.nombre, prochaineExpiration: solde.prochaineExpiration })}
+            {messageSoldeFidelite(solde.montantCumule, { nombre: solde.nombre, prochaineExpiration: solde.prochaineExpiration })}
           </p>
           {solde.nombre > 0 && (
             <div className="rounded border border-[#2D5A27] bg-white p-2">

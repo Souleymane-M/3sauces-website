@@ -42,7 +42,7 @@ import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
-import { MONTANT_RECOMPENSE, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -1436,11 +1436,13 @@ export function CommandePubliqueApp({
                     </div>
                   )
                 )}
-                {total > 0 &&
-                  (() => {
-                    const texte = texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif));
-                    return texte && <p className="mt-1 text-xs font-semibold text-gray-500">{texte}</p>;
-                  })()}
+                {total > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-gray-500">
+                    {texteProgressionCommande(
+                      calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                    )}
+                  </p>
+                )}
               </div>
 
               <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">

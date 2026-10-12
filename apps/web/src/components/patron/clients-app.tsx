@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ClientAdmin, CommandeClientAdmin } from "@/lib/patron/clients";
-import { MONTANT_RECOMPENSE, SEUIL_TAMPON, formaterEuros, messageFidelite, progressionTampons } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageSoldeFidelite, progressionTampons } from "@/lib/fidelite/regles";
 import { normaliserEmail } from "@/lib/email";
 
 interface ClientsAppProps {
@@ -207,9 +207,10 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                     <p className="text-xs text-gray-500">{c.email ?? "Pas d'email enregistré"}</p>
 
                     <p className={`text-xs ${c.tamponsDisponibles > 0 ? "font-bold text-[#2D5A27]" : "text-gray-400"}`}>
-                      {c.tamponsDisponibles > 0
-                        ? messageFidelite({ nombre: c.tamponsDisponibles, prochaineExpiration: c.prochaineExpiration })
-                        : `Encore ${formaterEuros(SEUIL_TAMPON - c.montantCumule)} pour débloquer ${MONTANT_RECOMPENSE}€ offerts.`}
+                      {messageSoldeFidelite(c.montantCumule, {
+                        nombre: c.tamponsDisponibles,
+                        prochaineExpiration: c.prochaineExpiration,
+                      })}
                     </p>
 
                     <div className="space-y-2 rounded border border-gray-200 bg-gray-50 p-2">

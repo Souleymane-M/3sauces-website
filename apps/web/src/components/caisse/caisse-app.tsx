@@ -31,7 +31,13 @@ import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/
 import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
-import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
+import {
+  MONTANT_RECOMPENSE,
+  MESSAGE_GENERIQUE_FIDELITE,
+  messageSoldeFidelite,
+  calculerProgressionCommande,
+  texteProgressionCommande,
+} from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -134,6 +140,7 @@ interface ClientInfo {
   email?: string | null;
   tamponsDisponibles?: number;
   prochaineExpiration?: string | null;
+  montantCumule?: number;
 }
 
 function platVide(numero: number): PlatGroupeCaisse {
@@ -1828,7 +1835,7 @@ export function CaisseApp({
                   {clientInfo.existe ? (
                     <>
                       <p className="font-semibold">
-                        {messageFidelite({
+                        {messageSoldeFidelite(clientInfo.montantCumule ?? 0, {
                           nombre: clientInfo.tamponsDisponibles ?? 0,
                           prochaineExpiration: clientInfo.prochaineExpiration ?? null,
                         })}
@@ -1868,11 +1875,7 @@ export function CaisseApp({
                   )}
                 </div>
               )}
-              {!clientInfo && (
-                <p className="mt-2 text-xs text-gray-500">
-                  🎁 {SEUIL_TAMPON}€ cumulés = {MONTANT_RECOMPENSE}€ offerts, valables 3 mois.
-                </p>
-              )}
+              {!clientInfo && <p className="mt-2 text-xs text-gray-500">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}
             </div>
 
             <div>
@@ -2091,11 +2094,13 @@ export function CaisseApp({
                 </p>
               )}
               Total : {totalApresRemises.toFixed(2)} €
-              {total > 0 &&
-                (() => {
-                  const texte = texteProgressionFidelite(progressionFideliteCommande(total, 0, nbTamponsEffectif));
-                  return texte && <p className="mt-1 text-xs font-semibold text-gray-500">{texte}</p>;
-                })()}
+              {total > 0 && (
+                <p className="mt-1 text-xs font-semibold text-gray-500">
+                  {texteProgressionCommande(
+                    calculerProgressionCommande(total, 0, clientInfo?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                  )}
+                </p>
+              )}
             </div>
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}

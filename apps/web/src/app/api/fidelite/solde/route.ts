@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
+  const { data, error } = await supabase.from("clients").select("email, montant_cumule").eq("telephone", telephone).maybeSingle();
 
   if (error) {
     console.error("[/api/fidelite/solde] échec lecture client :", error.message);
@@ -49,5 +49,6 @@ export async function POST(request: Request) {
     telephone,
     tamponsDisponibles: tampons.nombre,
     prochaineExpiration: tampons.prochaineExpiration,
+    montantCumule: data.montant_cumule,
   });
 }
