@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
 import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
-import { marquerTicketImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
+import { marquerTicketImprime, marquerTicketRemis, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 
 /**
@@ -29,6 +29,11 @@ export async function GET() {
 
   try {
     const commandesPourImpression = await listerCommandesDuJourAImprimer();
+    // Marqué "remis" dès cet envoi (même garde-fou que la route Epson Server
+    // Direct Print) : si le relais local et l'imprimante elle-même tournent
+    // en parallèle pendant la transition, aucun des deux ne ré-imprime ce
+    // que l'autre a déjà pris en charge dans les 2 dernières minutes.
+    await Promise.all(commandesPourImpression.map((c) => marquerTicketRemis(c.id)));
 
     const imprimantes = await listerImprimantesAdmin();
     const comptoir = imprimantes.find((i) => i.role === "comptoir");

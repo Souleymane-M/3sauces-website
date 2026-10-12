@@ -196,6 +196,9 @@ export async function listerCommandesAImprimerDifferees(heureDebut: string): Pro
   return construireCommandesPourImpression(supabase, commandes);
 }
 
+/** Au-delà de ce délai sans confirmation de l'imprimante, un ticket "remis" est reproposé — une imprimante qui ne répond jamais ne doit pas faire perdre une commande pour de bon. */
+const DELAI_RECONFIRMATION_MS = 2 * 60 * 1000;
+
 /**
  * Toutes les commandes publiques payées, pas encore imprimées, dont
  * l'heure souhaitée tombe aujourd'hui (commande du jour même ou commande
@@ -203,16 +206,23 @@ export async function listerCommandesAImprimerDifferees(heureDebut: string): Pro
  * d'impression local ET de la route Epson "Server Direct Print"
  * (`app/api/print/epson/[token]`), partagée pour ne jamais avoir deux
  * définitions de "qu'est-ce qui reste à imprimer" qui divergent.
+ *
+ * `ticket_remis_le` filtre les tickets déjà envoyés à l'imprimante il y a
+ * moins de `DELAI_RECONFIRMATION_MS` : sans ça, un échec silencieux de
+ * l'imprimante (bourrage, imprimante occupée — vécu le 2026-10-12,
+ * commande #303) ne serait jamais réessayé.
  */
 export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpression[]> {
   const supabase = createServiceSupabaseClient();
   const { debut, fin } = plageJourMayotteUtc(dateMayotteIso());
+  const limiteReconfirmation = new Date(Date.now() - DELAI_RECONFIRMATION_MS).toISOString();
 
   const { data: commandes, error } = await supabase
     .from("commandes")
     .select(SELECT_POUR_IMPRESSION)
     .is("commande_par", null)
     .is("ticket_imprime_le", null)
+    .or(`ticket_remis_le.is.null,ticket_remis_le.lt.${limiteReconfirmation}`)
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
     .gte("heure_souhaitee", debut.toISOString())
     .lt("heure_souhaitee", fin.toISOString())
@@ -227,6 +237,19 @@ export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpr
   }
 
   return construireCommandesPourImpression(supabase, commandes);
+}
+
+/** Ticket envoyé à l'imprimante, en attente de confirmation (cf. `listerCommandesDuJourAImprimer`). */
+export async function marquerTicketRemis(commandeId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { error } = await supabase
+    .from("commandes")
+    .update({ ticket_remis_le: new Date().toISOString() })
+    .eq("id", commandeId);
+
+  if (error) {
+    throw new Error(`Impossible de marquer le ticket comme remis : ${error.message}`);
+  }
 }
 
 export async function marquerTicketImprime(commandeId: string): Promise<void> {

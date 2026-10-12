@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
-import { marquerTicketImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
+import { analyserResultats } from "@/lib/impression/epos-response";
+import { marquerTicketImprime, marquerTicketRemis, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
 
 /**
@@ -52,9 +53,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     const formulaire = new URLSearchParams(corps);
     const typeConnexion = formulaire.get("ConnectionType");
 
+    if (typeConnexion === "SetResponse") {
+      // L'imprimante rapporte le résultat des jobs qu'on lui a remis —
+      // seul un succès confirmé marque vraiment le ticket comme imprimé
+      // (cf. commentaire sur `listerCommandesDuJourAImprimer` : marquer
+      // "imprimé" dès l'envoi, sans attendre cette confirmation, a déjà
+      // fait rater une impression silencieusement le 2026-10-12).
+      const resultats = analyserResultats(formulaire.get("ResponseFile") ?? "");
+      const commandeIds = new Set(
+        resultats.filter((r) => r.succes && r.jobId).map((r) => r.jobId!.replace(/-(client|cuisine)$/, ""))
+      );
+      await Promise.all([...commandeIds].map((id) => marquerTicketImprime(id)));
+      return reponseVide();
+    }
+
     if (typeConnexion !== "GetRequest") {
-      // SetResponse (résultat des jobs) ou tout autre type (notification de
-      // statut) : accusé réception, rien de plus à faire.
       return reponseVide();
     }
 
@@ -71,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       .flat()
       .join("");
 
-    await Promise.all(commandes.map((commande) => marquerTicketImprime(commande.id)));
+    await Promise.all(commandes.map((commande) => marquerTicketRemis(commande.id)));
 
     const xml = `<?xml version="1.0" encoding="utf-8"?><PrintRequestInfo Version="2.00">${jobs}</PrintRequestInfo>`;
     return new NextResponse(xml, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });

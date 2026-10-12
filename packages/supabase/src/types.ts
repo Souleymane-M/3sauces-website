@@ -316,6 +316,7 @@ export interface Database {
           consentement_cgv_le: string | null;
           nb_plats: number;
           ticket_imprime_le: string | null;
+          ticket_remis_le: string | null;
           palier_groupe: string | null;
           motif_annulation: string | null;
         };
@@ -345,6 +346,7 @@ export interface Database {
           consentement_cgv_le?: string | null;
           nb_plats?: number;
           ticket_imprime_le?: string | null;
+          ticket_remis_le?: string | null;
           palier_groupe?: string | null;
           motif_annulation?: string | null;
         };
