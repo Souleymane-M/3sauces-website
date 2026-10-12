@@ -199,6 +199,29 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   return details;
 }
 
+interface AttributCuisine {
+  label: string;
+  valeur: string;
+}
+
+/**
+ * Même détail que `detailLigne`, mais label et valeur séparés — le bon de
+ * cuisine imprime le label en petit/normal et la valeur en gras juste en
+ * dessous, pour que viande/sauces/boisson se distinguent d'un coup d'œil du
+ * reste (retour du patron après les premiers tickets imprimés en réel,
+ * 2026-10-12 : tout avait la même graisse, impossible à scanner vite).
+ */
+function attributsCuisine(l: LigneCommande): AttributCuisine[] {
+  const attributs: AttributCuisine[] = [];
+  if (l.viandes.length > 0) attributs.push({ label: "Viande", valeur: l.viandes.join(", ") });
+  if (l.sauces && l.sauces.length > 0) attributs.push({ label: "Sauces", valeur: l.sauces.join(", ") });
+  if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
+  if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
+  if (l.accompagnementsInclus?.length)
+    attributs.push({ label: "Accompagnement", valeur: l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ") });
+  return attributs;
+}
+
 function estPrioritaire(commande: CommandePourImpression): boolean {
   return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
 }
@@ -238,12 +261,12 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
-      // En gras : la cuisine doit lire viande/sauces/boisson d'un coup
-      // d'œil, pas les chercher dans du texte fin (retour du patron après
-      // les premiers tickets imprimés en conditions réelles, 2026-10-12).
-      for (const detail of detailLigne(l)) {
-        b.ligne(detail, { gras: true, taille: 1 }, "  ");
+      for (const { label, valeur } of attributsCuisine(l)) {
+        b.ligne(label, { gras: false, taille: 1 }, "  ");
+        b.ligne(valeur.toUpperCase(), { gras: true, taille: 1 }, "  ");
       }
+      if (l.sansBoisson) b.ligne("SANS BOISSON — ne pas donner de canette", { gras: true, taille: 1 }, "  ");
+      if (l.pourQui) b.ligne(`Pour ${l.pourQui}`, { gras: true, taille: 1 }, "  ");
     }
   }
 }
