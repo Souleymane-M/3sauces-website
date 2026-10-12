@@ -28,6 +28,16 @@ function validerRelaisUrl(valeur: unknown): { ok: true; relaisUrl: string | null
   return { ok: true, relaisUrl: valeur.trim() };
 }
 
+function validerDirectPrintToken(valeur: unknown): { ok: true; directPrintToken: string | null } | { ok: false } {
+  if (valeur === null || valeur === undefined || valeur === "") {
+    return { ok: true, directPrintToken: null };
+  }
+  if (typeof valeur !== "string") {
+    return { ok: false };
+  }
+  return { ok: true, directPrintToken: valeur.trim() };
+}
+
 function validerPort(valeur: unknown): number | null {
   const port = Number(valeur);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
@@ -51,7 +61,14 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { id?: string; nom?: string; adresseIp?: string | null; port?: number | string; relaisUrl?: string | null }
+    | {
+        id?: string;
+        nom?: string;
+        adresseIp?: string | null;
+        port?: number | string;
+        relaisUrl?: string | null;
+        directPrintToken?: string | null;
+      }
     | null;
   if (!body?.id || typeof body.id !== "string") {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
@@ -82,6 +99,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Adresse du relais invalide." }, { status: 400 });
     }
     patch.relaisUrl = resultat.relaisUrl;
+  }
+  if (body.directPrintToken !== undefined) {
+    const resultat = validerDirectPrintToken(body.directPrintToken);
+    if (!resultat.ok) {
+      return NextResponse.json({ error: "Jeton Server Direct Print invalide." }, { status: 400 });
+    }
+    patch.directPrintToken = resultat.directPrintToken;
   }
 
   try {

@@ -434,6 +434,7 @@ export interface Database {
           adresse_ip: string | null;
           port: number;
           relais_url: string | null;
+          direct_print_token: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -444,6 +445,7 @@ export interface Database {
           adresse_ip?: string | null;
           port?: number;
           relais_url?: string | null;
+          direct_print_token?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["imprimantes"]["Insert"]>;
         Relationships: [];

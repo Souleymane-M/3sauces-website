@@ -10,6 +10,7 @@ export interface ImprimanteAdmin {
   adresseIp: string | null;
   port: number;
   relaisUrl: string | null;
+  directPrintToken: string | null;
 }
 
 export interface ImprimanteAdminPatch {
@@ -17,4 +18,5 @@ export interface ImprimanteAdminPatch {
   adresseIp?: string | null;
   port?: number;
   relaisUrl?: string | null;
+  directPrintToken?: string | null;
 }

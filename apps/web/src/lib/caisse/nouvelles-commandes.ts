@@ -196,6 +196,39 @@ export async function listerCommandesAImprimerDifferees(heureDebut: string): Pro
   return construireCommandesPourImpression(supabase, commandes);
 }
 
+/**
+ * Toutes les commandes publiques payées, pas encore imprimées, dont
+ * l'heure souhaitée tombe aujourd'hui (commande du jour même ou commande
+ * à l'avance dont le jour est enfin arrivé) — la requête du relais
+ * d'impression local ET de la route Epson "Server Direct Print"
+ * (`app/api/print/epson/[token]`), partagée pour ne jamais avoir deux
+ * définitions de "qu'est-ce qui reste à imprimer" qui divergent.
+ */
+export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpression[]> {
+  const supabase = createServiceSupabaseClient();
+  const { debut, fin } = plageJourMayotteUtc(dateMayotteIso());
+
+  const { data: commandes, error } = await supabase
+    .from("commandes")
+    .select(SELECT_POUR_IMPRESSION)
+    .is("commande_par", null)
+    .is("ticket_imprime_le", null)
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    .gte("heure_souhaitee", debut.toISOString())
+    .lt("heure_souhaitee", fin.toISOString())
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (error) {
+    throw new Error(`Impossible de charger les commandes à imprimer : ${error.message}`);
+  }
+  if (!commandes || commandes.length === 0) {
+    return [];
+  }
+
+  return construireCommandesPourImpression(supabase, commandes);
+}
+
 export async function marquerTicketImprime(commandeId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
   const { error } = await supabase

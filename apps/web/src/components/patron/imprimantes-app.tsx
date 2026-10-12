@@ -12,10 +12,17 @@ interface Brouillon {
   adresseIp: string;
   port: string;
   relaisUrl: string;
+  directPrintToken: string;
 }
 
 function versBrouillon(i: ImprimanteAdmin): Brouillon {
-  return { nom: i.nom, adresseIp: i.adresseIp ?? "", port: String(i.port), relaisUrl: i.relaisUrl ?? "" };
+  return {
+    nom: i.nom,
+    adresseIp: i.adresseIp ?? "",
+    port: String(i.port),
+    relaisUrl: i.relaisUrl ?? "",
+    directPrintToken: i.directPrintToken ?? "",
+  };
 }
 
 function estModifie(brouillon: Brouillon, i: ImprimanteAdmin): boolean {
@@ -24,7 +31,8 @@ function estModifie(brouillon: Brouillon, i: ImprimanteAdmin): boolean {
     brouillon.nom !== reference.nom ||
     brouillon.adresseIp !== reference.adresseIp ||
     brouillon.port !== reference.port ||
-    brouillon.relaisUrl !== reference.relaisUrl
+    brouillon.relaisUrl !== reference.relaisUrl ||
+    brouillon.directPrintToken !== reference.directPrintToken
   );
 }
 
@@ -66,6 +74,7 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       return;
     }
     const relaisUrl = brouillon.relaisUrl.trim() || null;
+    const directPrintToken = brouillon.directPrintToken.trim() || null;
 
     setErreur(null);
     setEnregistrementEnCours(imprimante.id);
@@ -73,14 +82,14 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       const reponse = await fetch("/api/patron/imprimantes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: imprimante.id, nom, adresseIp, port, relaisUrl }),
+        body: JSON.stringify({ id: imprimante.id, nom, adresseIp, port, relaisUrl, directPrintToken }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
         setErreur(data.error ?? "Échec de l'enregistrement.");
         return;
       }
-      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, adresseIp, port, relaisUrl };
+      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, adresseIp, port, relaisUrl, directPrintToken };
       setImprimantes((precedent) => precedent.map((i) => (i.id === imprimante.id ? imprimanteMiseAJour : i)));
       setBrouillons((precedent) => ({ ...precedent, [imprimante.id]: versBrouillon(imprimanteMiseAJour) }));
     } finally {
@@ -132,6 +141,33 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
               <p className="text-xs text-gray-500">
                 Optionnel — adresse du petit relais local qui contourne le blocage CORS de l&apos;imprimante (ex:
                 https://192.168.x.x:8099). Laisser vide pour une tentative d&apos;impression directe.
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  value={brouillon.directPrintToken}
+                  onChange={(e) => modifierBrouillon(imprimante.id, "directPrintToken", e.target.value)}
+                  placeholder="Jeton Server Direct Print"
+                  className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => modifierBrouillon(imprimante.id, "directPrintToken", crypto.randomUUID())}
+                  className="shrink-0 rounded border border-gray-600 px-3 text-sm text-gray-300"
+                >
+                  Générer
+                </button>
+              </div>
+              {brouillon.directPrintToken && (
+                <p className="rounded bg-gray-900 p-2 text-xs break-all text-gray-400">
+                  À coller dans l&apos;imprimante (Services → Server Direct Print → URL) :<br />
+                  {typeof window !== "undefined" ? window.location.origin : ""}/api/print/epson/{brouillon.directPrintToken}
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Optionnel — l&apos;imprimante va elle-même chercher son travail à cette adresse toutes les quelques
+                secondes, sans dépendre d&apos;un relais ni d&apos;un ordinateur allumé. Se configure une seule fois
+                directement sur l&apos;imprimante.
               </p>
 
               {modifie && (

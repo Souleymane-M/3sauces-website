@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
-import { marquerTicketImprime, construireCommandesPourImpression } from "@/lib/caisse/nouvelles-commandes";
+import { marquerTicketImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
-import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
-
-const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats";
 
 /**
  * Pensé pour le relais d'impression (scripts/relais-impression/), qui
@@ -33,30 +28,7 @@ export async function GET() {
   }
 
   try {
-    const supabase = createServiceSupabaseClient();
-    const { debut, fin } = plageJourMayotteUtc(dateMayotteIso());
-
-    const { data: commandes, error } = await supabase
-      .from("commandes")
-      .select(SELECT_POUR_IMPRESSION)
-      .is("commande_par", null)
-      .is("ticket_imprime_le", null)
-      .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
-      // Jamais le gros arriéré de commandes jamais imprimées avant ce
-      // circuit (plus de 100 commandes anciennes, jamais marquées — repéré
-      // le 2026-10-10) : uniquement une heure souhaitée dans la fenêtre
-      // d'aujourd'hui (couvre à la fois une commande du jour même et une
-      // commande à l'avance dont le jour est enfin arrivé).
-      .gte("heure_souhaitee", debut.toISOString())
-      .lt("heure_souhaitee", fin.toISOString())
-      .order("created_at", { ascending: true })
-      .limit(20);
-
-    if (error) {
-      throw new Error(`Impossible de charger les commandes à imprimer : ${error.message}`);
-    }
-
-    const commandesPourImpression = await construireCommandesPourImpression(supabase, commandes ?? []);
+    const commandesPourImpression = await listerCommandesDuJourAImprimer();
 
     const imprimantes = await listerImprimantesAdmin();
     const comptoir = imprimantes.find((i) => i.role === "comptoir");
