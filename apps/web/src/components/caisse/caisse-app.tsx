@@ -34,12 +34,7 @@ import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } 
 import { MONTANT_RECOMPENSE, SEUIL_TAMPON, messageFidelite, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
-import {
-  composerTelephoneAvecPays,
-  LIBELLE_PAYS_TELEPHONE,
-  ressembleAFranceMetropolitaine,
-  type PaysTelephone,
-} from "@/lib/telephone";
+import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 import {
   SEUIL_GROUPE_3_PLATS,
@@ -342,12 +337,6 @@ export function CaisseApp({
   // calcul mental de la monnaie à rendre.
   const [montantRecuEspeces, setMontantRecuEspeces] = useState("");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
-  // Pas de pays présélectionné pour une nouvelle commande, même raison que
-  // /commander — la caissière doit choisir explicitement plutôt que de
-  // risquer un numéro métropolitain enregistré comme mahorais sans s'en
-  // rendre compte. En modification, le numéro est déjà valide : pas besoin
-  // de reforcer un choix.
-  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone | null>(() => (enModeEdition ? "mayotte" : null));
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   const [nbTamponsAUtiliser, setNbTamponsAUtiliser] = useState(0);
@@ -1043,13 +1032,9 @@ export function CaisseApp({
 
   async function rechercherClient() {
     if (!telephone.trim()) return;
-    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
-      setErreur(
-        ressembleAFranceMetropolitaine(telephone, paysTelephone)
-          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
-          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
-      );
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     setRechercheEnCours(true);
@@ -1204,21 +1189,13 @@ export function CaisseApp({
       setErreur(erreurValidation);
       return;
     }
-    if (!paysTelephone) {
-      setErreur("Choisis le pays du client (Mayotte, France métropolitaine ou La Réunion).");
-      return;
-    }
     if (!canal) {
       setErreur("Choisis comment le client récupère sa commande : sur place, à emporter ou en livraison.");
       return;
     }
-    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
-      setErreur(
-        ressembleAFranceMetropolitaine(telephone, paysTelephone)
-          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
-          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
-      );
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     const resultatEmail = validerEmailSaisi();
@@ -1323,7 +1300,6 @@ export function CaisseApp({
       setAdresse("");
       setMontantRecuEspeces("");
       setCanal(null);
-      setPaysTelephone(null);
       setDateCommande(datesOuvertes[0] ?? aujourdHui);
       setEncaisserMaintenant(true);
     } catch {
@@ -1348,21 +1324,13 @@ export function CaisseApp({
       setErreur(erreurValidation);
       return;
     }
-    if (!paysTelephone) {
-      setErreur("Choisis le pays du client (Mayotte, France métropolitaine ou La Réunion).");
-      return;
-    }
     if (!canal) {
       setErreur("Choisis comment le client récupère sa commande : sur place, à emporter ou en livraison.");
       return;
     }
-    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
-      setErreur(
-        ressembleAFranceMetropolitaine(telephone, paysTelephone)
-          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
-          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
-      );
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     const resultatEmail = validerEmailSaisi();
@@ -1840,25 +1808,6 @@ export function CaisseApp({
 
             <div>
               <label className="text-xs text-gray-500">Téléphone</label>
-              <p className="mt-1 rounded bg-orange-50 px-2 py-1.5 text-xs font-semibold text-[#8B2020]">
-                📍 Choisis le pays du client, puis tape juste son numéro local (ex: 0639123456).
-              </p>
-              <div className={`mt-1.5 grid grid-cols-3 gap-1.5 rounded-lg ${paysTelephone ? "" : "ring-2 ring-[#8B2020]/40"}`}>
-                {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPaysTelephone(p)}
-                    className={`rounded border py-1.5 text-xs font-bold uppercase ${
-                      paysTelephone === p
-                        ? "border-[#8B2020] bg-[#8B2020] text-white"
-                        : "border-gray-300 text-gray-700"
-                    }`}
-                  >
-                    {LIBELLE_PAYS_TELEPHONE[p]}
-                  </button>
-                ))}
-              </div>
               <div className="mt-1.5 flex gap-2">
                 <input
                   value={telephone}

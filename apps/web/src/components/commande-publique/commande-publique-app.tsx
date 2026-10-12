@@ -45,12 +45,7 @@ import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, progressionFideliteCommande, texteProgressionFidelite } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
-import {
-  composerTelephoneAvecPays,
-  LIBELLE_PAYS_TELEPHONE,
-  ressembleAFranceMetropolitaine,
-  type PaysTelephone,
-} from "@/lib/telephone";
+import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 
 interface LignePanierPublique {
@@ -209,14 +204,6 @@ export function CommandePubliqueApp({
   const [prenom, setPrenom] = useState("");
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
-  // Mayotte par défaut : l'écrasante majorité des clients. Le client choisit
-  // explicitement son pays plutôt que de devoir savoir qu'il doit taper
-  // lui-même +33 — élimine le risque qu'un numéro métropolitain tapé sans
-  // indicatif se retrouve silencieusement enregistré comme mahorais.
-  // Pas de pays présélectionné non plus, même raison que le canal — un
-  // client qui ne regarde pas se retrouvait avec un numéro métropolitain
-  // enregistré comme mahorais (ou l'inverse) sans jamais s'en rendre compte.
-  const [paysTelephone, setPaysTelephone] = useState<PaysTelephone | null>(null);
   const [emailDejaConnu, setEmailDejaConnu] = useState(false);
 
   // Un client déjà passé commande n'a pas à retaper son email à chaque
@@ -226,7 +213,7 @@ export function CommandePubliqueApp({
   // validation s'il laisse le champ vide.
   useEffect(() => {
     let annule = false;
-    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const telephoneComplet = normaliserTelephone(telephone);
     const minuteur = setTimeout(async () => {
       if (!telephoneComplet) {
         if (!annule) setEmailDejaConnu(false);
@@ -245,7 +232,7 @@ export function CommandePubliqueApp({
       annule = true;
       clearTimeout(minuteur);
     };
-  }, [telephone, paysTelephone]);
+  }, [telephone]);
 
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
@@ -852,10 +839,6 @@ export function CommandePubliqueApp({
       setErreur("Indique ton adresse email.");
       return;
     }
-    if (!paysTelephone) {
-      setErreur("Choisis ton pays (Mayotte, France métropolitaine ou La Réunion).");
-      return;
-    }
     if (!telephone.trim()) {
       setErreur("Indique ton numéro de téléphone.");
       return;
@@ -864,13 +847,9 @@ export function CommandePubliqueApp({
       setErreur("Choisis comment récupérer ta commande : sur place, à emporter ou en livraison.");
       return;
     }
-    const telephoneComplet = composerTelephoneAvecPays(telephone, paysTelephone);
+    const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
-      setErreur(
-        ressembleAFranceMetropolitaine(telephone, paysTelephone)
-          ? "Ce numéro ressemble à un numéro de France métropolitaine — sélectionne \"France métropolitaine\" ci-dessus."
-          : "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)."
-      );
+      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     if (canal === "livraison") {
@@ -1078,7 +1057,7 @@ export function CommandePubliqueApp({
             )
           }
           onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
-          telephoneCommande={composerTelephoneAvecPays(telephone, paysTelephone) ?? ""}
+          telephoneCommande={normaliserTelephone(telephone) ?? ""}
           emailCommande={email}
         />
 
@@ -1501,25 +1480,6 @@ export function CommandePubliqueApp({
 
               <div>
                 <label className="text-xs text-gray-500">Téléphone</label>
-                <p className="mt-1 rounded bg-orange-50 px-2.5 py-2 text-sm font-semibold text-[#8B2020]">
-                  📍 Choisis d&apos;abord ton pays, puis tape juste ton numéro local (ex: 0639123456) — sans +33 ni indicatif.
-                </p>
-                <div className={`mt-2 grid grid-cols-3 gap-2 rounded-lg ${paysTelephone ? "" : "ring-2 ring-[#8B2020]/40"}`}>
-                  {(Object.keys(LIBELLE_PAYS_TELEPHONE) as PaysTelephone[]).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPaysTelephone(p)}
-                      className={`rounded border py-2 text-xs font-bold uppercase ${
-                        paysTelephone === p
-                          ? "border-[#8B2020] bg-[#8B2020] text-white"
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                    >
-                      {LIBELLE_PAYS_TELEPHONE[p]}
-                    </button>
-                  ))}
-                </div>
                 <input
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
