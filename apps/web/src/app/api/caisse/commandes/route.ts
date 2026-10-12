@@ -446,8 +446,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
-  // Email : requis, sauf si ce numéro a déjà un email enregistré et que la
-  // caissière a volontairement laissé le champ vide pour le garder.
+  // Email : optionnel en caisse (contrairement au site public) — jamais
+  // bloquant pour un encaissement rapide au comptoir. Un email vide ne
+  // touche jamais celui déjà enregistré sur ce numéro, voir plus bas
+  // `...(email ? { email } : {})`.
   const emailSaisiBrut = (body.email ?? "").trim();
   let email: string | null = null;
   if (emailSaisiBrut) {
@@ -458,13 +460,6 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-
-  if (!email) {
-    const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", clientTelephone).maybeSingle();
-    if (!clientExistant?.email) {
-      return NextResponse.json({ error: "Adresse email requise." }, { status: 400 });
-    }
-  }
 
   // --- Paramètres de livraison (mêmes règles que le site public, cf.
   // /api/commande) : une livraison prise au téléphone par la caisse a
@@ -791,6 +786,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
+  // Email optionnel ici aussi — voir le même commentaire au POST ci-dessus.
   const emailSaisiBrut = (body.email ?? "").trim();
   let email: string | null = null;
   if (emailSaisiBrut) {
@@ -801,13 +797,6 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-
-  if (!email) {
-    const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", clientTelephone).maybeSingle();
-    if (!clientExistant?.email) {
-      return NextResponse.json({ error: "Adresse email requise." }, { status: 400 });
-    }
-  }
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")

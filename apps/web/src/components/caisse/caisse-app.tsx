@@ -1179,16 +1179,15 @@ export function CaisseApp({
   }
 
   /**
-   * `null` = laisse volontairement vide pour garder l'email déjà enregistré
-   * sur ce numéro (jamais pour un numéro inconnu/sans email en fiche, où
-   * c'est alors refusé) — jamais une saisie non vide mais invalide.
+   * Optionnel en caisse (contrairement au site public) — jamais bloquant
+   * pour un encaissement rapide au comptoir. `null` = pas saisi (laisse
+   * l'email déjà enregistré sur ce numéro tel quel) ; seule une saisie non
+   * vide mais invalide bloque.
    */
   function validerEmailSaisi(): { email: string | null } | null {
     const saisie = email.trim();
     if (!saisie) {
-      if (clientInfo?.existe && clientInfo.email) return { email: null };
-      setErreur("Indique l'adresse email du client.");
-      return null;
+      return { email: null };
     }
     const normalise = normaliserEmail(saisie);
     if (!normalise) {
@@ -1928,7 +1927,7 @@ export function CaisseApp({
             </div>
 
             <div>
-              <label className="text-xs text-gray-500">Email</label>
+              <label className="text-xs text-gray-500">Email (optionnel)</label>
               <input
                 type="email"
                 value={email}
