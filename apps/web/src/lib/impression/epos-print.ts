@@ -238,8 +238,11 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
+      // En gras : la cuisine doit lire viande/sauces/boisson d'un coup
+      // d'œil, pas les chercher dans du texte fin (retour du patron après
+      // les premiers tickets imprimés en conditions réelles, 2026-10-12).
       for (const detail of detailLigne(l)) {
-        b.ligne(detail, { gras: false, taille: 1 }, "  ");
+        b.ligne(detail, { gras: true, taille: 1 }, "  ");
       }
     }
   }
@@ -395,6 +398,9 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   }
 
   b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
+  if (commande.canal === "livraison" && commande.clientTelephone) {
+    b.ligne(`Tél : ${commande.clientTelephone}`, { align: "center", gras: true, taille: 1 });
+  }
   separateur(b);
 
   imprimerArticlesCuisine(b, commande);
