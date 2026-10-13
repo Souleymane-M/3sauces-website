@@ -263,3 +263,33 @@ export async function marquerTicketImprime(commandeId: string): Promise<void> {
     throw new Error(`Impossible de marquer le ticket comme imprimé : ${error.message}`);
   }
 }
+
+/**
+ * Marque la commande remise à l'imprimante le plus récemment (pas encore
+ * confirmée) comme imprimée — utilisé par la route Server Direct Print
+ * quand le micrologiciel de l'imprimante est trop ancien pour renvoyer le
+ * `printjobid` dans sa confirmation (cf. `app/api/print/epson/[token]`,
+ * qui ne remet qu'une seule commande à la fois, rendant cette
+ * correspondance fiable).
+ */
+export async function marquerDernierTicketRemisImprime(): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data, error: erreurLecture } = await supabase
+    .from("commandes")
+    .select("id")
+    .is("ticket_imprime_le", null)
+    .not("ticket_remis_le", "is", null)
+    .order("ticket_remis_le", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (erreurLecture) {
+    throw new Error(`Impossible de retrouver le dernier ticket remis : ${erreurLecture.message}`);
+  }
+  if (!data) return;
+
+  const { error } = await supabase.from("commandes").update({ ticket_imprime_le: new Date().toISOString() }).eq("id", data.id);
+  if (error) {
+    throw new Error(`Impossible de marquer le ticket comme imprimé : ${error.message}`);
+  }
+}
