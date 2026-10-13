@@ -84,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     const commandesDuJour = await listerCommandesDuJourAImprimer();
     const [commande] = commandesDuJour;
     if (!commande) {
-      return reponseVide(`0 (token=${imprimante.id})`);
+      return reponseVide(`${commandesDuJour.length} (imprimante=${imprimante.id})`);
     }
 
     const jobs = [
