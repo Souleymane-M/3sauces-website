@@ -8,10 +8,9 @@ import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes"
  * Là où l'imprimante Epson (fonction "Server Direct Print", activée
  * directement sur l'imprimante — Services → Server Direct Print) vient
  * elle-même chercher son travail toutes les quelques secondes, sans
- * dépendre d'un relais local toujours allumé (cf. scripts/relais-impression/
- * README.md, section historique). Jamais de session ici : l'imprimante ne
- * porte pas de cookie, le jeton dans l'URL EST l'authentification — voir
- * `trouverImprimantePourJetonDirectPrint`.
+ * dépendre d'aucun appareil local (Mac/iPad/relais). Jamais de session
+ * ici : l'imprimante ne porte pas de cookie, le jeton dans l'URL EST
+ * l'authentification — voir `trouverImprimantePourJetonDirectPrint`.
  *
  * Protocole confirmé via le manuel Epson "Server Direct Print". Le format
  * `<printjobid>` et `Version="2.00"` ne sont disponibles qu'à partir du
@@ -36,10 +35,8 @@ const TAILLE_MAX_CORPS = 64 * 1024;
 const XML_CONTENT_TYPE = "text/xml; charset=utf-8";
 const TIMEOUT_JOB_MS = 10_000;
 
-function reponseVide(debug?: string): NextResponse {
-  const headers: Record<string, string> = { "Content-Type": XML_CONTENT_TYPE };
-  if (debug) headers["X-Debug-Count"] = debug;
-  return new NextResponse(null, { status: 200, headers });
+function reponseVide(): NextResponse {
+  return new NextResponse(null, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });
 }
 
 function construireJob(xml: string): string {
@@ -81,10 +78,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       return reponseVide();
     }
 
-    const commandesDuJour = await listerCommandesDuJourAImprimer();
-    const [commande] = commandesDuJour;
+    const [commande] = await listerCommandesDuJourAImprimer();
     if (!commande) {
-      return reponseVide(`${commandesDuJour.length} (imprimante=${imprimante.id})`);
+      return reponseVide();
     }
 
     const jobs = [
@@ -96,12 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
 
     const xml = `<?xml version="1.0" encoding="utf-8"?><PrintRequestInfo Version="1.00">${jobs}</PrintRequestInfo>`;
     return new NextResponse(xml, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });
-  } catch (e) {
-    // DIAGNOSTIC TEMPORAIRE (2026-10-13 bis) : réponse vide inattendue avec
-    // des commandes qui correspondent pourtant à la requête — exposer
-    // l'erreur réelle en en-tête pour diagnostiquer sans table de log. À
-    // retirer une fois la cause confirmée.
-    const message = e instanceof Error ? e.message : String(e);
-    return new NextResponse(null, { status: 500, headers: { "X-Debug-Error": message.slice(0, 500) } });
+  } catch {
+    return new NextResponse(null, { status: 500 });
   }
 }
