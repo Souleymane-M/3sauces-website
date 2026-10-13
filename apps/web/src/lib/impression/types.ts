@@ -18,6 +18,8 @@ export interface CommandePourImpression {
   modePaiement: ModePaiementCommande;
   nom: string;
   adresse: string | null;
+  /** Commune de livraison (ex: "Dembéni") — distincte de l'adresse complète, pour le bloc livraison bien visible du reçu. */
+  zoneLivraison: string | null;
   heureSouhaitee: string | null;
   creeLe: string;
   qrCode: string | null;

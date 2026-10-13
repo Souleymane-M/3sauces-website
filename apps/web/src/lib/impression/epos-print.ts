@@ -291,6 +291,29 @@ function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourIm
 }
 
 const URL_SITE = "https://3sauces.fr";
+const BORDURE_LIVRAISON = "=".repeat(32);
+
+/**
+ * Bloc encadré bien visible pour une livraison (nom, lieu, adresse,
+ * téléphone en gros, total à payer) — demande explicite du patron le
+ * 2026-10-13 : sur le reçu classique ces infos se perdaient, trop petites
+ * et serrées au milieu du reste, alors que c'est l'essentiel pour le
+ * livreur d'un coup d'œil.
+ */
+function imprimerBlocLivraison(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
+  b.ligne("LIVRAISON", { align: "center", gras: true, taille: 2 });
+  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
+  b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  if (commande.zoneLivraison) b.ligne(commande.zoneLivraison, { align: "left", gras: true, taille: 2 });
+  if (commande.adresse) b.ligne(commande.adresse, { align: "left", gras: true, taille: 1 });
+  if (commande.clientTelephone) {
+    b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: true, taille: 2 });
+  }
+  const libelleMontant = commande.modePaiement === "stripe" ? "DEJA PAYE" : "A PAYER";
+  b.ligne(`${libelleMontant} : ${commande.montant.toFixed(2)} €`, { align: "left", gras: true, taille: 2 });
+  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
+}
 
 function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
   separateur(b);
@@ -386,13 +409,8 @@ function construireContenuTicketClient(
     taille: 1,
   });
 
-  // Infos de livraison mises en évidence (gras) — doivent sauter aux yeux
-  // du livreur, pas se fondre dans le reste du ticket en police normale.
   if (commande.canal === "livraison") {
-    if (commande.adresse) b.ligne(`Adresse : ${commande.adresse}`, { gras: true, taille: 1 });
-    if (commande.clientTelephone) {
-      b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { gras: true, taille: 1 });
-    }
+    imprimerBlocLivraison(b, commande);
     if (commande.qrCode) {
       b.brut(`<feed line="1"/>`);
       b.brut(styleTexte({ align: "center" }));

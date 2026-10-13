@@ -1020,6 +1020,12 @@ export async function PATCH(request: Request) {
       heure_souhaitee: heureSouhaitee.toISOString(),
       nb_plats: nbPlats,
       palier_groupe: palierGroupe,
+      // Remis à zéro pour que le ticket (déjà imprimé ou pas) reparte dans
+      // la file de Server Direct Print avec le contenu à jour — sans ça,
+      // une commande modifiée après son premier passage à l'impression ne
+      // ressortait jamais avec les changements.
+      ticket_imprime_le: null,
+      ticket_remis_le: null,
     })
     .eq("id", body.commandeId);
   if (erreurMaj) {

@@ -7,7 +7,7 @@ import { calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 
 const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats";
+  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, zone_livraison, client_telephone, heure_souhaitee, created_at, nb_plats";
 
 type LigneBrutePourImpression = {
   id: string;
@@ -18,6 +18,7 @@ type LigneBrutePourImpression = {
   mode_paiement: CommandePourImpression["modePaiement"] | null;
   nom_livraison: string | null;
   adresse_livraison: string | null;
+  zone_livraison: string | null;
   client_telephone: string | null;
   heure_souhaitee: string | null;
   created_at: string;
@@ -28,7 +29,7 @@ type LigneBrutePourImpression = {
  * Résout les données dynamiques (QR livraison, tampons fidélité, message du
  * moment) une seule fois pour un lot de commandes, puis construit les
  * `CommandePourImpression` — partagé entre les deux fonctions ci-dessous et
- * la route du relais (`app/api/relais/commandes-a-imprimer`).
+ * la route Server Direct Print (`app/api/print/epson/[token]`).
  */
 export async function construireCommandesPourImpression(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
@@ -61,6 +62,7 @@ export async function construireCommandesPourImpression(
       modePaiement: c.mode_paiement ?? "especes",
       nom: c.nom_livraison ?? "",
       adresse: c.adresse_livraison,
+      zoneLivraison: c.zone_livraison,
       heureSouhaitee: c.heure_souhaitee,
       creeLe: c.created_at,
       qrCode: qrCodeParCommandeId.get(c.id) ?? null,
