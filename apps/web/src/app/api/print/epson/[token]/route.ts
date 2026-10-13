@@ -36,8 +36,10 @@ const TAILLE_MAX_CORPS = 64 * 1024;
 const XML_CONTENT_TYPE = "text/xml; charset=utf-8";
 const TIMEOUT_JOB_MS = 10_000;
 
-function reponseVide(): NextResponse {
-  return new NextResponse(null, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });
+function reponseVide(debug?: string): NextResponse {
+  const headers: Record<string, string> = { "Content-Type": XML_CONTENT_TYPE };
+  if (debug) headers["X-Debug-Count"] = debug;
+  return new NextResponse(null, { status: 200, headers });
 }
 
 function construireJob(xml: string): string {
@@ -79,9 +81,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       return reponseVide();
     }
 
-    const [commande] = await listerCommandesDuJourAImprimer();
+    const commandesDuJour = await listerCommandesDuJourAImprimer();
+    const [commande] = commandesDuJour;
     if (!commande) {
-      return reponseVide();
+      return reponseVide(`0 (token=${imprimante.id})`);
     }
 
     const jobs = [
