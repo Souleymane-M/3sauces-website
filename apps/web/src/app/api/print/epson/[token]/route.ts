@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
+import { construireTicketClientXmlBrut, construireBonCuisineXmlBrut } from "@/lib/impression/epos-print";
 import { analyserResultats } from "@/lib/impression/epos-response";
 import { marquerTicketImprime, marquerTicketRemis, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
@@ -93,8 +93,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
 
     const jobs = commandes
       .map((commande) => [
-        construireJob(`${commande.id}-client`, construireTicketClientXml(commande, null)),
-        construireJob(`${commande.id}-cuisine`, construireBonCuisineXml(commande)),
+        construireJob(`${commande.id}-client`, construireTicketClientXmlBrut(commande, null)),
+        construireJob(`${commande.id}-cuisine`, construireBonCuisineXmlBrut(commande)),
       ])
       .flat()
       .join("");

@@ -325,11 +325,19 @@ function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePour
   }
 }
 
-function enveloppeEposPrint(contenu: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">${contenu}</epos-print></s:Body></s:Envelope>`;
+const NAMESPACE_EPOS_PRINT = "http://www.epson-pos.com/schemas/2011/03/epos-print";
+
+/** `<epos-print>...</epos-print>` seul, sans enveloppe — c'est ce que Server Direct Print attend dans `<PrintData>` (un `<epos-print>` niché dans une autre enveloppe XML, celle de `enveloppeEposPrint`, ne parse jamais côté imprimante). */
+function eposPrintSeul(contenu: string): string {
+  return `<epos-print xmlns="${NAMESPACE_EPOS_PRINT}">${contenu}</epos-print>`;
 }
 
-export function construireTicketClientXml(
+/** Enveloppe SOAP complète — uniquement pour l'envoi direct/relais (POST classique vers l'IP de l'imprimante), jamais pour Server Direct Print. */
+function enveloppeEposPrint(contenu: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>${eposPrintSeul(contenu)}</s:Body></s:Envelope>`;
+}
+
+function construireContenuTicketClient(
   commande: CommandePourImpression,
   logo: { base64: string; largeur: number; hauteur: number } | null
 ): string {
@@ -400,10 +408,25 @@ export function construireTicketClientXml(
   b.ligne(MENTION_LEGALE, { align: "center", gras: false, taille: 1 });
 
   b.brut(`<feed line="2"/><cut type="feed"/>`);
-  return enveloppeEposPrint(b.xml());
+  return b.xml();
 }
 
-export function construireBonCuisineXml(commande: CommandePourImpression): string {
+export function construireTicketClientXml(
+  commande: CommandePourImpression,
+  logo: { base64: string; largeur: number; hauteur: number } | null
+): string {
+  return enveloppeEposPrint(construireContenuTicketClient(commande, logo));
+}
+
+/** Pour Server Direct Print (`<PrintData>`) — jamais d'enveloppe SOAP, cf. `eposPrintSeul`. */
+export function construireTicketClientXmlBrut(
+  commande: CommandePourImpression,
+  logo: { base64: string; largeur: number; hauteur: number } | null
+): string {
+  return eposPrintSeul(construireContenuTicketClient(commande, logo));
+}
+
+function construireContenuBonCuisine(commande: CommandePourImpression): string {
   const b = creerConstructeurTicket();
 
   if (estPrioritaire(commande)) {
@@ -432,7 +455,16 @@ export function construireBonCuisineXml(commande: CommandePourImpression): strin
   imprimerArticlesCuisine(b, commande);
 
   b.brut(`<feed line="2"/><cut type="feed"/>`);
-  return enveloppeEposPrint(b.xml());
+  return b.xml();
+}
+
+export function construireBonCuisineXml(commande: CommandePourImpression): string {
+  return enveloppeEposPrint(construireContenuBonCuisine(commande));
+}
+
+/** Pour Server Direct Print (`<PrintData>`) — jamais d'enveloppe SOAP, cf. `eposPrintSeul`. */
+export function construireBonCuisineXmlBrut(commande: CommandePourImpression): string {
+  return eposPrintSeul(construireContenuBonCuisine(commande));
 }
 
 /**
