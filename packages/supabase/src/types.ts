@@ -498,13 +498,6 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["livraisons"]["Insert"]>;
         Relationships: [];
       };
-      // DIAGNOSTIC TEMPORAIRE (2026-10-13) — cf. debug_print_log dans la migration et la route /api/print/epson/[token].
-      debug_print_log: {
-        Row: { id: string; created_at: string; connection_type: string | null; corps: string | null };
-        Insert: { id?: string; connection_type?: string | null; corps?: string | null };
-        Update: Partial<Database["public"]["Tables"]["debug_print_log"]["Insert"]>;
-        Relationships: [];
-      };
     };
     Views: {
       v_encaissements_jour: {

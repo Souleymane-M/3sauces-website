@@ -31,12 +31,3 @@ export interface CommandePourImpression {
   /** Message du moment actif à imprimer sur le reçu client — null si inactif/vide. */
   messageDuMoment: string | null;
 }
-
-export interface ConfigImprimante {
-  adresseIp: string;
-  port: number;
-  /** Adresse du relais local (ex: "https://192.168.x.x:8099") qui contourne le blocage CORS des imprimantes Epson — null = tentative directe (cf. epos-print.ts). */
-  relaisUrl: string | null;
-}
-
-export type ResultatImpression = { ok: true } | { ok: false; erreur: string };

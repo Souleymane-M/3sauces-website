@@ -3,31 +3,6 @@ import { requireRole } from "@/lib/auth/get-session";
 import { listerImprimantesAdmin, mettreAJourImprimante } from "@/lib/patron/imprimantes";
 import type { ImprimanteAdminPatch } from "@/lib/patron/imprimantes-types";
 
-// Regex volontairement simple (IPv4 uniquement) : les imprimantes du resto
-// sont sur un réseau local classique, pas besoin d'IPv6/nom d'hôte pour
-// l'instant.
-const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
-
-function validerAdresseIp(valeur: unknown): { ok: true; adresseIp: string | null } | { ok: false } {
-  if (valeur === null || valeur === undefined || valeur === "") {
-    return { ok: true, adresseIp: null };
-  }
-  if (typeof valeur !== "string" || !IPV4_REGEX.test(valeur.trim())) {
-    return { ok: false };
-  }
-  return { ok: true, adresseIp: valeur.trim() };
-}
-
-function validerRelaisUrl(valeur: unknown): { ok: true; relaisUrl: string | null } | { ok: false } {
-  if (valeur === null || valeur === undefined || valeur === "") {
-    return { ok: true, relaisUrl: null };
-  }
-  if (typeof valeur !== "string") {
-    return { ok: false };
-  }
-  return { ok: true, relaisUrl: valeur.trim() };
-}
-
 function validerDirectPrintToken(valeur: unknown): { ok: true; directPrintToken: string | null } | { ok: false } {
   if (valeur === null || valeur === undefined || valeur === "") {
     return { ok: true, directPrintToken: null };
@@ -36,12 +11,6 @@ function validerDirectPrintToken(valeur: unknown): { ok: true; directPrintToken:
     return { ok: false };
   }
   return { ok: true, directPrintToken: valeur.trim() };
-}
-
-function validerPort(valeur: unknown): number | null {
-  const port = Number(valeur);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return port;
 }
 
 export async function GET() {
@@ -61,14 +30,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | {
-        id?: string;
-        nom?: string;
-        adresseIp?: string | null;
-        port?: number | string;
-        relaisUrl?: string | null;
-        directPrintToken?: string | null;
-      }
+    | { id?: string; nom?: string; directPrintToken?: string | null }
     | null;
   if (!body?.id || typeof body.id !== "string") {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
@@ -80,25 +42,6 @@ export async function PATCH(request: Request) {
     const nom = body.nom.trim();
     if (!nom) return NextResponse.json({ error: "Le nom ne peut pas être vide." }, { status: 400 });
     patch.nom = nom;
-  }
-  if (body.adresseIp !== undefined) {
-    const resultat = validerAdresseIp(body.adresseIp);
-    if (!resultat.ok) {
-      return NextResponse.json({ error: "Adresse IP invalide (ex: 192.168.1.50)." }, { status: 400 });
-    }
-    patch.adresseIp = resultat.adresseIp;
-  }
-  if (body.port !== undefined) {
-    const port = validerPort(body.port);
-    if (port === null) return NextResponse.json({ error: "Port invalide (1 à 65535)." }, { status: 400 });
-    patch.port = port;
-  }
-  if (body.relaisUrl !== undefined) {
-    const resultat = validerRelaisUrl(body.relaisUrl);
-    if (!resultat.ok) {
-      return NextResponse.json({ error: "Adresse du relais invalide." }, { status: 400 });
-    }
-    patch.relaisUrl = resultat.relaisUrl;
   }
   if (body.directPrintToken !== undefined) {
     const resultat = validerDirectPrintToken(body.directPrintToken);

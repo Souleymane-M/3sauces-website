@@ -1,4 +1,4 @@
-import type { CommandePourImpression, ConfigImprimante, ResultatImpression } from "./types";
+import type { CommandePourImpression } from "./types";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -7,23 +7,22 @@ import { TAGLINE_FIDELITE } from "@/lib/fidelite/regles";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 
 /**
- * Protocole ePOS-Print d'Epson (TM-m30 et quasi toute la gamme TM-*) : une
- * requête XML enveloppée SOAP, postée en HTTP(S) directement depuis le
- * navigateur vers l'adresse IP locale de l'imprimante — jamais depuis le
- * serveur Next.js/Vercel, qui n'a aucun accès au réseau WiFi du restaurant.
- * `port` par défaut 8043 (SSL) : le site est servi en HTTPS, une requête
- * vers du HTTP simple (port 80) serait bloquée par le navigateur comme
- * "contenu mixte". La première connexion à chaque imprimante depuis l'iPad
- * nécessite d'accepter une fois son certificat auto-signé dans Safari
- * (réglage réseau à faire sur place, pas quelque chose que ce code peut
- * automatiser).
+ * Construction du XML ePOS-Print d'Epson pour les deux tickets (reçu
+ * client + bon de cuisine). Depuis 2026-10-13, l'impression ne dépend plus
+ * d'aucun appareil local (ni navigateur, ni relais, ni Mac/iPad allumé) :
+ * l'imprimante va elle-même chercher son travail via Server Direct Print
+ * (`app/api/print/epson/[token]`), qui utilise les variantes `*Brut`
+ * ci-dessous (sans enveloppe SOAP, cf. `eposPrintSeul` — Server Direct
+ * Print n'accepte jamais l'enveloppe SOAP classique). Les variantes avec
+ * enveloppe (`construireTicketClientXml`/`construireBonCuisineXml`) ne
+ * sont plus utilisées, conservées uniquement si un envoi direct
+ * navigateur→imprimante redevenait nécessaire un jour.
  *
- * Aucune librairie tierce : le protocole est un simple POST XML documenté
- * par Epson, et le QR code est généré par l'imprimante elle-même via
+ * Aucune librairie tierce : le protocole est un simple XML documenté par
+ * Epson, et le QR code est généré par l'imprimante elle-même via
  * `<symbol type="qrcode_model_2">` — pas besoin de le rasteriser côté code.
  */
 
-const TIMEOUT_MS = 5000;
 
 function echapperXml(texte: string): string {
   return texte
@@ -467,85 +466,3 @@ export function construireBonCuisineXmlBrut(commande: CommandePourImpression): s
   return eposPrintSeul(construireContenuBonCuisine(commande));
 }
 
-/**
- * Les imprimantes Epson TM ne renvoient jamais les en-têtes CORS
- * (Access-Control-Allow-Origin) sur leur service ePOS-Print, et n'offrent
- * aucun réglage pour l'activer (vérifié exhaustivement le 2026-10-09 dans
- * tous les onglets de leur Web Config, modèle TM-m30III). Un site public
- * (3sauces.fr) qui leur parle en HTTPS depuis le navigateur se heurte donc
- * systématiquement à un préflight que l'imprimante ne sait pas satisfaire
- * ("blocked by CORS policy"). Un contournement purement client (mode
- * "no-cors", Content-Type générique pour éviter le préflight) part bien
- * mais l'imprimante ignore alors silencieusement la requête : elle attend
- * un vrai `text/xml`, qui lui, redéclenche le préflight — cul-de-sac.
- *
- * `envoyerDirectement` : ancien comportement, conservé comme repli quand
- * aucun relais n'est configuré (`config.relaisUrl` null) — souvent sans
- * effet avec ces imprimantes pour la raison ci-dessus, mais jamais
- * bloquant pour la commande elle-même.
- */
-async function envoyerDirectement(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
-  const url = `https://${config.adresseIp}:${config.port}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
-  const controleur = new AbortController();
-  const minuteur = setTimeout(() => controleur.abort(), TIMEOUT_MS);
-
-  try {
-    await fetch(url, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=UTF-8" },
-      body: xml,
-      signal: controleur.signal,
-    });
-    return { ok: true };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Erreur inconnue.";
-    return { ok: false, erreur: `Imprimante injoignable (${config.adresseIp}) : ${message}` };
-  } finally {
-    clearTimeout(minuteur);
-  }
-}
-
-/**
- * Passe par le petit relais local (cf. scripts/relais-impression/), qui
- * tourne sur un ordinateur du réseau du restaurant : lui répond avec les
- * bons en-têtes CORS (qu'on contrôle, contrairement au firmware Epson),
- * puis retransmet la requête à l'imprimante en serveur-à-serveur — jamais
- * soumis aux restrictions CORS du navigateur. Avantage sur l'envoi direct :
- * la vraie réponse de l'imprimante redevient lisible, `success="true"` est
- * donc revérifié comme avant ce blocage.
- */
-async function envoyerViaRelais(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
-  const urlCible = `https://${config.adresseIp}:${config.port}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000`;
-  const controleur = new AbortController();
-  const minuteur = setTimeout(() => controleur.abort(), TIMEOUT_MS);
-
-  try {
-    const reponse = await fetch(`${config.relaisUrl!.replace(/\/$/, "")}/print`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: urlCible, xml }),
-      signal: controleur.signal,
-    });
-    const data = await reponse.json().catch(() => null);
-    if (!reponse.ok || !data?.ok) {
-      return { ok: false, erreur: data?.erreur ?? `Relais ou imprimante en erreur (HTTP ${reponse.status}).` };
-    }
-    if (!(data.corps as string | undefined)?.includes('success="true"')) {
-      return { ok: false, erreur: "Réponse imprimante inattendue via le relais." };
-    }
-    return { ok: true };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Erreur inconnue.";
-    return { ok: false, erreur: `Relais d'impression injoignable (${config.relaisUrl}) : ${message}` };
-  } finally {
-    clearTimeout(minuteur);
-  }
-}
-
-export async function envoyerImpression(xml: string, config: ConfigImprimante): Promise<ResultatImpression> {
-  if (config.relaisUrl) {
-    return envoyerViaRelais(xml, config);
-  }
-  return envoyerDirectement(xml, config);
-}

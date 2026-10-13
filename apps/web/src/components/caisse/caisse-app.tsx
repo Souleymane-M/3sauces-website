@@ -15,7 +15,6 @@ import {
 } from "@/lib/commande-publique/types";
 import {
   prochainCreneauValide,
-  construireHeureSouhaiteeUtc,
   heureActuelleMayotteMinutes,
   creneauxPourDate,
   prochainesDatesOuvertes,
@@ -26,9 +25,7 @@ import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
 import { DatePicker } from "@/components/commande-publique/date-picker";
-import type { ImprimanteAdmin } from "@/lib/patron/imprimantes-types";
-import type { CommandePourImpression, ConfigImprimante } from "@/lib/impression/types";
-import { imprimerCommande, type ConfigImprimantes } from "@/lib/impression/imprimer-commande";
+import type { CommandePourImpression } from "@/lib/impression/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
@@ -84,7 +81,6 @@ interface CaisseAppProps {
   /** Parfums de la Boisson 2L — référentiel indépendant de `saveurs` (canettes), cf. lib/patron/options.ts. */
   parfums2l: SaveurCaisse[];
   parametres: ParametresLivraisonPublic;
-  imprimantesInitiales: ImprimanteAdmin[];
   nomEmploye: string;
   /** Présent uniquement quand /caisse est ouvert via `?modifier=<id>` — bascule tout l'écran en mode édition d'une commande déjà "en_attente" plutôt qu'en prise de commande. */
   commandeExistante?: CommandeAModifier | null;
@@ -98,14 +94,6 @@ const CLE_CURSEUR = "caisse_impression_depuis";
 const CLE_IMPRIMES = "caisse_impression_imprimes";
 const MAX_IDS_MEMORISES = 200;
 const INTERVALLE_POLLING_MS = 7000;
-
-function versConfigImprimantes(liste: ImprimanteAdmin[]): ConfigImprimantes {
-  const comptoir = liste.find((i) => i.role === "comptoir");
-  const cuisine = liste.find((i) => i.role === "cuisine");
-  const config = (i: ImprimanteAdmin | undefined): ConfigImprimante | null =>
-    i?.adresseIp ? { adresseIp: i.adresseIp, port: i.port, relaisUrl: i.relaisUrl } : null;
-  return { comptoir: config(comptoir), cuisine: config(cuisine) };
-}
 
 interface Section {
   key: string;
@@ -175,7 +163,6 @@ export function CaisseApp({
   saveurs,
   parfums2l,
   parametres,
-  imprimantesInitiales,
   nomEmploye,
   commandeExistante,
 }: CaisseAppProps) {
@@ -410,32 +397,8 @@ export function CaisseApp({
   // re-récupérée juste avant chaque impression (pas seulement au chargement)
   // pour qu'un changement d'IP fait depuis /patron en plein service prenne
   // effet sans recharger l'onglet.
-  const [imprimantes, setImprimantes] = useState<ImprimanteAdmin[]>(imprimantesInitiales);
-  const [avertissementImpression, setAvertissementImpression] = useState<string | null>(null);
   const depuisRef = useRef<string | null>(null);
   const idsImprimesRef = useRef<Set<string>>(new Set());
-
-  async function recupererImprimantes(): Promise<ImprimanteAdmin[]> {
-    try {
-      const reponse = await fetch("/api/caisse/imprimantes", { cache: "no-store" });
-      if (!reponse.ok) return imprimantes;
-      const data = await reponse.json();
-      const liste: ImprimanteAdmin[] = data.imprimantes ?? imprimantes;
-      setImprimantes(liste);
-      return liste;
-    } catch {
-      return imprimantes;
-    }
-  }
-
-  async function imprimerEtSignaler(commande: CommandePourImpression) {
-    const liste = await recupererImprimantes();
-    const resultat = await imprimerCommande(commande, versConfigImprimantes(liste));
-    const messages: string[] = [];
-    if (resultat.comptoir && !resultat.comptoir.ok) messages.push(`Comptoir : ${resultat.comptoir.erreur}`);
-    if (resultat.cuisine && !resultat.cuisine.ok) messages.push(`Cuisine : ${resultat.cuisine.erreur}`);
-    setAvertissementImpression(messages.length > 0 ? messages.join(" · ") : null);
-  }
 
   // Détecte les commandes reçues depuis le site public (jamais celles
   // prises au comptoir, cf. lib/caisse/nouvelles-commandes.ts) pour les
@@ -1247,53 +1210,11 @@ export function CaisseApp({
       }
       setConfirmation({ commandeId: data.commandeId, montant: data.montant, canal, encaisse: encaisserEffectif });
 
-      // Impression immédiate, sans bloquer l'écran de confirmation : une
-      // imprimante non configurée ou hors ligne n'empêche jamais
-      // l'encaissement (déjà enregistré à ce stade), juste un avertissement
-      // discret (cf. imprimerEtSignaler).
-      const lignesPourImpression: LigneCommande[] = (
-        enModeGroupe
-          ? plats.flatMap((plat, index) =>
-              plat.lignes.map((l) => ({ ligne: l, pourQui: plat.pourQui.trim() || null, platIndex: index }))
-            )
-          : panierSimple.map((l) => ({ ligne: l, pourQui: null, platIndex: null }))
-      ).map(({ ligne: l, pourQui, platIndex }) => ({
-        produitId: l.produit.id,
-        nom: l.produit.nom,
-        categorie: l.produit.categorie,
-        quantite: l.quantite,
-        prixUnitaire: prixLigne(l),
-        coutMatiereUnitaire: l.produit.coutMatiere,
-        viandes: l.viandes,
-        sauces: l.sauces,
-        saveurs: l.saveurs,
-        boissonIncluse: l.boissonIncluse,
-        sansBoisson: l.sansBoisson,
-        canetteIncluse: l.produit.canetteIncluse,
-        saladeIncluse: l.saladeIncluse,
-        accompagnementsInclus: l.accompagnementsInclus,
-        pourQui,
-        platIndex,
-      }));
-      imprimerEtSignaler({
-        id: data.commandeId,
-        numero: data.numero,
-        canal,
-        lignes: lignesPourImpression,
-        montant: data.montant,
-        modePaiement,
-        nom: `${prenom.trim()} ${nom.trim()}`.trim(),
-        adresse: canal === "livraison" ? adresse.trim() : null,
-        heureSouhaitee: construireHeureSouhaiteeUtc(creneauHeure, dateCommande)?.toISOString() ?? null,
-        creeLe: new Date().toISOString(),
-        qrCode: canal === "livraison" ? (data.qrCode ?? null) : null,
-        nbPlats: enModeGroupe ? nbPlatsValides : 0,
-        clientTelephone: telephoneComplet || null,
-        tamponsAffiches: data.tamponsAffiches ?? null,
-        recompenseDisponible: data.recompenseDisponible ?? false,
-        messageDuMoment: data.messageDuMoment ?? null,
-      });
-
+      // Impression désormais entièrement gérée côté serveur : l'imprimante
+      // va elle-même chercher cette commande via Server Direct Print dans
+      // les secondes qui suivent (cf. lib/caisse/nouvelles-commandes.ts,
+      // app/api/print/epson/[token]) — plus aucun appel depuis le
+      // navigateur, plus de dépendance au relais local.
       setPanierSimple([]);
       setPlats([platVide(1)]);
       setPlatDeplie(null);
@@ -1593,15 +1514,6 @@ export function CaisseApp({
 
           <div id="panier-caisse" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-gray-500">Caissier·e : {nomEmploye}</p>
-            <p className="text-xs text-gray-400">
-              🖨️{" "}
-              {imprimantes
-                .map(
-                  (i) => `${i.role === "comptoir" ? "Comptoir" : "Cuisine"} ${i.adresseIp ? "configurée" : "non configurée"}`
-                )
-                .join(" · ")}
-            </p>
-            {avertissementImpression && <p className="text-xs text-orange-600">⚠️ {avertissementImpression}</p>}
 
             {enModeGroupe && (
               <div className="rounded-lg border border-[#8B2020] p-3">

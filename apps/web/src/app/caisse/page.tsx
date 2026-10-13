@@ -12,7 +12,6 @@ import {
   listerParfums2lActifs,
 } from "@/lib/caisse/produits";
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
-import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
 import { listerCommandesActives } from "@/lib/cuisine/commandes";
 import { chargerCommandePourModification } from "@/lib/caisse/modification";
@@ -38,7 +37,7 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
 
   const { modifier } = await searchParams;
 
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres, imprimantes, livraisonsAEncaisser, commandesActives, modification] =
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres, livraisonsAEncaisser, commandesActives, modification] =
     await Promise.all([
       listerProduitsActifs(),
       listerViandesActives(),
@@ -46,7 +45,6 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
       listerSaveursActives(),
       listerParfums2lActifs(),
       chargerParametresLivraisonPublics(),
-      listerImprimantesAdmin(),
       listerLivraisonsAEncaisser(),
       listerCommandesActives(),
       modifier ? chargerCommandePourModification(modifier) : Promise.resolve(null),
@@ -108,7 +106,6 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
         saveurs={saveurs}
         parfums2l={parfums2l}
         parametres={parametres}
-        imprimantesInitiales={imprimantes}
         nomEmploye={session.nom}
         commandeExistante={modification?.commande ?? null}
       />

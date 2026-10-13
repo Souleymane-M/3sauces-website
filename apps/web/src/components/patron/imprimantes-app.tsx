@@ -9,38 +9,25 @@ interface ImprimantesAppProps {
 
 interface Brouillon {
   nom: string;
-  adresseIp: string;
-  port: string;
-  relaisUrl: string;
   directPrintToken: string;
 }
 
 function versBrouillon(i: ImprimanteAdmin): Brouillon {
-  return {
-    nom: i.nom,
-    adresseIp: i.adresseIp ?? "",
-    port: String(i.port),
-    relaisUrl: i.relaisUrl ?? "",
-    directPrintToken: i.directPrintToken ?? "",
-  };
+  return { nom: i.nom, directPrintToken: i.directPrintToken ?? "" };
 }
 
 function estModifie(brouillon: Brouillon, i: ImprimanteAdmin): boolean {
   const reference = versBrouillon(i);
-  return (
-    brouillon.nom !== reference.nom ||
-    brouillon.adresseIp !== reference.adresseIp ||
-    brouillon.port !== reference.port ||
-    brouillon.relaisUrl !== reference.relaisUrl ||
-    brouillon.directPrintToken !== reference.directPrintToken
-  );
+  return brouillon.nom !== reference.nom || brouillon.directPrintToken !== reference.directPrintToken;
 }
 
 /**
  * Configuration des 2 imprimantes thermiques (comptoir/cuisine) — cf.
  * lib/patron/imprimantes.ts. Contrairement à ProduitsApp/OptionsApp, ce sont
  * 2 lignes fixes créées par la migration : pas d'ajout ni de suppression
- * ici, juste éditer nom/adresse IP/port.
+ * ici, juste éditer le nom et le jeton Server Direct Print. Depuis
+ * 2026-10-13, plus besoin d'adresse IP/port/relais : l'imprimante va
+ * elle-même chercher son travail, identifiée uniquement par ce jeton.
  */
 export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
   const [imprimantes, setImprimantes] = useState<ImprimanteAdmin[]>(imprimantesInitiales);
@@ -63,17 +50,6 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       setErreur("Le nom ne peut pas être vide.");
       return;
     }
-    const port = Number(brouillon.port);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      setErreur("Port invalide (1 à 65535).");
-      return;
-    }
-    const adresseIp = brouillon.adresseIp.trim() || null;
-    if (adresseIp && !/^(\d{1,3}\.){3}\d{1,3}$/.test(adresseIp)) {
-      setErreur("Adresse IP invalide (ex: 192.168.1.50).");
-      return;
-    }
-    const relaisUrl = brouillon.relaisUrl.trim() || null;
     const directPrintToken = brouillon.directPrintToken.trim() || null;
 
     setErreur(null);
@@ -82,14 +58,14 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
       const reponse = await fetch("/api/patron/imprimantes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: imprimante.id, nom, adresseIp, port, relaisUrl, directPrintToken }),
+        body: JSON.stringify({ id: imprimante.id, nom, directPrintToken }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
         setErreur(data.error ?? "Échec de l'enregistrement.");
         return;
       }
-      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, adresseIp, port, relaisUrl, directPrintToken };
+      const imprimanteMiseAJour: ImprimanteAdmin = { ...imprimante, nom, directPrintToken };
       setImprimantes((precedent) => precedent.map((i) => (i.id === imprimante.id ? imprimanteMiseAJour : i)));
       setBrouillons((precedent) => ({ ...precedent, [imprimante.id]: versBrouillon(imprimanteMiseAJour) }));
     } finally {
@@ -101,8 +77,8 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Imprimantes</h2>
       <p className="text-xs text-gray-500">
-        Adresse IP visible dans le menu réseau de l&apos;imprimante Epson TM-m30 (ou sur un ticket de test réseau).
-        Laisser l&apos;adresse IP vide désactive l&apos;impression pour cette imprimante, sans bloquer les commandes.
+        L&apos;imprimante va elle-même chercher son travail (Server Direct Print), sans dépendre d&apos;un relais ni
+        d&apos;un ordinateur allumé — jamais besoin d&apos;adresse IP ici.
       </p>
       {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
 
@@ -119,29 +95,6 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
                 placeholder="Nom"
                 className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
               />
-              <input
-                value={brouillon.adresseIp}
-                onChange={(e) => modifierBrouillon(imprimante.id, "adresseIp", e.target.value)}
-                placeholder="Adresse IP (ex: 192.168.1.50)"
-                className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-              />
-              <input
-                value={brouillon.port}
-                onChange={(e) => modifierBrouillon(imprimante.id, "port", e.target.value)}
-                placeholder="Port"
-                inputMode="numeric"
-                className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-              />
-              <input
-                value={brouillon.relaisUrl}
-                onChange={(e) => modifierBrouillon(imprimante.id, "relaisUrl", e.target.value)}
-                placeholder="Adresse du relais d'impression"
-                className="w-full rounded border border-gray-600 bg-gray-900 p-2 text-sm text-white"
-              />
-              <p className="text-xs text-gray-500">
-                Optionnel — adresse du petit relais local qui contourne le blocage CORS de l&apos;imprimante (ex:
-                https://192.168.x.x:8099). Laisser vide pour une tentative d&apos;impression directe.
-              </p>
 
               <div className="flex gap-2">
                 <input
@@ -160,15 +113,10 @@ export function ImprimantesApp({ imprimantesInitiales }: ImprimantesAppProps) {
               </div>
               {brouillon.directPrintToken && (
                 <p className="rounded bg-gray-900 p-2 text-xs break-all text-gray-400">
-                  À coller dans l&apos;imprimante (Services → Server Direct Print → URL) :<br />
+                  À coller dans l&apos;imprimante (Services → Server Direct Print → Server1 → URL) :<br />
                   {typeof window !== "undefined" ? window.location.origin : ""}/api/print/epson/{brouillon.directPrintToken}
                 </p>
               )}
-              <p className="text-xs text-gray-500">
-                Optionnel — l&apos;imprimante va elle-même chercher son travail à cette adresse toutes les quelques
-                secondes, sans dépendre d&apos;un relais ni d&apos;un ordinateur allumé. Se configure une seule fois
-                directement sur l&apos;imprimante.
-              </p>
 
               {modifie && (
                 <button

@@ -202,10 +202,11 @@ const DELAI_RECONFIRMATION_MS = 2 * 60 * 1000;
 /**
  * Toutes les commandes publiques payées, pas encore imprimées, dont
  * l'heure souhaitée tombe aujourd'hui (commande du jour même ou commande
- * à l'avance dont le jour est enfin arrivé) — la requête du relais
- * d'impression local ET de la route Epson "Server Direct Print"
- * (`app/api/print/epson/[token]`), partagée pour ne jamais avoir deux
- * définitions de "qu'est-ce qui reste à imprimer" qui divergent.
+ * à l'avance dont le jour est enfin arrivé), **y compris les ventes prises
+ * directement au comptoir** depuis 2026-10-13 — l'impression ne dépend
+ * plus d'aucun appareil local (relais/iPad/Mac), uniquement de cette
+ * requête, sondée par l'imprimante elle-même via Server Direct Print
+ * (`app/api/print/epson/[token]`).
  *
  * `ticket_remis_le` filtre les tickets déjà envoyés à l'imprimante il y a
  * moins de `DELAI_RECONFIRMATION_MS` : sans ça, un échec silencieux de
@@ -220,7 +221,6 @@ export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpr
   const { data: commandes, error } = await supabase
     .from("commandes")
     .select(SELECT_POUR_IMPRESSION)
-    .is("commande_par", null)
     .is("ticket_imprime_le", null)
     .or(`ticket_remis_le.is.null,ticket_remis_le.lt.${limiteReconfirmation}`)
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
