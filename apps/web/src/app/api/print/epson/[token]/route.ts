@@ -1,22 +1,8 @@
 import { NextResponse } from "next/server";
-import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { construireTicketClientXmlBrut, construireBonCuisineXmlBrut } from "@/lib/impression/epos-print";
 import { analyserResultats } from "@/lib/impression/epos-response";
 import { marquerTicketRemis, marquerDernierTicketRemisImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
-
-// DIAGNOSTIC TEMPORAIRE (2026-10-13) : l'imprimante remet le ticket en
-// boucle sans jamais confirmer, sans erreur visible dessus — capture brute
-// de chaque requête pour comprendre ce qu'elle envoie réellement en
-// SetResponse. À retirer une fois diagnostiqué (cf. debug_print_log).
-async function journaliserDebug(connectionType: string | null, corps: string) {
-  try {
-    const supabase = createServiceSupabaseClient();
-    await supabase.from("debug_print_log").insert({ connection_type: connectionType, corps: corps.slice(0, 5000) });
-  } catch {
-    // Jamais bloquant.
-  }
-}
 
 /**
  * Là où l'imprimante Epson (fonction "Server Direct Print", activée
@@ -76,7 +62,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     }
     const formulaire = new URLSearchParams(corps);
     const typeConnexion = formulaire.get("ConnectionType");
-    await journaliserDebug(typeConnexion, corps);
 
     if (typeConnexion === "SetResponse") {
       // Micrologiciel trop ancien pour renvoyer le `printjobid` dans le
@@ -107,9 +92,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     await marquerTicketRemis(commande.id);
 
     const xml = `<?xml version="1.0" encoding="utf-8"?><PrintRequestInfo Version="1.00">${jobs}</PrintRequestInfo>`;
-    await journaliserDebug("GetRequest-reponse", xml);
     return new NextResponse(xml, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });
-  } catch {
-    return new NextResponse(null, { status: 500 });
+  } catch (e) {
+    // DIAGNOSTIC TEMPORAIRE (2026-10-13 bis) : réponse vide inattendue avec
+    // des commandes qui correspondent pourtant à la requête — exposer
+    // l'erreur réelle en en-tête pour diagnostiquer sans table de log. À
+    // retirer une fois la cause confirmée.
+    const message = e instanceof Error ? e.message : String(e);
+    return new NextResponse(null, { status: 500, headers: { "X-Debug-Error": message.slice(0, 500) } });
   }
 }
