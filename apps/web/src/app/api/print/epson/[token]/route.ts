@@ -102,6 +102,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     await Promise.all(commandes.map((commande) => marquerTicketRemis(commande.id)));
 
     const xml = `<?xml version="1.0" encoding="utf-8"?><PrintRequestInfo Version="2.00">${jobs}</PrintRequestInfo>`;
+    await journaliserDebug("GetRequest-reponse", xml);
     return new NextResponse(xml, { status: 200, headers: { "Content-Type": XML_CONTENT_TYPE } });
   } catch {
     return new NextResponse(null, { status: 500 });
