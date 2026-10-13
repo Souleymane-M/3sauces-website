@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
+import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { construireTicketClientXml, construireBonCuisineXml } from "@/lib/impression/epos-print";
 import { analyserResultats } from "@/lib/impression/epos-response";
 import { marquerTicketImprime, marquerTicketRemis, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
+
+// DIAGNOSTIC TEMPORAIRE (2026-10-13) : l'imprimante remet le ticket en
+// boucle sans jamais confirmer, sans erreur visible dessus — capture brute
+// de chaque requête pour comprendre ce qu'elle envoie réellement en
+// SetResponse. À retirer une fois diagnostiqué (cf. debug_print_log).
+async function journaliserDebug(connectionType: string | null, corps: string) {
+  try {
+    const supabase = createServiceSupabaseClient();
+    await supabase.from("debug_print_log").insert({ connection_type: connectionType, corps: corps.slice(0, 5000) });
+  } catch {
+    // Jamais bloquant.
+  }
+}
 
 /**
  * Là où l'imprimante Epson (fonction "Server Direct Print", activée
@@ -52,6 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     }
     const formulaire = new URLSearchParams(corps);
     const typeConnexion = formulaire.get("ConnectionType");
+    await journaliserDebug(typeConnexion, corps);
 
     if (typeConnexion === "SetResponse") {
       // L'imprimante rapporte le résultat des jobs qu'on lui a remis —
