@@ -30,7 +30,11 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase.from("clients").select("email, montant_cumule").eq("telephone", telephone).maybeSingle();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("email, montant_cumule, nom, prenom")
+    .eq("telephone", telephone)
+    .maybeSingle();
 
   if (error) {
     console.error("[/api/fidelite/solde] échec lecture client :", error.message);
@@ -45,10 +49,27 @@ export async function POST(request: Request) {
 
   const tampons = await compterTamponsDisponibles(supabase, telephone);
 
+  // Dernière adresse de livraison connue — purement un confort de
+  // pré-remplissage (le client peut toujours la modifier), jamais une
+  // source de vérité : une commande peut très bien être livrée ailleurs.
+  const { data: derniereLivraison } = await supabase
+    .from("commandes")
+    .select("adresse_livraison, zone_livraison")
+    .eq("client_telephone", telephone)
+    .eq("canal", "livraison")
+    .not("adresse_livraison", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return NextResponse.json({
     telephone,
     tamponsDisponibles: tampons.nombre,
     prochaineExpiration: tampons.prochaineExpiration,
     montantCumule: data.montant_cumule,
+    nom: data.nom,
+    prenom: data.prenom,
+    derniereAdresseLivraison: derniereLivraison?.adresse_livraison ?? null,
+    derniereZoneLivraison: derniereLivraison?.zone_livraison ?? null,
   });
 }

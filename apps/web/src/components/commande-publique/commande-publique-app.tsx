@@ -1140,28 +1140,6 @@ export function CommandePubliqueApp({
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
-        <CarteFidelite
-          montantPanier={total}
-          nbTampons={nbTamponsEffectif}
-          onChangeNbTampons={setNbTampons}
-          onSoldeVerifie={(verifie, tel, email, tamponsDisponibles) =>
-            setFideliteVerifiee(
-              verifie && tel && email ? { telephone: tel, email, tamponsDisponibles: tamponsDisponibles ?? 0 } : null
-            )
-          }
-          onPrefillTelephone={(tel) => setTelephone((precedent) => precedent.trim() || tel)}
-          telephoneCommande={normaliserTelephone(telephone) ?? ""}
-          emailCommande={email}
-        />
-
-        {parametres.remiseLancementActive && (
-          <div className="rounded-lg p-3 text-white" style={{ backgroundColor: ROUGE }}>
-            <p className="font-bold">
-              🚀 Lancement 3sauces.fr — -{MONTANT_REMISE_LANCEMENT}€ dès {SEUIL_REMISE_LANCEMENT}€ d&apos;achat,
-              jusqu&apos;au {parametres.remiseLancementFinLibelle}
-            </p>
-          </div>
-        )}
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
           <p className="font-bold">🚀 Vous êtes plusieurs ? Commandez en groupe, avant 11h :</p>
           <p className="mt-1 text-sm text-white/90">
@@ -1208,6 +1186,27 @@ export function CommandePubliqueApp({
             >
               ← Changer de mode ({modeCommande === "groupee" ? "commande groupée" : "commande simple"})
             </button>
+
+            <CarteFidelite
+              montantPanier={total}
+              nbTampons={nbTamponsEffectif}
+              onChangeNbTampons={setNbTampons}
+              onSoldeVerifie={(verifie, tel, email, tamponsDisponibles) =>
+                setFideliteVerifiee(
+                  verifie && tel && email ? { telephone: tel, email, tamponsDisponibles: tamponsDisponibles ?? 0 } : null
+                )
+              }
+              onPrefillIdentite={(infos) => {
+                setTelephone((precedent) => precedent.trim() || infos.telephone);
+                setEmail((precedent) => precedent.trim() || infos.email);
+                if (infos.nom) setNom((precedent) => precedent.trim() || infos.nom!);
+                if (infos.prenom) setPrenom((precedent) => precedent.trim() || infos.prenom!);
+                if (canal === "livraison") {
+                  if (infos.adresse) setAdresse((precedent) => precedent.trim() || infos.adresse!);
+                  if (infos.zone) setZone((precedent) => precedent.trim() || infos.zone!);
+                }
+              }}
+            />
 
             {modeCommande === "groupee" && (
               <div className="rounded-lg border border-[#8B2020] bg-white p-3">
