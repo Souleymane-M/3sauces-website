@@ -16,10 +16,10 @@ export interface CommandePourImpression {
   lignes: LigneCommande[];
   montant: number;
   modePaiement: ModePaiementCommande;
+  /** true si le montant est déjà réglé (Stripe, ou encaissé au comptoir) — pour afficher "DÉJÀ PAYÉ" plutôt que "À PAYER" dans le bloc client. */
+  dejaPayee: boolean;
   nom: string;
   adresse: string | null;
-  /** Commune de livraison (ex: "Dembéni") — distincte de l'adresse complète, pour le bloc livraison bien visible du reçu. */
-  zoneLivraison: string | null;
   heureSouhaitee: string | null;
   creeLe: string;
   qrCode: string | null;

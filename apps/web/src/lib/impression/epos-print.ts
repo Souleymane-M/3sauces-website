@@ -290,19 +290,20 @@ function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourIm
 }
 
 const URL_SITE = "https://3sauces.fr";
-const BORDURE_LIVRAISON = "=".repeat(32);
+const BORDURE_BLOC_CLIENT = "=".repeat(32);
 
 /**
- * Bloc encadré bien visible pour une livraison (nom, lieu, adresse,
- * téléphone en gros, total à payer) — demande explicite du patron le
- * 2026-10-13 : sur le reçu classique ces infos se perdaient, trop petites
- * et serrées au milieu du reste, alors que c'est l'essentiel pour le
- * livreur d'un coup d'œil.
+ * Bloc encadré bien visible pour les infos client (nom, adresse si
+ * livraison, téléphone en gros, statut du paiement) — demande explicite du
+ * patron : sur le reçu classique ces infos se perdaient, trop petites et
+ * serrées au milieu du reste. D'abord réservé à la livraison (2026-10-13),
+ * puis étendu à tous les canaux (2026-10-14) : le même besoin de visibilité
+ * immédiate existe pour le sur place/à emporter.
  */
-function imprimerBlocLivraison(b: ConstructeurTicket, commande: CommandePourImpression): void {
-  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
-  b.ligne("LIVRAISON", { align: "center", gras: true, taille: 2 });
-  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
+function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpression): void {
+  b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
+  b.ligne(libelleCanal(commande.canal).toUpperCase(), { align: "center", gras: true, taille: 2 });
+  b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
   if (commande.adresse) {
     b.brut(`<feed line="1"/>`);
@@ -313,9 +314,9 @@ function imprimerBlocLivraison(b: ConstructeurTicket, commande: CommandePourImpr
     b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: true, taille: 2 });
   }
   b.brut(`<feed line="1"/>`);
-  const libelleMontant = commande.modePaiement === "stripe" ? "DEJA PAYE" : "A PAYER";
+  const libelleMontant = commande.dejaPayee ? "DEJA PAYE" : "A PAYER";
   b.ligne(`${libelleMontant} : ${commande.montant.toFixed(2)} €`, { align: "left", gras: true, taille: 2 });
-  b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
+  b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
 }
 
 function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
@@ -381,9 +382,6 @@ function construireContenuTicketClient(
   }
 
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
-  if (commande.canal !== "livraison" && commande.clientTelephone) {
-    b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: false, taille: 1 });
-  }
   separateur(b);
 
   for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
@@ -407,20 +405,15 @@ function construireContenuTicketClient(
     b.ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
   }
 
-  const heureLabel = commande.heureSouhaitee ? libelleHeureSouhaitee(commande.heureSouhaitee) : null;
-  b.ligne(`${libelleCanal(commande.canal).toUpperCase()}${heureLabel ? ` · ${heureLabel}` : ""}`, {
-    align: "left",
-    gras: true,
-    taille: 1,
-  });
+  if (commande.heureSouhaitee) {
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "left", gras: true, taille: 1 });
+  }
 
-  if (commande.canal === "livraison") {
-    imprimerBlocLivraison(b, commande);
-    if (commande.qrCode) {
-      b.brut(`<feed line="1"/>`);
-      b.brut(styleTexte({ align: "center" }));
-      b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`);
-    }
+  imprimerBlocClient(b, commande);
+  if (commande.canal === "livraison" && commande.qrCode) {
+    b.brut(`<feed line="1"/>`);
+    b.brut(styleTexte({ align: "center" }));
+    b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`);
   }
 
   imprimerBlocFidelite(b, commande);
