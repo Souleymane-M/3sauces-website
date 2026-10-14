@@ -381,6 +381,9 @@ function construireContenuTicketClient(
   }
 
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  if (commande.canal !== "livraison" && commande.clientTelephone) {
+    b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: false, taille: 1 });
+  }
   separateur(b);
 
   for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
@@ -466,7 +469,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   }
 
   b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
-  if (commande.canal === "livraison" && commande.clientTelephone) {
+  if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
   }
   separateur(b);
