@@ -304,11 +304,15 @@ function imprimerBlocLivraison(b: ConstructeurTicket, commande: CommandePourImpr
   b.ligne("LIVRAISON", { align: "center", gras: true, taille: 2 });
   b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
-  if (commande.zoneLivraison) b.ligne(commande.zoneLivraison, { align: "left", gras: true, taille: 2 });
-  if (commande.adresse) b.ligne(commande.adresse, { align: "left", gras: true, taille: 1 });
+  if (commande.adresse) {
+    b.brut(`<feed line="1"/>`);
+    b.ligne(commande.adresse, { align: "left", gras: true, taille: 2 });
+  }
   if (commande.clientTelephone) {
+    b.brut(`<feed line="1"/>`);
     b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: true, taille: 2 });
   }
+  b.brut(`<feed line="1"/>`);
   const libelleMontant = commande.modePaiement === "stripe" ? "DEJA PAYE" : "A PAYER";
   b.ligne(`${libelleMontant} : ${commande.montant.toFixed(2)} €`, { align: "left", gras: true, taille: 2 });
   b.ligne(BORDURE_LIVRAISON, { align: "center", gras: true, taille: 1 });
