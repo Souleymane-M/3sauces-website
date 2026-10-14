@@ -3,7 +3,6 @@ import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
-import { TAGLINE_FIDELITE } from "@/lib/fidelite/regles";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 
 /**
@@ -328,7 +327,6 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
   } else {
-    b.ligne(TAGLINE_FIDELITE, { align: "center", gras: false, taille: 1 });
     b.ligne("Suivez vos tampons sur 3sauces.fr/fidelite", { align: "center", gras: false, taille: 1 });
   }
 }
