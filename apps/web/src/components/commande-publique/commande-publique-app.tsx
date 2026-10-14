@@ -34,6 +34,8 @@ import {
   palierGroupeActif,
   palierGroupeSelonQuantite,
   messageProgressionBoissonOfferte,
+  nombreBoissonsOffertes,
+  type PalierGroupe,
 } from "@/lib/commande-publique/groupe-priorite";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ViandeModalPublique } from "./viande-modal-publique";
@@ -111,6 +113,88 @@ function platVide(numero: number): PlatGroupe {
   return { id: `plat-${numero}-${Date.now()}-${Math.random()}`, pourQui: "", lignes: [] };
 }
 
+/**
+ * Progression vers livraison prioritaire / boisson(s) offerte(s) — commune
+ * aux deux modes (simple et groupée) depuis le 2026-10-14 : avant, ce bloc
+ * n'existait que côté "Commande groupée", donc une commande simple n'avait
+ * jamais aucune chance de débloquer ces avantages, même largement au-dessus
+ * des seuils (ex: 90€ de grillades en commande simple). Composant à part
+ * (plutôt qu'un fragment JSX en ligne) pour limiter la taille/complexité du
+ * composant parent.
+ */
+function BlocProgressionGroupe({
+  nbArticles,
+  total,
+  canal,
+  palierGroupeReel,
+  groupeTropTard,
+  nbBoissonsOffertes,
+}: {
+  nbArticles: number;
+  total: number;
+  canal: CanalPublic | null;
+  palierGroupeReel: PalierGroupe;
+  groupeTropTard: boolean;
+  nbBoissonsOffertes: number;
+}) {
+  if (nbArticles > 0 && nbArticles < SEUIL_COMMANDE_PRIORITAIRE) {
+    return (
+      <p className="text-sm font-semibold text-orange-600">
+        Encore {SEUIL_COMMANDE_PRIORITAIRE - nbArticles} article
+        {SEUIL_COMMANDE_PRIORITAIRE - nbArticles > 1 ? "s" : ""} pour la livraison prioritaire 🚀
+      </p>
+    );
+  }
+  if (nbArticles < SEUIL_COMMANDE_PRIORITAIRE) return null;
+
+  if (groupeTropTard) {
+    return (
+      <p className="text-sm font-semibold text-orange-600">
+        Trop tard pour aujourd&apos;hui — cet avantage doit être débloqué avant 11h.
+      </p>
+    );
+  }
+  // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
+  // la priorité livraison, elle, reste propre à ce canal.
+  if (canal !== "livraison") {
+    if (palierGroupeReel === "GROUPE_4") {
+      return (
+        <p className="text-sm font-bold text-[#2D5A27]">
+          🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
+          {nbBoissonsOffertes > 1 ? "s" : ""} !
+        </p>
+      );
+    }
+    return (
+      <p className="text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>
+    );
+  }
+  if (palierGroupeReel === "GROUPE_4") {
+    return (
+      <p className="text-sm font-bold text-[#2D5A27]">
+        🚀 Livraison prioritaire + 🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
+        {nbBoissonsOffertes > 1 ? "s" : ""} !
+      </p>
+    );
+  }
+  if (palierGroupeReel === "GROUPE_3") {
+    return (
+      <p className="text-sm font-semibold text-[#2D5A27]">
+        🚀 Livraison prioritaire activée ! {messageProgressionBoissonOfferte(nbArticles, total)}
+      </p>
+    );
+  }
+  const montantRestant = Math.max(0, SEUIL_GROUPE_3_MONTANT - total);
+  if (montantRestant > 0) {
+    return (
+      <p className="text-sm font-semibold text-[#2D5A27]">
+        Encore {montantRestant.toFixed(2)}€ pour la livraison prioritaire 🚀
+      </p>
+    );
+  }
+  return null;
+}
+
 export function CommandePubliqueApp({
   produits,
   viandes,
@@ -152,7 +236,10 @@ export function CommandePubliqueApp({
   // n'avait jamais été demandée — le client doit cliquer explicitement sur
   // un des trois choix avant de pouvoir valider (2026-10-07).
   const [canal, setCanal] = useState<CanalPublic | null>(null);
-  const [boissonOfferteSaveur, setBoissonOfferteSaveur] = useState<string | null>(null);
+  // Un parfum par boisson 2L offerte (1 par tranche de 40€ entamée depuis le
+  // 2026-10-14, plus un seul flacon fixe) — index = position parmi les
+  // boissons offertes, jamais lié à un article du panier en particulier.
+  const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
 
   // Restauration du panier après un rechargement accidentel de l'onglet : on
   // ne persiste qu'après cette première lecture (`pretPourPersistance`),
@@ -179,7 +266,7 @@ export function CommandePubliqueApp({
           // recharge la page doit recliquer son mode de retrait à chaque
           // fois, sinon un choix fait il y a 20 minutes (ou avant même ce
           // correctif) reste "collé" sans qu'il ne le revoie (2026-10-07).
-          if (etat.boissonOfferteSaveur !== undefined) setBoissonOfferteSaveur(etat.boissonOfferteSaveur);
+          if (Array.isArray(etat.boissonOfferteSaveurs)) setBoissonOfferteSaveurs(etat.boissonOfferteSaveurs);
         }
       } catch {
         // sessionStorage indisponible ou contenu corrompu : on repart d'un panier vide, jamais bloquant.
@@ -193,12 +280,12 @@ export function CommandePubliqueApp({
     try {
       sessionStorage.setItem(
         CLE_PANIER_PUBLIC,
-        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveur })
+        JSON.stringify({ modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveurs })
       );
     } catch {
       // Stockage plein ou indisponible : la session continue simplement sans persistance.
     }
-  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveur]);
+  }, [pretPourPersistance, modeCommande, panierSimple, plats, platDeplie, platActifId, boissonOfferteSaveurs]);
 
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -368,10 +455,15 @@ export function CommandePubliqueApp({
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
   // Le palier (quantité/montant) est le même quel que soit le canal — seule
   // la priorité livraison, gérée à l'affichage ci-dessous, dépend du canal.
-  const palierGroupeReel = palierGroupeActif(nbPlatsValides, total, heureActuelleMayotteMinutes());
+  // `nbArticles` (quantité totale, peu importe le mode simple/groupé) sert
+  // ici, jamais `nbPlatsValides` (plats-conteneurs du seul mode groupé,
+  // toujours 0 en mode simple — une commande simple de 90€ de grillades ne
+  // touchait donc jamais ce palier, repéré le 2026-10-14).
+  const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
-  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbPlatsValides, total) !== null;
+  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
+  const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -926,7 +1018,8 @@ export function CommandePubliqueApp({
           fideliteTelephone: nbTamponsEffectif > 0 ? fideliteVerifiee?.telephone : undefined,
           fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
           nbTampons: nbTamponsEffectif,
-          boissonOfferteSaveur: palierGroupeReel === "GROUPE_4" ? (boissonOfferteSaveur ?? undefined) : undefined,
+          boissonOfferteSaveurs:
+            palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
         }),
       });
       const data = await reponse.json();
@@ -1365,59 +1458,17 @@ export function CommandePubliqueApp({
                       Plus qu&apos;un plat pour valider votre commande groupée.
                     </p>
                   )}
-                  {nbPlatsValides >= SEUIL_MINIMUM_GROUPE && nbPlatsValides < SEUIL_COMMANDE_PRIORITAIRE && (
-                    <p className="text-sm font-semibold text-orange-600">
-                      Encore {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides} plat
-                      {SEUIL_COMMANDE_PRIORITAIRE - nbPlatsValides > 1 ? "s" : ""} pour la livraison prioritaire 🚀
-                    </p>
-                  )}
-                  {nbPlatsValides >= SEUIL_COMMANDE_PRIORITAIRE &&
-                    (() => {
-                      if (groupeTropTard) {
-                        return (
-                          <p className="text-sm font-semibold text-orange-600">
-                            Trop tard pour aujourd&apos;hui — la commande groupée doit être passée avant 11h.
-                          </p>
-                        );
-                      }
-                      // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
-                      // la priorité livraison, elle, reste propre à ce canal.
-                      if (canal !== "livraison") {
-                        if (palierGroupeReel === "GROUPE_4") {
-                          return <p className="text-sm font-bold text-[#2D5A27]">🎁 Boisson 2L offerte !</p>;
-                        }
-                        return (
-                          <p className="text-sm font-semibold text-[#2D5A27]">
-                            {messageProgressionBoissonOfferte(nbPlatsValides, total)}
-                          </p>
-                        );
-                      }
-                      if (palierGroupeReel === "GROUPE_4") {
-                        return (
-                          <p className="text-sm font-bold text-[#2D5A27]">
-                            🚀 Livraison prioritaire + 🎁 boisson 2L offerte !
-                          </p>
-                        );
-                      }
-                      if (palierGroupeReel === "GROUPE_3") {
-                        return (
-                          <p className="text-sm font-semibold text-[#2D5A27]">
-                            🚀 Livraison prioritaire activée ! {messageProgressionBoissonOfferte(nbPlatsValides, total)}
-                          </p>
-                        );
-                      }
-                      const montantRestant = Math.max(0, SEUIL_GROUPE_3_MONTANT - total);
-                      if (montantRestant > 0) {
-                        return (
-                          <p className="text-sm font-semibold text-[#2D5A27]">
-                            Encore {montantRestant.toFixed(2)}€ pour la livraison prioritaire 🚀
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
                 </>
               )}
+
+              <BlocProgressionGroupe
+                nbArticles={nbArticles}
+                total={total}
+                canal={canal}
+                palierGroupeReel={palierGroupeReel}
+                groupeTropTard={groupeTropTard}
+                nbBoissonsOffertes={nbBoissonsOffertes}
+              />
 
               <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
                 Total : {total.toFixed(2)} €
@@ -1535,23 +1586,40 @@ export function CommandePubliqueApp({
 
               {palierGroupeReel === "GROUPE_4" && (
                 <div className="rounded-lg border border-gray-200 bg-white p-3">
-                  <p className="text-sm font-semibold text-gray-900">🎁 Choisis le parfum de ta boisson 2L offerte</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {parfums2l.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setBoissonOfferteSaveur(s.nom)}
-                        className={`rounded-full border px-3 py-1.5 text-sm ${
-                          boissonOfferteSaveur === s.nom
-                            ? "border-[#8B2020] bg-[#8B2020] text-white"
-                            : "border-gray-300 text-gray-700"
-                        }`}
-                      >
-                        {s.nom}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    🎁 Choisis le{nbBoissonsOffertes > 1 ? "s" : ""} parfum{nbBoissonsOffertes > 1 ? "s" : ""} de ta
+                    {nbBoissonsOffertes > 1 ? "" : " boisson 2L offerte"}
+                    {nbBoissonsOffertes > 1 ? ` ${nbBoissonsOffertes} boissons 2L offertes` : ""}
+                  </p>
+                  {Array.from({ length: nbBoissonsOffertes }, (_, index) => (
+                    <div key={index} className="mt-2">
+                      {nbBoissonsOffertes > 1 && (
+                        <p className="text-xs font-semibold text-gray-500">Boisson offerte n°{index + 1}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {parfums2l.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() =>
+                              setBoissonOfferteSaveurs((prev) => {
+                                return Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) =>
+                                  i === index ? s.nom : prev[i]
+                                );
+                              })
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                              boissonOfferteSaveurs[index] === s.nom
+                                ? "border-[#8B2020] bg-[#8B2020] text-white"
+                                : "border-gray-300 text-gray-700"
+                            }`}
+                          >
+                            {s.nom}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1650,7 +1718,8 @@ export function CommandePubliqueApp({
                   !accepteCgv ||
                   nbArticles === 0 ||
                   (modeCommande === "groupee" && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
-                  (palierGroupeReel === "GROUPE_4" && !boissonOfferteSaveur)
+                  (palierGroupeReel === "GROUPE_4" &&
+                    boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes)
                 }
                 className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
               >

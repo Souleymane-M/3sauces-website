@@ -24,7 +24,13 @@ import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles, calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
-import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif, type PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import {
+  NOM_PRODUIT_BOISSON_OFFERTE,
+  palierGroupeActif,
+  compterPlatsPourPalier,
+  nombreBoissonsOffertes,
+  type PalierGroupe,
+} from "@/lib/commande-publique/groupe-priorite";
 
 const CANAUX_CAISSE = ["sur_place", "emporter", "livraison"] as const;
 const MODES_PAIEMENT_CAISSE = ["especes", "cb", "mixte"] as const;
@@ -88,7 +94,7 @@ interface LignesValidees {
 async function validerLignesCommande(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
   lignesBrutes: unknown,
-  boissonOfferteSaveurBrut: unknown
+  boissonOfferteSaveursBrut: unknown
 ): Promise<LignesValidees> {
   if (!Array.isArray(lignesBrutes) || lignesBrutes.length === 0) {
     throw new ErreurValidation("Requête invalide : au moins une ligne de commande est requise.");
@@ -335,12 +341,22 @@ async function validerLignesCommande(
   }
 
   // Offre "commande groupée" : même règle que le site public (/api/commande)
-  // — calculée une seule fois ici, sur le montant brut.
-  const palierGroupe = palierGroupeActif(nbPlats, montantBrut, heureActuelleMayotteMinutes());
+  // — calculée une seule fois ici, sur le montant brut. Nombre de plats
+  // distinct de `nbPlats` (nb_plats stocké) : voir `compterPlatsPourPalier`.
+  const nbPlatsPalier = compterPlatsPourPalier(lignes);
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantBrut, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
-    const boissonOfferteSaveur = typeof boissonOfferteSaveurBrut === "string" ? boissonOfferteSaveurBrut : null;
-    if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
-      throw new ErreurValidation("Choisis un parfum disponible pour la boisson 2L offerte.");
+    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantBrut);
+    const saveursBrutes = Array.isArray(boissonOfferteSaveursBrut) ? boissonOfferteSaveursBrut : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsParfums2lValides.has(s)
+    );
+    if (saveursValidees.length !== nbOffertes) {
+      throw new ErreurValidation(
+        nbOffertes > 1
+          ? `Choisis un parfum pour chacune des ${nbOffertes} boissons 2L offertes.`
+          : "Choisis un parfum disponible pour la boisson 2L offerte."
+      );
     }
 
     const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
@@ -351,18 +367,20 @@ async function validerLignesCommande(
       .maybeSingle();
     if (erreurBoissonOfferte) throw new Error("Erreur serveur (boisson offerte).");
     if (boissonOfferte) {
-      lignes.push({
-        produitId: boissonOfferte.id,
-        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
-        categorie: "boisson",
-        quantite: 1,
-        prixUnitaire: 0,
-        coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
-        viandes: [],
-        saveurs: [boissonOfferteSaveur],
-        canetteIncluse: false,
-        platIndex: null,
-      });
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: boissonOfferte.id,
+          nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: boissonOfferte.cout_matiere ?? null,
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
     }
   }
 
@@ -523,7 +541,7 @@ export async function POST(request: Request) {
 
   let validation;
   try {
-    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveur);
+    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveurs);
   } catch (e) {
     if (e instanceof ErreurValidation) {
       return NextResponse.json({ error: e.message }, { status: 400 });
@@ -870,7 +888,7 @@ export async function PATCH(request: Request) {
 
   let validation;
   try {
-    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveur);
+    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveurs);
   } catch (e) {
     if (e instanceof ErreurValidation) {
       return NextResponse.json({ error: e.message }, { status: 400 });

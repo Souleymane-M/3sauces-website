@@ -95,8 +95,8 @@ export interface CreerCommandePayload {
   email?: string | null;
   /** Nombre de tampons fidélité (10€ chacun) à utiliser sur cette commande — revérifié intégralement côté serveur (disponibilité réelle, FIFO). */
   nbTampons?: number;
-  /** Parfum choisi pour la boisson 2L offerte (palier GROUPE_4) — requis uniquement si ce palier s'applique, revérifié côté serveur. */
-  boissonOfferteSaveur?: string;
+  /** Un parfum par boisson 2L offerte (palier GROUPE_4, une par tranche de 40€) — longueur revérifiée côté serveur. */
+  boissonOfferteSaveurs?: string[];
   // Livraison uniquement (même règles que le site public, cf. /api/commande) :
   adresse?: string;
   zone?: string;

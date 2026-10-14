@@ -28,7 +28,12 @@ import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accomp
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
-import { NOM_PRODUIT_BOISSON_OFFERTE, palierGroupeActif } from "@/lib/commande-publique/groupe-priorite";
+import {
+  NOM_PRODUIT_BOISSON_OFFERTE,
+  palierGroupeActif,
+  compterPlatsPourPalier,
+  nombreBoissonsOffertes,
+} from "@/lib/commande-publique/groupe-priorite";
 import { notifierCommandeRecue } from "@/lib/notifications/paiement";
 
 const CANAUX_PUBLICS = ["sur_place", "emporter", "livraison"] as const;
@@ -562,13 +567,25 @@ export async function POST(request: Request) {
   // brut (avant remise), jamais re-dérivée plus tard (cf. migration
   // palier_groupe) — la boisson offerte s'applique quel que soit le canal,
   // sans aucune limite horaire. Seule la priorité (badge affiché côté UI)
-  // reste propre à la livraison.
-  const palierGroupe = palierGroupeActif(nbPlats, montant, heureActuelleMayotteMinutes());
+  // reste propre à la livraison. Le nombre de plats utilisé ici est
+  // volontairement distinct de `nbPlats` (nb_plats stocké) : voir
+  // `compterPlatsPourPalier`.
+  const nbPlatsPalier = compterPlatsPourPalier(lignes);
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montant, heureActuelleMayotteMinutes());
   if (palierGroupe === "GROUPE_4") {
-    const boissonOfferteSaveur = typeof body.boissonOfferteSaveur === "string" ? body.boissonOfferteSaveur : null;
-    if (!boissonOfferteSaveur || !nomsParfums2lValides.has(boissonOfferteSaveur)) {
+    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montant);
+    const saveursBrutes = Array.isArray(body.boissonOfferteSaveurs) ? body.boissonOfferteSaveurs : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsParfums2lValides.has(s)
+    );
+    if (saveursValidees.length !== nbOffertes) {
       return NextResponse.json(
-        { error: "Choisis un parfum disponible pour ta boisson 2L offerte." },
+        {
+          error:
+            nbOffertes > 1
+              ? `Choisis un parfum pour chacune de tes ${nbOffertes} boissons 2L offertes.`
+              : "Choisis un parfum disponible pour ta boisson 2L offerte.",
+        },
         { status: 400 }
       );
     }
@@ -584,18 +601,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
     }
     if (boissonOfferte) {
-      lignes.push({
-        produitId: boissonOfferte.id,
-        nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
-        categorie: "boisson",
-        quantite: 1,
-        prixUnitaire: 0,
-        coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
-        viandes: [],
-        saveurs: [boissonOfferteSaveur],
-        canetteIncluse: false,
-        platIndex: null,
-      });
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: boissonOfferte.id,
+          nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
     }
   }
 

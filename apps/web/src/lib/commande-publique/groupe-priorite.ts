@@ -41,6 +41,32 @@ export function palierGroupeSelonQuantite(nbPlats: number, montantBrut: number):
   return null;
 }
 
+/**
+ * Nombre de "plats" à utiliser pour évaluer les paliers ci-dessus —
+ * quantité totale d'articles du panier, quel que soit le mode de saisie
+ * (simple ou groupée). Distinct de `compterPlatsGroupes` (lib/plats.ts),
+ * qui ne compte que les plats-conteneurs explicitement créés en mode
+ * "Commande groupée" et vaut toujours 0 en mode simple : une commande
+ * simple de 90€ de grillades ne touchait donc jamais la livraison
+ * prioritaire ni la boisson offerte, même largement au-dessus des seuils
+ * (repéré le 2026-10-14). `compterPlatsGroupes` reste utilisé tel quel
+ * pour `nb_plats` (badge prioritaire cuisine, affichage ticket) et la
+ * validation du mode groupé — seule l'évaluation de ces paliers change.
+ */
+export function compterPlatsPourPalier<T extends { quantite: number }>(lignes: T[]): number {
+  return lignes.reduce((total, l) => total + l.quantite, 0);
+}
+
+/**
+ * Nombre de boissons 2L offertes : une par tranche de 40€ entamée, dès que
+ * le palier GROUPE_4 (4 plats et 40€) est atteint — 40€→1, 80€→2, 90€→2,
+ * 120€→3... Jamais de boisson sous ce palier.
+ */
+export function nombreBoissonsOffertes(nbPlats: number, montantBrut: number): number {
+  if (nbPlats < SEUIL_GROUPE_4_PLATS || montantBrut < SEUIL_GROUPE_4_MONTANT) return 0;
+  return Math.floor(montantBrut / SEUIL_GROUPE_4_MONTANT);
+}
+
 export function libellePalierGroupe(palier: PalierGroupe): string | null {
   if (palier === "GROUPE_4") return "GROUPE 4";
   if (palier === "GROUPE_3") return "GROUPE 3";
