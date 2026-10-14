@@ -305,6 +305,10 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
   b.ligne(libelleCanal(commande.canal).toUpperCase(), { align: "center", gras: true, taille: 2 });
   b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  if (commande.heureSouhaitee) {
+    b.brut(`<feed line="1"/>`);
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "left", gras: true, taille: 2 });
+  }
   if (commande.adresse) {
     b.brut(`<feed line="1"/>`);
     b.ligne(commande.adresse, { align: "left", gras: true, taille: 2 });
@@ -405,10 +409,6 @@ function construireContenuTicketClient(
     b.ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
   }
 
-  if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "left", gras: true, taille: 1 });
-  }
-
   imprimerBlocClient(b, commande);
   if (commande.canal === "livraison" && commande.qrCode) {
     b.brut(`<feed line="1"/>`);
@@ -457,11 +457,10 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   if (commande.modePaiement === "stripe") {
     b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
   }
-  if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: false, taille: 1 });
-  }
-
   b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
+  if (commande.heureSouhaitee) {
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: true, taille: 1 });
+  }
   if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
   }
