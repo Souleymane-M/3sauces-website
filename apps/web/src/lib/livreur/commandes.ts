@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
+import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import type { LivraisonAssignee, PaiementDeclare } from "./types";
@@ -73,9 +74,14 @@ interface DeclarationLivraison {
 /**
  * Déclare le ou les paiements récupérés à la livraison. Ne fait jamais
  * confiance au total calculé côté client : revérifié ici avant tout
- * enregistrement. `paiement_statut` passe à "declare" (pas "paye") — la
- * caisse ou le patron doit encore valider manuellement, cf.
- * lib/encaissements-livraison.ts.
+ * enregistrement, le total déclaré doit correspondre exactement au montant
+ * dû (sinon rejeté, cf. plus bas) — `paiement_statut` passe donc
+ * directement à "paye", sans étape intermédiaire "declare" à valider
+ * manuellement en caisse (auto-validation, 2026-10-15 : le contrôle du
+ * montant a déjà eu lieu ici, un second clic en caisse ne vérifiait rien
+ * de plus). `lib/encaissements-livraison.ts` ne reste utile que pour le
+ * cas où le livreur n'a jamais déclaré via l'app (filet de secours
+ * caisse/patron).
  *
  * Une commande déjà réglée en ligne (Stripe, `mode_paiement === "stripe"`)
  * ne demande aucune déclaration de paiement : rien n'a été encaissé à la
@@ -142,16 +148,19 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
 
   // Contrairement aux effets de bord "best effort" du reste du code (QR,
   // impression...), un échec ici est critique : la commande resterait
-  // indéfiniment invisible pour la validation caisse/patron alors que
-  // l'argent a déjà été récupéré. On fait donc échouer toute la
-  // déclaration plutôt que de continuer silencieusement.
+  // indéfiniment non payée alors que l'argent a déjà été récupéré. On fait
+  // donc échouer toute la déclaration plutôt que de continuer
+  // silencieusement. Le montant est déjà revérifié exactement ci-dessus,
+  // donc "paye" directement, jamais "declare" (cf. commentaire de
+  // `declarerLivraison`).
   const { error: erreurStatutPaiement } = await supabase
     .from("commandes")
-    .update({ paiement_statut: "declare" })
+    .update({ paiement_statut: "paye" })
     .eq("id", commandeId);
   if (erreurStatutPaiement) {
-    throw new Error(`Impossible d'enregistrer la déclaration : ${erreurStatutPaiement.message}`);
+    throw new Error(`Impossible d'enregistrer le paiement : ${erreurStatutPaiement.message}`);
   }
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
+  await notifierPaiementConfirme(commandeId);
 }
