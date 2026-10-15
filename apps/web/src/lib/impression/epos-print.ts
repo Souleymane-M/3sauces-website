@@ -425,8 +425,15 @@ function construireContenuTicketClient(
   imprimerBlocClient(b, commande);
   if (commande.canal === "livraison" && commande.qrCode) {
     b.brut(`<feed line="1"/>`);
+    b.ligne("Scan pour prendre/confirmer", { align: "center", gras: true, taille: 1 });
     b.brut(styleTexte({ align: "center" }));
-    b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(commande.qrCode)}</symbol>`);
+    // Un lien, pas juste un code brut : le livreur scanne avec l'appareil
+    // photo natif de son téléphone (pas d'app dédiée) et atterrit
+    // directement sur /livreur/scan/[code] — demande explicite du patron,
+    // 2026-10-15 (plus de choix du livreur en cuisine, remplacé par ce scan).
+    b.brut(
+      `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/livreur/scan/${commande.qrCode}`)}</symbol>`
+    );
   }
 
   imprimerBlocFidelite(b, commande);

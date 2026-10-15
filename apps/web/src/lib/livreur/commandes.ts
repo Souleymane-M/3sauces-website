@@ -4,7 +4,7 @@ import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
-import type { LivraisonAssignee, PaiementDeclare } from "./types";
+import type { EtatScan, LivraisonAssignee, PaiementDeclare } from "./types";
 
 /**
  * Livraisons remises à CE livreur par la cuisine (étape "Pris par
@@ -163,4 +163,114 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
   await notifierPaiementConfirme(commandeId);
+}
+
+/**
+ * Résout l'état d'un ticket scanné (QR imprimé sur le reçu client,
+ * `livraisons.qr_code`) pour `/livreur/scan/[code]` — un seul endroit qui
+ * décide quoi afficher/proposer, jamais dupliqué entre la page et une
+ * éventuelle action. Ne fait jamais confiance à `livreurId` au-delà de
+ * déterminer l'état (ex: "a_livrer" seulement si CE livreur a bien la
+ * livraison) — les actions elles-mêmes (`prendreLivraisonParQrCode`,
+ * `declarerLivraison`) revérifient tout de leur côté.
+ */
+export async function lireEtatScan(qrCode: string, livreurId: string): Promise<EtatScan> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: livraison, error: erreurLivraison } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_id")
+    .eq("qr_code", qrCode)
+    .maybeSingle();
+  if (erreurLivraison || !livraison) {
+    return { type: "introuvable" };
+  }
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select(
+      "id, numero, statut, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, palier_groupe, mode_paiement"
+    )
+    .eq("id", livraison.commande_id)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    return { type: "introuvable" };
+  }
+
+  if (commande.statut === "annulee") {
+    return { type: "annulee" };
+  }
+  if (commande.statut === "en_attente" || commande.statut === "en_preparation") {
+    return { type: "pas_prete", numero: commande.numero };
+  }
+
+  const livraisonAssignee: LivraisonAssignee = {
+    id: commande.id,
+    numero: commande.numero,
+    nom: commande.nom_livraison ?? "",
+    adresse: commande.adresse_livraison,
+    montant: commande.montant,
+    heureSouhaitee: commande.heure_souhaitee,
+    lignes: Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [],
+    nbPlats: commande.nb_plats,
+    palierGroupe: commande.palier_groupe as PalierGroupe,
+    modePaiement: commande.mode_paiement,
+  };
+
+  if (commande.statut === "pret") {
+    if (livraison.livreur_id) {
+      // Statut normalement impossible (l'attribution d'un livreur ne se
+      // produit qu'au passage à "pris_par_livreur"), mais ne jamais planter
+      // sur un état imprévu : traité comme déjà pris par quelqu'un d'autre.
+      const nomLivreur = await nomProfil(supabase, livraison.livreur_id);
+      return { type: "deja_prise_autre", numero: commande.numero, nomLivreur };
+    }
+    return { type: "a_prendre", commandeId: commande.id, livraison: livraisonAssignee };
+  }
+
+  if (commande.statut === "pris_par_livreur") {
+    if (livraison.livreur_id === livreurId) {
+      return { type: "a_livrer", commandeId: commande.id, livraison: livraisonAssignee };
+    }
+    const nomLivreur = livraison.livreur_id ? await nomProfil(supabase, livraison.livreur_id) : null;
+    return { type: "deja_prise_autre", numero: commande.numero, nomLivreur };
+  }
+
+  // "livre" (ou tout autre statut terminal futur) : rien à faire de plus.
+  return { type: "deja_livree", numero: commande.numero };
+}
+
+async function nomProfil(supabase: ReturnType<typeof createServiceSupabaseClient>, profilId: string): Promise<string | null> {
+  const { data } = await supabase.from("profils").select("nom").eq("id", profilId).maybeSingle();
+  return data?.nom ?? null;
+}
+
+/**
+ * Prise en charge par scan : le livreur flashe le QR du ticket dès qu'il le
+ * récupère à l'emplacement de sa zone, sans qu'un employé de cuisine n'ait
+ * à désigner qui que ce soit (remplace le sélecteur "Choisir le livreur"
+ * en cuisine, retiré le 2026-10-15 — trop lent pour 20 commandes/jour).
+ * Réutilise `changerStatutCommande`, qui revérifie déjà la transition
+ * (pret -> pris_par_livreur) et écrit `livraisons.livreur_id`.
+ */
+export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: livraison, error } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_id")
+    .eq("qr_code", qrCode)
+    .maybeSingle();
+  if (error || !livraison) {
+    throw new Error("Ticket introuvable.");
+  }
+  if (livraison.livreur_id) {
+    throw new Error("Cette livraison a déjà été prise par quelqu'un d'autre.");
+  }
+
+  await changerStatutCommande({
+    commandeId: livraison.commande_id,
+    statut: "pris_par_livreur",
+    profilId: livreurId,
+    livreurId,
+  });
 }

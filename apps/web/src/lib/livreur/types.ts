@@ -22,3 +22,18 @@ export interface PaiementDeclare {
   montant: number;
   payeur?: string;
 }
+
+/**
+ * État résolu d'un QR scanné (cf. `lireEtatScan`) — un seul type `union`
+ * pour que la page `/livreur/scan/[code]` n'ait jamais à redériver elle-même
+ * la logique métier, juste à afficher l'état et proposer l'action qui va
+ * avec (ou aucune).
+ */
+export type EtatScan =
+  | { type: "introuvable" }
+  | { type: "annulee" }
+  | { type: "pas_prete"; numero: number }
+  | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee }
+  | { type: "a_livrer"; commandeId: string; livraison: LivraisonAssignee }
+  | { type: "deja_prise_autre"; numero: number; nomLivreur: string | null }
+  | { type: "deja_livree"; numero: number };

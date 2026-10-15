@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CommandeCuisine, LivreurActif } from "@/lib/cuisine/types";
+import type { CommandeCuisine } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
@@ -12,7 +12,6 @@ import { IdentificationModal } from "./identification-modal";
 interface CommandesAppProps {
   commandesInitiales: CommandeCuisine[];
   aVenirInitial: CommandeCuisine[];
-  livreursActifs: LivreurActif[];
 }
 
 const INTERVALLE_POLLING_MS = 5000;
@@ -90,13 +89,12 @@ function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActiv
   }
 }
 
-export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs }: CommandesAppProps) {
+export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesAppProps) {
   const [commandes, setCommandes] = useState<CommandeCuisine[]>(commandesInitiales);
   const [aVenir, setAVenir] = useState<CommandeCuisine[]>(aVenirInitial);
   const [employeActif, setEmployeActif] = useState<EmployeActif | null>(() => lireIdentitePersistee().identite);
   const [modalOuverte, setModalOuverte] = useState(false);
   const [actionEnAttente, setActionEnAttente] = useState<((identite: EmployeActif) => void) | null>(null);
-  const [livreurChoisi, setLivreurChoisi] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
 
   const idsVusRef = useRef<Set<string>>(new Set(commandesInitiales.map((c) => c.id)));
@@ -246,28 +244,6 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
     setModalOuverte(true);
   }
 
-  /**
-   * Raccourci "Prêt & remis au livreur" : enchaîne les deux transitions
-   * (en_preparation -> pret -> pris_par_livreur) en un seul geste côté
-   * employé, sans supprimer l'évènement "pret" lui-même — encore utilisé
-   * pour calculer le temps de préparation moyen par employé
-   * (lib/patron/commandes-historique.ts). Seule l'ergonomie change, jamais
-   * l'historique enregistré.
-   */
-  function demanderChangementFusionne(commandeId: string, livreurId: string) {
-    const executer = async (identite: EmployeActif) => {
-      await appliquerChangement(commandeId, "pret", identite.profilId);
-      await appliquerChangement(commandeId, "pris_par_livreur", identite.profilId, livreurId);
-    };
-
-    if (employeActif) {
-      executer(employeActif);
-      return;
-    }
-    setActionEnAttente(() => executer);
-    setModalOuverte(true);
-  }
-
   /** Uniquement pour une commande encore "en_attente" — vérifié aussi côté serveur. */
   function demanderAnnulation(commandeId: string) {
     const motif = window.prompt("Pourquoi annuler cette commande ? (optionnel)");
@@ -302,12 +278,12 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {commandes.map((commande) => {
           const statutSuivant = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
-          // Fusionne "Prêt" et "Pris par livreur" en une seule étape : le
-          // livreur se choisit dès "En préparation", jamais besoin de
-          // revenir sur la commande une fois prête.
-          const fusionPretLivreur = commande.canal === "livraison" && commande.statut === "en_preparation";
-          const demandeLivreur = statutSuivant === "pris_par_livreur" || fusionPretLivreur;
-          const livreurSelectionne = livreurChoisi[commande.id] ?? "";
+          // Depuis le 2026-10-15 : la cuisine ne désigne plus le livreur —
+          // le ticket imprimé porte un QR que le livreur scanne lui-même à
+          // la prise en charge (cf. /livreur/scan/[code]). Une livraison
+          // "prête" n'a donc plus de bouton d'action en cuisine, juste un
+          // statut d'attente.
+          const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
 
           const prioritaire = estPrioritaire(commande);
           // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
@@ -412,32 +388,18 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, livreursActifs
                 Total : {commande.montant.toFixed(2)} €
               </p>
 
-              {statutSuivant && (
+              {enAttenteScanLivreur && (
+                <p className="mt-4 rounded bg-blue-50 py-3 text-center text-lg font-semibold text-blue-700">
+                  📦 Prête — en attente qu&apos;un livreur scanne le ticket
+                </p>
+              )}
+              {statutSuivant && !enAttenteScanLivreur && (
                 <div className="mt-4 space-y-2">
-                  {demandeLivreur && (
-                    <select
-                      value={livreurSelectionne}
-                      onChange={(e) => setLivreurChoisi((prec) => ({ ...prec, [commande.id]: e.target.value }))}
-                      className="w-full rounded border border-gray-300 p-3 text-lg text-black"
-                    >
-                      <option value="">Choisir le livreur…</option>
-                      {livreursActifs.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.nom}
-                        </option>
-                      ))}
-                    </select>
-                  )}
                   <button
-                    onClick={() =>
-                      fusionPretLivreur
-                        ? demanderChangementFusionne(commande.id, livreurSelectionne)
-                        : demanderChangement(commande.id, statutSuivant, demandeLivreur ? livreurSelectionne : undefined)
-                    }
-                    disabled={demandeLivreur && !livreurSelectionne}
+                    onClick={() => demanderChangement(commande.id, statutSuivant)}
                     className="w-full rounded bg-[#8B2020] py-3 text-xl font-bold text-white disabled:opacity-40"
                   >
-                    {fusionPretLivreur ? "Prêt & remis au livreur" : LIBELLES_STATUT[statutSuivant]}
+                    {LIBELLES_STATUT[statutSuivant]}
                   </button>
                 </div>
               )}
