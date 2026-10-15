@@ -256,7 +256,13 @@ function fusionnerLignesIdentiques(lignes: LigneCommande[]): LigneCommande[] {
 }
 
 function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneCommande[]): void {
-  for (const groupe of regrouperLignesParCategorie(fusionnerLignesIdentiques(lignes))) {
+  const groupes = regrouperLignesParCategorie(fusionnerLignesIdentiques(lignes));
+  groupes.forEach((groupe, index) => {
+    // Espace entre chaque catégorie (jamais avant la première) — pour
+    // s'y retrouver d'un coup d'œil dès qu'une commande mélange plusieurs
+    // catégories (ex: un plat du jour + des grillades), pas seulement en
+    // mode "Commande groupée" (demande explicite du patron, 2026-10-15).
+    if (index > 0) b.brut(`<feed line="1"/>`);
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
@@ -267,7 +273,7 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
       if (l.sansBoisson) b.ligne("SANS BOISSON — ne pas donner de canette", { gras: true, taille: 1 }, "  ");
       if (l.pourQui) b.ligne(`Pour ${l.pourQui}`, { gras: true, taille: 1 }, "  ");
     }
-  }
+  });
 }
 
 /** Commande groupée (au moins une ligne avec `platIndex`) : un bloc "PLAT N" par convive plutôt qu'un classement par catégorie. */
@@ -279,12 +285,15 @@ function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourIm
   }
 
   const indices = [...new Set(commande.lignes.map((l) => l.platIndex).filter((i): i is number => i !== null))].sort((a, bb) => a - bb);
-  for (const indexPlat of indices) {
+  indices.forEach((indexPlat, position) => {
+    // Un vrai séparateur (pas juste un espace) entre deux plats/convives —
+    // une rupture plus marquée qu'entre deux catégories d'un même plat.
+    if (position > 0) separateur(b);
     const lignesPlat = commande.lignes.filter((l) => l.platIndex === indexPlat);
     const pourQui = lignesPlat.find((l) => l.pourQui)?.pourQui;
     b.ligne(`PLAT ${indexPlat + 1}${pourQui ? ` — ${pourQui}` : ""}`, { align: "left", gras: true, taille: 2 });
     imprimerGroupeCategorieCuisine(b, lignesPlat);
-  }
+  });
   separateur(b);
   b.ligne(`${commande.nbPlats} plat${commande.nbPlats > 1 ? "s" : ""}`, { align: "center", gras: true, taille: 1 });
 }
@@ -388,7 +397,11 @@ function construireContenuTicketClient(
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
   separateur(b);
 
-  for (const groupe of regrouperLignesParCategorie(commande.lignes)) {
+  regrouperLignesParCategorie(commande.lignes).forEach((groupe, index) => {
+    // Espace entre chaque catégorie (jamais avant la première) — pour
+    // s'y retrouver d'un coup d'œil dès qu'une commande mélange plusieurs
+    // catégories (demande explicite du patron, 2026-10-15).
+    if (index > 0) b.brut(`<feed line="1"/>`);
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       const prixLigne = l.quantite * l.prixUnitaire;
@@ -400,7 +413,7 @@ function construireContenuTicketClient(
         b.ligne(detail, { gras: false, taille: 1 }, "  ");
       }
     }
-  }
+  });
 
   separateur(b);
   b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
