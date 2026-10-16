@@ -14,7 +14,7 @@ import {
 } from "./types";
 
 const SELECT_COMMANDES_CUISINE =
-  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe";
+  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe, statut_change_le";
 
 /** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
 function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
@@ -40,6 +40,7 @@ function versCommandeCuisine(c: {
   ticket_imprime_le: string | null;
   palier_groupe: string | null;
   mode_paiement: CommandeCuisine["modePaiement"];
+  statut_change_le: string | null;
 }): CommandeCuisine {
   return {
     id: c.id,
@@ -58,6 +59,7 @@ function versCommandeCuisine(c: {
     palierGroupe: c.palier_groupe as PalierGroupe,
     commandeAvance: estCommandeAvance(c.heure_souhaitee, c.created_at),
     ticketImprimeLe: c.ticket_imprime_le,
+    statutChangeLe: c.statut_change_le,
   };
 }
 
@@ -273,7 +275,13 @@ export async function changerStatutCommande({
   // précis (ni Stripe, déjà géré par son webhook, ni la caisse, déjà payée
   // à la création), ce qui empêchait le trigger de fidélité de se déclencher
   // et laissait la commande "non payée" indéfiniment.
-  const misesAJour: { statut: StatutEvenement; paiement_statut?: "paye" } = { statut };
+  const misesAJour: { statut: StatutEvenement; paiement_statut?: "paye"; statut_change_le: string } = {
+    statut,
+    // Minuteur par étape de l'écran cuisine (alerte après 15 min dans le
+    // même statut) — remis à zéro à chaque transition, jamais calculé
+    // depuis la création de la commande.
+    statut_change_le: new Date().toISOString(),
+  };
   if (statut === "remis_au_client" && commande.mode_paiement !== "stripe" && commande.paiement_statut !== "paye") {
     misesAJour.paiement_statut = "paye";
   }
@@ -439,6 +447,7 @@ export async function resoudreLivraisonSignalee(
       .from("commandes")
       .update({
         statut: "pret",
+        statut_change_le: new Date().toISOString(),
         alerte_signalee: false,
         alerte_note: null,
         alerte_signalee_par: null,

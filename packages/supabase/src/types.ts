@@ -338,6 +338,7 @@ export interface Database {
           ticket_remis_le: string | null;
           palier_groupe: string | null;
           motif_annulation: string | null;
+          statut_change_le: string | null;
         };
         Insert: {
           id?: string;
@@ -368,6 +369,7 @@ export interface Database {
           ticket_remis_le?: string | null;
           palier_groupe?: string | null;
           motif_annulation?: string | null;
+          statut_change_le?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];

@@ -105,6 +105,13 @@ function formaterDepuis(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** Minutes écoulées depuis le dernier changement de statut (remis à zéro à chaque étape, demande explicite du patron 2026-10-16) — 15 min sans action dans "En attente"/"En préparation"/"Prête" déclenche un bandeau discret, pas de son (contrairement à une nouvelle commande ou une livraison signalée : ça arriverait trop souvent en période de rush pour rester sonore sans lasser). */
+const SEUIL_RETARD_ETAPE_MIN = 15;
+
+function minutesDepuis(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+}
+
 // Lecture pure (aucun Date.now(), aucune écriture) de l'identité persistée
 // en sessionStorage — utilisable comme initialiseur paresseux de useState.
 function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActivite: number } {
@@ -135,6 +142,8 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
 
   const prioritaire = estPrioritaire(commande);
   const ancienne = estAncienne(commande.creeLe);
+  const minutesDansEtape = minutesDepuis(commande.statutChangeLe ?? commande.creeLe);
+  const enRetard = !ancienne && minutesDansEtape >= SEUIL_RETARD_ETAPE_MIN;
   // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
   // stockée telle quelle en base, déduite de l'écart entre la somme des
   // lignes et le montant réellement dû — pour que l'équipe voie que le
@@ -143,10 +152,17 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
   const remiseCommande = Math.round((montantBrutCommande - commande.montant) * 100) / 100;
 
   return (
-    <div className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : prioritaire ? "border-orange-500" : "border-gray-200"}`}>
+    <div
+      className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : enRetard ? "border-amber-500" : prioritaire ? "border-orange-500" : "border-gray-200"}`}
+    >
       {ancienne && (
         <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
           ⚠️ Depuis {formaterDepuis(commande.creeLe)} — jamais finalisée, à vérifier
+        </div>
+      )}
+      {!ancienne && enRetard && (
+        <div className="mb-2 rounded bg-amber-100 px-2 py-1 text-base font-semibold text-amber-800">
+          ⏱️ Depuis {minutesDansEtape} min dans cette étape
         </div>
       )}
       {prioritaire && (

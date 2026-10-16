@@ -30,6 +30,8 @@ export interface CommandeCuisine {
   commandeAvance: boolean;
   /** Renseigné une fois le ticket physiquement imprimé (commandes à l'avance uniquement) — null tant que ce n'est pas fait. */
   ticketImprimeLe: string | null;
+  /** Dernier changement de statut — minuteur par étape de l'écran cuisine, null pour une commande encore "en_attente" (jamais transitionnée), repli sur `creeLe` dans ce cas. */
+  statutChangeLe: string | null;
 }
 
 /** Statuts journalisables dans `commandes_evenements` — jamais "en_attente" (état initial automatique, pas une action). */
