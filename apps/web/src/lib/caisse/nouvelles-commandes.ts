@@ -202,13 +202,28 @@ export async function listerCommandesAImprimerDifferees(heureDebut: string): Pro
 const DELAI_RECONFIRMATION_MS = 2 * 60 * 1000;
 
 /**
+ * Jusqu'à quand retenter l'impression d'une commande jamais confirmée
+ * imprimée — assez large pour couvrir une vraie panne (imprimante
+ * débranchée une soirée, panne réseau...) sans pour autant rattraper des
+ * commandes vieilles de plusieurs semaines. Volontairement basé sur
+ * `created_at`, jamais sur `heure_souhaitee` : avant le 2026-10-16, la
+ * borne basse utilisait `heure_souhaitee` (pour écarter les commandes à
+ * l'avance pas encore arrivées à échéance), ce qui avait un effet de bord
+ * grave — une commande dont l'impression avait raté la veille devenait
+ * invisible pour toujours dès minuit passé, sans aucune alerte, et la
+ * seule façon de la récupérer était de modifier `heure_souhaitee`
+ * elle-même (ce qui a fait perdre l'heure réelle demandée par le client
+ * pour #357/#358, incident du jour même).
+ */
+const DELAI_RATTRAPAGE_IMPRESSION_MS = 48 * 60 * 60 * 1000;
+
+/**
  * Toutes les commandes publiques payées, pas encore imprimées, dont
- * l'heure souhaitée tombe aujourd'hui (commande du jour même ou commande
- * à l'avance dont le jour est enfin arrivé), **y compris les ventes prises
- * directement au comptoir** depuis 2026-10-13 — l'impression ne dépend
- * plus d'aucun appareil local (relais/iPad/Mac), uniquement de cette
- * requête, sondée par l'imprimante elle-même via Server Direct Print
- * (`app/api/print/epson/[token]`).
+ * l'heure souhaitée est déjà arrivée (jamais une commande à l'avance avant
+ * son jour), **y compris les ventes prises directement au comptoir**
+ * depuis 2026-10-13 — l'impression ne dépend plus d'aucun appareil local
+ * (relais/iPad/Mac), uniquement de cette requête, sondée par l'imprimante
+ * elle-même via Server Direct Print (`app/api/print/epson/[token]`).
  *
  * `ticket_remis_le` filtre les tickets déjà envoyés à l'imprimante il y a
  * moins de `DELAI_RECONFIRMATION_MS` : sans ça, un échec silencieux de
@@ -217,8 +232,9 @@ const DELAI_RECONFIRMATION_MS = 2 * 60 * 1000;
  */
 export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpression[]> {
   const supabase = createServiceSupabaseClient();
-  const { debut, fin } = plageJourMayotteUtc(dateMayotteIso());
-  const limiteReconfirmation = new Date(Date.now() - DELAI_RECONFIRMATION_MS).toISOString();
+  const maintenant = new Date();
+  const limiteReconfirmation = new Date(maintenant.getTime() - DELAI_RECONFIRMATION_MS).toISOString();
+  const limiteRattrapage = new Date(maintenant.getTime() - DELAI_RATTRAPAGE_IMPRESSION_MS).toISOString();
 
   const { data: commandes, error } = await supabase
     .from("commandes")
@@ -226,8 +242,8 @@ export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpr
     .is("ticket_imprime_le", null)
     .or(`ticket_remis_le.is.null,ticket_remis_le.lt.${limiteReconfirmation}`)
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
-    .gte("heure_souhaitee", debut.toISOString())
-    .lt("heure_souhaitee", fin.toISOString())
+    .lte("heure_souhaitee", maintenant.toISOString())
+    .gte("created_at", limiteRattrapage)
     .order("created_at", { ascending: true })
     .limit(20);
 
