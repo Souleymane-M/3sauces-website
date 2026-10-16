@@ -169,7 +169,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
         </div>
       )}
       {!ancienne && enRetard && (
-        <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
+        <div className="bandeau-urgence-clignotant mb-2 rounded px-2 py-1 text-base font-bold text-white">
           🚨 Depuis {minutesDansEtape} min dans cette étape — à traiter
         </div>
       )}

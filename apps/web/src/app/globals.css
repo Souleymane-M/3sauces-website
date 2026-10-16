@@ -59,19 +59,28 @@ body {
   animation: pulse-alerte 1.4s ease-in-out infinite;
 }
 
-/* Clignotement franc (bordure), réservé à une commande bloquée trop
-   longtemps dans la même étape en cuisine — demande explicite du patron,
-   2026-10-16 : l'ambre discret ne suffisait pas, ça doit sauter aux yeux. */
+/* Clignotement franc, réservé à une commande bloquée trop longtemps dans
+   la même étape en cuisine — demande explicite du patron, 2026-10-16 :
+   l'ambre discret puis le simple changement de couleur de bordure ne
+   suffisaient pas, ça doit vraiment sauter aux yeux. Anime à la fois le
+   fond du bandeau (bien visible, un gros bloc de couleur) et la bordure
+   de la carte entière. */
 @keyframes clignote-urgence {
   0%,
   100% {
+    background-color: #dc2626;
     border-color: #dc2626;
   }
   50% {
+    background-color: #fca5a5;
     border-color: #fca5a5;
   }
 }
 
 .bordure-urgence-clignotante {
-  animation: clignote-urgence 1s ease-in-out infinite;
+  animation: clignote-urgence 0.8s step-end infinite;
+}
+
+.bandeau-urgence-clignotant {
+  animation: clignote-urgence 0.8s step-end infinite;
 }
