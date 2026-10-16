@@ -58,3 +58,20 @@ body {
 .texte-alerte-pulsant {
   animation: pulse-alerte 1.4s ease-in-out infinite;
 }
+
+/* Clignotement franc (bordure), réservé à une commande bloquée trop
+   longtemps dans la même étape en cuisine — demande explicite du patron,
+   2026-10-16 : l'ambre discret ne suffisait pas, ça doit sauter aux yeux. */
+@keyframes clignote-urgence {
+  0%,
+  100% {
+    border-color: #dc2626;
+  }
+  50% {
+    border-color: #fca5a5;
+  }
+}
+
+.bordure-urgence-clignotante {
+  animation: clignote-urgence 1s ease-in-out infinite;
+}

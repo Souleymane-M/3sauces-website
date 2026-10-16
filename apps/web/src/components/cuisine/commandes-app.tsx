@@ -153,7 +153,15 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
 
   return (
     <div
-      className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : enRetard ? "border-amber-500" : prioritaire ? "border-orange-500" : "border-gray-200"}`}
+      className={`rounded-xl border-2 p-4 ${
+        ancienne
+          ? "border-red-600"
+          : enRetard
+            ? "bordure-urgence-clignotante border-red-600"
+            : prioritaire
+              ? "border-orange-500"
+              : "border-gray-200"
+      }`}
     >
       {ancienne && (
         <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
@@ -161,8 +169,8 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
         </div>
       )}
       {!ancienne && enRetard && (
-        <div className="mb-2 rounded bg-amber-100 px-2 py-1 text-base font-semibold text-amber-800">
-          ⏱️ Depuis {minutesDansEtape} min dans cette étape
+        <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
+          🚨 Depuis {minutesDansEtape} min dans cette étape — à traiter
         </div>
       )}
       {prioritaire && (
