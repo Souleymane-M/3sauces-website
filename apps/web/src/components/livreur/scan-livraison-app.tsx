@@ -223,6 +223,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
           {choix === "especes" && (
             <div className="space-y-2">
+              <p className="text-xs text-gray-500">Combien le client t&apos;a-t-il donné ?</p>
               <input
                 value={montantEspeces}
                 onChange={(e) => setMontantEspeces(e.target.value)}
@@ -230,6 +231,24 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
                 inputMode="decimal"
                 className="w-full rounded border border-gray-300 p-3 text-lg text-gray-900"
               />
+              {(() => {
+                const recu = Number(montantEspeces.replace(",", "."));
+                if (!montantEspeces.trim() || !Number.isFinite(recu)) return null;
+                const monnaie = Math.round((recu - montantDu) * 100) / 100;
+                if (monnaie < 0) {
+                  return (
+                    <p className="text-sm font-semibold text-red-600">
+                      Il manque {Math.abs(monnaie).toFixed(2)} € — le client doit encore {Math.abs(monnaie).toFixed(2)} €.
+                    </p>
+                  );
+                }
+                if (monnaie > 0) {
+                  return (
+                    <p className="text-lg font-bold text-[#2D5A27]">💶 Rendre {monnaie.toFixed(2)} € de monnaie</p>
+                  );
+                }
+                return <p className="text-sm font-semibold text-gray-600">Compte juste, rien à rendre.</p>;
+              })()}
               <button
                 type="button"
                 onClick={() => declarer(commandeId, [{ mode: "especes", montant: montantDu }])}
