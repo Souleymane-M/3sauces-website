@@ -39,6 +39,14 @@ export async function listerLivraisonsAEncaisser(): Promise<LivraisonAEncaisser[
     )
     .neq("paiement_statut", "paye")
     .neq("statut", "annulee")
+    // Une commande Stripe n'a jamais rien à encaisser manuellement — son
+    // paiement est confirmé par le webhook, pas par la caisse/le patron. La
+    // seule chose qui pouvait la faire apparaître ici était le court
+    // instant entre la création de la commande et l'arrivée du webhook
+    // (quelques secondes), ce qui a déjà mené à un faux encaissement
+    // "espèces" saisi par erreur sur une commande déjà payée en ligne
+    // (#376, 2026-10-16).
+    .neq("mode_paiement", "stripe")
     .order("created_at", { ascending: true });
 
   if (error) {
