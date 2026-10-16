@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
-import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
+import { notifierPaiementConfirme, notifierLivraisonNonEffectuee } from "@/lib/notifications/paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
@@ -288,4 +288,56 @@ export async function prendreLivraisonParQrCode(qrCode: string, livreurId: strin
     profilId: livreurId,
     livreurId,
   });
+}
+
+/**
+ * Le livreur ne peut pas remettre la commande (client absent, adresse
+ * introuvable, refusée...) — contrairement à un paiement qui manque
+ * (`declarerLivraison`), on ne redemande jamais une déclaration : la
+ * commande reste au statut "pris_par_livreur" (jamais "livre", ce serait
+ * faux), mais un responsable est alerté immédiatement par email pour
+ * décider de la suite en interne. Réutilise les colonnes `alerte_*`
+ * existantes (déjà utilisées côté caisse pour un écart de paiement, cf.
+ * `signalerEcartLivraison`), juste déclenchable directement depuis le
+ * scan, là où le problème se produit réellement.
+ */
+export async function signalerLivraisonNonEffectuee(
+  commandeId: string,
+  livreurId: string,
+  nomLivreur: string,
+  motif: string
+): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select("id, canal, statut")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.canal !== "livraison" || commande.statut !== "pris_par_livreur") {
+    throw new Error("Cette commande n'est pas en cours de livraison.");
+  }
+
+  const { data: livraison } = await supabase.from("livraisons").select("livreur_id").eq("commande_id", commandeId).maybeSingle();
+  if (!livraison || livraison.livreur_id !== livreurId) {
+    throw new Error("Cette livraison n'est pas assignée à ce livreur.");
+  }
+
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({
+      alerte_signalee: true,
+      alerte_note: motif.trim() || "Livraison impossible (motif non précisé par le livreur)",
+      alerte_signalee_par: livreurId,
+      alerte_signalee_le: new Date().toISOString(),
+    })
+    .eq("id", commandeId);
+  if (erreurMaj) {
+    throw new Error(`Impossible d'enregistrer le signalement : ${erreurMaj.message}`);
+  }
+
+  await notifierLivraisonNonEffectuee(commandeId, motif.trim() || "non précisé", nomLivreur);
 }

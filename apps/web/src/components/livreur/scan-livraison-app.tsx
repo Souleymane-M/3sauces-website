@@ -55,10 +55,12 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   const etat = etatInitial;
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [confirmeLocal, setConfirmeLocal] = useState<"prise" | "livre" | null>(null);
+  const [confirmeLocal, setConfirmeLocal] = useState<"prise" | "livre" | "echec" | null>(null);
   const [choix, setChoix] = useState<ChoixPaiement>(null);
   const [montantEspeces, setMontantEspeces] = useState("");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
+  const [echecOuvert, setEchecOuvert] = useState(false);
+  const [motifEchec, setMotifEchec] = useState("");
 
   async function prendre() {
     setEnCours(true);
@@ -105,6 +107,28 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
     }
   }
 
+  async function signalerEchec(commandeId: string) {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      const reponse = await fetch("/api/livreur/signaler-echec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId, motif: motifEchec }),
+      });
+      const data = await reponse.json();
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Échec du signalement.");
+        return;
+      }
+      setConfirmeLocal("echec");
+    } catch {
+      setErreur("Connexion impossible, réessaie.");
+    } finally {
+      setEnCours(false);
+    }
+  }
+
   // Après une action réussie, le serveur refait autorité : on ne recalcule
   // jamais l'état nous-mêmes, mais on affiche un message de succès pendant
   // le court instant avant que `router.refresh()` ne renvoie le nouvel état.
@@ -113,6 +137,11 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   }
   if (confirmeLocal === "livre") {
     return <MessageEtat emoji="✅" titre="Livraison confirmée" detail="Paiement enregistré, merci !" />;
+  }
+  if (confirmeLocal === "echec") {
+    return (
+      <MessageEtat emoji="🚨" titre="Signalé" detail="Un responsable a été alerté, merci — tu peux passer à la suivante." />
+    );
   }
 
   if (etat.type === "introuvable") {
@@ -299,6 +328,48 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {etat.type === "a_livrer" && !echecOuvert && (
+        <button
+          type="button"
+          onClick={() => setEchecOuvert(true)}
+          className="w-full rounded border border-red-600 py-3 text-sm font-semibold text-red-600"
+        >
+          ❌ Impossible de livrer
+        </button>
+      )}
+
+      {etat.type === "a_livrer" && echecOuvert && (
+        <div className="space-y-2 rounded-lg border border-red-600 bg-red-50 p-3">
+          <p className="text-sm font-semibold text-red-700">
+            Pourquoi ? (client absent, adresse introuvable, refusée...)
+          </p>
+          <input
+            value={motifEchec}
+            onChange={(e) => setMotifEchec(e.target.value)}
+            placeholder="Motif"
+            className="w-full rounded border border-gray-300 p-3 text-sm text-gray-900"
+          />
+          <p className="text-xs text-gray-600">Un responsable sera alerté tout de suite par email.</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEchecOuvert(false)}
+              className="flex-1 rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={() => signalerEchec(commandeId)}
+              disabled={enCours}
+              className="flex-1 rounded bg-red-600 py-2 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {enCours ? "…" : "Signaler"}
+            </button>
+          </div>
         </div>
       )}
     </div>

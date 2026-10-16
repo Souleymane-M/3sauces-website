@@ -386,3 +386,48 @@ export async function notifierCommandeModifiee(commandeId: string): Promise<void
     console.error("[notifications/paiement] échec envoi modification :", resultat.erreur);
   }
 }
+
+/**
+ * Alerte immédiate au restaurant quand une livraison n'a pas pu être
+ * remise au client (absent, adresse introuvable, refusée...) — demande
+ * explicite du patron, 2026-10-16 : contrairement à un échec de paiement,
+ * la commande ne doit jamais revenir silencieusement dans le circuit (le
+ * plat est froid entre-temps), un responsable doit être alerté tout de
+ * suite pour décider de la suite en interne. Aucun email client ici —
+ * seulement le restaurant.
+ */
+export async function notifierLivraisonNonEffectuee(commandeId: string, motif: string, nomLivreur: string): Promise<void> {
+  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
+  if (!emailRestaurant) return;
+
+  const supabase = createServiceSupabaseClient();
+  const { data: commande, error } = await supabase
+    .from("commandes")
+    .select("numero, montant, contenu, nom_livraison, adresse_livraison, client_telephone, paiement_statut")
+    .eq("id", commandeId)
+    .maybeSingle();
+
+  if (error || !commande) {
+    console.error("[notifications/paiement] commande introuvable (livraison non effectuée) :", commandeId, error?.message);
+    return;
+  }
+
+  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
+  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
+  const montantAffiche = commande.montant.toFixed(2);
+  const dejaPayee = commande.paiement_statut === "paye";
+
+  const resultat = await envoyerEmail(
+    emailRestaurant,
+    `🚨 Livraison non effectuée — commande #${commande.numero}`,
+    `<p><strong>${nomLivreur}</strong> n'a pas pu livrer la commande #${commande.numero}.</p>` +
+      `<p>Motif : ${motif || "non précisé"}</p>` +
+      `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
+      `<p>Adresse : ${commande.adresse_livraison ?? "—"}</p>` +
+      `<p>Montant : ${montantAffiche} € — ${dejaPayee ? "déjà payée en ligne" : "non payée"}</p>` +
+      `<p>${resume}</p>`
+  );
+  if (!resultat.ok) {
+    console.error("[notifications/paiement] échec envoi alerte livraison non effectuée :", resultat.erreur);
+  }
+}
