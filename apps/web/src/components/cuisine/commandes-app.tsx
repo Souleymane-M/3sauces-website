@@ -75,6 +75,34 @@ function estPrioritaire(commande: CommandeCuisine): boolean {
   return commande.palierGroupe !== null;
 }
 
+function jourMayotte(iso: string): string {
+  return new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(iso));
+}
+
+/**
+ * Vrai si la commande traîne depuis un jour précédent — l'écran cuisine
+ * n'a volontairement aucune limite de date basse (une commande anormale ne
+ * doit jamais disparaître en silence), mais ça veut dire qu'une commande
+ * jamais validée reste indéfiniment mélangée à celles du jour, sans que
+ * personne ne s'en rende compte (vécu avec #299 puis #357/#358,
+ * 2026-10-16) — ce signal rend la différence visible d'un coup d'œil,
+ * sans rien cacher.
+ */
+function estAncienne(commande: CommandeCuisine): boolean {
+  return jourMayotte(commande.creeLe) !== jourMayotte(new Date().toISOString());
+}
+
+function formaterDepuis(iso: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
 // Lecture pure (aucun Date.now(), aucune écriture) de l'identité persistée
 // en sessionStorage — utilisable comme initialiseur paresseux de useState.
 function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActivite: number } {
@@ -286,6 +314,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
           const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
 
           const prioritaire = estPrioritaire(commande);
+          const ancienne = estAncienne(commande);
           // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
           // stockée telle quelle en base, déduite de l'écart entre la somme
           // des lignes et le montant réellement dû — pour que l'équipe voie
@@ -296,8 +325,13 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
           return (
             <div
               key={commande.id}
-              className={`rounded-xl border-2 p-4 ${prioritaire ? "border-orange-500" : "border-gray-200"}`}
+              className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : prioritaire ? "border-orange-500" : "border-gray-200"}`}
             >
+              {ancienne && (
+                <div className="mb-2 rounded bg-red-600 px-2 py-1 text-lg font-bold text-white">
+                  ⚠️ Depuis {formaterDepuis(commande.creeLe)} — jamais finalisée, à vérifier
+                </div>
+              )}
               {prioritaire && (
                 <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
                   {libellePalierGroupe(commande.palierGroupe)} 🚀
