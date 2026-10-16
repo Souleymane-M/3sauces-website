@@ -288,10 +288,18 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
 function MessageEtat({ emoji, titre, detail }: { emoji: string; titre: string; detail: string }) {
   return (
-    <div className="mx-auto mt-16 max-w-sm space-y-2 text-center">
+    <div className="mx-auto mt-16 max-w-sm space-y-4 text-center">
       <p className="text-4xl">{emoji}</p>
       <p className="text-xl font-bold text-gray-900">{titre}</p>
       <p className="text-gray-600">{detail}</p>
+      {/* Pas besoin de rescanner pour livrer/déclarer un paiement : la liste
+          affiche déjà toutes les livraisons en cours, sélectionnables —
+          demande explicite du patron, 2026-10-16 (deux façons d'y arriver,
+          scan ou liste, au choix selon ce qui est le plus rapide sur le
+          moment). */}
+      <a href="/livreur" className="inline-block text-sm font-semibold text-[#8B2020] underline">
+        ← Voir mes livraisons en cours
+      </a>
     </div>
   );
 }
