@@ -47,6 +47,31 @@ export interface LivreurActif {
 }
 
 /**
+ * Livraison prise en charge par un livreur (statut "pris_par_livreur"),
+ * pour la colonne "En cours de livraison" de l'écran cuisine — distinct de
+ * `CommandeCuisine` : volontairement pas mélangé dans `listerCommandesActives`
+ * (cf. commentaire sur `STATUTS_TERMINAUX`), récupéré séparément par
+ * `listerLivraisonsEnCours`.
+ */
+export interface LivraisonEnCours {
+  id: string;
+  numero: number;
+  lignes: LigneCommande[];
+  montant: number;
+  nom: string;
+  telephone: string | null;
+  adresse: string | null;
+  heureSouhaitee: string | null;
+  creeLe: string;
+  /** Nom du livreur qui a pris la commande — jamais null une fois "pris_par_livreur". */
+  livreurNom: string;
+  /** Signalement "impossible de livrer" depuis le scan — cf. `signalerLivraisonNonEffectuee`. */
+  alerteSignalee: boolean;
+  alerteNote: string | null;
+  alerteSignaleeLe: string | null;
+}
+
+/**
  * Statut suivant valide selon le canal, à partir du statut actuel.
  * "pris_par_livreur" -> "livre" est déclenché depuis /livreur (déclaration
  * de paiement à la livraison), pas depuis /commandes — même fonction
@@ -61,10 +86,14 @@ export const TRANSITIONS_PAR_CANAL: Record<Canal, Partial<Record<StatutCommande,
 };
 
 /**
- * Statuts au-delà desquels une commande n'apparaît plus sur /commandes
- * (écran cuisine) — "pris_par_livreur" y reste terminal : une fois remise
- * au livreur, la cuisine n'a plus rien à faire dessus, même si elle n'est
- * pas encore réellement livrée (ça, c'est le rôle de /livreur).
+ * Statuts au-delà desquels une commande sort de `listerCommandesActives`
+ * (colonnes "En attente"/"En préparation"/"Prête" de l'écran cuisine) —
+ * "pris_par_livreur" y reste terminal, rien à faire dessus niveau
+ * préparation. Depuis le 2026-10-16, une livraison "pris_par_livreur"
+ * réapparaît quand même sur le même écran, dans une colonne séparée
+ * ("En cours de livraison", via `listerLivraisonsEnCours`) — ce tableau
+ * ne sert qu'à exclure ce statut de la requête de préparation, pas à le
+ * cacher de l'écran entier.
  */
 export const STATUTS_TERMINAUX: StatutCommande[] = ["remis_au_client", "pris_par_livreur", "livre", "annulee"];
 

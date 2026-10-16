@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { listerCommandesActives, listerCommandesAVenir, changerStatutCommande, annulerCommande } from "@/lib/cuisine/commandes";
+import {
+  listerCommandesActives,
+  listerCommandesAVenir,
+  listerLivraisonsEnCours,
+  changerStatutCommande,
+  annulerCommande,
+} from "@/lib/cuisine/commandes";
 import type { StatutEvenement } from "@/lib/cuisine/types";
 
 // "en_attente" est l'état initial automatique, jamais une transition
@@ -21,8 +27,12 @@ export async function GET() {
   }
 
   try {
-    const [commandes, aVenir] = await Promise.all([listerCommandesActives(), listerCommandesAVenir()]);
-    return NextResponse.json({ commandes, aVenir });
+    const [commandes, aVenir, enLivraison] = await Promise.all([
+      listerCommandesActives(),
+      listerCommandesAVenir(),
+      listerLivraisonsEnCours(),
+    ]);
+    return NextResponse.json({ commandes, aVenir, enLivraison });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";
     return NextResponse.json({ error: message }, { status: 500 });

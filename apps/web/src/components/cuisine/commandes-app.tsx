@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CommandeCuisine } from "@/lib/cuisine/types";
+import type { CommandeCuisine, LivraisonEnCours } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
+import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { IdentificationModal } from "./identification-modal";
 
 interface CommandesAppProps {
   commandesInitiales: CommandeCuisine[];
   aVenirInitial: CommandeCuisine[];
+  enLivraisonInitial: LivraisonEnCours[];
 }
 
 const INTERVALLE_POLLING_MS = 5000;
@@ -88,8 +90,8 @@ function jourMayotte(iso: string): string {
  * 2026-10-16) — ce signal rend la différence visible d'un coup d'œil,
  * sans rien cacher.
  */
-function estAncienne(commande: CommandeCuisine): boolean {
-  return jourMayotte(commande.creeLe) !== jourMayotte(new Date().toISOString());
+function estAncienne(creeLe: string): boolean {
+  return jourMayotte(creeLe) !== jourMayotte(new Date().toISOString());
 }
 
 function formaterDepuis(iso: string): string {
@@ -117,15 +119,238 @@ function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActiv
   }
 }
 
-export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesAppProps) {
+interface CarteCommandeProps {
+  commande: CommandeCuisine;
+  demanderChangement: (commandeId: string, statut: string, livreurId?: string, motif?: string) => void;
+  demanderAnnulation: (commandeId: string) => void;
+}
+
+function CarteCommande({ commande, demanderChangement, demanderAnnulation }: CarteCommandeProps) {
+  const statutSuivant = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
+  // Depuis le 2026-10-15 : la cuisine ne désigne plus le livreur — le
+  // ticket imprimé porte un QR que le livreur scanne lui-même à la prise
+  // en charge (cf. /livreur/scan/[code]). Une livraison "prête" n'a donc
+  // plus de bouton d'action en cuisine, juste un statut d'attente.
+  const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
+
+  const prioritaire = estPrioritaire(commande);
+  const ancienne = estAncienne(commande.creeLe);
+  // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
+  // stockée telle quelle en base, déduite de l'écart entre la somme des
+  // lignes et le montant réellement dû — pour que l'équipe voie que le
+  // client a bénéficié d'une réduction, pas juste le total final.
+  const montantBrutCommande = commande.lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0);
+  const remiseCommande = Math.round((montantBrutCommande - commande.montant) * 100) / 100;
+
+  return (
+    <div className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : prioritaire ? "border-orange-500" : "border-gray-200"}`}>
+      {ancienne && (
+        <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
+          ⚠️ Depuis {formaterDepuis(commande.creeLe)} — jamais finalisée, à vérifier
+        </div>
+      )}
+      {prioritaire && (
+        <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-base font-bold text-white">
+          {libellePalierGroupe(commande.palierGroupe)} 🚀
+        </div>
+      )}
+      <div className="flex items-baseline justify-between">
+        <span className="text-xl font-bold text-black">Commande #{commande.numero}</span>
+        <span className="text-base text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</span>
+      </div>
+      <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
+          {libelleCanal(commande.canal)}
+        </span>
+        <span className="text-base text-black">{LIBELLES_STATUT[commande.statut]}</span>
+      </div>
+      {commande.modePaiement === "stripe" && (
+        <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
+          <p className="text-lg font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+          <p className="text-sm font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
+        </div>
+      )}
+      {commande.commandeAvance && !commande.ticketImprimeLe && (
+        <div className="mt-2 rounded bg-amber-100 p-2 text-sm font-semibold text-amber-900">
+          ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
+        </div>
+      )}
+      {commande.nom && (
+        <p className="mt-1 text-base text-black">
+          Client : {commande.nom}
+          {commande.telephone && ` — ${commande.telephone}`}
+        </p>
+      )}
+      {commande.canal === "livraison" && commande.adresse && (
+        <p className="mt-1 text-base text-black">Adresse : {commande.adresse}</p>
+      )}
+
+      <div className="mt-3 space-y-3">
+        {regrouperLignesParCategorie(commande.lignes).map((groupe) => (
+          <div key={groupe.categorie}>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
+            <ul className="mt-1 space-y-2">
+              {groupe.lignes.map((ligne, i) => {
+                // Formule "composée" (menu/tacos/plat du jour) : mise en
+                // avant visuelle dès qu'il y a un vrai détail attaché
+                // (viande, boisson incluse...), pour la distinguer d'un
+                // article simple (une grillade seule, par exemple).
+                const estFormuleDetaillee =
+                  (groupe.categorie === "menu_special" ||
+                    groupe.categorie === "snacking" ||
+                    groupe.categorie === "plat_du_jour") &&
+                  detailLigne(ligne).length > 0;
+                return (
+                  <li key={i} className={`text-lg text-black ${estFormuleDetaillee ? "border-l-4 border-[#8B2020] pl-2" : ""}`}>
+                    <span className="font-semibold">
+                      {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+                    </span>{" "}
+                    <span className="text-base text-gray-500">({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)</span>
+                    {detailLigne(ligne).map((detail, j) => (
+                      <div key={j} className="text-base text-gray-700">
+                        {detail}
+                      </div>
+                    ))}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* Montant réel déjà calculé en base (remises comprises) — jamais à
+          resommer les lignes de tête, qui donnerait le montant brut et non
+          ce qu'il faut vraiment faire payer. */}
+      {remiseCommande > 0.009 && (
+        <p className="mt-3 text-center text-base font-semibold text-[#2D5A27]">
+          🎁 Remise appliquée : -{remiseCommande.toFixed(2)} €
+        </p>
+      )}
+      <p
+        className={
+          remiseCommande > 0.009
+            ? "mt-1 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
+            : "mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
+        }
+      >
+        Total : {commande.montant.toFixed(2)} €
+      </p>
+
+      {enAttenteScanLivreur && (
+        <p className="mt-4 rounded bg-blue-50 py-3 text-center text-base font-semibold text-blue-700">
+          📦 Prête — en attente qu&apos;un livreur scanne le ticket
+        </p>
+      )}
+      {statutSuivant && !enAttenteScanLivreur && (
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={() => demanderChangement(commande.id, statutSuivant)}
+            className="w-full rounded bg-[#8B2020] py-3 text-lg font-bold text-white disabled:opacity-40"
+          >
+            {commande.canal !== "livraison" && statutSuivant === "remis_au_client" ? "Client venu" : LIBELLES_STATUT[statutSuivant]}
+          </button>
+        </div>
+      )}
+      {commande.statut === "en_attente" && (
+        <div className="mt-2 flex gap-2">
+          <a
+            href={`/caisse?modifier=${commande.id}`}
+            className="flex-1 rounded border border-gray-400 py-2 text-center text-sm font-semibold text-gray-700"
+          >
+            Modifier
+          </a>
+          <button
+            onClick={() => demanderAnnulation(commande.id)}
+            className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
+          >
+            Annuler la commande
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Carte "En cours de livraison" — volontairement plus sobre qu'une alerte
+ * rouge clignotante (demande explicite du patron : "attirer l'attention,
+ * sans stresser") : un bandeau orange fixe, pas d'animation, mais bien
+ * distinct du reste de l'écran.
+ */
+function CarteLivraisonEnCours({ livraison }: { livraison: LivraisonEnCours }) {
+  const ancienne = estAncienne(livraison.creeLe);
+  return (
+    <div
+      className={`rounded-xl border-2 p-4 ${livraison.alerteSignalee ? "border-orange-500" : ancienne ? "border-red-600" : "border-gray-200"}`}
+    >
+      {livraison.alerteSignalee && (
+        <div className="mb-2 rounded bg-orange-100 p-3">
+          <p className="text-lg font-bold text-orange-800">🚨 Impossible de livrer</p>
+          {livraison.alerteNote && <p className="mt-1 text-base text-orange-800">{livraison.alerteNote}</p>}
+          {livraison.alerteSignaleeLe && (
+            <p className="mt-1 text-sm text-orange-700">Signalé à {formaterHeure(livraison.alerteSignaleeLe)}</p>
+          )}
+        </div>
+      )}
+      {!livraison.alerteSignalee && ancienne && (
+        <div className="mb-2 rounded bg-red-600 px-2 py-1 text-base font-bold text-white">
+          ⚠️ Depuis {formaterDepuis(livraison.creeLe)} — jamais clôturée
+        </div>
+      )}
+      <div className="flex items-baseline justify-between">
+        <span className="text-xl font-bold text-black">Commande #{livraison.numero}</span>
+        <span className="text-base text-black">Retrait : {formaterHeure(livraison.heureSouhaitee)}</span>
+      </div>
+      <p className="text-sm text-gray-500">Livreur : {livraison.livreurNom}</p>
+      {livraison.nom && (
+        <p className="mt-1 text-base text-black">
+          Client : {livraison.nom}
+          {livraison.telephone && ` — ${formaterTelephoneAffichage(livraison.telephone)}`}
+        </p>
+      )}
+      {livraison.adresse && <p className="mt-1 text-base text-black">Adresse : {livraison.adresse}</p>}
+      <div className="mt-2 space-y-1">
+        {regrouperLignesParCategorie(livraison.lignes).map((groupe) =>
+          groupe.lignes.map((ligne, i) => (
+            <p key={`${groupe.categorie}-${i}`} className="text-base text-black">
+              {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+            </p>
+          ))
+        )}
+      </div>
+      <p className="mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black">
+        {livraison.montant.toFixed(2)} €
+      </p>
+    </div>
+  );
+}
+
+function Colonne({ titre, count, children }: { titre: string; count: number; children: React.ReactNode }) {
+  return (
+    <div className="flex-1 min-w-[280px]">
+      <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-700">
+        {titre} <span className="rounded-full bg-gray-200 px-2 py-0.5 text-sm text-gray-600">{count}</span>
+      </h2>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
+export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonInitial }: CommandesAppProps) {
   const [commandes, setCommandes] = useState<CommandeCuisine[]>(commandesInitiales);
   const [aVenir, setAVenir] = useState<CommandeCuisine[]>(aVenirInitial);
+  const [enLivraison, setEnLivraison] = useState<LivraisonEnCours[]>(enLivraisonInitial);
   const [employeActif, setEmployeActif] = useState<EmployeActif | null>(() => lireIdentitePersistee().identite);
   const [modalOuverte, setModalOuverte] = useState(false);
   const [actionEnAttente, setActionEnAttente] = useState<((identite: EmployeActif) => void) | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const idsVusRef = useRef<Set<string>>(new Set(commandesInitiales.map((c) => c.id)));
+  const alertesVuesRef = useRef<Set<string>>(
+    new Set(enLivraisonInitial.filter((l) => l.alerteSignalee).map((l) => l.id))
+  );
   const derniereActiviteRef = useRef<number>(0);
 
   // Initialise le minuteur d'inactivité à partir de la valeur persistée (ou
@@ -193,7 +418,10 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
 
   // Polling : remplace toute la liste (reflète aussi les changements de
   // statut faits par d'autres employés/appareils), joue une alerte sonore
-  // uniquement pour un id jamais vu depuis l'ouverture de la page.
+  // pour un id de commande jamais vu, ou pour une livraison tout juste
+  // signalée "impossible à livrer" — les deux cas demandent une action
+  // immédiate, visible et audible, quel que soit qui se trouve devant
+  // l'écran à ce moment-là.
   useEffect(() => {
     let annule = false;
 
@@ -203,16 +431,22 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
         if (!reponse.ok || annule) return;
         const data = await reponse.json();
         const nouvellesCommandes: CommandeCuisine[] = data.commandes ?? [];
+        const nouvelEnLivraison: LivraisonEnCours[] = data.enLivraison ?? [];
 
         const idsNouveaux = nouvellesCommandes.filter((c) => !idsVusRef.current.has(c.id));
-        if (idsNouveaux.length > 0) {
+        const nouvellesAlertes = nouvelEnLivraison.filter(
+          (l) => l.alerteSignalee && !alertesVuesRef.current.has(l.id)
+        );
+        if (idsNouveaux.length > 0 || nouvellesAlertes.length > 0) {
           jouerAlerteSonore();
           for (const c of idsNouveaux) idsVusRef.current.add(c.id);
+          for (const l of nouvellesAlertes) alertesVuesRef.current.add(l.id);
         }
 
         if (!annule) {
           setCommandes(nouvellesCommandes);
           setAVenir(data.aVenir ?? []);
+          setEnLivraison(nouvelEnLivraison);
         }
       } catch {
         // Erreur réseau ponctuelle : le prochain passage réessaiera.
@@ -233,6 +467,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
       const data = await reponse.json();
       setCommandes(data.commandes ?? []);
       setAVenir(data.aVenir ?? []);
+      setEnLivraison(data.enLivraison ?? []);
     } catch {
       // ignore, le polling reprendra
     }
@@ -279,6 +514,10 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
     demanderChangement(commandeId, "annulee", undefined, motif);
   }
 
+  const enAttente = commandes.filter((c) => c.statut === "en_attente");
+  const enPreparation = commandes.filter((c) => c.statut === "en_preparation");
+  const prete = commandes.filter((c) => c.statut === "pret");
+
   return (
     <div className="mt-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -301,161 +540,46 @@ export function CommandesApp({ commandesInitiales, aVenirInitial }: CommandesApp
 
       {erreur && <p className="mb-3 text-lg text-red-600">{erreur}</p>}
 
-      {commandes.length === 0 && <p className="text-xl text-gray-400">Aucune commande en cours.</p>}
+      {commandes.length === 0 && enLivraison.length === 0 && (
+        <p className="text-xl text-gray-400">Aucune commande en cours.</p>
+      )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {commandes.map((commande) => {
-          const statutSuivant = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
-          // Depuis le 2026-10-15 : la cuisine ne désigne plus le livreur —
-          // le ticket imprimé porte un QR que le livreur scanne lui-même à
-          // la prise en charge (cf. /livreur/scan/[code]). Une livraison
-          // "prête" n'a donc plus de bouton d'action en cuisine, juste un
-          // statut d'attente.
-          const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
-
-          const prioritaire = estPrioritaire(commande);
-          const ancienne = estAncienne(commande);
-          // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
-          // stockée telle quelle en base, déduite de l'écart entre la somme
-          // des lignes et le montant réellement dû — pour que l'équipe voie
-          // que le client a bénéficié d'une réduction, pas juste le total final.
-          const montantBrutCommande = commande.lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0);
-          const remiseCommande = Math.round((montantBrutCommande - commande.montant) * 100) / 100;
-
-          return (
-            <div
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <Colonne titre="En attente" count={enAttente.length}>
+          {enAttente.map((commande) => (
+            <CarteCommande
               key={commande.id}
-              className={`rounded-xl border-2 p-4 ${ancienne ? "border-red-600" : prioritaire ? "border-orange-500" : "border-gray-200"}`}
-            >
-              {ancienne && (
-                <div className="mb-2 rounded bg-red-600 px-2 py-1 text-lg font-bold text-white">
-                  ⚠️ Depuis {formaterDepuis(commande.creeLe)} — jamais finalisée, à vérifier
-                </div>
-              )}
-              {prioritaire && (
-                <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
-                  {libellePalierGroupe(commande.palierGroupe)} 🚀
-                </div>
-              )}
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-black">Commande #{commande.numero}</span>
-                <span className="text-xl text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</span>
-              </div>
-              <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="rounded bg-gray-200 px-2 py-1 text-lg font-semibold text-black">
-                  {libelleCanal(commande.canal)}
-                </span>
-                <span className="text-lg text-black">{LIBELLES_STATUT[commande.statut]}</span>
-              </div>
-              {commande.modePaiement === "stripe" && (
-                <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
-                  <p className="text-xl font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
-                  <p className="text-base font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
-                </div>
-              )}
-              {commande.commandeAvance && !commande.ticketImprimeLe && (
-                <div className="mt-2 rounded bg-amber-100 p-2 text-base font-semibold text-amber-900">
-                  ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
-                </div>
-              )}
-              {commande.nom && (
-                <p className="mt-1 text-lg text-black">
-                  Client : {commande.nom}
-                  {commande.telephone && ` — ${commande.telephone}`}
-                </p>
-              )}
-              {commande.canal === "livraison" && commande.adresse && (
-                <p className="mt-1 text-lg text-black">Adresse : {commande.adresse}</p>
-              )}
-
-              <div className="mt-3 space-y-3">
-                {regrouperLignesParCategorie(commande.lignes).map((groupe) => (
-                  <div key={groupe.categorie}>
-                    <p className="text-sm font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
-                    <ul className="mt-1 space-y-2">
-                      {groupe.lignes.map((ligne, i) => {
-                        // Formule "composée" (menu/tacos/plat du jour) : mise en
-                        // avant visuelle dès qu'il y a un vrai détail attaché
-                        // (viande, boisson incluse...), pour la distinguer d'un
-                        // article simple (une grillade seule, par exemple).
-                        const estFormuleDetaillee =
-                          (groupe.categorie === "menu_special" ||
-                            groupe.categorie === "snacking" ||
-                            groupe.categorie === "plat_du_jour") &&
-                          detailLigne(ligne).length > 0;
-                        return (
-                          <li
-                            key={i}
-                            className={`text-xl text-black ${
-                              estFormuleDetaillee ? "border-l-4 border-[#8B2020] pl-2" : ""
-                            }`}
-                          >
-                            <span className="font-semibold">
-                              {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
-                            </span>{" "}
-                            <span className="text-lg text-gray-500">
-                              ({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)
-                            </span>
-                            {detailLigne(ligne).map((detail, j) => (
-                              <div key={j} className="text-lg text-gray-700">
-                                {detail}
-                              </div>
-                            ))}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-
-              {/* Montant réel déjà calculé en base (remises comprises) —
-                  jamais à resommer les lignes de tête, qui donnerait le
-                  montant brut et non ce qu'il faut vraiment faire payer. */}
-              {remiseCommande > 0.009 && (
-                <p className="mt-3 text-center text-lg font-semibold text-[#2D5A27]">
-                  🎁 Remise appliquée : -{remiseCommande.toFixed(2)} €
-                </p>
-              )}
-              <p className={remiseCommande > 0.009 ? "mt-1 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black" : "mt-3 rounded bg-gray-100 py-2 text-center text-2xl font-extrabold text-black"}>
-                Total : {commande.montant.toFixed(2)} €
-              </p>
-
-              {enAttenteScanLivreur && (
-                <p className="mt-4 rounded bg-blue-50 py-3 text-center text-lg font-semibold text-blue-700">
-                  📦 Prête — en attente qu&apos;un livreur scanne le ticket
-                </p>
-              )}
-              {statutSuivant && !enAttenteScanLivreur && (
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={() => demanderChangement(commande.id, statutSuivant)}
-                    className="w-full rounded bg-[#8B2020] py-3 text-xl font-bold text-white disabled:opacity-40"
-                  >
-                    {LIBELLES_STATUT[statutSuivant]}
-                  </button>
-                </div>
-              )}
-              {commande.statut === "en_attente" && (
-                <div className="mt-2 flex gap-2">
-                  <a
-                    href={`/caisse?modifier=${commande.id}`}
-                    className="flex-1 rounded border border-gray-400 py-2 text-center text-base font-semibold text-gray-700"
-                  >
-                    Modifier
-                  </a>
-                  <button
-                    onClick={() => demanderAnnulation(commande.id)}
-                    className="flex-1 rounded border border-red-600 py-2 text-base font-semibold text-red-600"
-                  >
-                    Annuler la commande
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+              commande={commande}
+              demanderChangement={demanderChangement}
+              demanderAnnulation={demanderAnnulation}
+            />
+          ))}
+        </Colonne>
+        <Colonne titre="En préparation" count={enPreparation.length}>
+          {enPreparation.map((commande) => (
+            <CarteCommande
+              key={commande.id}
+              commande={commande}
+              demanderChangement={demanderChangement}
+              demanderAnnulation={demanderAnnulation}
+            />
+          ))}
+        </Colonne>
+        <Colonne titre="Prête" count={prete.length}>
+          {prete.map((commande) => (
+            <CarteCommande
+              key={commande.id}
+              commande={commande}
+              demanderChangement={demanderChangement}
+              demanderAnnulation={demanderAnnulation}
+            />
+          ))}
+        </Colonne>
+        <Colonne titre="En cours de livraison" count={enLivraison.length}>
+          {enLivraison.map((livraison) => (
+            <CarteLivraisonEnCours key={livraison.id} livraison={livraison} />
+          ))}
+        </Colonne>
       </div>
 
       {aVenir.length > 0 && (

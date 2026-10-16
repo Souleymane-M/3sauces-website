@@ -8,6 +8,7 @@ import {
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
   type CommandeCuisine,
+  type LivraisonEnCours,
   type LivreurActif,
   type StatutEvenement,
 } from "./types";
@@ -98,6 +99,74 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
   // passent en tête, sans perdre l'ordre chronologique existant à
   // l'intérieur de chaque groupe (tri stable).
   return [...commandes].sort((a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null));
+}
+
+/**
+ * Livraisons déjà prises en charge par un livreur, pour la colonne "En
+ * cours de livraison" de l'écran cuisine — demande explicite du patron,
+ * 2026-10-16 : une livraison signalée "impossible à livrer" depuis le scan
+ * (cf. `signalerLivraisonNonEffectuee`) doit être vue en temps réel par
+ * quelqu'un sur place, pas seulement par email (pas fiable, personne ne
+ * consulte sa boîte en continu). Même borne que `listerCommandesActives`
+ * (jour courant, pas de borne basse) pour la même raison : ne jamais
+ * cacher une anomalie en silence.
+ */
+export async function listerLivraisonsEnCours(): Promise<LivraisonEnCours[]> {
+  const supabase = createServiceSupabaseClient();
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
+
+  const { data: commandes, error } = await supabase
+    .from("commandes")
+    .select(
+      "id, numero, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, alerte_signalee, alerte_note, alerte_signalee_le"
+    )
+    .eq("canal", "livraison")
+    .eq("statut", "pris_par_livreur")
+    .lt("heure_souhaitee", fin.toISOString())
+    .order("heure_souhaitee", { ascending: true, nullsFirst: false });
+
+  if (error) {
+    throw new Error(`Impossible de charger les livraisons en cours : ${error.message}`);
+  }
+  if (!commandes || commandes.length === 0) return [];
+
+  const ids = commandes.map((c) => c.id);
+  const { data: livraisons, error: erreurLivraisons } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_id")
+    .in("commande_id", ids);
+  if (erreurLivraisons) {
+    throw new Error(`Impossible de charger les livreurs assignés : ${erreurLivraisons.message}`);
+  }
+
+  const livreurIdParCommande = new Map((livraisons ?? []).map((l) => [l.commande_id, l.livreur_id]));
+  const livreurIds = [...new Set((livraisons ?? []).map((l) => l.livreur_id).filter((id): id is string => !!id))];
+  const { data: profils } =
+    livreurIds.length > 0 ? await supabase.from("profils").select("id, nom").in("id", livreurIds) : { data: [] };
+  const nomParLivreurId = new Map((profils ?? []).map((p) => [p.id, p.nom]));
+
+  const resultats: LivraisonEnCours[] = commandes.map((c) => {
+    const livreurId = livreurIdParCommande.get(c.id) ?? null;
+    return {
+      id: c.id,
+      numero: c.numero,
+      lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+      montant: c.montant,
+      nom: c.nom_livraison ?? "",
+      telephone: c.client_telephone,
+      adresse: c.adresse_livraison,
+      heureSouhaitee: c.heure_souhaitee,
+      creeLe: c.created_at,
+      livreurNom: (livreurId ? nomParLivreurId.get(livreurId) : null) ?? "—",
+      alerteSignalee: c.alerte_signalee,
+      alerteNote: c.alerte_note,
+      alerteSignaleeLe: c.alerte_signalee_le,
+    };
+  });
+
+  // Les livraisons signalées "impossible à livrer" en tête — c'est ce qui
+  // demande une action immédiate, jamais noyé dans la liste.
+  return [...resultats].sort((a, b) => Number(b.alerteSignalee) - Number(a.alerteSignalee));
 }
 
 /**
