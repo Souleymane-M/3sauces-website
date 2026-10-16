@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
+import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { construireTicketClientXmlBrut, construireBonCuisineXmlBrut } from "@/lib/impression/epos-print";
 import { analyserResultats } from "@/lib/impression/epos-response";
 import { marquerTicketRemis, marquerDernierTicketRemisImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
+
+/**
+ * Diagnostic temporaire (2026-10-16, cf. migration debug_print_log) :
+ * journalise ce que l'imprimante envoie/reçoit réellement, pour comprendre
+ * pourquoi #357/#358 ont été marquées imprimées sans sortir sur papier.
+ * Best effort — ne doit jamais faire échouer le vrai flux d'impression.
+ */
+async function journaliser(connectionType: string, commandeNumero: number | null, corps: string): Promise<void> {
+  try {
+    const supabase = createServiceSupabaseClient();
+    await supabase
+      .from("debug_print_log")
+      .insert({ connection_type: connectionType, commande_numero: commandeNumero, corps: corps.slice(0, 4000) });
+  } catch {
+    // Jamais bloquant pour l'impression réelle.
+  }
+}
 
 /**
  * Là où l'imprimante Epson (fonction "Server Direct Print", activée
@@ -63,11 +81,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     const typeConnexion = formulaire.get("ConnectionType");
 
     if (typeConnexion === "SetResponse") {
+      const fichierReponse = formulaire.get("ResponseFile") ?? "";
+      await journaliser("SetResponse", null, fichierReponse);
       // Micrologiciel trop ancien pour renvoyer le `printjobid` dans le
       // résultat (cf. commentaire en tête de fichier) : un succès marque
       // simplement la dernière commande remise comme imprimée — fiable ici
       // puisqu'une seule commande est remise à la fois (voir plus bas).
-      const resultats = analyserResultats(formulaire.get("ResponseFile") ?? "");
+      const resultats = analyserResultats(fichierReponse);
       if (resultats.some((r) => r.succes)) {
         await marquerDernierTicketRemisImprime();
       }
@@ -82,6 +102,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (!commande) {
       return reponseVide();
     }
+    await journaliser("GetRequest", commande.numero, `commande #${commande.numero} remise`);
 
     const jobs = [
       construireJob(construireTicketClientXmlBrut(commande, null)),
