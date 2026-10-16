@@ -4,21 +4,34 @@ import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
+import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 import type { EtatScan, LivraisonAssignee, PaiementDeclare } from "./types";
 
 /**
- * Livraisons remises à CE livreur par la cuisine (étape "Pris par
- * livreur" sur /commandes) et pas encore déclarées comme livrées — deux
- * requêtes + fusion en JS, même style que lib/caisse/nouvelles-commandes.ts.
+ * Livraisons remises à CE livreur (prise en charge par scan,
+ * `heure_depart_cuisine` posé à ce moment-là) et pas encore déclarées
+ * comme livrées — deux requêtes + fusion en JS, même style que
+ * lib/caisse/nouvelles-commandes.ts.
+ *
+ * Bornée à AUJOURD'HUI (Mayotte), contrairement à la liste cuisine
+ * (`listerCommandesActives`, volontairement sans borne basse) : une
+ * livraison se conclut normalement en moins d'une heure ou deux, jamais
+ * des jours plus tard — une commande restée "pris_par_livreur" depuis des
+ * semaines n'est pas une livraison en cours à afficher, c'est une anomalie
+ * oubliée (repéré le 2026-10-16, 21 commandes jusqu'au 28 septembre
+ * encombrant la liste réelle d'un livreur). Celles-ci restent en base,
+ * inchangées, pour traitement séparé — seul l'affichage change ici.
  */
 export async function listerLivraisonsAssignees(livreurId: string): Promise<LivraisonAssignee[]> {
   const supabase = createServiceSupabaseClient();
+  const { debut } = plageJourMayotteUtc(dateMayotteIso());
 
   const { data: livraisons, error: erreurLivraisons } = await supabase
     .from("livraisons")
     .select("commande_id")
     .eq("livreur_id", livreurId)
-    .eq("statut", "en_livraison");
+    .eq("statut", "en_livraison")
+    .gte("heure_depart_cuisine", debut.toISOString());
 
   if (erreurLivraisons) {
     throw new Error(`Impossible de charger les livraisons assignées : ${erreurLivraisons.message}`);
