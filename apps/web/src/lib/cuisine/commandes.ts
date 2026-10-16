@@ -389,3 +389,114 @@ export async function annulerCommande({ commandeId, profilId, motif }: Annulatio
     console.error("[cuisine/commandes] échec notification annulation :", e)
   );
 }
+
+/**
+ * Résout une livraison signalée "impossible à livrer" (colonne "En cours
+ * de livraison" de l'écran cuisine) — deux issues possibles, décidées en
+ * interne par un employé/le patron, jamais automatique :
+ *
+ * - "remettre" : le plat est encore utilisable (ex: client qui recontacte
+ *   tout de suite) — repasse "prête", retire le livreur assigné, efface
+ *   le signalement, pour qu'elle soit de nouveau scannable par un livreur.
+ * - "annuler" : la commande est définitivement perdue — mêmes effets que
+ *   `annulerCommande` (restitution du stock, notification client), mais
+ *   applicable ici à une commande déjà "pris_par_livreur" (contrairement
+ *   à `annulerCommande`, volontairement limitée à "en_attente").
+ */
+export async function resoudreLivraisonSignalee(
+  commandeId: string,
+  profilId: string,
+  action: "remettre" | "annuler",
+  motif?: string
+): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: profil, error: erreurProfil } = await supabase
+    .from("profils")
+    .select("id")
+    .eq("id", profilId)
+    .in("role", ["employe", "livreur", "patron"])
+    .eq("actif", true)
+    .maybeSingle();
+  if (erreurProfil || !profil) {
+    throw new Error("Identité invalide.");
+  }
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select("id, statut, contenu, alerte_signalee")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.statut !== "pris_par_livreur" || !commande.alerte_signalee) {
+    throw new Error("Cette commande n'est pas signalée comme non livrée.");
+  }
+
+  if (action === "remettre") {
+    const { error: erreurMaj } = await supabase
+      .from("commandes")
+      .update({
+        statut: "pret",
+        alerte_signalee: false,
+        alerte_note: null,
+        alerte_signalee_par: null,
+        alerte_signalee_le: null,
+      })
+      .eq("id", commandeId);
+    if (erreurMaj) {
+      throw new Error(`Impossible de remettre la commande en circulation : ${erreurMaj.message}`);
+    }
+
+    const { error: erreurLivraison } = await supabase
+      .from("livraisons")
+      .update({ statut: "en_attente", livreur_id: null, heure_depart_cuisine: null })
+      .eq("commande_id", commandeId);
+    if (erreurLivraison) {
+      console.error("[cuisine/commandes] échec remise en circulation côté livraisons :", erreurLivraison.message);
+    }
+
+    const { error: erreurEvenement } = await supabase
+      .from("commandes_evenements")
+      .insert({ commande_id: commandeId, statut: "pret", profil_id: profilId });
+    if (erreurEvenement) {
+      console.error("[cuisine/commandes] échec journalisation remise en circulation :", erreurEvenement.message);
+    }
+    return;
+  }
+
+  // action === "annuler"
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({ statut: "annulee", motif_annulation: motif?.trim() || "Livraison impossible" })
+    .eq("id", commandeId);
+  if (erreurMaj) {
+    throw new Error(`Impossible d'annuler la commande : ${erreurMaj.message}`);
+  }
+
+  const lignes = Array.isArray(commande.contenu)
+    ? (commande.contenu as { produitId?: string; quantite?: number }[])
+    : [];
+  if (lignes.length > 0) {
+    const { error: erreurStock } = await supabase.rpc("incrementer_stocks_produits", {
+      items: lignes
+        .filter((l): l is { produitId: string; quantite: number } => Boolean(l.produitId) && Boolean(l.quantite))
+        .map((l) => ({ produitId: l.produitId, quantite: l.quantite })),
+    });
+    if (erreurStock) {
+      console.error("[cuisine/commandes] échec restitution stock à l'annulation :", erreurStock.message);
+    }
+  }
+
+  const { error: erreurEvenement } = await supabase
+    .from("commandes_evenements")
+    .insert({ commande_id: commandeId, statut: "annulee", profil_id: profilId });
+  if (erreurEvenement) {
+    console.error("[cuisine/commandes] échec journalisation annulation :", erreurEvenement.message);
+  }
+
+  await notifierCommandeAnnulee(commandeId, motif?.trim() || "Livraison impossible").catch((e) =>
+    console.error("[cuisine/commandes] échec notification annulation :", e)
+  );
+}

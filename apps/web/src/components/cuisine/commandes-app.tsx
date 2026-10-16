@@ -279,7 +279,12 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
  * sans stresser") : un bandeau orange fixe, pas d'animation, mais bien
  * distinct du reste de l'écran.
  */
-function CarteLivraisonEnCours({ livraison }: { livraison: LivraisonEnCours }) {
+interface CarteLivraisonEnCoursProps {
+  livraison: LivraisonEnCours;
+  resoudreLivraison: (commandeId: string, action: "remettre" | "annuler") => void;
+}
+
+function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonEnCoursProps) {
   const ancienne = estAncienne(livraison.creeLe);
   return (
     <div
@@ -292,6 +297,22 @@ function CarteLivraisonEnCours({ livraison }: { livraison: LivraisonEnCours }) {
           {livraison.alerteSignaleeLe && (
             <p className="mt-1 text-sm text-orange-700">Signalé à {formaterHeure(livraison.alerteSignaleeLe)}</p>
           )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => resoudreLivraison(livraison.id, "remettre")}
+              className="flex-1 rounded bg-[#2D5A27] py-2 text-sm font-semibold text-white"
+            >
+              🔁 Redonner à un livreur
+            </button>
+            <button
+              type="button"
+              onClick={() => resoudreLivraison(livraison.id, "annuler")}
+              className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
+            >
+              Annuler la commande
+            </button>
+          </div>
         </div>
       )}
       {!livraison.alerteSignalee && ancienne && (
@@ -514,6 +535,34 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     demanderChangement(commandeId, "annulee", undefined, motif);
   }
 
+  async function appliquerResolutionLivraison(commandeId: string, action: "remettre" | "annuler", profilId: string) {
+    setErreur(null);
+    const reponse = await fetch("/api/cuisine/livraison-echec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commandeId, action, profilId }),
+    });
+    if (!reponse.ok) {
+      const data = await reponse.json().catch(() => ({}));
+      setErreur(data.error ?? "Échec de la résolution.");
+      return;
+    }
+    await rafraichir();
+  }
+
+  function resoudreLivraison(commandeId: string, action: "remettre" | "annuler") {
+    if (action === "annuler" && !window.confirm("Confirmer l'annulation de cette commande ?")) return;
+    const executer = (identite: EmployeActif) => {
+      appliquerResolutionLivraison(commandeId, action, identite.profilId);
+    };
+    if (employeActif) {
+      executer(employeActif);
+      return;
+    }
+    setActionEnAttente(() => executer);
+    setModalOuverte(true);
+  }
+
   const enAttente = commandes.filter((c) => c.statut === "en_attente");
   const enPreparation = commandes.filter((c) => c.statut === "en_preparation");
   const prete = commandes.filter((c) => c.statut === "pret");
@@ -577,7 +626,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
         </Colonne>
         <Colonne titre="En cours de livraison" count={enLivraison.length}>
           {enLivraison.map((livraison) => (
-            <CarteLivraisonEnCours key={livraison.id} livraison={livraison} />
+            <CarteLivraisonEnCours key={livraison.id} livraison={livraison} resoudreLivraison={resoudreLivraison} />
           ))}
         </Colonne>
       </div>
