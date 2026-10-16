@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ModePaiement } from "@3sauces/supabase";
-import type { EtatScan } from "@/lib/livreur/types";
+import type { EtatScan, LivraisonAssignee } from "@/lib/livreur/types";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
+import { formaterTelephoneAffichage } from "@/lib/telephone";
 
 interface ScanLivraisonAppProps {
   qrCode: string;
@@ -13,6 +14,35 @@ interface ScanLivraisonAppProps {
 }
 
 type ChoixPaiement = "especes" | "cb" | "mixte" | null;
+
+// Même logique que la liste /livreur (livreur-app.tsx) — défensif comme côté
+// cuisine, d'anciennes commandes peuvent avoir un `contenu` qui ne respecte
+// pas exactement la forme actuelle de LigneCommande.
+function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
+  const details: string[] = [];
+  if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
+  if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
+  if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
+  if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
+  if (l.accompagnementsInclus?.length)
+    details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
+  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
+  return details;
+}
+
+// Toujours la date ET l'heure, jamais l'heure seule — sinon impossible de
+// distinguer une livraison de la veille restée bloquée d'une du jour même.
+function formaterHeure(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
 
 /**
  * Page ouverte en flashant le QR d'un ticket livraison avec l'appareil
@@ -119,13 +149,27 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
         <p className="text-lg font-bold text-gray-900">{livraison.nom}</p>
         {livraison.adresse && <p className="text-sm text-gray-700">{livraison.adresse}</p>}
-        <div className="mt-2 space-y-1">
+        {livraison.clientTelephone && (
+          <a href={`tel:${livraison.clientTelephone}`} className="mt-1 block text-sm font-semibold text-[#8B2020] underline">
+            📞 {formaterTelephoneAffichage(livraison.clientTelephone)}
+          </a>
+        )}
+        <p className="mt-1 text-sm text-gray-700">Heure souhaitée : {formaterHeure(livraison.heureSouhaitee)}</p>
+        <div className="mt-2 space-y-2 border-t border-gray-200 pt-2">
           {regrouperLignesParCategorie(livraison.lignes).map((groupe) => (
             <div key={groupe.categorie}>
+              <p className="text-xs font-semibold uppercase text-gray-500">{groupe.titre}</p>
               {groupe.lignes.map((l, i) => (
-                <p key={i} className="text-sm text-gray-800">
-                  {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
-                </p>
+                <div key={i} className="text-sm text-gray-800">
+                  <p className="font-semibold">
+                    {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
+                  </p>
+                  {detailLigne(l).map((detail, j) => (
+                    <p key={j} className="pl-2 text-xs text-gray-600">
+                      {detail}
+                    </p>
+                  ))}
+                </div>
               ))}
             </div>
           ))}

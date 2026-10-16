@@ -7,6 +7,8 @@ export interface LivraisonAssignee {
   numero: number;
   nom: string;
   adresse: string | null;
+  /** Pour appeler le client si l'adresse est introuvable — null si non identifié. */
+  clientTelephone: string | null;
   montant: number;
   heureSouhaitee: string | null;
   lignes: LigneCommande[];

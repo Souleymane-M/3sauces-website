@@ -31,7 +31,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
   const { data: commandes, error: erreurCommandes } = await supabase
     .from("commandes")
     .select(
-      "id, numero, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement, palier_groupe"
+      "id, numero, nom_livraison, adresse_livraison, client_telephone, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement, palier_groupe"
     )
     .in("id", idsCommandes)
     .eq("statut", "pris_par_livreur")
@@ -49,6 +49,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     numero: c.numero,
     nom: c.nom_livraison ?? "",
     adresse: c.adresse_livraison,
+    clientTelephone: c.client_telephone,
     montant: c.montant,
     heureSouhaitee: c.heure_souhaitee,
     lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
@@ -189,7 +190,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .select(
-      "id, numero, statut, nom_livraison, adresse_livraison, montant, heure_souhaitee, contenu, nb_plats, palier_groupe, mode_paiement"
+      "id, numero, statut, nom_livraison, adresse_livraison, client_telephone, montant, heure_souhaitee, contenu, nb_plats, palier_groupe, mode_paiement"
     )
     .eq("id", livraison.commande_id)
     .maybeSingle();
@@ -209,6 +210,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
     numero: commande.numero,
     nom: commande.nom_livraison ?? "",
     adresse: commande.adresse_livraison,
+    clientTelephone: commande.client_telephone,
     montant: commande.montant,
     heureSouhaitee: commande.heure_souhaitee,
     lignes: Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [],
