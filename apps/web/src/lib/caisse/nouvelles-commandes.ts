@@ -235,6 +235,13 @@ export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpr
   const maintenant = new Date();
   const limiteReconfirmation = new Date(maintenant.getTime() - DELAI_RECONFIRMATION_MS).toISOString();
   const limiteRattrapage = new Date(maintenant.getTime() - DELAI_RATTRAPAGE_IMPRESSION_MS).toISOString();
+  // Borne haute = fin de la journée Mayotte, jamais "maintenant" : une
+  // commande du jour doit s'imprimer tout de suite pour que la cuisine
+  // commence à préparer, pas seulement une fois l'heure de retrait/livraison
+  // demandée arrivée (régression du 2026-10-16, repérée sur la commande
+  // #376 — passée à 8h25 pour un retrait à 9h, jamais imprimée avant 9h).
+  // Seule une vraie commande à l'avance (jour différent) doit attendre.
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
 
   const { data: commandes, error } = await supabase
     .from("commandes")
@@ -242,7 +249,7 @@ export async function listerCommandesDuJourAImprimer(): Promise<CommandePourImpr
     .is("ticket_imprime_le", null)
     .or(`ticket_remis_le.is.null,ticket_remis_le.lt.${limiteReconfirmation}`)
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
-    .lte("heure_souhaitee", maintenant.toISOString())
+    .lt("heure_souhaitee", fin.toISOString())
     .gte("created_at", limiteRattrapage)
     .order("created_at", { ascending: true })
     .limit(20);
