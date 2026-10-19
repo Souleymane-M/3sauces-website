@@ -30,7 +30,8 @@ function mediane(valeurs: number[]): number | null {
   if (valeurs.length === 0) return null;
   const triees = [...valeurs].sort((a, b) => a - b);
   const milieu = Math.floor(triees.length / 2);
-  return triees.length % 2 === 0 ? (triees[milieu - 1] + triees[milieu]) / 2 : triees[milieu];
+  const resultat = triees.length % 2 === 0 ? (triees[milieu - 1] + triees[milieu]) / 2 : triees[milieu];
+  return Math.round(resultat * 10) / 10;
 }
 
 /** Lundi (Mayotte) de la semaine contenant `dateIso` ("YYYY-MM-DD"). */
