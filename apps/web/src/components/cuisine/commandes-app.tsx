@@ -203,7 +203,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
       {commande.nom && (
         <p className="mt-1 text-base text-black">
           Client : {commande.nom}
-          {commande.telephone && ` — ${commande.telephone}`}
+          {commande.telephone && ` — ${formaterTelephoneAffichage(commande.telephone)}`}
         </p>
       )}
       {commande.canal === "livraison" && commande.adresse && (
