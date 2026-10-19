@@ -25,7 +25,13 @@ function lireOuCreerAppareilId(): string | null {
   }
 }
 
-export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: string }) {
+interface PinPadProps {
+  /** Omis pour une connexion unifiée (ex: /equipe) : cherche indifféremment parmi employé et livreur. */
+  role?: "employe" | "livreur";
+  titre: string;
+}
+
+export function PinPad({ role, titre }: PinPadProps) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);

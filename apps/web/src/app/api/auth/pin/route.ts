@@ -12,11 +12,18 @@ const FENETRE_IP_MS = 60 * 60 * 1000; // 1 heure
 
 /**
  * Connexion employé/livreur par code PIN.
- * Body attendu : { pin: string, role: "employe" | "livreur", appareilId?: string }
+ * Body attendu : { pin: string, role?: "employe" | "livreur", appareilId?: string }
+ *
+ * `role` reste obligatoire pour les écrans existants (/commandes, /caisse,
+ * /livreur/scan — un seul type de compte possible à cet endroit). Omis
+ * (entrée unifiée `/equipe`, qui n'affiche pas de sélection de rôle avant
+ * le PIN), on cherche indifféremment parmi les comptes employé ET livreur,
+ * avec le plafond "appareil partagé" (une tablette unique peut servir à
+ * n'importe qui).
  *
  * Comme les PIN sont hashés avec un sel différent par profil (bcrypt), on ne
- * peut pas chercher directement par hash : on récupère les profils actifs du
- * rôle demandé (une poignée par restaurant) et on compare un par un.
+ * peut pas chercher directement par hash : on récupère les profils actifs
+ * concernés (une poignée par restaurant) et on compare un par un.
  *
  * Double plafond anti-bruteforce (demande explicite du patron, 2026-10-19) :
  * un plafond par APPAREIL (`appareilId`, généré et stocké côté navigateur),
@@ -32,18 +39,18 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const pin = typeof body?.pin === "string" ? body.pin : null;
-  const role = body?.role === "employe" || body?.role === "livreur" ? body.role : null;
+  const roleDemande = body?.role === "employe" || body?.role === "livreur" ? body.role : null;
   const appareilId = typeof body?.appareilId === "string" ? body.appareilId.slice(0, 100) : null;
 
-  if (!pin || !role) {
+  if (!pin) {
     return NextResponse.json(
-      { error: "Requête invalide : pin et role sont requis." },
+      { error: "Requête invalide : pin est requis." },
       { status: 400 }
     );
   }
 
   const [seuilAppareil, seuilIp] = await Promise.all([
-    chargerSeuil(role === "livreur" ? "seuil_tentatives_appareil_livreur" : "seuil_tentatives_appareil_partage", role === "livreur" ? 5 : 20),
+    chargerSeuil(roleDemande === "livreur" ? "seuil_tentatives_appareil_livreur" : "seuil_tentatives_appareil_partage", roleDemande === "livreur" ? 5 : 20),
     chargerSeuil("seuil_tentatives_ip_horaire", 30),
   ]);
 
@@ -66,8 +73,8 @@ export async function POST(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data: profils, error } = await supabase
     .from("profils")
-    .select("id, nom, pin_hash")
-    .eq("role", role)
+    .select("id, nom, role, pin_hash")
+    .in("role", roleDemande ? [roleDemande] : ["employe", "livreur"])
     .eq("actif", true);
 
   if (error) {
@@ -84,7 +91,7 @@ export async function POST(request: Request) {
       const rolesMetier = await chargerRolesMetier(profil.id);
       const token = await createSessionToken({
         profilId: profil.id,
-        role,
+        role: profil.role as "employe" | "livreur",
         nom: profil.nom,
         rolesMetier,
       });
