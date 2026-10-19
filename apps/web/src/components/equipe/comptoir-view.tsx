@@ -67,18 +67,21 @@ export function ComptoirView({ profilId, nom }: { profilId: string; nom: string 
   }, []);
 
   async function ouvrirVueAvecCatalogue(cible: "nouvelle_commande" | "encaissements") {
-    if (!catalogue) {
-      setChargementCatalogue(true);
-      try {
-        const res = await fetch("/api/equipe/comptoir/catalogue");
-        if (!res.ok) {
-          setErreur("Impossible de charger le catalogue.");
-          return;
-        }
-        setCatalogue(await res.json());
-      } finally {
-        setChargementCatalogue(false);
+    // Toujours rechargé (jamais mis en cache) : "à encaisser" change à chaque
+    // commande créée, et une catégorie en cache périmée ferait rater une
+    // commande fraîchement enregistrée (bug repéré en testant le 2026-10-19 :
+    // une commande venait d'être créée, invisible dans "Encaissements" car
+    // la liste chargée au tout premier clic n'était jamais rafraîchie).
+    setChargementCatalogue(true);
+    try {
+      const res = await fetch("/api/equipe/comptoir/catalogue");
+      if (!res.ok) {
+        setErreur("Impossible de charger le catalogue.");
+        return;
       }
+      setCatalogue(await res.json());
+    } finally {
+      setChargementCatalogue(false);
     }
     setVue(cible);
   }
