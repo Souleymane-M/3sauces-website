@@ -180,6 +180,26 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
 }
 
 /**
+ * Vérification AVANT toute connexion : un client scanne son reçu une fois
+ * la commande déjà livrée/remise/annulée bien plus souvent qu'un livreur
+ * ne scanne un ticket légitime (le client ne reçoit son reçu qu'à la
+ * remise) — demande explicite du patron, 2026-10-19. Dans ce cas, la page
+ * ne doit même pas proposer le pavé PIN du livreur : elle redirige
+ * directement vers le site public, avant tout rendu interne.
+ */
+export async function commandeDuQrCodeEstFinalisee(qrCode: string): Promise<boolean> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: livraison } = await supabase.from("livraisons").select("commande_id").eq("qr_code", qrCode).maybeSingle();
+  if (!livraison) return false;
+
+  const { data: commande } = await supabase.from("commandes").select("statut").eq("id", livraison.commande_id).maybeSingle();
+  if (!commande) return false;
+
+  return commande.statut === "livre" || commande.statut === "remis_au_client" || commande.statut === "annulee";
+}
+
+/**
  * Résout l'état d'un ticket scanné (QR imprimé sur le reçu client,
  * `livraisons.qr_code`) pour `/livreur/scan/[code]` — un seul endroit qui
  * décide quoi afficher/proposer, jamais dupliqué entre la page et une
@@ -265,29 +285,56 @@ async function nomProfil(supabase: ReturnType<typeof createServiceSupabaseClient
  * récupère à l'emplacement de sa zone, sans qu'un employé de cuisine n'ait
  * à désigner qui que ce soit (remplace le sélecteur "Choisir le livreur"
  * en cuisine, retiré le 2026-10-15 — trop lent pour 20 commandes/jour).
- * Réutilise `changerStatutCommande`, qui revérifie déjà la transition
- * (pret -> pris_par_livreur) et écrit `livraisons.livreur_id`.
+ *
+ * N'appelle PAS `changerStatutCommande` (contrairement aux autres
+ * transitions) : c'est le seul endroit où deux personnes différentes
+ * peuvent littéralement cliquer sur la même ressource à la même seconde
+ * (deux livreurs scannent le même ticket presque en même temps). Un
+ * lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour) laisserait
+ * passer les deux en cas de course — demande explicite du patron,
+ * 2026-10-19 : une seule mise à jour conditionnelle sur `commandes.statut`
+ * (`WHERE statut = 'pret'`) décide qui gagne, le `UPDATE` ne retourne une
+ * ligne QUE pour celui qui a vraiment changé le statut.
  */
 export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
   const { data: livraison, error } = await supabase
     .from("livraisons")
-    .select("commande_id, livreur_id")
+    .select("commande_id")
     .eq("qr_code", qrCode)
     .maybeSingle();
   if (error || !livraison) {
     throw new Error("Ticket introuvable.");
   }
-  if (livraison.livreur_id) {
+
+  const { data: commandeGagnee, error: erreurClaim } = await supabase
+    .from("commandes")
+    .update({ statut: "pris_par_livreur", statut_change_le: new Date().toISOString() })
+    .eq("id", livraison.commande_id)
+    .eq("statut", "pret")
+    .select("id")
+    .maybeSingle();
+  if (erreurClaim) {
+    throw new Error(`Impossible de prendre la livraison : ${erreurClaim.message}`);
+  }
+  if (!commandeGagnee) {
     throw new Error("Cette livraison a déjà été prise par quelqu'un d'autre.");
   }
 
-  await changerStatutCommande({
-    commandeId: livraison.commande_id,
-    statut: "pris_par_livreur",
-    profilId: livreurId,
-    livreurId,
-  });
+  const { error: erreurLivreur } = await supabase
+    .from("livraisons")
+    .update({ livreur_id: livreurId, statut: "en_livraison", heure_depart_cuisine: new Date().toISOString() })
+    .eq("commande_id", livraison.commande_id);
+  if (erreurLivreur) {
+    console.error("[livreur/commandes] échec attribution livreur après prise atomique :", erreurLivreur.message);
+  }
+
+  const { error: erreurEvenement } = await supabase
+    .from("commandes_evenements")
+    .insert({ commande_id: livraison.commande_id, statut: "pris_par_livreur", profil_id: livreurId, role_metier: "livreur" });
+  if (erreurEvenement) {
+    console.error("[livreur/commandes] échec journalisation prise de livraison :", erreurEvenement.message);
+  }
 }
 
 /**
