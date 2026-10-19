@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import type { RoleMetier } from "./roles-metier";
 
 export type Role = "employe" | "livreur" | "patron";
 
@@ -6,6 +7,13 @@ export interface SessionPayload {
   profilId: string;
   role: Role;
   nom: string;
+  /**
+   * Rôles métier (cuisine/comptoir/livreur/patron) pour l'interface équipe
+   * unifiée — distinct de `role`, qui ne reste que le type de compte. Absent
+   * sur un jeton émis avant ce champ : traité comme `[]`, jamais une erreur
+   * (évite de déconnecter tout le monde au déploiement).
+   */
+  rolesMetier: RoleMetier[];
 }
 
 const SESSION_COOKIE_NAME = "3sauces_session";
@@ -49,6 +57,7 @@ export async function verifySessionToken(
         profilId: payload.profilId,
         role: payload.role as Role,
         nom: payload.nom,
+        rolesMetier: Array.isArray(payload.rolesMetier) ? (payload.rolesMetier as RoleMetier[]) : [],
       };
     }
     return null;

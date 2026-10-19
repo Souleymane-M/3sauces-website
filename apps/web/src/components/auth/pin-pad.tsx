@@ -4,6 +4,26 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const LONGUEUR_MAX = 6;
+const CLE_APPAREIL_ID = "3sauces_appareil_id";
+
+/**
+ * Identifiant d'appareil pour le plafond anti-bruteforce par appareil
+ * (distinct du plafond par IP, plus large — cf. /api/auth/pin) : un
+ * simple id aléatoire stocké en local, jamais une "inscription" d'appareil
+ * côté serveur. N'importe quel téléphone de secours fonctionne, il génère
+ * juste son propre id au premier essai.
+ */
+function lireOuCreerAppareilId(): string | null {
+  try {
+    const existant = window.localStorage.getItem(CLE_APPAREIL_ID);
+    if (existant) return existant;
+    const nouveau = crypto.randomUUID();
+    window.localStorage.setItem(CLE_APPAREIL_ID, nouveau);
+    return nouveau;
+  } catch {
+    return null;
+  }
+}
 
 export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: string }) {
   const router = useRouter();
@@ -18,7 +38,7 @@ export function PinPad({ role, titre }: { role: "employe" | "livreur"; titre: st
       const res = await fetch("/api/auth/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pinSaisi, role }),
+        body: JSON.stringify({ pin: pinSaisi, role, appareilId: lireOuCreerAppareilId() }),
       });
       const data = await res.json();
       if (!res.ok) {

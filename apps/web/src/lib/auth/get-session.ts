@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, verifySessionToken, type Role, type SessionPayload } from "./session";
+import type { RoleMetier } from "./roles-metier";
 
 /**
  * Lit et vérifie la session courante depuis le cookie httpOnly.
@@ -24,5 +25,21 @@ export async function requireRole(
   if (!session) return null;
   if (session.role === "patron") return session;
   if (allowedRoles.includes(session.role)) return session;
+  return null;
+}
+
+/**
+ * Même principe que `requireRole`, mais sur les rôles métier (cuisine,
+ * comptoir, livreur, patron) de l'interface équipe unifiée — un profil
+ * "employe" peut cumuler cuisine ET comptoir, `requireRole` seul ne peut
+ * pas exprimer ça. Le patron garde l'accès à tout.
+ */
+export async function requireRoleMetier(
+  allowedRolesMetier: RoleMetier[]
+): Promise<SessionPayload | null> {
+  const session = await getSession();
+  if (!session) return null;
+  if (session.role === "patron") return session;
+  if (session.rolesMetier.some((r) => allowedRolesMetier.includes(r))) return session;
   return null;
 }

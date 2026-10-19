@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { verifySecret } from "@/lib/auth/crypto";
 import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
-import { estBloque, enregistrerEchec, reinitialiser } from "@/lib/auth/rate-limit";
+import { estBloqueDb, enregistrerEchecDb, reinitialiserDb } from "@/lib/auth/rate-limit-db";
+import { chargerRolesMetier } from "@/lib/auth/roles-metier";
+import { chargerSeuil } from "@/lib/patron/seuils";
+
+const FENETRE_IP_MS = 60 * 60 * 1000; // 1 heure
 
 /**
  * Connexion patron par mot de passe.
@@ -12,8 +16,10 @@ import { estBloque, enregistrerEchec, reinitialiser } from "@/lib/auth/rate-limi
 export async function POST(request: Request) {
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for") ?? "local";
+  const cleIp = `patron_ip:${ip}`;
 
-  if (estBloque(`patron:${ip}`)) {
+  const seuilIp = await chargerSeuil("seuil_tentatives_ip_horaire", 30);
+  if (await estBloqueDb(cleIp, seuilIp)) {
     return NextResponse.json(
       { error: "Trop de tentatives. Réessaie dans quelques minutes." },
       { status: 429 }
@@ -49,12 +55,14 @@ export async function POST(request: Request) {
       profil.mot_de_passe_hash &&
       (await verifySecret(motDePasse, profil.mot_de_passe_hash))
     ) {
-      reinitialiser(`patron:${ip}`);
+      await reinitialiserDb(cleIp);
 
+      const rolesMetier = await chargerRolesMetier(profil.id);
       const token = await createSessionToken({
         profilId: profil.id,
         role: "patron",
         nom: profil.nom,
+        rolesMetier,
       });
 
       const cookieStore = await cookies();
@@ -70,6 +78,6 @@ export async function POST(request: Request) {
     }
   }
 
-  enregistrerEchec(`patron:${ip}`);
+  await enregistrerEchecDb(cleIp, FENETRE_IP_MS);
   return NextResponse.json({ error: "Mot de passe incorrect." }, { status: 401 });
 }

@@ -9,6 +9,8 @@
 
 export type Role = "employe" | "livreur" | "patron";
 
+export type RoleMetier = "cuisine" | "comptoir" | "livreur" | "patron";
+
 export type Categorie =
   | "menu_special"
   | "snacking"
@@ -461,6 +463,7 @@ export interface Database {
           commande_id: string;
           statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre" | "annulee";
           profil_id: string;
+          role_metier: RoleMetier | null;
           created_at: string;
         };
         Insert: {
@@ -468,8 +471,55 @@ export interface Database {
           commande_id: string;
           statut: "en_preparation" | "pret" | "remis_au_client" | "pris_par_livreur" | "livre" | "annulee";
           profil_id: string;
+          role_metier?: RoleMetier | null;
         };
         Update: Partial<Database["public"]["Tables"]["commandes_evenements"]["Insert"]>;
+        Relationships: [];
+      };
+
+      profil_roles: {
+        Row: {
+          profil_id: string;
+          role_metier: RoleMetier;
+          created_at: string;
+        };
+        Insert: {
+          profil_id: string;
+          role_metier: RoleMetier;
+        };
+        Update: Partial<Database["public"]["Tables"]["profil_roles"]["Insert"]>;
+        Relationships: [];
+      };
+
+      tentatives_connexion: {
+        Row: {
+          cle: string;
+          tentatives: number;
+          reinitialise_a: string;
+          updated_at: string;
+        };
+        Insert: {
+          cle: string;
+          tentatives?: number;
+          reinitialise_a: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tentatives_connexion"]["Insert"]>;
+        Relationships: [];
+      };
+
+      parametres: {
+        Row: {
+          cle: string;
+          valeur: unknown;
+          description: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          cle: string;
+          valeur: unknown;
+          description?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["parametres"]["Insert"]>;
         Relationships: [];
       };
 
