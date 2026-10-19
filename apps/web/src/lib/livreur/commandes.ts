@@ -133,7 +133,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
   }
 
   if (commande.mode_paiement === "stripe") {
-    await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
+    await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
     return;
   }
 
@@ -175,7 +175,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     throw new Error(`Impossible d'enregistrer le paiement : ${erreurStatutPaiement.message}`);
   }
 
-  await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId });
+  await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
   await notifierPaiementConfirme(commandeId);
 }
 
