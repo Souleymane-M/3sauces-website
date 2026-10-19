@@ -131,7 +131,7 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
       )}
 
       {session && roleActif === "cuisine" && <CuisineView profilId={session.profilId} seuilAlerteMin={seuilAlerteMin} />}
-      {session && roleActif === "comptoir" && <ComptoirView profilId={session.profilId} />}
+      {session && roleActif === "comptoir" && <ComptoirView profilId={session.profilId} nom={session.nom} />}
       {session && roleActif === "patron" && <PilotageView />}
       {session && roleActif && !vueActiveConstruite && (
         <p className="mt-3 text-sm text-gray-500">
