@@ -9,6 +9,7 @@ import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { CuisineView } from "./cuisine-view";
 import { ComptoirView } from "./comptoir-view";
+import { PilotageView } from "./pilotage-view";
 import { useVerrouAppareil } from "./use-verrou-appareil";
 
 const INTERVALLE_POLLING_MS = 5000;
@@ -96,7 +97,7 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
     return () => clearInterval(intervalle);
   }, []);
 
-  const vueActiveConstruite = roleActif === "cuisine" || roleActif === "comptoir";
+  const vueActiveConstruite = roleActif === "cuisine" || roleActif === "comptoir" || roleActif === "patron";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -131,6 +132,7 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
 
       {session && roleActif === "cuisine" && <CuisineView profilId={session.profilId} seuilAlerteMin={seuilAlerteMin} />}
       {session && roleActif === "comptoir" && <ComptoirView profilId={session.profilId} />}
+      {session && roleActif === "patron" && <PilotageView />}
       {session && roleActif && !vueActiveConstruite && (
         <p className="mt-3 text-sm text-gray-500">
           Vue « {LIBELLES_ROLE_METIER[roleActif]} » — pas encore construite dans l&apos;interface équipe unifiée.
