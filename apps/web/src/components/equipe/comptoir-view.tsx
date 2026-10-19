@@ -17,6 +17,10 @@ function resumeLignes(lignes: CommandeCuisine["lignes"]): string {
   return lignes.map((l) => `${l.quantite}x ${l.nom}`).join(", ");
 }
 
+function minutesDepuis(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+}
+
 interface Catalogue {
   produits: ProduitCaisse[];
   viandes: ViandeCaisse[];
@@ -36,7 +40,7 @@ type Vue = "liste" | "nouvelle_commande" | "encaissements" | "fin_service";
  * encaissements réutilisent `CaisseApp`/`EncaissementsLivraisonCaisse` —
  * mêmes composants que `/caisse`, jamais une deuxième implémentation.
  */
-export function ComptoirView({ profilId, nom }: { profilId: string; nom: string }) {
+export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: string; nom: string; seuilAlerteMin: number }) {
   const [commandes, setCommandes] = useState<CommandeCuisine[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
@@ -169,8 +173,19 @@ export function ComptoirView({ profilId, nom }: { profilId: string; nom: string 
       </div>
       {erreur && <p className="mb-3 text-sm text-red-600">{erreur}</p>}
       <div className="space-y-3">
-        {commandes.map((c) => (
-          <div key={c.id} className="rounded-lg border border-gray-200 p-3">
+        {commandes.map((c) => {
+          const minutesEtape = minutesDepuis(c.statutChangeLe ?? c.creeLe);
+          const enRetard = c.statut === "pret" && minutesEtape >= seuilAlerteMin;
+          return (
+          <div
+            key={c.id}
+            className={`rounded-lg border-2 p-3 ${enRetard ? "bordure-urgence-clignotante border-red-600" : "border-gray-200"}`}
+          >
+            {enRetard && (
+              <div className="bandeau-urgence-clignotant mb-2 rounded px-2 py-1 text-sm font-bold text-white">
+                🚨 Prête depuis {minutesEtape} min — pas encore {c.canal === "livraison" ? "enlevée" : "remise"}
+              </div>
+            )}
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-bold text-black">
@@ -208,7 +223,8 @@ export function ComptoirView({ profilId, nom }: { profilId: string; nom: string 
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {commandes.length === 0 && <p className="text-center text-gray-500">Aucune commande active.</p>}
       </div>
 
