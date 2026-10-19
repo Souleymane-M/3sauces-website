@@ -7,6 +7,9 @@ import { LIBELLES_STATUT } from "@/lib/cuisine/types";
 import { PinPad } from "@/components/auth/pin-pad";
 import { PasswordForm } from "@/components/auth/password-form";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { CuisineView } from "./cuisine-view";
+import { ComptoirView } from "./comptoir-view";
+import { useVerrouAppareil } from "./use-verrou-appareil";
 
 const INTERVALLE_POLLING_MS = 5000;
 
@@ -18,6 +21,7 @@ const LIBELLES_ROLE_METIER: Record<RoleMetier, string> = {
 };
 
 interface SessionEquipe {
+  profilId: string;
   nom: string;
   role: Role;
   rolesMetier: RoleMetier[];
@@ -26,6 +30,8 @@ interface SessionEquipe {
 interface EquipeAppProps {
   session: SessionEquipe | null;
   tableauInitial: CommandeTableauPublic[];
+  seuilAlerteMin: number;
+  dureeVerrouillageSec: number;
 }
 
 function formaterHeure(iso: string | null): string {
@@ -65,11 +71,13 @@ function Plateau({ commandes }: { commandes: CommandeTableauPublic[] }) {
   );
 }
 
-export function EquipeApp({ session, tableauInitial }: EquipeAppProps) {
+export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrouillageSec }: EquipeAppProps) {
   const [tableau, setTableau] = useState(tableauInitial);
   const [vuePatronMotDePasse, setVuePatronMotDePasse] = useState(false);
   const [roleActif, setRoleActif] = useState<RoleMetier | null>(session?.rolesMetier[0] ?? null);
   const enVol = useRef(false);
+
+  useVerrouAppareil(session !== null, dureeVerrouillageSec);
 
   useEffect(() => {
     const intervalle = setInterval(async () => {
@@ -87,6 +95,8 @@ export function EquipeApp({ session, tableauInitial }: EquipeAppProps) {
     }, INTERVALLE_POLLING_MS);
     return () => clearInterval(intervalle);
   }, []);
+
+  const vueActiveConstruite = roleActif === "cuisine" || roleActif === "comptoir";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -119,10 +129,11 @@ export function EquipeApp({ session, tableauInitial }: EquipeAppProps) {
         </div>
       )}
 
-      {session && roleActif && (
+      {session && roleActif === "cuisine" && <CuisineView profilId={session.profilId} seuilAlerteMin={seuilAlerteMin} />}
+      {session && roleActif === "comptoir" && <ComptoirView profilId={session.profilId} />}
+      {session && roleActif && !vueActiveConstruite && (
         <p className="mt-3 text-sm text-gray-500">
-          Vue « {LIBELLES_ROLE_METIER[roleActif]} » — actions à venir à l&apos;étape suivante du chantier. Le
-          plateau ci-dessous reste le même pour tout le monde.
+          Vue « {LIBELLES_ROLE_METIER[roleActif]} » — pas encore construite dans l&apos;interface équipe unifiée.
         </p>
       )}
 
@@ -154,7 +165,7 @@ export function EquipeApp({ session, tableauInitial }: EquipeAppProps) {
         </div>
       )}
 
-      <Plateau commandes={tableau} />
+      {!vueActiveConstruite && <Plateau commandes={tableau} />}
     </div>
   );
 }

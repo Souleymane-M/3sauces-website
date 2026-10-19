@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
+import type { RoleMetier } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
@@ -214,6 +215,8 @@ interface ChangementStatut {
   statut: StatutEvenement;
   profilId: string;
   livreurId?: string;
+  /** Sous quel rôle métier l'action a été faite (interface équipe unifiée) — absent pour les appelants existants. */
+  roleMetier?: RoleMetier;
 }
 
 /**
@@ -238,6 +241,7 @@ export async function changerStatutCommande({
   statut,
   profilId,
   livreurId,
+  roleMetier,
 }: ChangementStatut): Promise<void> {
   const supabase = createServiceSupabaseClient();
 
@@ -315,7 +319,7 @@ export async function changerStatutCommande({
 
   const { error: erreurEvenement } = await supabase
     .from("commandes_evenements")
-    .insert({ commande_id: commandeId, statut, profil_id: profilId });
+    .insert({ commande_id: commandeId, statut, profil_id: profilId, role_metier: roleMetier ?? null });
   if (erreurEvenement) {
     console.error("[cuisine/commandes] échec journalisation évènement :", erreurEvenement.message);
   }
