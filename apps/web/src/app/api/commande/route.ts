@@ -52,9 +52,12 @@ const MAX_COMMANDES_PAR_FENETRE = 30;
 const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 
 // Anti-abus sur le contenu du panier : un panier "normal" ne dépasse jamais
-// ça ; au-delà, ça ne peut venir que d'une requête trafiquée.
+// ça ; au-delà, ça ne peut venir que d'une requête trafiquée. Même plafond
+// de quantité par ligne que la caisse (demande explicite du patron,
+// 2026-10-19) : un article à 2€ (ex: Brochettes bœuf x3) dépasse vite 20
+// paquets sur une grosse commande groupée, même passée depuis le site.
 const MAX_LIGNES_PAR_COMMANDE = 30;
-const MAX_QUANTITE_PAR_LIGNE = 20;
+const MAX_QUANTITE_PAR_LIGNE = 99;
 
 /**
  * Création d'une commande depuis le site public (client anonyme, sans
@@ -321,7 +324,10 @@ export async function POST(request: Request) {
 
     const quantite = Number(ligneBrute.quantite);
     if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
-      return NextResponse.json({ error: `Quantité invalide pour ${produit.nom}.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Quantité invalide pour ${produit.nom} : maximum ${MAX_QUANTITE_PAR_LIGNE} par ligne.` },
+        { status: 400 }
+      );
     }
 
     // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai
