@@ -64,10 +64,15 @@ function validerPaiementsMixte(
   return paiements;
 }
 
-// Même plafonds anti-abus que le site public (cf. /api/commande) — un
-// panier caisse "normal" ne les dépasse jamais.
+// Plafond de lignes repris du site public (cf. /api/commande) — jamais
+// atteint en caisse en pratique. La quantité par ligne, en revanche, DOIT
+// être plus large qu'au public : un article à 2€ (ex: Brochettes bœuf x3)
+// dépasse vite 20 paquets sur une grosse commande groupée au comptoir
+// (50€ = 25 paquets, cas réel bloqué le 2026-10-19, sans aucun message
+// expliquant pourquoi). Le personnel de caisse est de confiance — rien à
+// protéger ici comme sur le site public, qui garde son propre plafond à 20.
 const MAX_LIGNES_PAR_COMMANDE = 30;
-const MAX_QUANTITE_PAR_LIGNE = 20;
+const MAX_QUANTITE_PAR_LIGNE = 99;
 
 /** Levée par `validerLignesCommande` pour toute erreur imputable au client (400) — jamais une erreur serveur. */
 class ErreurValidation extends Error {}
@@ -154,7 +159,9 @@ async function validerLignesCommande(
 
     const quantite = Number(ligneBrute.quantite);
     if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
-      throw new ErreurValidation(`Quantité invalide pour ${produit.nom}.`);
+      throw new ErreurValidation(
+        `Quantité invalide pour ${produit.nom} : maximum ${MAX_QUANTITE_PAR_LIGNE} par ligne, sépare en deux lignes si besoin de plus.`
+      );
     }
 
     // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai

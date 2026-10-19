@@ -1651,7 +1651,8 @@ export function CaisseApp({
                   if (groupeTropTard) {
                     return (
                       <p className="mt-2 text-sm font-semibold text-orange-600">
-                        Trop tard pour aujourd&apos;hui — cet avantage doit être débloqué avant 11h.
+                        Avantage (boisson offerte / priorité) non disponible après 11h — la commande peut quand
+                        même être enregistrée normalement.
                       </p>
                     );
                   }
