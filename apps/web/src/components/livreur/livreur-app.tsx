@@ -6,7 +6,7 @@ import type { LivraisonAssignee } from "@/lib/livreur/types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
-import { formaterTelephoneAffichage } from "@/lib/telephone";
+import { formaterTelephoneAffichage, formaterTelephonePourAppel } from "@/lib/telephone";
 
 // Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
 // `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
@@ -186,7 +186,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
             <p className="mt-1 text-lg text-gray-900">{livraison.nom}</p>
             <p className="text-lg text-gray-700">{livraison.adresse}</p>
             {livraison.clientTelephone && (
-              <a href={`tel:${livraison.clientTelephone}`} className="text-base font-semibold text-[#8B2020] underline">
+              <a href={`tel:${formaterTelephonePourAppel(livraison.clientTelephone)}`} className="text-base font-semibold text-[#8B2020] underline">
                 📞 {formaterTelephoneAffichage(livraison.clientTelephone)}
               </a>
             )}

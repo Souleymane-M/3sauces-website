@@ -59,20 +59,31 @@ export function normaliserTelephone(saisie: string): string | null {
 }
 
 /**
+ * Numéro local à 0, pour composer l'appel (lien `tel:`) : "+262639123456"
+ * → "0639123456". Sans ça, le téléphone compose l'indicatif international
+ * (+262) même pour un numéro local, ce qui affiche l'écran d'appel avec
+ * "+262" devant quel que soit le client — demande explicite du patron,
+ * 2026-10-19. +262 (Mayotte/Réunion) et +33 (métropole) redeviennent un 0
+ * local ; tout autre indicatif (rare) reste tel quel, faute de convention
+ * locale à 0 fiable pour le reconstituer.
+ */
+export function formaterTelephonePourAppel(telephone: string): string {
+  const local = /^\+(262|33)(\d{9})$/.exec(telephone);
+  if (!local) return telephone;
+  return `0${local[2]}`;
+}
+
+/**
  * Format court pour l'affichage (tickets imprimés, notamment) : "+262639123456"
  * → "06-39-12-34-56" — l'indicatif reste nécessaire en base (identifiant
  * unique du client pour la fidélité, numéro réellement composable), mais
  * prend de la place inutilement sur un ticket déjà étroit, où seul le
- * numéro local compte pour rappeler le client. +262 (Mayotte/Réunion) et
- * +33 (métropole) redeviennent un 0 local, puis sont découpés par paires
- * pour rester lisibles en gros caractères sur le papier. Tout autre
- * indicatif (rare) reste affiché tel quel, faute de convention locale à 0
- * fiable pour le reconstituer.
+ * numéro local compte pour rappeler le client. Découpé par paires pour
+ * rester lisible en gros caractères sur le papier.
  */
 export function formaterTelephoneAffichage(telephone: string): string {
-  const local = /^\+(262|33)(\d{9})$/.exec(telephone);
-  if (!local) return telephone;
-  const numero = `0${local[2]}`;
+  const numero = formaterTelephonePourAppel(telephone);
+  if (numero === telephone) return telephone;
   return numero.match(/.{1,2}/g)!.join("-");
 }
 

@@ -6,7 +6,7 @@ import type { ModePaiement } from "@3sauces/supabase";
 import type { EtatScan, LivraisonAssignee } from "@/lib/livreur/types";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
-import { formaterTelephoneAffichage } from "@/lib/telephone";
+import { formaterTelephoneAffichage, formaterTelephonePourAppel } from "@/lib/telephone";
 
 interface ScanLivraisonAppProps {
   qrCode: string;
@@ -179,7 +179,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
         <p className="text-lg font-bold text-gray-900">{livraison.nom}</p>
         {livraison.adresse && <p className="text-sm text-gray-700">{livraison.adresse}</p>}
         {livraison.clientTelephone && (
-          <a href={`tel:${livraison.clientTelephone}`} className="mt-1 block text-sm font-semibold text-[#8B2020] underline">
+          <a href={`tel:${formaterTelephonePourAppel(livraison.clientTelephone)}`} className="mt-1 block text-sm font-semibold text-[#8B2020] underline">
             📞 {formaterTelephoneAffichage(livraison.clientTelephone)}
           </a>
         )}
