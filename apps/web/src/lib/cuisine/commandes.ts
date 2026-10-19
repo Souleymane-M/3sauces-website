@@ -195,6 +195,30 @@ export async function listerCommandesAVenir(): Promise<CommandeCuisine[]> {
   return (data ?? []).map(versCommandeCuisine);
 }
 
+/**
+ * Commandes du jour non clôturées, pour l'écran "Fin de service" — à la
+ * différence de `listerCommandesActives`, inclut volontairement
+ * "pris_par_livreur" (une livraison jamais confirmée "livrée" doit
+ * pouvoir être fermée ici, cf. `cloturerCommandeFinService`).
+ */
+export async function listerCommandesNonCloturees(): Promise<CommandeCuisine[]> {
+  const supabase = createServiceSupabaseClient();
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
+  const { data, error } = await supabase
+    .from("commandes")
+    .select(SELECT_COMMANDES_CUISINE)
+    .not("statut", "in", "(livre,remis_au_client,annulee)")
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    .lt("heure_souhaitee", fin.toISOString())
+    .order("heure_souhaitee", { ascending: true });
+
+  if (error) {
+    throw new Error(`Impossible de charger les commandes non clôturées : ${error.message}`);
+  }
+
+  return (data ?? []).map(versCommandeCuisine);
+}
+
 export async function listerLivreursActifs(): Promise<LivreurActif[]> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
@@ -399,6 +423,98 @@ export async function annulerCommande({ commandeId, profilId, motif }: Annulatio
 
   await notifierCommandeAnnulee(commandeId, motif?.trim() || null).catch((e) =>
     console.error("[cuisine/commandes] échec notification annulation :", e)
+  );
+}
+
+export const MOTIFS_FIN_SERVICE = ["no_show", "erreur", "annulation", "client_injoignable"] as const;
+export type MotifFinService = (typeof MOTIFS_FIN_SERVICE)[number];
+
+interface ClotureFinService {
+  commandeId: string;
+  profilId: string;
+  motif: MotifFinService;
+  roleMetier?: RoleMetier;
+}
+
+/**
+ * Clôture de fin de service (interface équipe unifiée, 2026-10-19) : une
+ * commande restée non terminale à la fermeture, peu importe son statut
+ * (en_attente, en_preparation, pret, pris_par_livreur — jamais déjà
+ * "livre"/"remis_au_client"/"annulee"), doit être fermée avec un motif
+ * structuré obligatoire — jamais laissée traîner au lendemain. Mêmes
+ * effets de bord que `annulerCommande` (restitution stock, notification
+ * client) mais sans sa restriction à "en_attente" : c'est précisément
+ * la différence entre les deux actions. Les motifs remontent au Pilotage
+ * pour comprendre le fonctionnement, jamais pour sanctionner quelqu'un.
+ */
+export async function cloturerCommandeFinService({
+  commandeId,
+  profilId,
+  motif,
+  roleMetier,
+}: ClotureFinService): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: profil, error: erreurProfil } = await supabase
+    .from("profils")
+    .select("id")
+    .eq("id", profilId)
+    .in("role", ["employe", "livreur", "patron"])
+    .eq("actif", true)
+    .maybeSingle();
+  if (erreurProfil || !profil) {
+    throw new Error("Identité invalide.");
+  }
+  if (!MOTIFS_FIN_SERVICE.includes(motif)) {
+    throw new Error("Motif de clôture invalide.");
+  }
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select("id, statut, contenu")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  // Volontairement différent de `STATUTS_TERMINAUX` (qui exclut aussi
+  // "pris_par_livreur" — terminal seulement du point de vue de la cuisine) :
+  // une livraison jamais confirmée "livrée" doit pouvoir être clôturée ici.
+  if (commande.statut === "livre" || commande.statut === "remis_au_client" || commande.statut === "annulee") {
+    throw new Error("Cette commande est déjà clôturée.");
+  }
+
+  const { error: erreurMaj } = await supabase
+    .from("commandes")
+    .update({ statut: "annulee", motif_annulation: motif })
+    .eq("id", commandeId);
+  if (erreurMaj) {
+    throw new Error(`Impossible de clôturer la commande : ${erreurMaj.message}`);
+  }
+
+  const lignes = Array.isArray(commande.contenu)
+    ? (commande.contenu as { produitId?: string; quantite?: number }[])
+    : [];
+  if (lignes.length > 0) {
+    const { error: erreurStock } = await supabase.rpc("incrementer_stocks_produits", {
+      items: lignes
+        .filter((l): l is { produitId: string; quantite: number } => Boolean(l.produitId) && Boolean(l.quantite))
+        .map((l) => ({ produitId: l.produitId, quantite: l.quantite })),
+    });
+    if (erreurStock) {
+      console.error("[cuisine/commandes] échec restitution stock à la clôture :", erreurStock.message);
+    }
+  }
+
+  const { error: erreurEvenement } = await supabase
+    .from("commandes_evenements")
+    .insert({ commande_id: commandeId, statut: "annulee", profil_id: profilId, role_metier: roleMetier ?? null });
+  if (erreurEvenement) {
+    console.error("[cuisine/commandes] échec journalisation clôture :", erreurEvenement.message);
+  }
+
+  await notifierCommandeAnnulee(commandeId, motif).catch((e) =>
+    console.error("[cuisine/commandes] échec notification clôture :", e)
   );
 }
 

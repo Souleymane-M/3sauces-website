@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine } from "@/lib/cuisine/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { ConfirmationPin } from "./confirmation-pin";
+import { FinServiceView } from "./fin-service-view";
 
 const INTERVALLE_POLLING_MS = 5000;
 
@@ -23,6 +24,7 @@ export function ComptoirView({ profilId }: { profilId: string }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [annulationEnAttente, setAnnulationEnAttente] = useState<string | null>(null);
+  const [finServiceOuvert, setFinServiceOuvert] = useState(false);
   const enVol = useRef(false);
 
   async function charger() {
@@ -65,8 +67,21 @@ export function ComptoirView({ profilId }: { profilId: string }) {
     }
   }
 
+  if (finServiceOuvert) {
+    return <FinServiceView profilId={profilId} onFermer={() => setFinServiceOuvert(false)} />;
+  }
+
   return (
     <div className="mt-4">
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setFinServiceOuvert(true)}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+        >
+          Fin de service
+        </button>
+      </div>
       {erreur && <p className="mb-3 text-sm text-red-600">{erreur}</p>}
       <div className="space-y-3">
         {commandes.map((c) => (
