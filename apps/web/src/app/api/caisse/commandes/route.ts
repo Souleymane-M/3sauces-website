@@ -18,6 +18,7 @@ import {
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
+import { STATUTS_MODIFIABLES } from "@/lib/caisse/modification";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
@@ -831,9 +832,9 @@ export async function PATCH(request: Request) {
   if (erreurExistante || !commandeExistante) {
     return NextResponse.json({ error: "Commande introuvable." }, { status: 404 });
   }
-  if (commandeExistante.statut !== "en_attente") {
+  if (!STATUTS_MODIFIABLES.includes(commandeExistante.statut as (typeof STATUTS_MODIFIABLES)[number])) {
     return NextResponse.json(
-      { error: 'Seules les commandes encore "En attente" peuvent être modifiées.' },
+      { error: "Cette commande ne peut plus être modifiée (déjà enlevée/remise/annulée)." },
       { status: 400 }
     );
   }

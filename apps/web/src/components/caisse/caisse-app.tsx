@@ -85,6 +85,8 @@ interface CaisseAppProps {
   nomEmploye: string;
   /** Présent uniquement quand /caisse est ouvert via `?modifier=<id>` — bascule tout l'écran en mode édition d'une commande déjà "en_attente" plutôt qu'en prise de commande. */
   commandeExistante?: CommandeAModifier | null;
+  /** Où aller une fois la modification annulée/terminée — par défaut `/commandes` (usage historique `/caisse`) ; `/equipe` passe un retour à sa propre liste plutôt que de naviguer hors de l'appli unifiée. */
+  onTerminerModification?: () => void;
 }
 
 // Clés localStorage du polling des commandes en ligne : persistées pour que
@@ -166,9 +168,11 @@ export function CaisseApp({
   parametres,
   nomEmploye,
   commandeExistante,
+  onTerminerModification,
 }: CaisseAppProps) {
   const router = useRouter();
   const enModeEdition = commandeExistante != null;
+  const terminerModification = onTerminerModification ?? (() => router.push("/commandes"));
 
   /**
    * Convertit une ligne persistée (`commandes.contenu`) en ligne de panier en
@@ -1306,7 +1310,7 @@ export function CaisseApp({
         setErreur(data.error ?? "Échec de la modification.");
         return;
       }
-      router.push("/commandes");
+      terminerModification();
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -1443,7 +1447,7 @@ export function CaisseApp({
                 </p>
                 <button
                   type="button"
-                  onClick={() => router.push("/commandes")}
+                  onClick={() => terminerModification()}
                   className="text-sm font-semibold text-gray-500 underline"
                 >
                   Annuler la modification

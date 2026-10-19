@@ -20,13 +20,22 @@ export interface CommandeAModifier {
 }
 
 /**
+ * Statuts où une commande reste modifiable : avant qu'elle parte vraiment
+ * (un livreur qui l'a déjà en main, ou un client qui l'a déjà récupérée,
+ * ne peut plus voir son contenu changer). Élargi au-delà de "en_attente"
+ * le 2026-10-19 — demande explicite du patron : un client qui rappelle
+ * juste au moment où sa commande part en préparation doit pouvoir la
+ * faire modifier, pas seulement avant que quiconque n'y ait touché.
+ */
+export const STATUTS_MODIFIABLES = ["en_attente", "en_preparation", "pret"] as const;
+
+/**
  * Charge une commande pour modification depuis /caisse (réutilise le même
- * configurateur que la prise de commande). Volontairement restreint aux
- * commandes encore "en_attente" (au-delà, la préparation a commencé, ça se
- * gère de vive voix) et jamais si une récompense fidélité a déjà été
- * consommée dessus (trop risqué à reverser/réappliquer automatiquement —
- * annuler et recréer dans ce cas précis). Retourne `null` avec un message
- * d'erreur explicite plutôt que de bloquer silencieusement.
+ * configurateur que la prise de commande). Jamais si une récompense
+ * fidélité a déjà été consommée dessus (trop risqué à reverser/réappliquer
+ * automatiquement — annuler et recréer dans ce cas précis). Retourne
+ * `null` avec un message d'erreur explicite plutôt que de bloquer
+ * silencieusement.
  */
 export async function chargerCommandePourModification(
   commandeId: string
@@ -44,8 +53,8 @@ export async function chargerCommandePourModification(
   if (error || !data) {
     return { commande: null, erreur: "Commande introuvable." };
   }
-  if (data.statut !== "en_attente") {
-    return { commande: null, erreur: 'Seules les commandes encore "En attente" peuvent être modifiées.' };
+  if (!STATUTS_MODIFIABLES.includes(data.statut as (typeof STATUTS_MODIFIABLES)[number])) {
+    return { commande: null, erreur: "Cette commande ne peut plus être modifiée (déjà enlevée/remise/annulée)." };
   }
   if (data.tampons_utilises > 0) {
     return {
