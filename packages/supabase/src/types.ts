@@ -222,25 +222,6 @@ export interface Database {
         Relationships: [];
       };
 
-      debug_print_log: {
-        Row: {
-          id: string;
-          created_at: string;
-          connection_type: string | null;
-          commande_numero: number | null;
-          corps: string | null;
-        };
-        Insert: {
-          id?: string;
-          created_at?: string;
-          connection_type?: string | null;
-          commande_numero?: number | null;
-          corps?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["debug_print_log"]["Insert"]>;
-        Relationships: [];
-      };
-
       clients: {
         Row: {
           telephone: string;
