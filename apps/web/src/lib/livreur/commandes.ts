@@ -1,4 +1,5 @@
 import "server-only";
+import type { RoleMetier } from "@3sauces/supabase";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import { notifierPaiementConfirme, notifierLivraisonNonEffectuee } from "@/lib/notifications/paiement";
@@ -213,7 +214,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
 
   const { data: livraison, error: erreurLivraison } = await supabase
     .from("livraisons")
-    .select("commande_id, livreur_id")
+    .select("commande_id, livreur_id, livreur_exclu_id")
     .eq("qr_code", qrCode)
     .maybeSingle();
   if (erreurLivraison || !livraison) {
@@ -260,7 +261,12 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
       const nomLivreur = await nomProfil(supabase, livraison.livreur_id);
       return { type: "deja_prise_autre", numero: commande.numero, nomLivreur };
     }
-    return { type: "a_prendre", commandeId: commande.id, livraison: livraisonAssignee };
+    return {
+      type: "a_prendre",
+      commandeId: commande.id,
+      livraison: livraisonAssignee,
+      exclu: livraison.livreur_exclu_id === livreurId,
+    };
   }
 
   if (commande.statut === "pris_par_livreur") {
@@ -300,11 +306,14 @@ export async function prendreLivraisonParQrCode(qrCode: string, livreurId: strin
   const supabase = createServiceSupabaseClient();
   const { data: livraison, error } = await supabase
     .from("livraisons")
-    .select("commande_id")
+    .select("commande_id, livreur_exclu_id")
     .eq("qr_code", qrCode)
     .maybeSingle();
   if (error || !livraison) {
     throw new Error("Ticket introuvable.");
+  }
+  if (livraison.livreur_exclu_id === livreurId) {
+    throw new Error("Tu viens de relâcher cette livraison — un collègue ou le comptoir doit la reprendre.");
   }
 
   const { data: commandeGagnee, error: erreurClaim } = await supabase
@@ -323,7 +332,12 @@ export async function prendreLivraisonParQrCode(qrCode: string, livreurId: strin
 
   const { error: erreurLivreur } = await supabase
     .from("livraisons")
-    .update({ livreur_id: livreurId, statut: "en_livraison", heure_depart_cuisine: new Date().toISOString() })
+    .update({
+      livreur_id: livreurId,
+      statut: "en_livraison",
+      heure_depart_cuisine: new Date().toISOString(),
+      livreur_exclu_id: null,
+    })
     .eq("commande_id", livraison.commande_id);
   if (erreurLivreur) {
     console.error("[livreur/commandes] échec attribution livreur après prise atomique :", erreurLivreur.message);
@@ -387,4 +401,73 @@ export async function signalerLivraisonNonEffectuee(
   }
 
   await notifierLivraisonNonEffectuee(commandeId, motif.trim() || "non précisé", nomLivreur);
+}
+
+/**
+ * Relâche une livraison déjà prise en charge (le livreur ne peut plus la
+ * faire — panne, fin de tournée — ou change de tournée en cours de route) :
+ * la commande redevient "prête" et repart au pot commun, qu'elle soit
+ * redéposée au resto ou remise en main à un collègue sur la route — dans
+ * les deux cas, c'est le même geste (rescanner le QR) qui l'attribue à
+ * nouveau, rien de plus à construire pour distinguer les deux cas.
+ *
+ * Appelable par le livreur lui-même (`roleMetier: "livreur"`, doit être
+ * celui à qui la livraison est assignée) ou par le comptoir en forçant
+ * (`roleMetier: "comptoir"`, pas de vérification de propriétaire — demande
+ * explicite du patron, 2026-10-20, pour couvrir le cas où le livreur ne
+ * peut pas agir lui-même).
+ */
+export async function relacherLivraison(commandeId: string, profilId: string, roleMetier: RoleMetier): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+
+  const { data: commande, error: erreurCommande } = await supabase
+    .from("commandes")
+    .select("id, canal, statut")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurCommande || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.canal !== "livraison" || commande.statut !== "pris_par_livreur") {
+    throw new Error("Cette commande n'est pas en cours de livraison.");
+  }
+
+  const { data: livraison } = await supabase.from("livraisons").select("livreur_id").eq("commande_id", commandeId).maybeSingle();
+  if (!livraison) {
+    throw new Error("Livraison introuvable.");
+  }
+  if (roleMetier === "livreur" && livraison.livreur_id !== profilId) {
+    throw new Error("Cette livraison n'est pas assignée à toi.");
+  }
+
+  const livreurExclu = livraison.livreur_id;
+
+  const { data: commandeRelachee, error: erreurRelacher } = await supabase
+    .from("commandes")
+    .update({ statut: "pret", statut_change_le: new Date().toISOString() })
+    .eq("id", commandeId)
+    .eq("statut", "pris_par_livreur")
+    .select("id")
+    .maybeSingle();
+  if (erreurRelacher) {
+    throw new Error(`Impossible de relâcher la livraison : ${erreurRelacher.message}`);
+  }
+  if (!commandeRelachee) {
+    throw new Error("Cette commande n'est plus en cours de livraison.");
+  }
+
+  const { error: erreurLivraisonMaj } = await supabase
+    .from("livraisons")
+    .update({ statut: "en_attente", livreur_id: null, livreur_exclu_id: livreurExclu, heure_depart_cuisine: null })
+    .eq("commande_id", commandeId);
+  if (erreurLivraisonMaj) {
+    console.error("[livreur/commandes] échec remise en attente après relâchement :", erreurLivraisonMaj.message);
+  }
+
+  const { error: erreurEvenement } = await supabase
+    .from("commandes_evenements")
+    .insert({ commande_id: commandeId, statut: "pret", profil_id: profilId, role_metier: roleMetier });
+  if (erreurEvenement) {
+    console.error("[livreur/commandes] échec journalisation relâchement :", erreurEvenement.message);
+  }
 }

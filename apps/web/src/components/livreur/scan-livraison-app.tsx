@@ -55,12 +55,13 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   const etat = etatInitial;
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [confirmeLocal, setConfirmeLocal] = useState<"prise" | "livre" | "echec" | null>(null);
+  const [confirmeLocal, setConfirmeLocal] = useState<"prise" | "livre" | "echec" | "relache" | null>(null);
   const [choix, setChoix] = useState<ChoixPaiement>(null);
   const [montantEspeces, setMontantEspeces] = useState("");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   const [echecOuvert, setEchecOuvert] = useState(false);
   const [motifEchec, setMotifEchec] = useState("");
+  const [relacherOuvert, setRelacherOuvert] = useState(false);
 
   async function prendre() {
     setEnCours(true);
@@ -129,6 +130,28 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
     }
   }
 
+  async function relacher(commandeId: string) {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      const reponse = await fetch("/api/livreur/relacher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId }),
+      });
+      const data = await reponse.json();
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Échec du relâchement.");
+        return;
+      }
+      setConfirmeLocal("relache");
+    } catch {
+      setErreur("Connexion impossible, réessaie.");
+    } finally {
+      setEnCours(false);
+    }
+  }
+
   // Après une action réussie, le serveur refait autorité : on ne recalcule
   // jamais l'état nous-mêmes, mais on affiche un message de succès pendant
   // le court instant avant que `router.refresh()` ne renvoie le nouvel état.
@@ -141,6 +164,11 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   if (confirmeLocal === "echec") {
     return (
       <MessageEtat emoji="🚨" titre="Signalé" detail="Un responsable a été alerté, merci — tu peux passer à la suivante." />
+    );
+  }
+  if (confirmeLocal === "relache") {
+    return (
+      <MessageEtat emoji="🔄" titre="Relâchée" detail="Elle repart au pot commun — un collègue ou le comptoir va la reprendre." />
     );
   }
 
@@ -210,7 +238,13 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
       {erreur && <p className="text-sm font-semibold text-red-600">{erreur}</p>}
 
-      {etat.type === "a_prendre" && (
+      {etat.type === "a_prendre" && etat.exclu && (
+        <p className="rounded border border-amber-400 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          Tu viens de relâcher cette livraison — un collègue ou le comptoir doit la reprendre.
+        </p>
+      )}
+
+      {etat.type === "a_prendre" && !etat.exclu && (
         <button
           type="button"
           onClick={prendre}
@@ -331,14 +365,49 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
         </div>
       )}
 
-      {etat.type === "a_livrer" && !echecOuvert && (
-        <button
-          type="button"
-          onClick={() => setEchecOuvert(true)}
-          className="w-full rounded border border-red-600 py-3 text-sm font-semibold text-red-600"
-        >
-          ❌ Impossible de livrer
-        </button>
+      {etat.type === "a_livrer" && !echecOuvert && !relacherOuvert && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setRelacherOuvert(true)}
+            className="w-full rounded border border-gray-400 py-3 text-sm font-semibold text-gray-700"
+          >
+            🔄 Je change de tournée (remettre au pot commun)
+          </button>
+          <button
+            type="button"
+            onClick={() => setEchecOuvert(true)}
+            className="w-full rounded border border-red-600 py-3 text-sm font-semibold text-red-600"
+          >
+            ❌ Impossible de livrer
+          </button>
+        </div>
+      )}
+
+      {etat.type === "a_livrer" && relacherOuvert && (
+        <div className="space-y-2 rounded-lg border border-gray-300 bg-gray-50 p-3">
+          <p className="text-sm font-semibold text-gray-800">
+            La commande redevient disponible pour un collègue (ou le comptoir) — à redéposer au resto ou à remettre en
+            main si tu croises quelqu&apos;un.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setRelacherOuvert(false)}
+              className="flex-1 rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={() => relacher(commandeId)}
+              disabled={enCours}
+              className="flex-1 rounded bg-gray-700 py-2 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {enCours ? "…" : "Confirmer"}
+            </button>
+          </div>
+        </div>
       )}
 
       {etat.type === "a_livrer" && echecOuvert && (

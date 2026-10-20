@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireRoleMetier } from "@/lib/auth/get-session";
 import { changerStatutCommande, annulerCommande } from "@/lib/cuisine/commandes";
+import { relacherLivraison } from "@/lib/livreur/commandes";
+
+const ACTIONS_VALIDES = ["remise", "annuler", "relacher_livreur"] as const;
+type Action = (typeof ACTIONS_VALIDES)[number];
 
 /**
- * Actions COMPTOIR : "Remise" (sur place/à emporter, après paiement) et
+ * Actions COMPTOIR : "Remise" (sur place/à emporter, après paiement),
  * "Annuler" — `annulerCommande` refuse déjà elle-même toute annulation
  * passé "en_attente", côté serveur, peu importe l'appelant (demande
- * explicite du patron : vérifiable par appel direct à l'API).
+ * explicite du patron : vérifiable par appel direct à l'API) — et
+ * "relacher_livreur" (le livreur assigné ne peut plus livrer, le comptoir
+ * force la remise au pot commun, cf. `relacherLivraison`).
  */
 export async function PATCH(request: Request) {
   const session = await requireRoleMetier(["comptoir"]);
@@ -19,15 +25,17 @@ export async function PATCH(request: Request) {
     | null;
 
   const { commandeId, action, profilId, motif } = body ?? {};
-  if (!commandeId || !profilId || (action !== "remise" && action !== "annuler")) {
+  if (!commandeId || !profilId || !ACTIONS_VALIDES.includes(action as Action)) {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
   try {
     if (action === "remise") {
       await changerStatutCommande({ commandeId, statut: "remis_au_client", profilId, roleMetier: "comptoir" });
-    } else {
+    } else if (action === "annuler") {
       await annulerCommande({ commandeId, profilId, motif });
+    } else {
+      await relacherLivraison(commandeId, profilId, "comptoir");
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

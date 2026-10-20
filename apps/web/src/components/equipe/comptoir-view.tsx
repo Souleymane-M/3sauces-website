@@ -64,6 +64,7 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [annulationEnAttente, setAnnulationEnAttente] = useState<string | null>(null);
+  const [relacherEnAttente, setRelacherEnAttente] = useState<string | null>(null);
   const [annulationAvecMotifPour, setAnnulationAvecMotifPour] = useState<string | null>(null);
   const [motifChoisi, setMotifChoisi] = useState("");
   const [confirmationMotifOuverte, setConfirmationMotifOuverte] = useState(false);
@@ -141,7 +142,7 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
     }
   }
 
-  async function appliquer(commandeId: string, action: "remise" | "annuler") {
+  async function appliquer(commandeId: string, action: "remise" | "annuler" | "relacher_livreur") {
     setEnCours(commandeId);
     setErreur(null);
     try {
@@ -338,6 +339,16 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                     Annuler (avec motif)
                   </button>
                 ) : null}
+                {c.statut === "pris_par_livreur" && (
+                  <button
+                    type="button"
+                    onClick={() => setRelacherEnAttente(c.id)}
+                    disabled={enCours === c.id}
+                    className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 disabled:opacity-50"
+                  >
+                    Remettre en attente de livreur
+                  </button>
+                )}
               </div>
 
               {annulationAvecMotifPour === c.id && (
@@ -385,6 +396,18 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
             const id = annulationEnAttente;
             setAnnulationEnAttente(null);
             appliquer(id, "annuler");
+          }}
+        />
+      )}
+
+      {relacherEnAttente && (
+        <ConfirmationPin
+          titre="Confirmer : remettre au pot commun"
+          onAnnule={() => setRelacherEnAttente(null)}
+          onConfirme={() => {
+            const id = relacherEnAttente;
+            setRelacherEnAttente(null);
+            appliquer(id, "relacher_livreur");
           }}
         />
       )}

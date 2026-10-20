@@ -35,7 +35,10 @@ export type EtatScan =
   | { type: "introuvable" }
   | { type: "annulee" }
   | { type: "pas_prete"; numero: number }
-  | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee }
+  // `exclu` : ce livreur vient lui-même de relâcher cette livraison — il ne
+  // peut pas la reprendre tout de suite, un collègue ou le comptoir doit le
+  // faire (cf. `relacherLivraison`).
+  | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee; exclu: boolean }
   | { type: "a_livrer"; commandeId: string; livraison: LivraisonAssignee }
   | { type: "deja_prise_autre"; numero: number; nomLivreur: string | null }
   | { type: "deja_livree"; numero: number };

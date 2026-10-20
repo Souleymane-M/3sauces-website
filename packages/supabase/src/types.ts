@@ -534,6 +534,7 @@ export interface Database {
           heure_depart_cuisine: string | null;
           heure_livraison_effective: string | null;
           statut: "en_attente" | "en_livraison" | "livre";
+          livreur_exclu_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -546,6 +547,7 @@ export interface Database {
           heure_depart_cuisine?: string | null;
           heure_livraison_effective?: string | null;
           statut?: "en_attente" | "en_livraison" | "livre";
+          livreur_exclu_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["livraisons"]["Insert"]>;
         Relationships: [];
