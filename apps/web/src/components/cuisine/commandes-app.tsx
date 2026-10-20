@@ -25,6 +25,19 @@ interface EmployeActif {
   nom: string;
 }
 
+// Recherche numéro ET/OU nom — une seule information suffit (demande
+// explicite du patron, 2026-10-20 : retrouver une commande précise parmi
+// plusieurs qui clignotent ne doit jamais exiger les deux). Le numéro
+// tolère avec ou sans "#" et avec ou sans les zéros de tête (ex: "287",
+// "0287" et "#287" trouvent tous la même commande).
+function commandeCorrespond(recherche: string, numero: number, nom: string): boolean {
+  const terme = recherche.trim().toLowerCase().replace(/^#/, "");
+  if (!terme) return true;
+  const numeroTexte = String(numero);
+  const numeroAffiche = numeroTexte.padStart(4, "0");
+  return numeroTexte.includes(terme) || numeroAffiche.includes(terme) || nom.toLowerCase().includes(terme);
+}
+
 function libelleCanal(canal: CommandeCuisine["canal"]): string {
   if (canal === "livraison") return "Livraison";
   if (canal === "emporter") return "À emporter";
@@ -391,6 +404,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
   const [modalOuverte, setModalOuverte] = useState(false);
   const [actionEnAttente, setActionEnAttente] = useState<((identite: EmployeActif) => void) | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [recherche, setRecherche] = useState("");
 
   const idsVusRef = useRef<Set<string>>(new Set(commandesInitiales.map((c) => c.id)));
   const alertesVuesRef = useRef<Set<string>>(
@@ -587,9 +601,13 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     setModalOuverte(true);
   }
 
-  const enAttente = commandes.filter((c) => c.statut === "en_attente");
-  const enPreparation = commandes.filter((c) => c.statut === "en_preparation");
-  const prete = commandes.filter((c) => c.statut === "pret");
+  const commandesFiltrees = commandes.filter((c) => commandeCorrespond(recherche, c.numero, c.nom));
+  const enLivraisonFiltree = enLivraison.filter((l) => commandeCorrespond(recherche, l.numero, l.nom));
+  const aVenirFiltre = aVenir.filter((c) => commandeCorrespond(recherche, c.numero, c.nom));
+
+  const enAttente = commandesFiltrees.filter((c) => c.statut === "en_attente");
+  const enPreparation = commandesFiltrees.filter((c) => c.statut === "en_preparation");
+  const prete = commandesFiltrees.filter((c) => c.statut === "pret");
 
   return (
     <div className="mt-4">
@@ -613,9 +631,33 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
 
       {erreur && <p className="mb-3 text-lg text-red-600">{erreur}</p>}
 
+      <div className="mb-4">
+        <input
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher par numéro et/ou nom du client…"
+          className="w-full max-w-md rounded border border-gray-300 p-2 text-lg text-gray-900"
+        />
+        {recherche.trim() && (
+          <button
+            type="button"
+            onClick={() => setRecherche("")}
+            className="ml-2 text-sm text-gray-500 underline"
+          >
+            Effacer
+          </button>
+        )}
+      </div>
+
       {commandes.length === 0 && enLivraison.length === 0 && (
         <p className="text-xl text-gray-400">Aucune commande en cours.</p>
       )}
+      {commandes.length > 0 &&
+        recherche.trim() &&
+        enAttente.length === 0 &&
+        enPreparation.length === 0 &&
+        prete.length === 0 &&
+        enLivraisonFiltree.length === 0 && <p className="text-xl text-gray-400">Aucune commande ne correspond.</p>}
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <Colonne titre="En attente" count={enAttente.length}>
@@ -648,18 +690,18 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
             />
           ))}
         </Colonne>
-        <Colonne titre="En cours de livraison" count={enLivraison.length}>
-          {enLivraison.map((livraison) => (
+        <Colonne titre="En cours de livraison" count={enLivraisonFiltree.length}>
+          {enLivraisonFiltree.map((livraison) => (
             <CarteLivraisonEnCours key={livraison.id} livraison={livraison} resoudreLivraison={resoudreLivraison} />
           ))}
         </Colonne>
       </div>
 
-      {aVenir.length > 0 && (
+      {aVenirFiltre.length > 0 && (
         <div className="mt-8">
           <h2 className="mb-3 text-xl font-bold text-gray-700">Commandes à venir</h2>
           <div className="space-y-2">
-            {aVenir.map((c) => (
+            {aVenirFiltre.map((c) => (
               <div key={c.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-lg text-gray-700">
                 Commande à venir — {formaterDateHeureComplete(c.heureSouhaitee)} — #{c.numero} — {c.nbPlats} plat
                 {c.nbPlats > 1 ? "s" : ""}
