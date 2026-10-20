@@ -349,17 +349,32 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   }
 }
 
-/** Message du moment (si actif) + QR vers le site (jamais en livraison, pour ne pas le confondre avec le QR livreur). */
+/**
+ * Message du moment (si actif, quel que soit canal/origine) + incitation à
+ * commander en ligne la prochaine fois — uniquement sur une commande
+ * saisie en caisse (`origineCaisse`), jamais sur une commande déjà passée
+ * depuis le site (inutile de la lui repromouvoir) : demande explicite du
+ * patron, 2026-10-20, pour convertir précisément les clients qui n'ont
+ * jamais essayé le site. QR uniquement hors livraison (jamais mélangé
+ * avec le QR livreur, déjà imprimé plus haut) — en livraison, juste la
+ * phrase, utile pour une commande prise par téléphone.
+ */
 function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
-  if (!commande.messageDuMoment && commande.canal === "livraison") return;
+  const incitationSite = commande.origineCaisse;
+  if (!commande.messageDuMoment && !incitationSite) return;
+
   separateur(b);
   if (commande.messageDuMoment) {
     b.ligne(commande.messageDuMoment, { align: "center", gras: false, taille: 1 });
   }
-  if (commande.canal !== "livraison") {
-    b.brut(`<feed line="1"/>`);
-    b.brut(styleTexte({ align: "center" }));
-    b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(URL_SITE)}</symbol>`);
+  if (incitationSite) {
+    if (commande.messageDuMoment) b.brut(`<feed line="1"/>`);
+    b.ligne("💡 La prochaine fois, commande en ligne !", { align: "center", gras: true, taille: 1 });
+    if (commande.canal !== "livraison") {
+      b.brut(`<feed line="1"/>`);
+      b.brut(styleTexte({ align: "center" }));
+      b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(URL_SITE)}</symbol>`);
+    }
   }
 }
 
