@@ -19,6 +19,10 @@ interface CommandesAppProps {
 const INTERVALLE_POLLING_MS = 5000;
 const INACTIVITE_LIMITE_MS = 10 * 60 * 1000;
 const CLE_EMPLOYE_ACTIF = "cuisine_employe_actif";
+// Repli automatique d'une carte dépliée sans action — demande explicite du
+// patron, 2026-10-20 : éviter qu'une carte ouverte "pour regarder" reste
+// grande ouverte indéfiniment et reprenne la place qu'on vient de gagner.
+const REPLI_AUTO_DETAIL_MS = 18000;
 
 interface EmployeActif {
   profilId: string;
@@ -36,6 +40,17 @@ function commandeCorrespond(recherche: string, numero: number, nom: string): boo
   const numeroTexte = String(numero);
   const numeroAffiche = numeroTexte.padStart(4, "0");
   return numeroTexte.includes(terme) || numeroAffiche.includes(terme) || nom.toLowerCase().includes(terme);
+}
+
+/** Replie automatiquement le détail d'une carte après `REPLI_AUTO_DETAIL_MS` d'inactivité, cf. `REPLI_AUTO_DETAIL_MS`. */
+function useDetailAvecRepliAuto(): [boolean, (v: boolean | ((prec: boolean) => boolean)) => void] {
+  const [detailOuvert, setDetailOuvert] = useState(false);
+  useEffect(() => {
+    if (!detailOuvert) return;
+    const delai = setTimeout(() => setDetailOuvert(false), REPLI_AUTO_DETAIL_MS);
+    return () => clearTimeout(delai);
+  }, [detailOuvert]);
+  return [detailOuvert, setDetailOuvert];
 }
 
 function libelleCanal(canal: CommandeCuisine["canal"]): string {
@@ -146,7 +161,7 @@ interface CarteCommandeProps {
 }
 
 function CarteCommande({ commande, demanderChangement, demanderAnnulation }: CarteCommandeProps) {
-  const [detailOuvert, setDetailOuvert] = useState(false);
+  const [detailOuvert, setDetailOuvert] = useDetailAvecRepliAuto();
   const [reimpressionEnCours, setReimpressionEnCours] = useState(false);
   const [reimpressionFaite, setReimpressionFaite] = useState(false);
 
@@ -364,7 +379,7 @@ interface CarteLivraisonEnCoursProps {
 
 function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonEnCoursProps) {
   const ancienne = estAncienne(livraison.creeLe);
-  const [detailOuvert, setDetailOuvert] = useState(false);
+  const [detailOuvert, setDetailOuvert] = useDetailAvecRepliAuto();
   const [reimpressionEnCours, setReimpressionEnCours] = useState(false);
   const [reimpressionFaite, setReimpressionFaite] = useState(false);
 
