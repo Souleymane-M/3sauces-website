@@ -64,6 +64,12 @@ export async function POST(request: Request) {
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
+      // Explicite plutôt que "automatic_payment_methods" (comportement par
+      // défaut sans ce champ) : Stripe proposait sinon aussi Bancontact et
+      // EPS (moyens belges/autrichiens, jamais pertinents à Mayotte) selon
+      // la devise/le pays détecté du client — demande explicite du patron,
+      // 2026-10-20.
+      payment_method_types: ["card"],
       line_items: [
         {
           quantity: 1,

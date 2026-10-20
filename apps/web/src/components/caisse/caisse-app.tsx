@@ -265,7 +265,7 @@ export function CaisseApp({
   // créditée, trop risqué depuis cet écran — annule et recrée dans ce
   // seul cas). L'autre sens (livraison non payée -> sur place/à emporter,
   // paiement collecté maintenant) est sans risque et donc autorisé.
-  const canalOriginalEdition = useRef(commandeExistante?.canal ?? null).current;
+  const [canalOriginalEdition] = useState<Canal | null>(() => commandeExistante?.canal ?? null);
   const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
 
   // Restauration du panier après un rechargement accidentel de l'iPad : on
@@ -338,6 +338,9 @@ export function CaisseApp({
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
+  // Dernier numéro (normalisé) déjà recherché automatiquement — évite de
+  // relancer la recherche à chaque frappe une fois le client trouvé.
+  const dernierTelephoneAutoRecherche = useRef<string | null>(null);
   const [nbTamponsAUtiliser, setNbTamponsAUtiliser] = useState(0);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -1010,11 +1013,14 @@ export function CaisseApp({
     });
   }
 
-  async function rechercherClient() {
+  async function rechercherClient(silencieux = false) {
     if (!telephone.trim()) return;
     const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
-      setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      // En automatique (frappe en cours), un numéro pas encore complet est
+      // normal et ne doit jamais afficher d'erreur — seul le clic manuel sur
+      // 🔍 le signale.
+      if (!silencieux) setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
       return;
     }
     setRechercheEnCours(true);
@@ -1040,6 +1046,23 @@ export function CaisseApp({
       setRechercheEnCours(false);
     }
   }
+
+  // Recherche automatique dès qu'un numéro complet et valide est saisi —
+  // ne plus dépendre du clic sur 🔍 (facilement oublié pendant un coup de
+  // feu, cf. retour du 2026-10-20 : coordonnées et tampons d'un client déjà
+  // enregistré non récupérés faute d'avoir cliqué). Débounce 400ms pour ne
+  // pas lancer une requête à chaque chiffre tapé ; le bouton 🔍 reste
+  // disponible pour relancer manuellement (ex: après correction du numéro).
+  useEffect(() => {
+    const telephoneComplet = normaliserTelephone(telephone);
+    if (!telephoneComplet || telephoneComplet === dernierTelephoneAutoRecherche.current) return;
+    const delai = setTimeout(() => {
+      dernierTelephoneAutoRecherche.current = telephoneComplet;
+      rechercherClient(true);
+    }, 400);
+    return () => clearTimeout(delai);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- volontairement sur `telephone` seul, cf. commentaire ci-dessus.
+  }, [telephone]);
 
   /** Vérifications communes à l'encaissement et à la modification — jamais de commande groupée sous le seuil, ni de plat sous 5€. */
   function validerPanierAvantEnvoi(): string | null {
@@ -1770,7 +1793,7 @@ export function CaisseApp({
                   className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
                 />
                 <button
-                  onClick={rechercherClient}
+                  onClick={() => rechercherClient()}
                   disabled={rechercheEnCours}
                   className="rounded border border-gray-300 px-3 text-sm text-gray-700"
                 >
