@@ -32,6 +32,8 @@ export interface CommandeCuisine {
   ticketImprimeLe: string | null;
   /** Dernier changement de statut — minuteur par étape de l'écran cuisine, null pour une commande encore "en_attente" (jamais transitionnée), repli sur `creeLe` dans ce cas. */
   statutChangeLe: string | null;
+  /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
+  origineCaisse: boolean;
 }
 
 /** Statuts journalisables dans `commandes_evenements` — jamais "en_attente" (état initial automatique, pas une action). */
@@ -71,6 +73,8 @@ export interface LivraisonEnCours {
   alerteSignalee: boolean;
   alerteNote: string | null;
   alerteSignaleeLe: string | null;
+  /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
+  origineCaisse: boolean;
 }
 
 /**

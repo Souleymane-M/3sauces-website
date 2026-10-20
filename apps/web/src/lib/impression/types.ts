@@ -32,4 +32,6 @@ export interface CommandePourImpression {
   recompenseDisponible: boolean;
   /** Message du moment actif à imprimer sur le reçu client — null si inactif/vide. */
   messageDuMoment: string | null;
+  /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
+  origineCaisse: boolean;
 }

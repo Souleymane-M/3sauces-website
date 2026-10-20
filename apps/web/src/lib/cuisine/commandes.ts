@@ -15,7 +15,7 @@ import {
 } from "./types";
 
 const SELECT_COMMANDES_CUISINE =
-  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe, statut_change_le";
+  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe, statut_change_le, commande_par";
 
 /** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
 function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
@@ -42,6 +42,7 @@ function versCommandeCuisine(c: {
   palier_groupe: string | null;
   mode_paiement: CommandeCuisine["modePaiement"];
   statut_change_le: string | null;
+  commande_par: string | null;
 }): CommandeCuisine {
   return {
     id: c.id,
@@ -61,6 +62,11 @@ function versCommandeCuisine(c: {
     commandeAvance: estCommandeAvance(c.heure_souhaitee, c.created_at),
     ticketImprimeLe: c.ticket_imprime_le,
     statutChangeLe: c.statut_change_le,
+    // `commande_par` = id employé pour une commande saisie en caisse, null
+    // pour une commande passée par le client sur le site public — demande
+    // explicite du patron, 2026-10-20 : distinguer l'origine, aussi bien
+    // ici qu'à l'impression.
+    origineCaisse: c.commande_par !== null,
   };
 }
 
@@ -121,7 +127,7 @@ export async function listerLivraisonsEnCours(): Promise<LivraisonEnCours[]> {
   const { data: commandes, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, alerte_signalee, alerte_note, alerte_signalee_le"
+      "id, numero, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, alerte_signalee, alerte_note, alerte_signalee_le, commande_par"
     )
     .eq("canal", "livraison")
     .eq("statut", "pris_par_livreur")
@@ -164,6 +170,7 @@ export async function listerLivraisonsEnCours(): Promise<LivraisonEnCours[]> {
       alerteSignalee: c.alerte_signalee,
       alerteNote: c.alerte_note,
       alerteSignaleeLe: c.alerte_signalee_le,
+      origineCaisse: c.commande_par !== null,
     };
   });
 

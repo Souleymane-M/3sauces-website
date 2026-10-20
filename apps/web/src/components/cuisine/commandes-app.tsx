@@ -221,6 +221,13 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           <span className="rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
             {libelleCanal(commande.canal)}
           </span>
+          <span
+            className={`rounded px-2 py-1 text-base font-semibold ${
+              commande.origineCaisse ? "bg-gray-100 text-gray-600" : "bg-blue-100 text-blue-700"
+            }`}
+          >
+            {commande.origineCaisse ? "🧾 Caisse" : "🌐 Site"}
+          </span>
           <span className="text-base text-black">{LIBELLES_STATUT[commande.statut]}</span>
         </div>
       </button>
@@ -417,9 +424,16 @@ function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonE
           </span>
           <span className="text-sm text-gray-400">{detailOuvert ? "▾" : "▸"}</span>
         </div>
-        <span className="mt-1 inline-block rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
-          Livraison
-        </span>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">Livraison</span>
+          <span
+            className={`rounded px-2 py-1 text-base font-semibold ${
+              livraison.origineCaisse ? "bg-gray-100 text-gray-600" : "bg-blue-100 text-blue-700"
+            }`}
+          >
+            {livraison.origineCaisse ? "🧾 Caisse" : "🌐 Site"}
+          </span>
+        </div>
       </button>
       <p className="mt-1 text-sm text-gray-500">Livreur : {livraison.livreurNom}</p>
 

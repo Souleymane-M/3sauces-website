@@ -387,6 +387,10 @@ function construireContenuTicketClient(
 
   b.ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
   b.ligne(formaterNumeroTicket(commande.numero), { align: "center", gras: true, taille: 2 });
+  // Distingue une commande saisie en caisse d'une commande passée par le
+  // client sur le site — demande explicite du patron, 2026-10-20 : à la
+  // pile de tickets du comptoir, impossible sinon de savoir d'où elle vient.
+  b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
   b.ligne(formaterDateHeure(commande.creeLe), { align: "center", gras: false, taille: 1 });
 
   if (commande.modePaiement === "stripe") {
@@ -473,6 +477,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
     gras: true,
     taille: 2,
   });
+  b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
 
   if (commande.modePaiement === "stripe") {
     b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
