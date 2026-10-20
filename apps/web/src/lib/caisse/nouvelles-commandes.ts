@@ -318,3 +318,35 @@ export async function marquerDernierTicketRemisImprime(): Promise<void> {
     throw new Error(`Impossible de marquer le ticket comme imprimé : ${error.message}`);
   }
 }
+
+/**
+ * Demande de réimpression (ticket perdu/abîmé) — ne réimprime jamais ici
+ * directement : remet simplement `ticket_imprime_le`/`ticket_remis_le` à
+ * null, exactement comme le fait déjà une modification de commande
+ * (`/api/caisse/commandes` PATCH). La commande rentre alors naturellement
+ * dans la file de `listerCommandesDuJourAImprimer`, et l'imprimante
+ * (Server Direct Print, sondage ~5s) l'imprime au cycle suivant — les 2
+ * tickets (client + cuisine) ensemble, comme à la création.
+ */
+export async function demanderReimpressionTicket(commandeId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: commande, error: erreurLecture } = await supabase
+    .from("commandes")
+    .select("id, statut")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (erreurLecture || !commande) {
+    throw new Error("Commande introuvable.");
+  }
+  if (commande.statut === "annulee") {
+    throw new Error("Cette commande est annulée.");
+  }
+
+  const { error } = await supabase
+    .from("commandes")
+    .update({ ticket_imprime_le: null, ticket_remis_le: null })
+    .eq("id", commandeId);
+  if (error) {
+    throw new Error(`Impossible de redemander l'impression : ${error.message}`);
+  }
+}

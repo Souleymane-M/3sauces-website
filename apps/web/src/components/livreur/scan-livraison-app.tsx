@@ -178,11 +178,6 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   if (etat.type === "annulee") {
     return <MessageEtat emoji="🚫" titre="Commande annulée" detail="Rien à livrer, préviens la cuisine si besoin." />;
   }
-  if (etat.type === "pas_prete") {
-    return (
-      <MessageEtat emoji="⏳" titre={`Commande #${etat.numero}`} detail="Pas encore prête en cuisine — repasse plus tard." />
-    );
-  }
   if (etat.type === "deja_livree") {
     return <MessageEtat emoji="✅" titre={`Commande #${etat.numero}`} detail="Déjà livrée et payée." />;
   }
@@ -245,14 +240,21 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
       )}
 
       {etat.type === "a_prendre" && !etat.exclu && (
-        <button
-          type="button"
-          onClick={prendre}
-          disabled={enCours}
-          className="w-full rounded bg-[#8B2020] py-4 text-lg font-bold text-white disabled:opacity-40"
-        >
-          {enCours ? "…" : "Je prends cette livraison"}
-        </button>
+        <>
+          {etat.pasEncorePrete && (
+            <p className="mb-2 rounded border border-amber-400 bg-amber-50 p-2 text-sm font-semibold text-amber-800">
+              ⏳ Pas encore marquée &quot;Prête&quot; en cuisine — vérifie que le sachet est bien complet avant de partir.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={prendre}
+            disabled={enCours}
+            className="w-full rounded bg-[#8B2020] py-4 text-lg font-bold text-white disabled:opacity-40"
+          >
+            {enCours ? "…" : "Je prends cette livraison"}
+          </button>
+        </>
       )}
 
       {etat.type === "a_livrer" && livraison.modePaiement === "stripe" && (

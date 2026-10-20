@@ -34,11 +34,12 @@ export interface PaiementDeclare {
 export type EtatScan =
   | { type: "introuvable" }
   | { type: "annulee" }
-  | { type: "pas_prete"; numero: number }
   // `exclu` : ce livreur vient lui-même de relâcher cette livraison — il ne
   // peut pas la reprendre tout de suite, un collègue ou le comptoir doit le
-  // faire (cf. `relacherLivraison`).
-  | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee; exclu: boolean }
+  // faire (cf. `relacherLivraison`). `pasEncorePrete` : la cuisine n'a pas
+  // encore cliqué "Prête" — prise en charge quand même possible (le ticket
+  // est déjà agrafé au sachet), juste un avertissement affiché au livreur.
+  | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee; exclu: boolean; pasEncorePrete: boolean }
   | { type: "a_livrer"; commandeId: string; livraison: LivraisonAssignee }
   | { type: "deja_prise_autre"; numero: number; nomLivreur: string | null }
   | { type: "deja_livree"; numero: number };

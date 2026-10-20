@@ -1,5 +1,5 @@
 import "server-only";
-import type { RoleMetier } from "@3sauces/supabase";
+import type { RoleMetier, StatutCommande } from "@3sauces/supabase";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import { notifierPaiementConfirme, notifierLivraisonNonEffectuee } from "@/lib/notifications/paiement";
@@ -235,9 +235,6 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
   if (commande.statut === "annulee") {
     return { type: "annulee" };
   }
-  if (commande.statut === "en_attente" || commande.statut === "en_preparation") {
-    return { type: "pas_prete", numero: commande.numero };
-  }
 
   const livraisonAssignee: LivraisonAssignee = {
     id: commande.id,
@@ -253,7 +250,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
     modePaiement: commande.mode_paiement,
   };
 
-  if (commande.statut === "pret") {
+  if (commande.statut === "en_attente" || commande.statut === "en_preparation" || commande.statut === "pret") {
     if (livraison.livreur_id) {
       // Statut normalement impossible (l'attribution d'un livreur ne se
       // produit qu'au passage à "pris_par_livreur"), mais ne jamais planter
@@ -261,11 +258,17 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
       const nomLivreur = await nomProfil(supabase, livraison.livreur_id);
       return { type: "deja_prise_autre", numero: commande.numero, nomLivreur };
     }
+    // Prise en charge possible dès que le ticket existe, même avant que la
+    // cuisine n'ait cliqué "Prête" — le ticket (avec son QR) est agrafé au
+    // sachet dès l'impression, bien avant ce clic ; demande explicite du
+    // patron, 2026-10-20. `pasEncorePrete` permet juste d'avertir le livreur
+    // que la commande n'est peut-être pas encore physiquement terminée.
     return {
       type: "a_prendre",
       commandeId: commande.id,
       livraison: livraisonAssignee,
       exclu: livraison.livreur_exclu_id === livreurId,
+      pasEncorePrete: commande.statut !== "pret",
     };
   }
 
@@ -299,9 +302,14 @@ async function nomProfil(supabase: ReturnType<typeof createServiceSupabaseClient
  * lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour) laisserait
  * passer les deux en cas de course — demande explicite du patron,
  * 2026-10-19 : une seule mise à jour conditionnelle sur `commandes.statut`
- * (`WHERE statut = 'pret'`) décide qui gagne, le `UPDATE` ne retourne une
- * ligne QUE pour celui qui a vraiment changé le statut.
+ * décide qui gagne, le `UPDATE` ne retourne une ligne QUE pour celui qui a
+ * vraiment changé le statut. Accepte "en_attente"/"en_preparation"/"pret"
+ * (pas seulement "pret") : le ticket, avec son QR, est agrafé au sachet dès
+ * l'impression — un livreur peut légitimement le scanner avant même que la
+ * cuisine ait cliqué "Prête" (demande explicite du patron, 2026-10-20).
  */
+const STATUTS_AVANT_PRISE_EN_CHARGE: StatutCommande[] = ["en_attente", "en_preparation", "pret"];
+
 export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
   const { data: livraison, error } = await supabase
@@ -320,7 +328,7 @@ export async function prendreLivraisonParQrCode(qrCode: string, livreurId: strin
     .from("commandes")
     .update({ statut: "pris_par_livreur", statut_change_le: new Date().toISOString() })
     .eq("id", livraison.commande_id)
-    .eq("statut", "pret")
+    .in("statut", STATUTS_AVANT_PRISE_EN_CHARGE)
     .select("id")
     .maybeSingle();
   if (erreurClaim) {

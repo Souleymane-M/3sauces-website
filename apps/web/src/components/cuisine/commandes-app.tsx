@@ -146,6 +146,25 @@ interface CarteCommandeProps {
 }
 
 function CarteCommande({ commande, demanderChangement, demanderAnnulation }: CarteCommandeProps) {
+  const [detailOuvert, setDetailOuvert] = useState(false);
+  const [reimpressionEnCours, setReimpressionEnCours] = useState(false);
+  const [reimpressionFaite, setReimpressionFaite] = useState(false);
+
+  async function reimprimer() {
+    setReimpressionEnCours(true);
+    setReimpressionFaite(false);
+    try {
+      const res = await fetch("/api/cuisine/reimprimer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: commande.id }),
+      });
+      if (res.ok) setReimpressionFaite(true);
+    } finally {
+      setReimpressionEnCours(false);
+    }
+  }
+
   const statutSuivant = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
   // Depuis le 2026-10-15 : la cuisine ne désigne plus le livreur — le
   // ticket imprimé porte un QR que le livreur scanne lui-même à la prise
@@ -191,89 +210,96 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           {libellePalierGroupe(commande.palierGroupe)} 🚀
         </div>
       )}
-      <div className="flex items-baseline justify-between">
-        <span className="text-xl font-bold text-black">Commande #{commande.numero}</span>
-        <span className="text-base text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</span>
-      </div>
-      <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
-          {libelleCanal(commande.canal)}
-        </span>
-        <span className="text-base text-black">{LIBELLES_STATUT[commande.statut]}</span>
-      </div>
-      {commande.modePaiement === "stripe" && (
-        <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
-          <p className="text-lg font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
-          <p className="text-sm font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
+      <button type="button" onClick={() => setDetailOuvert((v) => !v)} className="w-full text-left">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xl font-bold text-black">
+            #{commande.numero} {commande.nom && `— ${commande.nom}`}
+          </span>
+          <span className="text-sm text-gray-400">{detailOuvert ? "▾" : "▸"}</span>
         </div>
-      )}
-      {commande.commandeAvance && !commande.ticketImprimeLe && (
-        <div className="mt-2 rounded bg-amber-100 p-2 text-sm font-semibold text-amber-900">
-          ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
+            {libelleCanal(commande.canal)}
+          </span>
+          <span className="text-base text-black">{LIBELLES_STATUT[commande.statut]}</span>
         </div>
-      )}
-      {commande.nom && (
-        <p className="mt-1 text-base text-black">
-          Client : {commande.nom}
-          {commande.telephone && ` — ${formaterTelephoneAffichage(commande.telephone)}`}
-        </p>
-      )}
-      {commande.canal === "livraison" && commande.adresse && (
-        <p className="mt-1 text-base text-black">Adresse : {commande.adresse}</p>
-      )}
+      </button>
 
-      <div className="mt-3 space-y-3">
-        {regrouperLignesParCategorie(commande.lignes).map((groupe) => (
-          <div key={groupe.categorie}>
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
-            <ul className="mt-1 space-y-2">
-              {groupe.lignes.map((ligne, i) => {
-                // Formule "composée" (menu/tacos/plat du jour) : mise en
-                // avant visuelle dès qu'il y a un vrai détail attaché
-                // (viande, boisson incluse...), pour la distinguer d'un
-                // article simple (une grillade seule, par exemple).
-                const estFormuleDetaillee =
-                  (groupe.categorie === "menu_special" ||
-                    groupe.categorie === "snacking" ||
-                    groupe.categorie === "plat_du_jour") &&
-                  detailLigne(ligne).length > 0;
-                return (
-                  <li key={i} className={`text-lg text-black ${estFormuleDetaillee ? "border-l-4 border-[#8B2020] pl-2" : ""}`}>
-                    <span className="font-semibold">
-                      {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
-                    </span>{" "}
-                    <span className="text-base text-gray-500">({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)</span>
-                    {detailLigne(ligne).map((detail, j) => (
-                      <div key={j} className="text-base text-gray-700">
-                        {detail}
-                      </div>
-                    ))}
-                  </li>
-                );
-              })}
-            </ul>
+      {detailOuvert && (
+        <div className="mt-2">
+          <p className="text-base text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</p>
+          <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
+          {commande.modePaiement === "stripe" && (
+            <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
+              <p className="text-lg font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+              <p className="text-sm font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
+            </div>
+          )}
+          {commande.commandeAvance && !commande.ticketImprimeLe && (
+            <div className="mt-2 rounded bg-amber-100 p-2 text-sm font-semibold text-amber-900">
+              ⚠️ Ticket pas encore imprimé — vérifie que /caisse est ouvert.
+            </div>
+          )}
+          {commande.telephone && (
+            <p className="mt-1 text-base text-black">{formaterTelephoneAffichage(commande.telephone)}</p>
+          )}
+          {commande.canal === "livraison" && commande.adresse && (
+            <p className="mt-1 text-base text-black">Adresse : {commande.adresse}</p>
+          )}
+
+          <div className="mt-3 space-y-3">
+            {regrouperLignesParCategorie(commande.lignes).map((groupe) => (
+              <div key={groupe.categorie}>
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
+                <ul className="mt-1 space-y-2">
+                  {groupe.lignes.map((ligne, i) => {
+                    // Formule "composée" (menu/tacos/plat du jour) : mise en
+                    // avant visuelle dès qu'il y a un vrai détail attaché
+                    // (viande, boisson incluse...), pour la distinguer d'un
+                    // article simple (une grillade seule, par exemple).
+                    const estFormuleDetaillee =
+                      (groupe.categorie === "menu_special" ||
+                        groupe.categorie === "snacking" ||
+                        groupe.categorie === "plat_du_jour") &&
+                      detailLigne(ligne).length > 0;
+                    return (
+                      <li key={i} className={`text-lg text-black ${estFormuleDetaillee ? "border-l-4 border-[#8B2020] pl-2" : ""}`}>
+                        <span className="font-semibold">
+                          {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+                        </span>{" "}
+                        <span className="text-base text-gray-500">({(ligne.prixUnitaire * ligne.quantite).toFixed(2)} €)</span>
+                        {detailLigne(ligne).map((detail, j) => (
+                          <div key={j} className="text-base text-gray-700">
+                            {detail}
+                          </div>
+                        ))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Montant réel déjà calculé en base (remises comprises) — jamais à
-          resommer les lignes de tête, qui donnerait le montant brut et non
-          ce qu'il faut vraiment faire payer. */}
-      {remiseCommande > 0.009 && (
-        <p className="mt-3 text-center text-base font-semibold text-[#2D5A27]">
-          🎁 Remise appliquée : -{remiseCommande.toFixed(2)} €
-        </p>
+          {/* Montant réel déjà calculé en base (remises comprises) — jamais à
+              resommer les lignes de tête, qui donnerait le montant brut et non
+              ce qu'il faut vraiment faire payer. */}
+          {remiseCommande > 0.009 && (
+            <p className="mt-3 text-center text-base font-semibold text-[#2D5A27]">
+              🎁 Remise appliquée : -{remiseCommande.toFixed(2)} €
+            </p>
+          )}
+          <p
+            className={
+              remiseCommande > 0.009
+                ? "mt-1 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
+                : "mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
+            }
+          >
+            Total : {commande.montant.toFixed(2)} €
+          </p>
+        </div>
       )}
-      <p
-        className={
-          remiseCommande > 0.009
-            ? "mt-1 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
-            : "mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black"
-        }
-      >
-        Total : {commande.montant.toFixed(2)} €
-      </p>
 
       {enAttenteScanLivreur && (
         <p className="mt-4 rounded bg-blue-50 py-3 text-center text-base font-semibold text-blue-700">
@@ -306,6 +332,14 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           </button>
         </div>
       )}
+      <button
+        type="button"
+        onClick={reimprimer}
+        disabled={reimpressionEnCours}
+        className="mt-2 w-full rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"
+      >
+        {reimpressionEnCours ? "…" : reimpressionFaite ? "🖨️ Renvoyé à l'imprimante" : "🖨️ Réimprimer (ticket perdu)"}
+      </button>
     </div>
   );
 }
@@ -323,6 +357,25 @@ interface CarteLivraisonEnCoursProps {
 
 function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonEnCoursProps) {
   const ancienne = estAncienne(livraison.creeLe);
+  const [detailOuvert, setDetailOuvert] = useState(false);
+  const [reimpressionEnCours, setReimpressionEnCours] = useState(false);
+  const [reimpressionFaite, setReimpressionFaite] = useState(false);
+
+  async function reimprimer() {
+    setReimpressionEnCours(true);
+    setReimpressionFaite(false);
+    try {
+      const res = await fetch("/api/cuisine/reimprimer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: livraison.id }),
+      });
+      if (res.ok) setReimpressionFaite(true);
+    } finally {
+      setReimpressionEnCours(false);
+    }
+  }
+
   return (
     <div
       className={`rounded-xl border-2 p-4 ${livraison.alerteSignalee ? "border-orange-500" : ancienne ? "border-red-600" : "border-gray-200"}`}
@@ -357,30 +410,49 @@ function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonE
           ⚠️ Depuis {formaterDepuis(livraison.creeLe)} — jamais clôturée
         </div>
       )}
-      <div className="flex items-baseline justify-between">
-        <span className="text-xl font-bold text-black">Commande #{livraison.numero}</span>
-        <span className="text-base text-black">Retrait : {formaterHeure(livraison.heureSouhaitee)}</span>
-      </div>
-      <p className="text-sm text-gray-500">Livreur : {livraison.livreurNom}</p>
-      {livraison.nom && (
-        <p className="mt-1 text-base text-black">
-          Client : {livraison.nom}
-          {livraison.telephone && ` — ${formaterTelephoneAffichage(livraison.telephone)}`}
-        </p>
+      <button type="button" onClick={() => setDetailOuvert((v) => !v)} className="w-full text-left">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xl font-bold text-black">
+            #{livraison.numero} {livraison.nom && `— ${livraison.nom}`}
+          </span>
+          <span className="text-sm text-gray-400">{detailOuvert ? "▾" : "▸"}</span>
+        </div>
+        <span className="mt-1 inline-block rounded bg-gray-200 px-2 py-1 text-base font-semibold text-black">
+          Livraison
+        </span>
+      </button>
+      <p className="mt-1 text-sm text-gray-500">Livreur : {livraison.livreurNom}</p>
+
+      {detailOuvert && (
+        <div className="mt-2">
+          <p className="text-base text-black">Retrait : {formaterHeure(livraison.heureSouhaitee)}</p>
+          {livraison.telephone && (
+            <p className="mt-1 text-base text-black">{formaterTelephoneAffichage(livraison.telephone)}</p>
+          )}
+          {livraison.adresse && <p className="mt-1 text-base text-black">Adresse : {livraison.adresse}</p>}
+          <div className="mt-2 space-y-1">
+            {regrouperLignesParCategorie(livraison.lignes).map((groupe) =>
+              groupe.lignes.map((ligne, i) => (
+                <p key={`${groupe.categorie}-${i}`} className="text-base text-black">
+                  {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
+                </p>
+              ))
+            )}
+          </div>
+          <p className="mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black">
+            {livraison.montant.toFixed(2)} €
+          </p>
+        </div>
       )}
-      {livraison.adresse && <p className="mt-1 text-base text-black">Adresse : {livraison.adresse}</p>}
-      <div className="mt-2 space-y-1">
-        {regrouperLignesParCategorie(livraison.lignes).map((groupe) =>
-          groupe.lignes.map((ligne, i) => (
-            <p key={`${groupe.categorie}-${i}`} className="text-base text-black">
-              {ligne.quantite * piecesParPaquet(ligne.nom)}x {nomSansMultiplicateur(ligne.nom)}
-            </p>
-          ))
-        )}
-      </div>
-      <p className="mt-3 rounded bg-gray-100 py-2 text-center text-xl font-extrabold text-black">
-        {livraison.montant.toFixed(2)} €
-      </p>
+
+      <button
+        type="button"
+        onClick={reimprimer}
+        disabled={reimpressionEnCours}
+        className="mt-2 w-full rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"
+      >
+        {reimpressionEnCours ? "…" : reimpressionFaite ? "🖨️ Renvoyé à l'imprimante" : "🖨️ Réimprimer (ticket perdu)"}
+      </button>
     </div>
   );
 }
