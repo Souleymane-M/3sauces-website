@@ -22,6 +22,23 @@ interface CommandeCuisineRestreinte {
   statutChangeLe: string | null;
 }
 
+// Colonne "En cours de livraison" — jamais de montant, nom, téléphone ni
+// adresse (cf. `/api/equipe/cuisine/commandes`). Lecture seule : le
+// relâchement/l'annulation d'une livraison en cours se fait depuis le
+// COMPTOIR ("Remettre en attente de livreur" / "Annuler (avec motif)"),
+// jamais depuis cuisine.
+interface LivraisonEnCoursRestreinte {
+  id: string;
+  numero: number;
+  lignes: LigneRestreinte[];
+  heureSouhaitee: string | null;
+  creeLe: string;
+  livreurNom: string;
+  alerteSignalee: boolean;
+  alerteNote: string | null;
+  alerteSignaleeLe: string | null;
+}
+
 function jourMayotte(iso: string): string {
   return new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(iso));
 }
@@ -34,8 +51,16 @@ function resumeLignes(lignes: LigneRestreinte[]): string {
   return lignes.map((l) => `${l.quantite}x ${l.nom}`).join(", ");
 }
 
+function formaterHeure(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", hour: "2-digit", minute: "2-digit" }).format(
+    new Date(iso)
+  );
+}
+
 export function CuisineView({ profilId, seuilAlerteMin }: { profilId: string; seuilAlerteMin: number }) {
   const [commandes, setCommandes] = useState<CommandeCuisineRestreinte[]>([]);
+  const [enLivraison, setEnLivraison] = useState<LivraisonEnCoursRestreinte[]>([]);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
@@ -49,6 +74,7 @@ export function CuisineView({ profilId, seuilAlerteMin }: { profilId: string; se
       if (res.ok) {
         const data = await res.json();
         setCommandes(data.commandes);
+        setEnLivraison(data.enLivraison ?? []);
       }
     } finally {
       enVol.current = false;
@@ -200,6 +226,29 @@ export function CuisineView({ profilId, seuilAlerteMin }: { profilId: string; se
             </div>
           );
         })}
+
+        <div className="flex-1">
+          <h2 className="mb-2 text-sm font-bold uppercase text-gray-500">En cours de livraison ({enLivraison.length})</h2>
+          <div className="space-y-3">
+            {enLivraison.map((l) => (
+              <div
+                key={l.id}
+                className={`rounded-lg border-2 p-3 ${l.alerteSignalee ? "border-orange-500" : "border-gray-200"}`}
+              >
+                {l.alerteSignalee && (
+                  <div className="mb-2 rounded bg-orange-100 p-2 text-sm font-semibold text-orange-800">
+                    🚨 Livreur signale un problème — préviens le comptoir
+                    {l.alerteSignaleeLe && ` (${formaterHeure(l.alerteSignaleeLe)})`}
+                  </div>
+                )}
+                <p className="font-bold text-black">#{String(l.numero).padStart(4, "0")}</p>
+                <p className="text-sm text-gray-700">{resumeLignes(l.lignes)}</p>
+                <p className="mt-1 text-xs text-gray-500">Livreur : {l.livreurNom}</p>
+              </div>
+            ))}
+            {enLivraison.length === 0 && <p className="text-sm text-gray-400">Aucune.</p>}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRoleMetier } from "@/lib/auth/get-session";
-import { listerCommandesActives, listerCommandesAVenir } from "@/lib/cuisine/commandes";
+import { listerCommandesActives, listerCommandesAVenir, listerLivraisonsEnCours } from "@/lib/cuisine/commandes";
 
 /**
  * Commandes pour la vue CUISINE de l'interface équipe unifiée — jamais de
@@ -17,7 +17,11 @@ export async function GET() {
   }
 
   try {
-    const [commandes, aVenir] = await Promise.all([listerCommandesActives(), listerCommandesAVenir()]);
+    const [commandes, aVenir, enLivraison] = await Promise.all([
+      listerCommandesActives(),
+      listerCommandesAVenir(),
+      listerLivraisonsEnCours(),
+    ]);
     const projeter = (liste: typeof commandes) =>
       liste.map((c) => ({
         id: c.id,
@@ -33,7 +37,22 @@ export async function GET() {
         ticketImprimeLe: c.ticketImprimeLe,
         statutChangeLe: c.statutChangeLe,
       }));
-    return NextResponse.json({ commandes: projeter(commandes), aVenir: projeter(aVenir) });
+    // Colonne "En cours de livraison" : jamais de montant, nom, téléphone ni
+    // adresse (contrairement à `LivraisonEnCours` complet, utilisé par
+    // l'écran historique `/commandes`) — même restriction que le reste de
+    // cette vue.
+    const enLivraisonProjetee = enLivraison.map((l) => ({
+      id: l.id,
+      numero: l.numero,
+      lignes: l.lignes,
+      heureSouhaitee: l.heureSouhaitee,
+      creeLe: l.creeLe,
+      livreurNom: l.livreurNom,
+      alerteSignalee: l.alerteSignalee,
+      alerteNote: l.alerteNote,
+      alerteSignaleeLe: l.alerteSignaleeLe,
+    }));
+    return NextResponse.json({ commandes: projeter(commandes), aVenir: projeter(aVenir), enLivraison: enLivraisonProjetee });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";
     return NextResponse.json({ error: message }, { status: 500 });
