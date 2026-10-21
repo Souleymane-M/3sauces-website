@@ -26,6 +26,13 @@ export interface CommandeHistorique {
   lignes: LigneCommande[];
   montant: number;
   modePaiement: ModePaiementCommande | null;
+  /**
+   * Vrai UNIQUEMENT si le paiement a réellement abouti — jamais déduit du
+   * seul `modePaiement === "stripe"` (ne reflète que le choix du client).
+   * Bug réel constaté le 2026-10-21, commande #455 : paiement Stripe
+   * abandonné affiché comme "déjà payé" sur cet écran précisément.
+   */
+  dejaPayee: boolean;
   /** Renseigné uniquement si la commande a été annulée. */
   motifAnnulation: string | null;
 }

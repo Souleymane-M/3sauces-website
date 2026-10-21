@@ -41,6 +41,7 @@ function versCommandeCuisine(c: {
   ticket_imprime_le: string | null;
   palier_groupe: string | null;
   mode_paiement: CommandeCuisine["modePaiement"];
+  paiement_statut: string | null;
   statut_change_le: string | null;
   commande_par: string | null;
 }): CommandeCuisine {
@@ -55,6 +56,7 @@ function versCommandeCuisine(c: {
     telephone: c.client_telephone,
     adresse: c.adresse_livraison,
     modePaiement: c.mode_paiement,
+    dejaPayee: c.paiement_statut === "paye",
     heureSouhaitee: c.heure_souhaitee,
     creeLe: c.created_at,
     nbPlats: c.nb_plats,

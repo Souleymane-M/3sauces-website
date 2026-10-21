@@ -271,10 +271,16 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
         <div className="mt-2">
           <p className="text-base text-black">Retrait : {formaterHeure(commande.heureSouhaitee)}</p>
           <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
-          {commande.modePaiement === "stripe" && (
+          {commande.dejaPayee && (
             <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
               <p className="text-lg font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
               <p className="text-sm font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
+            </div>
+          )}
+          {commande.modePaiement === "stripe" && !commande.dejaPayee && (
+            <div className="mt-2 rounded-lg border-2 border-red-600 bg-red-50 p-2 text-center">
+              <p className="text-lg font-extrabold text-red-700">⚠️ PAIEMENT EN LIGNE NON ABOUTI</p>
+              <p className="text-sm font-semibold text-red-700">Vérifie/encaisse avant de remettre — le client a choisi de payer en ligne mais ça n&apos;a jamais été confirmé.</p>
             </div>
           )}
           {commande.commandeAvance && !commande.ticketImprimeLe && (

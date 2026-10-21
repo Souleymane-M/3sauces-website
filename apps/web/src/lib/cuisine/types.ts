@@ -19,8 +19,15 @@ export interface CommandeCuisine {
   nom: string;
   telephone: string | null;
   adresse: string | null;
-  /** "stripe" = déjà réglée en ligne — rien à faire payer au client. */
   modePaiement: ModePaiementCommande | null;
+  /**
+   * Vrai UNIQUEMENT si le paiement en ligne a réellement abouti — jamais
+   * déduit du seul `modePaiement === "stripe"` (ne reflète que le choix du
+   * client, pas si Stripe a confirmé l'encaissement). Bug réel constaté le
+   * 2026-10-21, commande #455 : paiement Stripe abandonné affiché comme
+   * "déjà payé".
+   */
+  dejaPayee: boolean;
   heureSouhaitee: string | null;
   creeLe: string;
   nbPlats: number;

@@ -227,7 +227,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
           ))}
         </div>
         <p className="mt-2 text-lg font-bold text-gray-900">
-          {livraison.modePaiement === "stripe" ? "Déjà payée en ligne" : `À récupérer : ${montantDu.toFixed(2)} €`}
+          {livraison.dejaPayee ? "Déjà payée en ligne" : `À récupérer : ${montantDu.toFixed(2)} €`}
         </p>
       </div>
 
@@ -257,7 +257,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
         </>
       )}
 
-      {etat.type === "a_livrer" && livraison.modePaiement === "stripe" && (
+      {etat.type === "a_livrer" && livraison.dejaPayee && (
         <button
           type="button"
           onClick={() => declarer(commandeId, [])}
@@ -268,7 +268,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
         </button>
       )}
 
-      {etat.type === "a_livrer" && livraison.modePaiement !== "stripe" && (
+      {etat.type === "a_livrer" && !livraison.dejaPayee && (
         <div className="space-y-3">
           <p className="text-sm font-semibold text-gray-900">Comment le client a-t-il payé ?</p>
           <div className="grid grid-cols-3 gap-2">

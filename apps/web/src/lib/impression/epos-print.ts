@@ -422,9 +422,16 @@ function construireContenuTicketClient(
   b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
   b.ligne(formaterDateHeure(commande.creeLe), { align: "center", gras: false, taille: 1 });
 
-  if (commande.modePaiement === "stripe") {
+  if (commande.dejaPayee) {
     b.ligne("*** DEJA PAYEE EN LIGNE ***", { align: "center", gras: true, taille: 2 });
     b.ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
+  } else if (commande.modePaiement === "stripe") {
+    // Paiement en ligne choisi mais jamais confirmé (abandon de checkout) —
+    // ne devrait normalement jamais être imprimé (filtré en amont tant que
+    // non payé), mais jamais annoncer "déjà payé" sur la seule foi du mode
+    // choisi. Bug réel constaté le 2026-10-21, commande #455.
+    b.ligne("*** PAIEMENT EN LIGNE NON CONFIRME ***", { align: "center", gras: true, taille: 2 });
+    b.ligne("VERIFIER / ENCAISSER", { align: "center", gras: true, taille: 2 });
   }
 
   b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
@@ -460,8 +467,8 @@ function construireContenuTicketClient(
     b.ligne(`Tampons fidélité utilisés : -${remise.toFixed(2)} €`, { gras: true, taille: 1 });
   }
   b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
-  b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.modePaiement === "stripe", taille: 1 });
-  if (commande.modePaiement === "stripe") {
+  b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.dejaPayee, taille: 1 });
+  if (commande.dejaPayee) {
     b.ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
   }
 
@@ -517,8 +524,10 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   });
   b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
 
-  if (commande.modePaiement === "stripe") {
+  if (commande.dejaPayee) {
     b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
+  } else if (commande.modePaiement === "stripe") {
+    b.ligne("PAIEMENT EN LIGNE NON CONFIRME", { align: "center", gras: true, taille: 1 });
   }
   b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {

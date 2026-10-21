@@ -176,9 +176,14 @@ export function CommandesHistoriqueApp({
                       {libellePalierGroupe(c.palierGroupe)}
                     </span>
                   )}
-                  {c.modePaiement === "stripe" && (
+                  {c.dejaPayee && (
                     <span className="ml-2 rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-bold text-green-400">
                       ✅ DÉJÀ PAYÉE EN LIGNE
+                    </span>
+                  )}
+                  {c.modePaiement === "stripe" && !c.dejaPayee && (
+                    <span className="ml-2 rounded bg-red-900/40 px-1.5 py-0.5 text-xs font-bold text-red-400">
+                      ⚠️ PAIEMENT EN LIGNE NON ABOUTI
                     </span>
                   )}
                 </summary>

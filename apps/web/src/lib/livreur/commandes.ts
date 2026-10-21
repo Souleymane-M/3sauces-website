@@ -70,6 +70,7 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     nbPlats: c.nb_plats,
     palierGroupe: c.palier_groupe as PalierGroupe,
     modePaiement: c.mode_paiement,
+    dejaPayee: c.paiement_statut === "paye",
   }));
 
   // Les livraisons ayant atteint un palier "commande groupée" en
@@ -98,10 +99,14 @@ interface DeclarationLivraison {
  * cas où le livreur n'a jamais déclaré via l'app (filet de secours
  * caisse/patron).
  *
- * Une commande déjà réglée en ligne (Stripe, `mode_paiement === "stripe"`)
- * ne demande aucune déclaration de paiement : rien n'a été encaissé à la
- * livraison, `paiement_statut` est déjà "paye" — on se contente de marquer
- * la livraison faite, jamais de faire payer le client une seconde fois.
+ * Une commande déjà réglée en ligne (Stripe) ne demande aucune déclaration
+ * de paiement : rien n'a été encaissé à la livraison, `paiement_statut`
+ * est déjà "paye" — on se contente de marquer la livraison faite, jamais
+ * de faire payer le client une seconde fois. Vérifié sur `paiement_statut`
+ * ET `mode_paiement`, jamais sur `mode_paiement` seul : un paiement Stripe
+ * démarré puis abandonné a `mode_paiement: "stripe"` mais n'a jamais été
+ * réglé — bug réel constaté le 2026-10-21 (commande #455), qui aurait pu
+ * faire livrer gratuitement une commande jamais payée.
  */
 export async function declarerLivraison({ commandeId, livreurId, paiements }: DeclarationLivraison): Promise<void> {
   for (const p of paiements) {
@@ -114,7 +119,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
 
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
-    .select("id, montant, canal, statut, mode_paiement")
+    .select("id, montant, canal, statut, mode_paiement, paiement_statut")
     .eq("id", commandeId)
     .maybeSingle();
   if (erreurCommande || !commande) {
@@ -133,7 +138,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     throw new Error("Cette livraison n'est pas assignée à ce livreur.");
   }
 
-  if (commande.mode_paiement === "stripe") {
+  if (commande.mode_paiement === "stripe" && commande.paiement_statut === "paye") {
     await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
     return;
   }
@@ -224,7 +229,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .select(
-      "id, numero, statut, nom_livraison, adresse_livraison, client_telephone, montant, heure_souhaitee, contenu, nb_plats, palier_groupe, mode_paiement"
+      "id, numero, statut, nom_livraison, adresse_livraison, client_telephone, montant, heure_souhaitee, contenu, nb_plats, palier_groupe, mode_paiement, paiement_statut"
     )
     .eq("id", livraison.commande_id)
     .maybeSingle();
@@ -248,6 +253,7 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
     nbPlats: commande.nb_plats,
     palierGroupe: commande.palier_groupe as PalierGroupe,
     modePaiement: commande.mode_paiement,
+    dejaPayee: commande.paiement_statut === "paye",
   };
 
   if (commande.statut === "en_attente" || commande.statut === "en_preparation" || commande.statut === "pret") {

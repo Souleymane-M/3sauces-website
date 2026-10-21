@@ -62,7 +62,13 @@ export async function construireCommandesPourImpression(
       lignes: (c.contenu as LigneCommande[]) ?? [],
       montant: c.montant,
       modePaiement: c.mode_paiement ?? "especes",
-      dejaPayee: c.mode_paiement === "stripe" || c.paiement_statut === "paye",
+      // Jamais `mode_paiement === "stripe"` seul : ne reflète que le choix
+      // du client, pas si Stripe a confirmé l'encaissement (paiement
+      // abandonné en cours de route réellement constaté, commande #455,
+      // 2026-10-21). `paiement_statut === "paye"` couvre déjà tous les cas
+      // légitimes (sur place/à emporter payés à la création, Stripe
+      // confirmé par webhook).
+      dejaPayee: c.paiement_statut === "paye",
       nom: c.nom_livraison ?? "",
       adresse: c.adresse_livraison,
       heureSouhaitee: c.heure_souhaitee,

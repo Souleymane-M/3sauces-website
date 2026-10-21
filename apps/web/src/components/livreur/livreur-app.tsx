@@ -215,7 +215,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
               </div>
             )}
 
-            {livraison.modePaiement === "stripe" ? (
+            {livraison.dejaPayee ? (
               <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-3 text-center">
                 <p className="text-xl font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
                 <p className="text-base font-semibold text-[#2D5A27]">Rien à récupérer — ne rien demander au client</p>
@@ -231,7 +231,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
               </>
             )}
 
-            {!declaration && livraison.modePaiement === "stripe" && (
+            {!declaration && livraison.dejaPayee && (
               <button
                 onClick={() => envoyer(livraison, [])}
                 disabled={enCours === livraison.id}
@@ -241,7 +241,7 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
               </button>
             )}
 
-            {!declaration && livraison.modePaiement !== "stripe" && (
+            {!declaration && !livraison.dejaPayee && (
               <button
                 onClick={() => ouvrirDeclaration(livraison.id)}
                 className="mt-4 w-full rounded bg-[#8B2020] py-3 text-xl font-bold text-white"

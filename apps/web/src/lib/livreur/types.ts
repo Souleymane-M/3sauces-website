@@ -15,8 +15,18 @@ export interface LivraisonAssignee {
   nbPlats: number;
   /** Palier de l'offre "commande groupée" atteint à la soumission, null sinon. */
   palierGroupe: PalierGroupe;
-  /** "stripe" = déjà réglée en ligne — rien à encaisser, jamais redemander de paiement au client. */
   modePaiement: ModePaiementCommande | null;
+  /**
+   * Vrai UNIQUEMENT si le paiement en ligne a réellement abouti
+   * (`paiement_statut === "paye"`) — jamais déduit du seul `modePaiement
+   * === "stripe"`, qui ne reflète que le choix du client au moment de
+   * commander, pas si Stripe a confirmé l'encaissement (un paiement en
+   * ligne abandonné en cours de route a `modePaiement: "stripe"` mais
+   * n'a jamais été réglé). Bug réel constaté le 2026-10-21, commande
+   * #455 : un paiement Stripe jamais finalisé affiché comme "déjà payé"
+   * un peu partout dans l'app.
+   */
+  dejaPayee: boolean;
 }
 
 export interface PaiementDeclare {
