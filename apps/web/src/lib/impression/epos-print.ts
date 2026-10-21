@@ -444,7 +444,6 @@ function construireContenuTicketClient(
   imprimerBlocClient(b, commande);
   if (commande.canal === "livraison" && commande.qrCode) {
     b.brut(`<feed line="1"/>`);
-    b.ligne("Scan pour prendre/confirmer", { align: "center", gras: true, taille: 1 });
     b.brut(styleTexte({ align: "center" }));
     // Un lien, pas juste un code brut : le livreur scanne avec l'appareil
     // photo natif de son téléphone (pas d'app dédiée) et atterrit
