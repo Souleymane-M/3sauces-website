@@ -47,6 +47,21 @@ function minutesDepuis(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
 }
 
+/**
+ * Une commande très à l'avance ne doit pas clignoter juste pour être
+ * restée `seuilAlerteMin` sans action — seulement à l'approche réelle de
+ * l'heure prévue (demande explicite du patron, 2026-10-21). "Prête" n'est
+ * jamais concernée (une commande prête qui traîne est à traiter tout de
+ * suite, peu importe l'heure prévue) — géré au point d'appel.
+ */
+const SEUIL_PROXIMITE_HEURE_MIN = 45;
+
+function dansLaFenetreAlerte(heureSouhaitee: string | null): boolean {
+  if (!heureSouhaitee) return true;
+  const minutesAvant = (new Date(heureSouhaitee).getTime() - Date.now()) / 60000;
+  return minutesAvant <= SEUIL_PROXIMITE_HEURE_MIN;
+}
+
 function resumeLignes(lignes: LigneRestreinte[]): string {
   return lignes.map((l) => `${l.quantite}x ${l.nom}`).join(", ");
 }
@@ -171,7 +186,10 @@ export function CuisineView({ profilId, seuilAlerteMin }: { profilId: string; se
                 {liste.map((c) => {
                   const ancienne = jourMayotte(c.creeLe) !== aujourdhui;
                   const minutesEtape = minutesDepuis(c.statutChangeLe ?? c.creeLe);
-                  const enRetard = !ancienne && minutesEtape >= seuilAlerteMin;
+                  const enRetard =
+                    !ancienne &&
+                    minutesEtape >= seuilAlerteMin &&
+                    (col.statut === "pret" || dansLaFenetreAlerte(c.heureSouhaitee));
                   return (
                     <div
                       key={c.id}

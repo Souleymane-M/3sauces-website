@@ -1675,14 +1675,7 @@ export function CaisseApp({
               )}
               {nbArticles >= SEUIL_COMMANDE_PRIORITAIRE &&
                 (() => {
-                  if (groupeTropTard) {
-                    return (
-                      <p className="mt-2 text-sm font-semibold text-orange-600">
-                        Avantage (boisson offerte / priorité) non disponible après 11h — la commande peut quand
-                        même être enregistrée normalement.
-                      </p>
-                    );
-                  }
+                  if (groupeTropTard) return null;
                   // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
                   // la priorité reste propre à la livraison.
                   if (canal !== "livraison") {

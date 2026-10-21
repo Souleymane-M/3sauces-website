@@ -147,13 +147,7 @@ function BlocProgressionGroupe({
   }
   if (nbArticles < SEUIL_COMMANDE_PRIORITAIRE) return null;
 
-  if (groupeTropTard) {
-    return (
-      <p className="text-sm font-semibold text-orange-600">
-        Trop tard pour aujourd&apos;hui — cet avantage doit être débloqué avant 11h.
-      </p>
-    );
-  }
+  if (groupeTropTard) return null;
   // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
   // la priorité livraison, elle, reste propre à ce canal.
   if (canal !== "livraison") {

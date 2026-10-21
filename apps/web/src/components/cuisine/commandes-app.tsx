@@ -136,8 +136,25 @@ function formaterDepuis(iso: string): string {
 /** Minutes écoulées depuis le dernier changement de statut (remis à zéro à chaque étape, demande explicite du patron 2026-10-16) — 15 min sans action dans "En attente"/"En préparation"/"Prête" déclenche un bandeau discret, pas de son (contrairement à une nouvelle commande ou une livraison signalée : ça arriverait trop souvent en période de rush pour rester sonore sans lasser). */
 const SEUIL_RETARD_ETAPE_MIN = 15;
 
+/**
+ * Une commande "en attente"/"en préparation" passée très à l'avance (ex:
+ * retrait à 13h30, commandée à 8h15) ne doit jamais clignoter juste parce
+ * qu'elle est restée 15 min sans action — rien d'urgent tant qu'il reste
+ * des heures. Le clignotement ne devient pertinent qu'à l'approche réelle
+ * de l'heure prévue — demande explicite du patron, 2026-10-21. "Prête"
+ * n'est jamais concernée par cette fenêtre (une commande prête qui traîne
+ * est à traiter tout de suite, peu importe l'heure prévue).
+ */
+const SEUIL_PROXIMITE_HEURE_MIN = 45;
+
 function minutesDepuis(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+}
+
+function dansLaFenetreAlerte(heureSouhaitee: string | null): boolean {
+  if (!heureSouhaitee) return true;
+  const minutesAvant = (new Date(heureSouhaitee).getTime() - Date.now()) / 60_000;
+  return minutesAvant <= SEUIL_PROXIMITE_HEURE_MIN;
 }
 
 // Lecture pure (aucun Date.now(), aucune écriture) de l'identité persistée
@@ -190,7 +207,10 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
   const prioritaire = estPrioritaire(commande);
   const ancienne = estAncienne(commande.creeLe);
   const minutesDansEtape = minutesDepuis(commande.statutChangeLe ?? commande.creeLe);
-  const enRetard = !ancienne && minutesDansEtape >= SEUIL_RETARD_ETAPE_MIN;
+  const enRetard =
+    !ancienne &&
+    minutesDansEtape >= SEUIL_RETARD_ETAPE_MIN &&
+    (commande.statut === "pret" || dansLaFenetreAlerte(commande.heureSouhaitee));
   // Remise éventuelle (lancement et/ou récompense fidélité) : jamais
   // stockée telle quelle en base, déduite de l'écart entre la somme des
   // lignes et le montant réellement dû — pour que l'équipe voie que le
