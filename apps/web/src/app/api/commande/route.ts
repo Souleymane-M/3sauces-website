@@ -641,14 +641,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (montant < parametres.minimum_commande) {
-      return NextResponse.json(
-        {
-          error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} €. Choisis le retrait sur place en dessous de ce montant.`,
-        },
-        { status: 400 }
-      );
-    }
   }
 
   const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
@@ -718,6 +710,22 @@ export async function POST(request: Request) {
     // une seule remise à la fois : la récompense fidélité prime toujours
     // si le client l'utilise sur cette commande (branche ci-dessus).
     montantFinal = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
+  }
+
+  // Minimum de commande pour la livraison : vérifié sur le montant RÉEL à
+  // payer (après tampons/remise de lancement), jamais sur le montant brut
+  // du panier — sinon un client pourrait utiliser ses tampons pour faire
+  // tomber une livraison à 4-5€ réellement encaissés tout en gardant un
+  // panier brut au-dessus du seuil (bug réel constaté le 2026-10-21,
+  // commande #509 : 14,50€ bruts, 4,50€ nets après 10€ de tampons,
+  // livraison acceptée alors que le minimum est 8€).
+  if (body.canal === "livraison" && montantFinal < parametres.minimum_commande) {
+    return NextResponse.json(
+      {
+        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels tampons). Choisis le retrait sur place en dessous de ce montant.`,
+      },
+      { status: 400 }
+    );
   }
 
   // --- Création du client fidélité (idempotent) ---

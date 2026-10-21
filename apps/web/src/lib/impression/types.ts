@@ -34,4 +34,6 @@ export interface CommandePourImpression {
   messageDuMoment: string | null;
   /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
   origineCaisse: boolean;
+  /** Nombre de récompenses (10€ chacune) utilisées sur CETTE commande — jamais confondu avec le solde de tampons restant. */
+  tamponsUtilises: number;
 }

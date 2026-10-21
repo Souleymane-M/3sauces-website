@@ -488,7 +488,13 @@ export function CommandePubliqueApp({
   }
 
   const livraisonPossible = parametres.zonesActives.length > 0;
-  const minimumAtteint = total >= parametres.minimumCommande;
+  // Sur le montant réellement payé (après tampons fidélité), jamais le
+  // panier brut — sinon un client pourrait faire tomber une livraison à
+  // quelques euros réellement encaissés en utilisant ses tampons, tout en
+  // gardant un panier brut au-dessus du seuil (même vérification côté
+  // serveur, /api/commande).
+  const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
+  const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
 
   // Courte animation sur le panier sticky à chaque ajout — déclenchée
   // directement par l'action utilisateur (pas dans un effect, pour éviter

@@ -4,6 +4,7 @@ import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
 
 /**
  * Construction du XML ePOS-Print d'Epson pour les deux tickets (reçu
@@ -339,9 +340,22 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   b.ligne("10 tampons = 10€ offerts", { align: "center", gras: false, taille: 1 });
 
   if (commande.clientTelephone && commande.tamponsAffiches !== null) {
-    const tampon = commande.tamponsAffiches > 1 ? "tampons" : "tampon";
-    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon}`, { align: "center", gras: true, taille: 2 });
-    if (commande.recompenseDisponible) {
+    if (commande.tamponsUtilises > 0) {
+      const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
+      b.ligne(`✅ ${remise.toFixed(2)} € de tampons utilisés sur cette commande`, {
+        align: "center",
+        gras: true,
+        taille: 1,
+      });
+    }
+    // Solde APRÈS cette commande (jamais le solde encore non décrémenté en
+    // base au moment de l'impression, qui attend la confirmation du
+    // paiement) — sinon le ticket annonce encore la récompense qu'on vient
+    // d'utiliser dessus, contradictoire avec la ligne ci-dessus.
+    const tamponsRestants = Math.max(0, commande.tamponsAffiches - commande.tamponsUtilises * NB_TAMPONS_RECOMPENSE);
+    const tampon = tamponsRestants > 1 ? "tampons" : "tampon";
+    b.ligne(`Tu as ${tamponsRestants} ${tampon}`, { align: "center", gras: true, taille: 2 });
+    if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
   } else {
@@ -435,6 +449,16 @@ function construireContenuTicketClient(
   });
 
   separateur(b);
+  // Détail explicite dès qu'une récompense est utilisée — sinon le TOTAL
+  // affiché ne correspond jamais à la somme des articles listés plus haut,
+  // confusion réelle constatée le 2026-10-21 (commande #509 : articles à
+  // 14,50 €, "TOTAL : 4,50 €" sans aucune explication).
+  if (commande.tamponsUtilises > 0) {
+    const montantBrut = commande.lignes.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
+    const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
+    b.ligne(`SOUS-TOTAL : ${montantBrut.toFixed(2)} €`, { gras: false, taille: 1 });
+    b.ligne(`Tampons fidélité utilisés : -${remise.toFixed(2)} €`, { gras: true, taille: 1 });
+  }
   b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
   b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.modePaiement === "stripe", taille: 1 });
   if (commande.modePaiement === "stripe") {
