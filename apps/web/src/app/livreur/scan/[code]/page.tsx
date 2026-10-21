@@ -15,9 +15,14 @@ export default async function ScanLivraisonPage({ params }: { params: Promise<{ 
   // Avant même de proposer le PIN livreur : le client scanne son reçu une
   // fois la commande déjà livrée/remise/annulée bien plus souvent qu'un
   // livreur ne scanne un ticket légitime. Redirection sans aucun rendu
-  // interne, aucune information de commande, aucun champ PIN.
+  // interne, aucune information de commande, aucun champ PIN — vers la
+  // page "voir mes tampons" plutôt que l'accueil générique (demande
+  // explicite du patron, 2026-10-21) : elle reconnaît le client par cette
+  // livraison précise et, si son email n'est pas encore connu, le lui
+  // demande pour débloquer l'accès — objectif : récupérer le maximum
+  // d'emails au moment le plus naturel, juste après la livraison.
   if (await commandeDuQrCodeEstFinalisee(code)) {
-    redirect("https://3sauces.fr/?src=recu");
+    redirect(`https://3sauces.fr/fidelite/voir?code=${code}`);
   }
 
   const session = await requireRole(["livreur"]);
