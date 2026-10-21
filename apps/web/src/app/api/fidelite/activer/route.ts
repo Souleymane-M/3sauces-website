@@ -4,7 +4,7 @@ import { normaliserEmail } from "@/lib/email";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import { activerEmailParQrLivraison } from "@/lib/fidelite/activation";
 
-/** Enregistre l'email du client sur la page "voir mes tampons" post-livraison, cf. `activerEmailParQrLivraison`. */
+/** Enregistre l'email du client sur la page "voir mes tampons" post-livraison — le téléphone est revérifié ici aussi, cf. `activerEmailParQrLivraison`. */
 export async function POST(request: Request) {
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for") ?? "local";
@@ -12,15 +12,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
 
-  const body = (await request.json().catch(() => null)) as { code?: string; email?: string } | null;
+  const body = (await request.json().catch(() => null)) as { code?: string; telephone?: string; email?: string } | null;
   const code = typeof body?.code === "string" ? body.code : null;
+  const telephone = typeof body?.telephone === "string" ? body.telephone : null;
   const email = normaliserEmail(body?.email ?? "");
-  if (!code || !email) {
+  if (!code || !telephone || !email) {
     return NextResponse.json({ error: "Email invalide." }, { status: 400 });
   }
 
   try {
-    const activation = await activerEmailParQrLivraison(code, email);
+    const activation = await activerEmailParQrLivraison(code, telephone, email);
     return NextResponse.json(activation);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";

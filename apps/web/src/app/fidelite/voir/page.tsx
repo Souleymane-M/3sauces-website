@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { chargerActivationParQrLivraison } from "@/lib/fidelite/activation";
+import { codeLivraisonExiste } from "@/lib/fidelite/activation";
 import { VoirTamponsApp } from "@/components/fidelite/voir-tampons-app";
 
 export const metadata: Metadata = {
@@ -12,9 +12,9 @@ interface VoirTamponsPageProps {
 
 export default async function VoirTamponsPage({ searchParams }: VoirTamponsPageProps) {
   const { code } = await searchParams;
-  const activation = code ? await chargerActivationParQrLivraison(code) : null;
+  const codeValide = code ? await codeLivraisonExiste(code) : false;
 
-  if (!activation || !code) {
+  if (!codeValide || !code) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white p-8 text-center">
         <p className="text-4xl">🎁</p>
@@ -29,7 +29,7 @@ export default async function VoirTamponsPage({ searchParams }: VoirTamponsPageP
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-white p-8">
-      <VoirTamponsApp code={code} activationInitiale={activation} />
+      <VoirTamponsApp code={code} />
     </main>
   );
 }
