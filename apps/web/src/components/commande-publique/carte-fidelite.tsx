@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
@@ -19,7 +19,7 @@ interface IdentiteStockee {
   email: string;
 }
 
-type Etape = "saisie" | "verifie" | "nouveau_client";
+type Etape = "saisie" | "verifie" | "nouveau_client" | "email_manquant";
 
 interface CarteFideliteProps {
   montantPanier: number;
@@ -61,6 +61,7 @@ export function CarteFidelite({
   const [emailSaisi, setEmailSaisi] = useState("");
   const [solde, setSolde] = useState<SoldeTampons | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const [enCoursLiaison, setEnCoursLiaison] = useState(false);
   const dejaMonte = useRef(false);
   const derniereIdentiteVerifiee = useRef<string | null>(null);
 
@@ -83,6 +84,64 @@ export function CarteFidelite({
       }
     });
   }, []);
+
+  const appliquerSucces = useCallback(
+    (
+      data: {
+        tamponsDisponibles: number;
+        prochaineExpiration: string | null;
+        montantCumule: number;
+        nom: string | null;
+        prenom: string | null;
+        derniereAdresseLivraison: string | null;
+        derniereZoneLivraison: string | null;
+      },
+      telephone: string,
+      email: string
+    ) => {
+      setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
+      try {
+        localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
+      } catch {
+        // Rien de bloquant : juste pas de pré-remplissage la prochaine fois.
+      }
+      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
+      onPrefillIdentite({
+        telephone,
+        email,
+        nom: data.nom ?? null,
+        prenom: data.prenom ?? null,
+        adresse: data.derniereAdresseLivraison ?? null,
+        zone: data.derniereZoneLivraison ?? null,
+      });
+      setEtape("verifie");
+    },
+    [onSoldeVerifie, onPrefillIdentite]
+  );
+
+  // Un numéro doit toujours être lié à un email pour voir/utiliser ses
+  // tampons (demande explicite du patron, 2026-10-21) : un numéro déjà
+  // connu mais sans email associé (commande en caisse, email facultatif)
+  // n'est jamais traité comme "nouveau client" — on propose de lier
+  // l'email tapé ici à ce numéro.
+  async function lierEmail() {
+    const telephone = normaliserTelephone(telephoneSaisi);
+    const email = normaliserEmail(emailSaisi);
+    if (!telephone || !email) return;
+    setEnCoursLiaison(true);
+    try {
+      const reponse = await fetch("/api/fidelite/lier-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telephone, email }),
+      });
+      const data = await reponse.json();
+      if (!reponse.ok) return;
+      appliquerSucces(data, telephone, email);
+    } finally {
+      setEnCoursLiaison(false);
+    }
+  }
 
   // Vérification automatique dès que les deux champs sont valides — jamais
   // besoin de cliquer sur un bouton pour voir ses tampons. Re-déclenche si
@@ -112,29 +171,17 @@ export function CarteFidelite({
 
         if (!reponse.ok) {
           // Jamais un message alarmant : la très grande majorité des échecs
-          // ici sont simplement un premier client, pas une vraie erreur.
+          // ici sont simplement un premier client, pas une vraie erreur —
+          // sauf le cas "numéro connu, email pas encore lié", distingué
+          // explicitement pour proposer de le lier plutôt que de prétendre
+          // qu'il n'y a pas de compte.
           setSolde(null);
-          setEtape("nouveau_client");
+          setEtape(data.raison === "email_manquant" ? "email_manquant" : "nouveau_client");
           onSoldeVerifie(false);
           return;
         }
 
-        setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
-        try {
-          localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
-        } catch {
-          // Rien de bloquant : juste pas de pré-remplissage la prochaine fois.
-        }
-        onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
-        onPrefillIdentite({
-          telephone,
-          email,
-          nom: data.nom ?? null,
-          prenom: data.prenom ?? null,
-          adresse: data.derniereAdresseLivraison ?? null,
-          zone: data.derniereZoneLivraison ?? null,
-        });
-        setEtape("verifie");
+        appliquerSucces(data, telephone, email);
       } catch {
         // Échec réseau : on ne bloque rien, le client peut continuer à taper.
       } finally {
@@ -145,7 +192,7 @@ export function CarteFidelite({
       annule = true;
       clearTimeout(minuteur);
     };
-  }, [telephoneSaisi, emailSaisi, onSoldeVerifie, onPrefillIdentite]);
+  }, [telephoneSaisi, emailSaisi, onSoldeVerifie, appliquerSucces]);
 
   const maxUtilisable = Math.min(solde?.nombre ?? 0, Math.floor(montantPanier / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxUtilisable);
@@ -177,6 +224,23 @@ export function CarteFidelite({
           Pas encore de compte avec ces infos — pas de souci, remplis le reste du formulaire, tout sera enregistré
           pour la prochaine fois.
         </p>
+      )}
+
+      {etape === "email_manquant" && (
+        <div className="mt-2 rounded border border-[#8B2020]/30 bg-white p-2">
+          <p className="text-xs text-gray-700">
+            On connaît ce numéro, mais aucun email n&apos;y est encore associé — nécessaire pour voir et utiliser tes
+            tampons.
+          </p>
+          <button
+            type="button"
+            onClick={lierEmail}
+            disabled={enCoursLiaison}
+            className="mt-2 rounded bg-[#8B2020] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {enCoursLiaison ? "…" : `Associer ${emailSaisi.trim()} à ce numéro`}
+          </button>
+        </div>
       )}
 
       {etape === "verifie" && solde && (

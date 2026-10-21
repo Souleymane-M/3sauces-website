@@ -41,10 +41,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
-  // Même message générique que le numéro soit inconnu ou que l'email ne
-  // corresponde pas — jamais révéler laquelle des deux infos est fausse.
-  if (!data || !data.email || data.email.toLowerCase() !== email) {
+  // Numéro totalement inconnu, ou email qui ne correspond pas à un numéro
+  // qui EN A un : même message générique, jamais révéler laquelle des deux
+  // infos est fausse.
+  if (!data || (data.email && data.email.toLowerCase() !== email)) {
     return NextResponse.json({ error: "Numéro de téléphone ou email incorrect." }, { status: 404 });
+  }
+
+  // Le numéro existe mais n'a jamais eu d'email associé (commande en
+  // caisse, email facultatif) : jamais traité comme "numéro inconnu" —
+  // l'historique (tampons) existe déjà, juste pas encore relié à un email.
+  // Demande explicite du patron, 2026-10-21 : un numéro doit être lié à un
+  // email pour voir/utiliser ses tampons, donc on propose de le lier ici
+  // plutôt que de prétendre qu'il n'y a pas de compte.
+  if (!data.email) {
+    return NextResponse.json({ error: "Email pas encore associé à ce numéro.", raison: "email_manquant" }, { status: 404 });
   }
 
   const tampons = await compterTamponsDisponibles(supabase, telephone);
