@@ -591,13 +591,11 @@ export function CaisseApp({
   // les paliers ci-dessous. Voir `compterPlatsPourPalier` côté serveur.
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
   const livraisonPossible = parametres.zonesActives.length > 0;
-  const minimumAtteint = total >= parametres.minimumCommande;
   const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
   const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
-  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
   // nombre de tampons choisis (ex: article retiré), le nombre effectif
@@ -617,6 +615,11 @@ export function CaisseApp({
   const remiseRecompenseEffective = nbTamponsEffectif * MONTANT_RECOMPENSE;
   const totalApresRemises =
     total - (remiseLancementEligible ? MONTANT_REMISE_LANCEMENT : 0) - remiseRecompenseEffective;
+  // Sur le montant réellement encaissé (après tampons/remise), jamais le
+  // panier brut — même correctif que /api/commande et /api/caisse/commandes,
+  // cf. commande #509, 2026-10-21.
+  const minimumAtteint = totalApresRemises >= parametres.minimumCommande;
+  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {

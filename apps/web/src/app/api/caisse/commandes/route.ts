@@ -576,14 +576,6 @@ export async function POST(request: Request) {
     if (!zone || !communesActives.has(zone)) {
       return NextResponse.json({ error: "Zone de livraison invalide." }, { status: 400 });
     }
-    if (montant < parametres.minimum_commande) {
-      return NextResponse.json(
-        {
-          error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} €.`,
-        },
-        { status: 400 }
-      );
-    }
   }
 
   const nbTamponsDemandes = typeof body.nbTampons === "number" ? Math.floor(body.nbTampons) : 0;
@@ -595,6 +587,18 @@ export async function POST(request: Request) {
     }
     tamponsUtilises = nbTamponsDemandes;
     montant = Math.round((montantBrut - tamponsUtilises * MONTANT_RECOMPENSE) * 100) / 100;
+  }
+
+  // Minimum de commande pour la livraison : vérifié sur le montant RÉEL à
+  // payer (après tampons), jamais sur le montant brut du panier — même
+  // correctif que /api/commande, cf. commande #509, 2026-10-21.
+  if (body.canal === "livraison" && montant < parametres.minimum_commande) {
+    return NextResponse.json(
+      {
+        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels tampons).`,
+      },
+      { status: 400 }
+    );
   }
 
   // Le trigger DB `commandes_appliquer_fidelite` crée le client automatiquement,
