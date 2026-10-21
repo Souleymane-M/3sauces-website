@@ -6,17 +6,10 @@ import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 import { MONTANT_RECOMPENSE, messageSoldeFidelite } from "@/lib/fidelite/regles";
 
-const CLE_LOCALSTORAGE = "3sauces_fidelite_identite";
-
 interface SoldeTampons {
   nombre: number;
   prochaineExpiration: string | null;
   montantCumule: number;
-}
-
-interface IdentiteStockee {
-  telephone: string;
-  email: string;
 }
 
 type Etape = "saisie" | "verifie" | "nouveau_client" | "email_manquant";
@@ -62,28 +55,7 @@ export function CarteFidelite({
   const [solde, setSolde] = useState<SoldeTampons | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [enCoursLiaison, setEnCoursLiaison] = useState(false);
-  const dejaMonte = useRef(false);
   const derniereIdentiteVerifiee = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (dejaMonte.current) return;
-    dejaMonte.current = true;
-    // Différé en microtâche, jamais un setState synchrone dans l'effet lui-même.
-    queueMicrotask(() => {
-      try {
-        const brut = localStorage.getItem(CLE_LOCALSTORAGE);
-        if (!brut) return;
-        const identite = JSON.parse(brut) as IdentiteStockee;
-        if (identite.telephone && identite.email) {
-          setTelephoneSaisi(identite.telephone);
-          setEmailSaisi(identite.email);
-        }
-      } catch {
-        // localStorage indisponible (navigation privée stricte, quota) : on
-        // dégrade simplement vers des champs vides, jamais bloquant.
-      }
-    });
-  }, []);
 
   const appliquerSucces = useCallback(
     (
@@ -100,11 +72,6 @@ export function CarteFidelite({
       email: string
     ) => {
       setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
-      try {
-        localStorage.setItem(CLE_LOCALSTORAGE, JSON.stringify({ telephone, email }));
-      } catch {
-        // Rien de bloquant : juste pas de pré-remplissage la prochaine fois.
-      }
       onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
       onPrefillIdentite({
         telephone,
