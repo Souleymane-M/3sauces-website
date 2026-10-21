@@ -274,6 +274,7 @@ export interface Database {
           utilise: boolean;
           commande_obtention_id: string | null;
           commande_utilisation_id: string | null;
+          commande_reservation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -284,6 +285,7 @@ export interface Database {
           utilise?: boolean;
           commande_obtention_id?: string | null;
           commande_utilisation_id?: string | null;
+          commande_reservation_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["fidelite_tampons"]["Insert"]>;
         Relationships: [];
@@ -596,6 +598,10 @@ export interface Database {
       corriger_telephone_client: {
         Args: { ancien: string; nouveau: string };
         Returns: void;
+      };
+      reserver_tampons_fidelite: {
+        Args: { p_telephone: string; p_nombre: number; p_commande_id: string };
+        Returns: number;
       };
     };
     Enums: {};

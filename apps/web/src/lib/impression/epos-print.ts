@@ -4,7 +4,7 @@ import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
-import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 
 /**
  * Construction du XML ePOS-Print d'Epson pour les deux tickets (reçu
@@ -348,13 +348,12 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
         taille: 1,
       });
     }
-    // Solde APRÈS cette commande (jamais le solde encore non décrémenté en
-    // base au moment de l'impression, qui attend la confirmation du
-    // paiement) — sinon le ticket annonce encore la récompense qu'on vient
-    // d'utiliser dessus, contradictoire avec la ligne ci-dessus.
-    const tamponsRestants = Math.max(0, commande.tamponsAffiches - commande.tamponsUtilises * NB_TAMPONS_RECOMPENSE);
-    const tampon = tamponsRestants > 1 ? "tampons" : "tampon";
-    b.ligne(`Tu as ${tamponsRestants} ${tampon}`, { align: "center", gras: true, taille: 2 });
+    // `tamponsAffiches` exclut déjà tout tampon réservé par cette commande
+    // (cf. `compterTamponsDisponibles`, `reserver_tampons_fidelite`) — ne
+    // jamais soustraire une seconde fois ici, ce serait compter la remise
+    // deux fois.
+    const tampon = commande.tamponsAffiches > 1 ? "tampons" : "tampon";
+    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon}`, { align: "center", gras: true, taille: 2 });
     if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }

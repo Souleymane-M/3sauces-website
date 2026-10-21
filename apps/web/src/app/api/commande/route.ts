@@ -802,6 +802,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Verrouille les tampons demandés au profit de CETTE commande, pour
+  // qu'ils ne puissent plus être proposés à une autre pendant que celle-ci
+  // attend son paiement (cf. migration 20261021090000, commande #509,
+  // 2026-10-21). Échec improbable (course entre deux commandes du même
+  // client au même instant) : on annule tout plutôt que de laisser une
+  // commande avec moins de tampons que ce qui a été affiché au client.
+  if (tamponsUtilises > 0) {
+    const { data: nbReserves, error: erreurReservation } = await supabase.rpc("reserver_tampons_fidelite", {
+      p_telephone: telephone,
+      p_nombre: tamponsUtilises,
+      p_commande_id: commande.id,
+    });
+    if (erreurReservation || nbReserves !== tamponsUtilises) {
+      console.error(
+        "[/api/commande] échec réservation tampons, annulation de la commande :",
+        erreurReservation?.message ?? `réservés: ${nbReserves}/${tamponsUtilises}`
+      );
+      await supabase.from("commandes").delete().eq("id", commande.id);
+      if (stockAVerifier.size > 0) {
+        await supabase.rpc("incrementer_stocks_produits", {
+          items: [...stockAVerifier.entries()].map(([produitId, quantite]) => ({ produitId, quantite })),
+        });
+      }
+      return NextResponse.json(
+        { error: "Tes tampons fidélité viennent d'être utilisés ailleurs — recharge la page et réessaie." },
+        { status: 409 }
+      );
+    }
+  }
+
   // QR de suivi livreur (Module 2, flash départ cuisine / flash arrivée
   // client — cf. supabase/migrations/20260830100600_livraisons.sql) : posé
   // ici pour que le ticket imprimé côté caisse ait un vrai QR, jamais un

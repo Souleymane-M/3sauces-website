@@ -10,6 +10,12 @@ import { progressionTampons } from "./regles";
  * par un job planifié qui les ferait "expirer" activement. Source unique
  * réutilisée par /api/caisse/clients, /api/fidelite/solde, /patron et les
  * emails, pour ne jamais avoir deux endroits qui comptent différemment.
+ *
+ * Exclut aussi tout tampon RÉSERVÉ par une commande non encore payée
+ * (`commande_reservation_id`, posé par `reserver_tampons_fidelite` à la
+ * création d'une commande qui en demande) — sinon le même tampon pourrait
+ * être proposé à une seconde commande pendant que la première attend
+ * d'être payée. Bug réel constaté le 2026-10-21, commande #509.
  */
 export async function compterTamponsDisponibles(
   supabase: SupabaseClient<Database>,
@@ -20,6 +26,7 @@ export async function compterTamponsDisponibles(
     .select("date_expiration")
     .eq("client_telephone", telephone)
     .eq("utilise", false)
+    .is("commande_reservation_id", null)
     .gt("date_expiration", new Date().toISOString())
     .order("date_expiration", { ascending: true });
 

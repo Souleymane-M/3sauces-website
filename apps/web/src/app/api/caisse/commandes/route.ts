@@ -700,6 +700,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Verrouille les tampons demandés au profit de CETTE commande — jamais
+  // nécessaire si elle est payée immédiatement (`encaisserMaintenant`) :
+  // le trigger de fidélité consomme alors déjà les bons tampons de façon
+  // atomique dans la même transaction que l'insertion, rien à protéger
+  // d'une commande concurrente puisqu'il n'y a aucun délai d'attente.
+  // Cf. migration 20261021090000, commande #509, 2026-10-21.
+  if (tamponsUtilises > 0 && paiementStatut === "non_paye") {
+    const { data: nbReserves, error: erreurReservation } = await supabase.rpc("reserver_tampons_fidelite", {
+      p_telephone: clientTelephone,
+      p_nombre: tamponsUtilises,
+      p_commande_id: commande.id,
+    });
+    if (erreurReservation || nbReserves !== tamponsUtilises) {
+      console.error(
+        "[/api/caisse/commandes] échec réservation tampons, annulation de la commande :",
+        erreurReservation?.message ?? `réservés: ${nbReserves}/${tamponsUtilises}`
+      );
+      await supabase.from("commandes").delete().eq("id", commande.id);
+      if (stockAVerifier.size > 0) {
+        await supabase.rpc("incrementer_stocks_produits", {
+          items: [...stockAVerifier.entries()].map(([produitId, quantite]) => ({ produitId, quantite })),
+        });
+      }
+      return NextResponse.json(
+        { error: "Les tampons fidélité de ce client viennent d'être utilisés ailleurs — relance la commande." },
+        { status: 409 }
+      );
+    }
+  }
+
   // QR de suivi livreur (Module 2) : même logique que /api/commande — posé
   // ici pour que le ticket imprimé ait un vrai QR pour une livraison prise
   // au téléphone par la caisse, jamais un jeton décoratif. Un échec ici ne
