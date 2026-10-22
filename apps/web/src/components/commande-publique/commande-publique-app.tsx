@@ -889,8 +889,6 @@ export function CommandePubliqueApp({
     document.getElementById("panier-recap")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint);
-
   async function commander() {
     setErreur(null);
 
@@ -900,6 +898,13 @@ export function CommandePubliqueApp({
     }
     if (modeCommande === "groupee" && nbPlatsValides < SEUIL_MINIMUM_GROUPE) {
       setErreur("Ajoutez au moins 2 plats pour une commande groupée, ou repassez en commande simple.");
+      return;
+    }
+    if (
+      palierGroupeReel === "GROUPE_4" &&
+      boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes
+    ) {
+      setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
     if (modeCommande === "groupee") {
@@ -945,6 +950,10 @@ export function CommandePubliqueApp({
       return;
     }
     if (canal === "livraison") {
+      if (!livraisonPossible) {
+        setErreur("La livraison n'est pas disponible pour le moment — choisis sur place ou à emporter.");
+        return;
+      }
       if (!adresse.trim()) {
         setErreur("Indique ton adresse de livraison.");
         return;
@@ -1687,12 +1696,12 @@ export function CommandePubliqueApp({
                 )}
               </div>
 
-              <label className="flex items-start gap-2 text-xs text-gray-600">
+              <label className="flex items-start gap-3 text-xs text-gray-600">
                 <input
                   type="checkbox"
                   checked={accepteCgv}
                   onChange={(e) => setAccepteCgv(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0"
+                  className="mt-0.5 h-6 w-6 shrink-0"
                 />
                 <span>
                   J&apos;accepte les{" "}
@@ -1711,15 +1720,7 @@ export function CommandePubliqueApp({
 
               <button
                 onClick={commander}
-                disabled={
-                  envoiEnCours ||
-                  canalLivraisonBloque ||
-                  !accepteCgv ||
-                  nbArticles === 0 ||
-                  (modeCommande === "groupee" && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
-                  (palierGroupeReel === "GROUPE_4" &&
-                    boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes)
-                }
+                disabled={envoiEnCours || nbArticles === 0}
                 className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
               >
                 {envoiEnCours ? "Envoi…" : "Commander"}
