@@ -359,6 +359,14 @@ export async function marquerDernierTicketRemisImprime(): Promise<void> {
  * dans la file de `listerCommandesDuJourAImprimer`, et l'imprimante
  * (Server Direct Print, sondage ~5s) l'imprime au cycle suivant — les 2
  * tickets (client + cuisine) ensemble, comme à la création.
+ *
+ * Force aussi `imprimer_ticket_client` à vrai : ce bouton existe
+ * précisément pour redonner un reçu au client, donc même si la case avait
+ * été décochée à la création, une demande explicite de réimpression doit
+ * toujours inclure le ticket client — sinon rien ne ressort pour lui, et
+ * seul le bon de cuisine repart (bug réel constaté le 2026-10-22, commande
+ * #559 : la case avait été décochée en caisse, et la réimpression côté
+ * cuisine la respectait encore silencieusement).
  */
 export async function demanderReimpressionTicket(commandeId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
@@ -376,7 +384,7 @@ export async function demanderReimpressionTicket(commandeId: string): Promise<vo
 
   const { error } = await supabase
     .from("commandes")
-    .update({ ticket_imprime_le: null, ticket_remis_le: null })
+    .update({ ticket_imprime_le: null, ticket_remis_le: null, imprimer_ticket_client: true })
     .eq("id", commandeId);
   if (error) {
     throw new Error(`Impossible de redemander l'impression : ${error.message}`);
