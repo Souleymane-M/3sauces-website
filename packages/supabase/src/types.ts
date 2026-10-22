@@ -324,6 +324,7 @@ export interface Database {
           palier_groupe: string | null;
           motif_annulation: string | null;
           statut_change_le: string | null;
+          imprimer_ticket_client: boolean;
         };
         Insert: {
           id?: string;
@@ -355,6 +356,7 @@ export interface Database {
           palier_groupe?: string | null;
           motif_annulation?: string | null;
           statut_change_le?: string | null;
+          imprimer_ticket_client?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];

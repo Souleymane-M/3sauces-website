@@ -456,6 +456,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Mode de paiement invalide." }, { status: 400 });
   }
 
+  // Choix fait en caisse uniquement : le ticket client peut être sauté
+  // (ex: client qui ne veut pas de papier), mais jamais le bon de cuisine.
+  // Absent/mal formé = imprimé par défaut, aucun changement de comportement.
+  const imprimerTicketClient = body.imprimerTicketClient !== false;
+
   // Nom et téléphone sont obligatoires pour tous les canaux, comme sur le
   // site public (/api/commande) : jamais de vente anonyme, y compris au
   // comptoir.
@@ -695,6 +700,7 @@ export async function POST(request: Request) {
       heure_souhaitee: heureSouhaitee.toISOString(),
       nb_plats: nbPlats,
       palier_groupe: palierGroupe,
+      imprimer_ticket_client: imprimerTicketClient,
     })
     .select("id, numero")
     .single();

@@ -105,6 +105,8 @@ export interface CreerCommandePayload {
   date?: string;
   /** Sur place/à emporter uniquement, pour aujourd'hui : le client est présent et paie tout de suite. Toujours ignoré pour une livraison ou une commande à l'avance (forcément "non_paye"). */
   encaisserMaintenant?: boolean;
+  /** Faux = ne jamais imprimer le ticket client (reçu) pour cette commande — le bon de cuisine n'est jamais concerné. Absent = imprimé (comportement par défaut). */
+  imprimerTicketClient?: boolean;
 }
 
 /**

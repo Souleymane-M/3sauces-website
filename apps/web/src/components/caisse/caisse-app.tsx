@@ -390,6 +390,10 @@ export function CaisseApp({
   const paiementImmediatPossible = canal !== null && canal !== "livraison" && !commandeAvance;
   const encaisserEffectif = paiementImmediatPossible && encaisserMaintenant;
 
+  // Choix du client au comptoir : certains ne veulent pas de papier. Le
+  // bon de cuisine, lui, n'est jamais concerné par cette case.
+  const [imprimerTicketClient, setImprimerTicketClient] = useState(true);
+
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
     const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
@@ -1237,6 +1241,7 @@ export function CaisseApp({
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
+          imprimerTicketClient,
         }),
       });
       const data = await reponse.json();
@@ -1266,6 +1271,7 @@ export function CaisseApp({
       setCanal(null);
       setDateCommande(datesOuvertes[0] ?? aujourdHui);
       setEncaisserMaintenant(true);
+      setImprimerTicketClient(true);
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -2068,6 +2074,18 @@ export function CaisseApp({
                 </p>
               )}
             </div>
+
+            {!enModeEdition && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={imprimerTicketClient}
+                  onChange={(e) => setImprimerTicketClient(e.target.checked)}
+                  className="h-5 w-5"
+                />
+                Imprimer le ticket client (le bon de cuisine s&apos;imprime toujours)
+              </label>
+            )}
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 

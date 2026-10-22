@@ -36,4 +36,6 @@ export interface CommandePourImpression {
   origineCaisse: boolean;
   /** Nombre de récompenses (10€ chacune) utilisées sur CETTE commande — jamais confondu avec le solde de tampons restant. */
   tamponsUtilises: number;
+  /** Faux = le ticket client (reçu) n'est jamais envoyé à l'impression — choix fait en caisse. Le bon de cuisine n'est jamais concerné. */
+  imprimerTicketClient: boolean;
 }

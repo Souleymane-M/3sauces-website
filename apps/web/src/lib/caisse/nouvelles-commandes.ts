@@ -7,7 +7,7 @@ import { calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 
 const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises";
+  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises, imprimer_ticket_client";
 
 type LigneBrutePourImpression = {
   id: string;
@@ -25,6 +25,7 @@ type LigneBrutePourImpression = {
   nb_plats: number;
   commande_par: string | null;
   tampons_utilises: number | null;
+  imprimer_ticket_client: boolean;
 };
 
 /**
@@ -81,6 +82,7 @@ export async function construireCommandesPourImpression(
       messageDuMoment,
       origineCaisse: c.commande_par !== null,
       tamponsUtilises: c.tampons_utilises ?? 0,
+      imprimerTicketClient: c.imprimer_ticket_client,
     };
   });
 }

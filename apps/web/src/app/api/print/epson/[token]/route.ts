@@ -84,8 +84,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       return reponseVide();
     }
 
+    // Le bon de cuisine s'imprime toujours ; le ticket client (reçu) est
+    // sauté si l'employé a décoché "Imprimer le ticket client" en caisse
+    // au moment de l'encaissement (demande explicite du patron).
     const jobs = [
-      construireJob(construireTicketClientXmlBrut(commande, null)),
+      ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, null))] : []),
       construireJob(construireBonCuisineXmlBrut(commande)),
     ].join("");
 
