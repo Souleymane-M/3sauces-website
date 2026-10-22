@@ -7,7 +7,7 @@ import { calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 
 const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises, imprimer_ticket_client";
+  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, prenom, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises, imprimer_ticket_client";
 
 type LigneBrutePourImpression = {
   id: string;
@@ -18,6 +18,7 @@ type LigneBrutePourImpression = {
   mode_paiement: CommandePourImpression["modePaiement"] | null;
   paiement_statut: string | null;
   nom_livraison: string | null;
+  prenom: string | null;
   adresse_livraison: string | null;
   client_telephone: string | null;
   heure_souhaitee: string | null;
@@ -48,9 +49,26 @@ export async function construireCommandesPourImpression(
 
   const telephones = [...new Set(commandes.map((c) => c.client_telephone).filter((t): t is string => !!t))];
   const soldeParTelephone = new Map<string, { tampons: number; recompenseDisponible: boolean }>();
+  // Date de la toute première commande jamais passée par ce numéro —
+  // sert à distinguer "nouveau client" de "client déjà connu" pour le
+  // message imprimé sur le ticket (cf. `determinerMessageFidelite` dans
+  // epos-print.ts). Comparée telle quelle à `created_at` de chaque
+  // commande du lot : si elles coïncident, c'est la toute première.
+  const premiereCommandeParTelephone = new Map<string, string>();
   await Promise.all(
     telephones.map(async (tel) => {
-      soldeParTelephone.set(tel, await calculerTamponsPourTicket(supabase, tel));
+      const [solde, { data: premiere }] = await Promise.all([
+        calculerTamponsPourTicket(supabase, tel),
+        supabase
+          .from("commandes")
+          .select("created_at")
+          .eq("client_telephone", tel)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      soldeParTelephone.set(tel, solde);
+      if (premiere) premiereCommandeParTelephone.set(tel, premiere.created_at);
     })
   );
 
@@ -71,12 +89,14 @@ export async function construireCommandesPourImpression(
       // confirmé par webhook).
       dejaPayee: c.paiement_statut === "paye",
       nom: c.nom_livraison ?? "",
+      prenom: c.prenom,
       adresse: c.adresse_livraison,
       heureSouhaitee: c.heure_souhaitee,
       creeLe: c.created_at,
       qrCode: qrCodeParCommandeId.get(c.id) ?? null,
       nbPlats: c.nb_plats,
       clientTelephone: c.client_telephone,
+      clientNouveau: c.client_telephone ? premiereCommandeParTelephone.get(c.client_telephone) === c.created_at : null,
       tamponsAffiches: solde ? solde.tampons : null,
       recompenseDisponible: solde ? solde.recompenseDisponible : false,
       messageDuMoment,

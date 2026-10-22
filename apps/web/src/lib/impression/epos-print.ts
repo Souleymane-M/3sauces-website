@@ -4,7 +4,7 @@ import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
-import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
 
 /**
  * Construction du XML ePOS-Print d'Epson pour les deux tickets (reçu
@@ -375,26 +375,50 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
 }
 
 /**
- * Message du moment (si actif, quel que soit canal/origine) + incitation à
- * commander en ligne la prochaine fois — uniquement sur une commande
- * saisie en caisse (`origineCaisse`), jamais sur une commande déjà passée
- * depuis le site (inutile de la lui repromouvoir) : demande explicite du
- * patron, 2026-10-20, pour convertir précisément les clients qui n'ont
- * jamais essayé le site. QR uniquement hors livraison (jamais mélangé
- * avec le QR livreur, déjà imprimé plus haut) — en livraison, juste la
- * phrase, utile pour une commande prise par téléphone.
+ * Message de fidélité personnalisé, trois variantes selon canal/origine/
+ * historique du client (demande explicite du patron, 2026-10-22) :
+ * - Livraison (caisse ou site, nouveau ou déjà connu) : progression vers
+ *   la prochaine récompense (ou annonce qu'elle est déjà débloquée) —
+ *   jamais d'incitation à visiter le site, déjà fait pour cette commande.
+ * - Sur place/à emporter, saisie en caisse, client jamais vu avant :
+ *   invite à activer sa fidélité en commandant en ligne la prochaine fois.
+ * - Sur place/à emporter, saisie en caisse, client déjà connu : remercie
+ *   pour sa fidélité, invite à commander en ligne pour éviter la queue.
+ * Jamais affiché sur une commande déjà passée depuis le site (sur
+ * place/emporter) : elle connaît déjà le site, rien à lui repromouvoir.
  */
+function determinerMessageFidelite(commande: CommandePourImpression): string | null {
+  if (!commande.clientTelephone) return null;
+  const prenom = commande.prenom?.trim();
+  const salutation = prenom ? `Merci ${prenom}` : "Merci";
+
+  if (commande.canal === "livraison") {
+    if (commande.tamponsAffiches === null) return null;
+    if (commande.recompenseDisponible) {
+      return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser 🙂`;
+    }
+    const reste = NB_TAMPONS_RECOMPENSE - commande.tamponsAffiches;
+    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} tampon${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts 🙂`;
+  }
+
+  if (!commande.origineCaisse) return null;
+  if (commande.clientNouveau) {
+    return `${salutation} pour ta commande. La prochaine fois, commande sur 3sauces.fr pour activer tes points de fidélité 🙂`;
+  }
+  return `${salutation} pour ta confiance et ta fidélité, la prochaine fois, avant de venir, commande sur 3sauces.fr pour éviter de faire la queue 🙂`;
+}
+
 function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
-  const incitationSite = commande.origineCaisse;
-  if (!commande.messageDuMoment && !incitationSite) return;
+  const messageFidelite = determinerMessageFidelite(commande);
+  if (!commande.messageDuMoment && !messageFidelite) return;
 
   separateur(b);
   if (commande.messageDuMoment) {
     b.ligne(commande.messageDuMoment, { align: "center", gras: false, taille: 1 });
   }
-  if (incitationSite) {
+  if (messageFidelite) {
     if (commande.messageDuMoment) b.brut(`<feed line="1"/>`);
-    b.ligne("💡 La prochaine fois, commande en ligne !", { align: "center", gras: true, taille: 1 });
+    b.ligne(messageFidelite, { align: "center", gras: true, taille: 1 });
     if (commande.canal !== "livraison") {
       b.brut(`<feed line="1"/>`);
       b.brut(styleTexte({ align: "center" }));

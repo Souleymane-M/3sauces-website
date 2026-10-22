@@ -26,6 +26,10 @@ export interface CommandePourImpression {
   nbPlats: number;
   /** Téléphone du client, pour le bloc fidélité du reçu — null si non identifié. */
   clientTelephone: string | null;
+  /** Prénom brut (jamais combiné au nom), pour personnaliser le message de fidélité imprimé — null si non communiqué (sur place/à emporter uniquement, facultatif en caisse). */
+  prenom: string | null;
+  /** Vrai si aucune autre commande n'a jamais été passée avec ce téléphone avant celle-ci — null si client non identifié. */
+  clientNouveau: boolean | null;
   /** Nombre de tampons à afficher (0-10+), déjà résolu par l'appelant (jamais calculé dans epos-print.ts, qui reste pur) — null si client non identifié. */
   tamponsAffiches: number | null;
   /** Une récompense (10 tampons) est disponible et pas encore utilisée. */
