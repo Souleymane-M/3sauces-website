@@ -7,6 +7,7 @@ import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import { formaterTelephoneAffichage, formaterTelephonePourAppel } from "@/lib/telephone";
+import { construireLienWhatsapp } from "@/lib/livreur/whatsapp";
 
 // Défensif comme côté cuisine : d'anciennes commandes peuvent avoir un
 // `contenu` qui ne respecte pas exactement la forme actuelle de LigneCommande.
@@ -74,6 +75,13 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   const [declarationsOuvertes, setDeclarationsOuvertes] = useState<Record<string, DeclarationEnCours>>({});
   const [enCours, setEnCours] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Liste "Prévenir via WhatsApp" repliée par défaut (jamais affichée toute
+  // seule) ; `whatsappOuverts` ne fait que mémoriser lesquels ont déjà été
+  // tapotés (on sait seulement que le lien a été ouvert, jamais que le
+  // message a vraiment été envoyé — c'est volontairement "ouvert", jamais
+  // "envoyé", pour rester honnête sur ce qu'on peut savoir).
+  const [whatsappDeplie, setWhatsappDeplie] = useState(false);
+  const [whatsappOuverts, setWhatsappOuverts] = useState<Set<string>>(new Set());
 
   // Sondage en direct des deux listes — jamais pendant qu'une déclaration de
   // paiement ou une prise en charge est en cours, pour ne jamais écraser une
@@ -208,6 +216,51 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       )}
 
       {livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
+
+      {livraisons.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setWhatsappDeplie((v) => !v)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] py-3 text-base font-bold text-white shadow"
+          >
+            📱 Prévenir mes {livraisons.length} client{livraisons.length > 1 ? "s" : ""} via WhatsApp
+          </button>
+          {whatsappDeplie && (
+            <div className="mt-2 space-y-1.5">
+              <p className="text-xs text-gray-500">
+                Un tap par client — WhatsApp s&apos;ouvre avec le message déjà écrit, il ne reste qu&apos;à l&apos;envoyer.
+              </p>
+              {livraisons.map((livraison) => {
+                const lien = construireLienWhatsapp(livraison);
+                const ouvert = whatsappOuverts.has(livraison.id);
+                return (
+                  <div key={livraison.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2">
+                    <span className="text-sm text-gray-900">
+                      #{livraison.numero} — {livraison.nom}
+                    </span>
+                    {lien ? (
+                      <a
+                        href={lien}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setWhatsappOuverts((prec) => new Set(prec).add(livraison.id))}
+                        className={`shrink-0 rounded px-3 py-1.5 text-sm font-semibold ${
+                          ouvert ? "bg-gray-100 text-gray-500" : "bg-[#25D366] text-white"
+                        }`}
+                      >
+                        {ouvert ? "✓ Ouvert" : "Envoyer"}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400">Pas de téléphone</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {livraisons.map((livraison) => {
         const declaration = declarationsOuvertes[livraison.id];

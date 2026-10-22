@@ -74,6 +74,17 @@ export function formaterTelephonePourAppel(telephone: string): string {
 }
 
 /**
+ * Format attendu par les liens `wa.me/<numéro>` (WhatsApp "cliquer pour
+ * discuter") : l'indicatif international SANS le "+" — "+262639123456" →
+ * "262639123456". Fonctionne même si le client n'a jamais enregistré le
+ * numéro du restaurant dans ses contacts (contrairement aux listes de
+ * diffusion WhatsApp), donc aucune configuration préalable nécessaire.
+ */
+export function formaterTelephonePourWhatsapp(telephone: string): string {
+  return telephone.replace(/^\+/, "");
+}
+
+/**
  * Format court pour l'affichage (tickets imprimés, notamment) : "+262639123456"
  * → "06-39-12-34-56" — l'indicatif reste nécessaire en base (identifiant
  * unique du client pour la fidélité, numéro réellement composable), mais
