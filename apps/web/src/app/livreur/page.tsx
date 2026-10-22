@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { LivreurApp } from "@/components/livreur/livreur-app";
-import { listerLivraisonsAssignees } from "@/lib/livreur/commandes";
+import { listerLivraisonsAssignees, listerLivraisonsEnAttente } from "@/lib/livreur/commandes";
 
 export const metadata: Metadata = {
   title: "Livreur — 3 Sauces",
@@ -20,7 +20,10 @@ export default async function LivreurPage() {
     );
   }
 
-  const livraisons = await listerLivraisonsAssignees(session.profilId);
+  const [livraisons, enAttente] = await Promise.all([
+    listerLivraisonsAssignees(session.profilId),
+    listerLivraisonsEnAttente(session.profilId),
+  ]);
 
   return (
     <main className="min-h-screen bg-white p-4">
@@ -28,7 +31,7 @@ export default async function LivreurPage() {
         <h1 className="text-2xl font-bold text-gray-900">Livreur — {session.nom}</h1>
         <LogoutButton />
       </div>
-      <LivreurApp livraisonsInitiales={livraisons} />
+      <LivreurApp livraisonsInitiales={livraisons} enAttenteInitiales={enAttente} />
     </main>
   );
 }

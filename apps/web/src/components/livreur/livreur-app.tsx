@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
-import type { LivraisonAssignee } from "@/lib/livreur/types";
+import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -25,7 +25,11 @@ function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
 
 interface LivreurAppProps {
   livraisonsInitiales: LivraisonAssignee[];
+  enAttenteInitiales: LivraisonDisponible[];
 }
+
+/** Sondage régulier de /api/livreur/commandes — même esprit que l'alerte sonore côté caisse, pour que la liste "en attente" se tienne à jour sans rafraîchissement manuel. */
+const INTERVALLE_SONDAGE_MS = 8_000;
 
 interface PaiementGroupe {
   mode: ModePaiement;
@@ -64,11 +68,60 @@ function formaterHeure(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
+export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurAppProps) {
   const [livraisons, setLivraisons] = useState<LivraisonAssignee[]>(livraisonsInitiales);
+  const [enAttente, setEnAttente] = useState<LivraisonDisponible[]>(enAttenteInitiales);
   const [declarationsOuvertes, setDeclarationsOuvertes] = useState<Record<string, DeclarationEnCours>>({});
   const [enCours, setEnCours] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+
+  // Sondage en direct des deux listes — jamais pendant qu'une déclaration de
+  // paiement ou une prise en charge est en cours, pour ne jamais écraser une
+  // saisie active sous le pied du livreur.
+  useEffect(() => {
+    let annule = false;
+    const minuteur = setInterval(async () => {
+      if (annule || enCours !== null || Object.keys(declarationsOuvertes).length > 0) return;
+      try {
+        const reponse = await fetch("/api/livreur/commandes");
+        if (!reponse.ok || annule) return;
+        const data = await reponse.json();
+        if (annule) return;
+        if (Array.isArray(data.livraisons)) setLivraisons(data.livraisons);
+        if (Array.isArray(data.enAttente)) setEnAttente(data.enAttente);
+      } catch {
+        // Échec silencieux : la prochaine tentative, 8s plus tard, suffit —
+        // jamais bloquant pour le livreur.
+      }
+    }, INTERVALLE_SONDAGE_MS);
+    return () => {
+      annule = true;
+      clearInterval(minuteur);
+    };
+  }, [enCours, declarationsOuvertes]);
+
+  async function prendreEnCharge(livraison: LivraisonDisponible) {
+    setErreur(null);
+    setEnCours(livraison.id);
+    try {
+      const reponse = await fetch("/api/livreur/prendre", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: livraison.id }),
+      });
+      const data = await reponse.json().catch(() => ({}));
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Échec de la prise en charge.");
+        return;
+      }
+      setEnAttente((prec) => prec.filter((l) => l.id !== livraison.id));
+      setLivraisons((prec) => [...prec, livraison]);
+    } catch {
+      setErreur("Erreur réseau, réessaie.");
+    } finally {
+      setEnCours(null);
+    }
+  }
 
   function ouvrirDeclaration(commandeId: string) {
     setErreur(null);
@@ -150,6 +203,39 @@ export function LivreurApp({ livraisonsInitiales }: LivreurAppProps) {
   return (
     <div className="mt-4 space-y-4">
       {erreur && <p className="text-lg text-red-600">{erreur}</p>}
+
+      {enAttente.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-gray-900">
+            {enAttente.length} livraison{enAttente.length > 1 ? "s" : ""} en attente
+          </h2>
+          {enAttente.map((livraison) => (
+            <div key={livraison.id} className="rounded-xl border-2 border-dashed border-gray-300 p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-bold text-gray-900">Commande #{livraison.numero}</span>
+                <span className="text-lg text-gray-700">{formaterHeure(livraison.heureSouhaitee)}</span>
+              </div>
+              <p className="mt-1 text-lg text-gray-900">{livraison.nom}</p>
+              <p className="text-base text-gray-700">{livraison.adresse}</p>
+              {livraison.pasEncorePrete && (
+                <p className="mt-1 text-sm font-semibold text-orange-600">⏳ Pas encore annoncée prête en cuisine</p>
+              )}
+              {livraison.exclu ? (
+                <p className="mt-2 text-sm text-gray-500">Tu viens de la relâcher — un collègue doit la reprendre.</p>
+              ) : (
+                <button
+                  onClick={() => prendreEnCharge(livraison)}
+                  disabled={enCours === livraison.id}
+                  className="mt-2 w-full rounded bg-[#8B2020] py-2 text-base font-semibold text-white disabled:opacity-40"
+                >
+                  {enCours === livraison.id ? "…" : "Je prends cette livraison"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
 
       {livraisons.map((livraison) => {

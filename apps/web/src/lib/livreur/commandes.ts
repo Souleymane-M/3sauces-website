@@ -6,7 +6,7 @@ import { notifierPaiementConfirme, notifierLivraisonNonEffectuee } from "@/lib/n
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
-import type { EtatScan, LivraisonAssignee, PaiementDeclare } from "./types";
+import type { EtatScan, LivraisonAssignee, LivraisonDisponible, PaiementDeclare } from "./types";
 
 /**
  * Livraisons remises à CE livreur (prise en charge par scan,
@@ -77,6 +77,72 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
   // tête, sans perdre l'ordre chronologique existant à l'intérieur de
   // chaque groupe (tri stable).
   return [...livraisonsAssignees].sort(
+    (a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null)
+  );
+}
+
+/**
+ * Livraisons dont le ticket est imprimé (QR agrafé au sachet) mais que
+ * personne n'a encore prise en charge — pour la liste en direct sur
+ * /livreur (sondée côté client), demande explicite du patron, 2026-10-22 :
+ * jusqu'ici, rien ne signalait à un livreur qu'une commande attendait, à
+ * part voir le ticket sortir à l'imprimante ou se le faire dire oralement.
+ *
+ * Même règle que le scan (`prendreLivraisonParQrCode`) : apparaît dès
+ * "en_attente"/"en_preparation", pas seulement "pret" — `pasEncorePrete`
+ * permet d'avertir sans bloquer la prise en charge. Bornée à aujourd'hui,
+ * même raison que `listerLivraisonsAssignees`.
+ */
+export async function listerLivraisonsEnAttente(livreurId: string): Promise<LivraisonDisponible[]> {
+  const supabase = createServiceSupabaseClient();
+  const { debut } = plageJourMayotteUtc(dateMayotteIso());
+
+  const { data: commandes, error: erreurCommandes } = await supabase
+    .from("commandes")
+    .select(
+      "id, numero, statut, nom_livraison, adresse_livraison, client_telephone, montant, heure_souhaitee, contenu, nb_plats, paiement_statut, mode_paiement, palier_groupe, created_at"
+    )
+    .eq("canal", "livraison")
+    .in("statut", STATUTS_AVANT_PRISE_EN_CHARGE)
+    // Même filet qu'ailleurs : un paiement en ligne jamais confirmé ne
+    // propose jamais la commande (cf. commande #455, 2026-10-21).
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    .gte("created_at", debut.toISOString())
+    .order("heure_souhaitee", { ascending: true, nullsFirst: false });
+
+  if (erreurCommandes) {
+    throw new Error(`Impossible de charger les livraisons en attente : ${erreurCommandes.message}`);
+  }
+  if (!commandes || commandes.length === 0) return [];
+
+  const idsCommandes = commandes.map((c) => c.id);
+  const { data: livraisons, error: erreurLivraisons } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_exclu_id")
+    .in("commande_id", idsCommandes);
+  if (erreurLivraisons) {
+    throw new Error(`Impossible de charger les livraisons en attente : ${erreurLivraisons.message}`);
+  }
+  const exclusParCommande = new Map((livraisons ?? []).map((l) => [l.commande_id, l.livreur_exclu_id]));
+
+  const resultats: LivraisonDisponible[] = commandes.map((c) => ({
+    id: c.id,
+    numero: c.numero,
+    nom: c.nom_livraison ?? "",
+    adresse: c.adresse_livraison,
+    clientTelephone: c.client_telephone,
+    montant: c.montant,
+    heureSouhaitee: c.heure_souhaitee,
+    lignes: Array.isArray(c.contenu) ? (c.contenu as LigneCommande[]) : [],
+    nbPlats: c.nb_plats,
+    palierGroupe: c.palier_groupe as PalierGroupe,
+    modePaiement: c.mode_paiement,
+    dejaPayee: c.paiement_statut === "paye",
+    pasEncorePrete: c.statut !== "pret",
+    exclu: exclusParCommande.get(c.id) === livreurId,
+  }));
+
+  return [...resultats].sort(
     (a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null)
   );
 }
@@ -296,36 +362,31 @@ async function nomProfil(supabase: ReturnType<typeof createServiceSupabaseClient
 }
 
 /**
- * Prise en charge par scan : le livreur flashe le QR du ticket dès qu'il le
- * récupère à l'emplacement de sa zone, sans qu'un employé de cuisine n'ait
- * à désigner qui que ce soit (remplace le sélecteur "Choisir le livreur"
- * en cuisine, retiré le 2026-10-15 — trop lent pour 20 commandes/jour).
+ * Prise en charge par scan OU directement depuis la liste "en attente" de
+ * /livreur (sans scanner, demande explicite du patron, 2026-10-22) — les
+ * deux chemins aboutissent ici une fois la ligne `livraisons` trouvée.
  *
  * N'appelle PAS `changerStatutCommande` (contrairement aux autres
  * transitions) : c'est le seul endroit où deux personnes différentes
  * peuvent littéralement cliquer sur la même ressource à la même seconde
- * (deux livreurs scannent le même ticket presque en même temps). Un
- * lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour) laisserait
- * passer les deux en cas de course — demande explicite du patron,
- * 2026-10-19 : une seule mise à jour conditionnelle sur `commandes.statut`
- * décide qui gagne, le `UPDATE` ne retourne une ligne QUE pour celui qui a
- * vraiment changé le statut. Accepte "en_attente"/"en_preparation"/"pret"
- * (pas seulement "pret") : le ticket, avec son QR, est agrafé au sachet dès
- * l'impression — un livreur peut légitimement le scanner avant même que la
- * cuisine ait cliqué "Prête" (demande explicite du patron, 2026-10-20).
+ * (deux livreurs prennent la même commande presque en même temps, scan ou
+ * liste). Un lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour)
+ * laisserait passer les deux en cas de course — demande explicite du
+ * patron, 2026-10-19 : une seule mise à jour conditionnelle sur
+ * `commandes.statut` décide qui gagne, le `UPDATE` ne retourne une ligne
+ * QUE pour celui qui a vraiment changé le statut. Accepte
+ * "en_attente"/"en_preparation"/"pret" (pas seulement "pret") : le ticket,
+ * avec son QR, est agrafé au sachet dès l'impression — une prise en charge
+ * légitime avant même que la cuisine ait cliqué "Prête" (demande explicite
+ * du patron, 2026-10-20).
  */
 const STATUTS_AVANT_PRISE_EN_CHARGE: StatutCommande[] = ["en_attente", "en_preparation", "pret"];
 
-export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
-  const supabase = createServiceSupabaseClient();
-  const { data: livraison, error } = await supabase
-    .from("livraisons")
-    .select("commande_id, livreur_exclu_id")
-    .eq("qr_code", qrCode)
-    .maybeSingle();
-  if (error || !livraison) {
-    throw new Error("Ticket introuvable.");
-  }
+async function prendreLivraisonInterne(
+  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  livraison: { commande_id: string; livreur_exclu_id: string | null },
+  livreurId: string
+): Promise<void> {
   if (livraison.livreur_exclu_id === livreurId) {
     throw new Error("Tu viens de relâcher cette livraison — un collègue ou le comptoir doit la reprendre.");
   }
@@ -363,6 +424,39 @@ export async function prendreLivraisonParQrCode(qrCode: string, livreurId: strin
   if (erreurEvenement) {
     console.error("[livreur/commandes] échec journalisation prise de livraison :", erreurEvenement.message);
   }
+}
+
+/** Prise en charge en flashant le QR du ticket physique — flux historique. */
+export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: livraison, error } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_exclu_id")
+    .eq("qr_code", qrCode)
+    .maybeSingle();
+  if (error || !livraison) {
+    throw new Error("Ticket introuvable.");
+  }
+  await prendreLivraisonInterne(supabase, livraison, livreurId);
+}
+
+/**
+ * Prise en charge directement depuis la liste "en attente" de /livreur,
+ * sans scanner — même garde-fou atomique que le scan (cf.
+ * `prendreLivraisonInterne`), juste une entrée différente (commandeId
+ * connu de la liste plutôt que QR lu sur le ticket).
+ */
+export async function prendreLivraisonParCommandeId(commandeId: string, livreurId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: livraison, error } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_exclu_id")
+    .eq("commande_id", commandeId)
+    .maybeSingle();
+  if (error || !livraison) {
+    throw new Error("Livraison introuvable.");
+  }
+  await prendreLivraisonInterne(supabase, livraison, livreurId);
 }
 
 /**

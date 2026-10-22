@@ -29,6 +29,19 @@ export interface LivraisonAssignee {
   dejaPayee: boolean;
 }
 
+/**
+ * Livraison imprimée (ticket + QR agrafé) mais pas encore prise par un
+ * livreur — pour la liste en direct sur /livreur, qui permet de la
+ * prendre en charge directement (sans scanner), en plus du scan déjà
+ * existant sur le ticket physique.
+ */
+export interface LivraisonDisponible extends LivraisonAssignee {
+  /** La cuisine n'a pas encore cliqué "Prête" — prise en charge quand même possible, juste un avertissement affiché. */
+  pasEncorePrete: boolean;
+  /** Ce livreur vient lui-même de relâcher cette livraison (cf. `relacherLivraison`) — ne peut pas la reprendre tout de suite, affichée mais sans bouton "prendre". */
+  exclu: boolean;
+}
+
 export interface PaiementDeclare {
   mode: ModePaiement;
   montant: number;
