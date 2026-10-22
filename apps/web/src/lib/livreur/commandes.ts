@@ -362,31 +362,41 @@ async function nomProfil(supabase: ReturnType<typeof createServiceSupabaseClient
 }
 
 /**
- * Prise en charge par scan OU directement depuis la liste "en attente" de
- * /livreur (sans scanner, demande explicite du patron, 2026-10-22) — les
- * deux chemins aboutissent ici une fois la ligne `livraisons` trouvée.
+ * Prise en charge par scan : le livreur flashe le QR du ticket dès qu'il le
+ * récupère à l'emplacement de sa zone, sans qu'un employé de cuisine n'ait
+ * à désigner qui que ce soit (remplace le sélecteur "Choisir le livreur"
+ * en cuisine, retiré le 2026-10-15 — trop lent pour 20 commandes/jour).
+ * Seul chemin de prise en charge possible (demande explicite du patron,
+ * 2026-10-22) : flasher prouve que le livreur a physiquement le ticket en
+ * main — un bouton direct sur la liste "en attente" ne le garantit pas
+ * (risque de prise à distance, avant d'être revenu au resto), donc
+ * volontairement jamais ajouté là.
  *
  * N'appelle PAS `changerStatutCommande` (contrairement aux autres
  * transitions) : c'est le seul endroit où deux personnes différentes
  * peuvent littéralement cliquer sur la même ressource à la même seconde
- * (deux livreurs prennent la même commande presque en même temps, scan ou
- * liste). Un lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour)
- * laisserait passer les deux en cas de course — demande explicite du
- * patron, 2026-10-19 : une seule mise à jour conditionnelle sur
- * `commandes.statut` décide qui gagne, le `UPDATE` ne retourne une ligne
- * QUE pour celui qui a vraiment changé le statut. Accepte
- * "en_attente"/"en_preparation"/"pret" (pas seulement "pret") : le ticket,
- * avec son QR, est agrafé au sachet dès l'impression — une prise en charge
- * légitime avant même que la cuisine ait cliqué "Prête" (demande explicite
- * du patron, 2026-10-20).
+ * (deux livreurs scannent le même ticket presque en même temps). Un
+ * lire-puis-écrire (vérifier `livreur_id`, puis mettre à jour) laisserait
+ * passer les deux en cas de course — demande explicite du patron,
+ * 2026-10-19 : une seule mise à jour conditionnelle sur `commandes.statut`
+ * décide qui gagne, le `UPDATE` ne retourne une ligne QUE pour celui qui a
+ * vraiment changé le statut. Accepte "en_attente"/"en_preparation"/"pret"
+ * (pas seulement "pret") : le ticket, avec son QR, est agrafé au sachet dès
+ * l'impression — un livreur peut légitimement le scanner avant même que la
+ * cuisine ait cliqué "Prête" (demande explicite du patron, 2026-10-20).
  */
 const STATUTS_AVANT_PRISE_EN_CHARGE: StatutCommande[] = ["en_attente", "en_preparation", "pret"];
 
-async function prendreLivraisonInterne(
-  supabase: ReturnType<typeof createServiceSupabaseClient>,
-  livraison: { commande_id: string; livreur_exclu_id: string | null },
-  livreurId: string
-): Promise<void> {
+export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { data: livraison, error } = await supabase
+    .from("livraisons")
+    .select("commande_id, livreur_exclu_id")
+    .eq("qr_code", qrCode)
+    .maybeSingle();
+  if (error || !livraison) {
+    throw new Error("Ticket introuvable.");
+  }
   if (livraison.livreur_exclu_id === livreurId) {
     throw new Error("Tu viens de relâcher cette livraison — un collègue ou le comptoir doit la reprendre.");
   }
@@ -424,39 +434,6 @@ async function prendreLivraisonInterne(
   if (erreurEvenement) {
     console.error("[livreur/commandes] échec journalisation prise de livraison :", erreurEvenement.message);
   }
-}
-
-/** Prise en charge en flashant le QR du ticket physique — flux historique. */
-export async function prendreLivraisonParQrCode(qrCode: string, livreurId: string): Promise<void> {
-  const supabase = createServiceSupabaseClient();
-  const { data: livraison, error } = await supabase
-    .from("livraisons")
-    .select("commande_id, livreur_exclu_id")
-    .eq("qr_code", qrCode)
-    .maybeSingle();
-  if (error || !livraison) {
-    throw new Error("Ticket introuvable.");
-  }
-  await prendreLivraisonInterne(supabase, livraison, livreurId);
-}
-
-/**
- * Prise en charge directement depuis la liste "en attente" de /livreur,
- * sans scanner — même garde-fou atomique que le scan (cf.
- * `prendreLivraisonInterne`), juste une entrée différente (commandeId
- * connu de la liste plutôt que QR lu sur le ticket).
- */
-export async function prendreLivraisonParCommandeId(commandeId: string, livreurId: string): Promise<void> {
-  const supabase = createServiceSupabaseClient();
-  const { data: livraison, error } = await supabase
-    .from("livraisons")
-    .select("commande_id, livreur_exclu_id")
-    .eq("commande_id", commandeId)
-    .maybeSingle();
-  if (error || !livraison) {
-    throw new Error("Livraison introuvable.");
-  }
-  await prendreLivraisonInterne(supabase, livraison, livreurId);
 }
 
 /**

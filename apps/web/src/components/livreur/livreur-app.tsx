@@ -100,29 +100,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
     };
   }, [enCours, declarationsOuvertes]);
 
-  async function prendreEnCharge(livraison: LivraisonDisponible) {
-    setErreur(null);
-    setEnCours(livraison.id);
-    try {
-      const reponse = await fetch("/api/livreur/prendre", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId: livraison.id }),
-      });
-      const data = await reponse.json().catch(() => ({}));
-      if (!reponse.ok) {
-        setErreur(data.error ?? "Échec de la prise en charge.");
-        return;
-      }
-      setEnAttente((prec) => prec.filter((l) => l.id !== livraison.id));
-      setLivraisons((prec) => [...prec, livraison]);
-    } catch {
-      setErreur("Erreur réseau, réessaie.");
-    } finally {
-      setEnCours(null);
-    }
-  }
-
   function ouvrirDeclaration(commandeId: string) {
     setErreur(null);
     setDeclarationsOuvertes((prec) => ({ ...prec, [commandeId]: declarationVide() }));
@@ -207,7 +184,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       {enAttente.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-bold text-gray-900">
-            {enAttente.length} livraison{enAttente.length > 1 ? "s" : ""} en attente
+            {enAttente.length} livraison{enAttente.length > 1 ? "s" : ""} en attente — dépêche-toi de rentrer !
           </h2>
           {enAttente.map((livraison) => (
             <div key={livraison.id} className="rounded-xl border-2 border-dashed border-gray-300 p-4">
@@ -223,13 +200,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               {livraison.exclu ? (
                 <p className="mt-2 text-sm text-gray-500">Tu viens de la relâcher — un collègue doit la reprendre.</p>
               ) : (
-                <button
-                  onClick={() => prendreEnCharge(livraison)}
-                  disabled={enCours === livraison.id}
-                  className="mt-2 w-full rounded bg-[#8B2020] py-2 text-base font-semibold text-white disabled:opacity-40"
-                >
-                  {enCours === livraison.id ? "…" : "Je prends cette livraison"}
-                </button>
+                <p className="mt-2 text-sm font-semibold text-gray-600">📱 Flashe le QR du ticket au resto pour la prendre</p>
               )}
             </div>
           ))}
