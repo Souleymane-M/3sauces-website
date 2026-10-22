@@ -400,6 +400,7 @@ export interface Database {
           remise_lancement_fin: string | null;
           message_moment: string | null;
           message_moment_actif: boolean;
+          livraison_active: boolean;
           updated_at: string;
         };
         Insert: {
@@ -413,6 +414,7 @@ export interface Database {
           remise_lancement_fin?: string | null;
           message_moment?: string | null;
           message_moment_actif?: boolean;
+          livraison_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["parametres_livraison"]["Insert"]>;
         Relationships: [];

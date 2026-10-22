@@ -491,7 +491,11 @@ export async function POST(request: Request) {
   // /api/commande) : une livraison prise au téléphone par la caisse a
   // besoin des mêmes informations qu'une livraison passée en ligne. ---
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
-    supabase.from("parametres_livraison").select("heure_debut, heure_fin, minimum_commande, jours_fermeture").eq("id", true).single(),
+    supabase
+      .from("parametres_livraison")
+      .select("heure_debut, heure_fin, minimum_commande, jours_fermeture, livraison_active")
+      .eq("id", true)
+      .single(),
     supabase.from("zones_livraison").select("commune").eq("actif", true),
   ]);
 
@@ -573,8 +577,8 @@ export async function POST(request: Request) {
     if (!adresse) {
       return NextResponse.json({ error: "Adresse de livraison requise." }, { status: 400 });
     }
-    if (!zone || !communesActives.has(zone)) {
-      return NextResponse.json({ error: "Zone de livraison invalide." }, { status: 400 });
+    if (!parametres.livraison_active || !zone || !communesActives.has(zone)) {
+      return NextResponse.json({ error: "Livraison indisponible pour le moment." }, { status: 400 });
     }
   }
 

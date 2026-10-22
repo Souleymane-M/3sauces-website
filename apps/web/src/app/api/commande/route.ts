@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       supabase
         .from("parametres_livraison")
         .select(
-          "heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture, remise_lancement_debut, remise_lancement_fin"
+          "heure_debut, heure_fin, minimum_commande, site_ouvert, livraison_active, jours_fermeture, remise_lancement_debut, remise_lancement_fin"
         )
         .eq("id", true)
         .single(),
@@ -635,9 +635,9 @@ export async function POST(request: Request) {
     if (!adresse) {
       return NextResponse.json({ error: "Adresse de livraison requise." }, { status: 400 });
     }
-    if (!zone || !communesActives.has(zone)) {
+    if (!parametres.livraison_active || !zone || !communesActives.has(zone)) {
       return NextResponse.json(
-        { error: "Livraison indisponible pour cette zone. Choisis le retrait sur place." },
+        { error: "Livraison indisponible pour le moment. Choisis le retrait sur place ou à emporter." },
         { status: 400 }
       );
     }

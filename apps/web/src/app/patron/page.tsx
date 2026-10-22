@@ -12,13 +12,20 @@ import { StatistiquesJourApp } from "@/components/patron/statistiques-jour-app";
 import { ClientsApp } from "@/components/patron/clients-app";
 import { PatronTabs } from "@/components/patron/patron-tabs";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
+import { LivraisonActiveApp } from "@/components/patron/livraison-active-app";
 import { JoursFermetureApp } from "@/components/patron/jours-fermeture-app";
 import { RemiseLancementApp } from "@/components/patron/remise-lancement-app";
 import { MessageMomentApp } from "@/components/patron/message-moment-app";
 import { GroupeMetriquesApp } from "@/components/patron/groupe-metriques-app";
 import { listerProduitsAdmin } from "@/lib/patron/produits";
 import { calculerMetriquesGroupe } from "@/lib/patron/groupe-metriques";
-import { chargerEtatSite, chargerJoursFermeture, chargerRemiseLancement, chargerMessageDuMoment } from "@/lib/patron/parametres";
+import {
+  chargerEtatSite,
+  chargerJoursFermeture,
+  chargerRemiseLancement,
+  chargerMessageDuMoment,
+  chargerLivraisonActive,
+} from "@/lib/patron/parametres";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
@@ -68,6 +75,7 @@ export default async function PatronPage() {
     statistiquesJour,
     clients,
     messageMoment,
+    livraisonActive,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -88,6 +96,7 @@ export default async function PatronPage() {
     chargerStatistiquesJour(),
     listerClientsAdmin(),
     chargerMessageDuMoment(),
+    chargerLivraisonActive(),
   ]);
 
   return (
@@ -100,8 +109,13 @@ export default async function PatronPage() {
         Bonjour {session.nom}. Finances, stocks, fidélité : en construction (Module 6). Commandes du site en ligne,
         gestion complète de la carte et des options ci-dessous.
       </p>
-      <div className="mb-4">
-        <EtatSiteApp ouvertInitial={siteOuvert} />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <div className="flex-1">
+          <EtatSiteApp ouvertInitial={siteOuvert} />
+        </div>
+        <div className="flex-1">
+          <LivraisonActiveApp actifInitial={livraisonActive} />
+        </div>
       </div>
 
       <PatronTabs

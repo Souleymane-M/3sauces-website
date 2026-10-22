@@ -487,7 +487,7 @@ export function CommandePubliqueApp({
     if (nouvelleDate !== aujourdHui) setModePaiement("stripe");
   }
 
-  const livraisonPossible = parametres.zonesActives.length > 0;
+  const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   // Sur le montant réellement payé (après tampons fidélité), jamais le
   // panier brut — sinon un client pourrait faire tomber une livraison à
   // quelques euros réellement encaissés en utilisant ses tampons, tout en

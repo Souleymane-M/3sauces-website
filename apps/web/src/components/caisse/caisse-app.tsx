@@ -590,7 +590,7 @@ export function CaisseApp({
   // (plats-conteneurs du seul mode groupé, toujours 0 en mode simple) pour évaluer
   // les paliers ci-dessous. Voir `compterPlatsPourPalier` côté serveur.
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
-  const livraisonPossible = parametres.zonesActives.length > 0;
+  const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".

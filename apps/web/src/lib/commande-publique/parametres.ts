@@ -17,7 +17,7 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
       supabase
         .from("parametres_livraison")
         .select(
-          "heure_debut, heure_fin, minimum_commande, site_ouvert, jours_fermeture, remise_lancement_debut, remise_lancement_fin"
+          "heure_debut, heure_fin, minimum_commande, site_ouvert, livraison_active, jours_fermeture, remise_lancement_debut, remise_lancement_fin"
         )
         .eq("id", true)
         .single(),
@@ -45,6 +45,7 @@ export async function chargerParametresLivraisonPublics(): Promise<ParametresLiv
     minimumCommande: parametres.minimum_commande,
     zonesActives: (zones ?? []).map((z) => z.commune),
     siteOuvert: parametres.site_ouvert,
+    livraisonActive: parametres.livraison_active,
     joursFermeture: parametres.jours_fermeture,
     remiseLancementActive: remiseActive,
     remiseLancementFinLibelle: remiseActive

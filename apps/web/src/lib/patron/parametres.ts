@@ -29,6 +29,35 @@ export async function basculerSiteOuvert(ouvert: boolean): Promise<void> {
 }
 
 /**
+ * Interrupteur "livraison activée/désactivée" — distinct de `site_ouvert`
+ * (coupe tout le site) et des zones (quelles communes sont livrées) : permet
+ * de couper uniquement le canal livraison, par ex. si aucun livreur n'est
+ * disponible. Revérifié côté serveur à la création de toute commande.
+ */
+export async function chargerLivraisonActive(): Promise<boolean> {
+  const supabase = createServiceSupabaseClient();
+  const { data, error } = await supabase
+    .from("parametres_livraison")
+    .select("livraison_active")
+    .eq("id", true)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Impossible de charger l'état de la livraison : ${error?.message ?? "introuvable"}`);
+  }
+  return data.livraison_active;
+}
+
+export async function basculerLivraisonActive(actif: boolean): Promise<void> {
+  const supabase = createServiceSupabaseClient();
+  const { error } = await supabase.from("parametres_livraison").update({ livraison_active: actif }).eq("id", true);
+
+  if (error) {
+    throw new Error(`Impossible de mettre à jour l'état de la livraison : ${error.message}`);
+  }
+}
+
+/**
  * Jours de fermeture hebdomadaire (0 = dimanche ... 6 = samedi) — distincts
  * de `site_ouvert`, qui coupe tout le site ponctuellement. Ceux-ci ne
  * bloquent jamais l'accès au site : ils ne font que restreindre les dates

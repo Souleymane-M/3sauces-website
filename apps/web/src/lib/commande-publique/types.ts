@@ -82,6 +82,8 @@ export interface ParametresLivraisonPublic {
   minimumCommande: number;
   zonesActives: string[]; // communes autorisées, ex: ["Dembéni"]
   siteOuvert: boolean;
+  /** Interrupteur dédié livraison, distinct de siteOuvert et des zones — configuré depuis /patron. */
+  livraisonActive: boolean;
   /** Jours de fermeture hebdomadaire (0 = dimanche ... 6 = samedi), configurés depuis /patron. */
   joursFermeture: number[];
   /** Remise de lancement (-2€ dès 10€) active aujourd'hui — dates configurées depuis /patron. */
