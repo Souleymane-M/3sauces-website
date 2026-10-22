@@ -38,6 +38,17 @@ const MODES_PAIEMENT_CAISSE = ["especes", "cb", "mixte"] as const;
 const TOLERANCE_ARRONDI_PAIEMENT = 0.01;
 
 /**
+ * Nom + prénom sont désormais tous les deux optionnels sur place/à
+ * emporter (seul le téléphone reste obligatoire, demande explicite du
+ * patron le 2026-10-22 pour fluidifier la file au comptoir) — `null`
+ * quand aucun des deux n'est renseigné, pour que l'impression affiche le
+ * numéro de commande à la place plutôt qu'une ligne vide.
+ */
+function nomClientAffiche(prenom: string, nom: string): string | null {
+  return [prenom, nom].filter(Boolean).join(" ") || null;
+}
+
+/**
  * "Mixte" n'est jamais une valeur de `paiements.mode` (toujours especes/cb
  * individuellement) — seulement de `commandes.mode_paiement`. Revérifie que
  * chaque part est positive, d'un mode réel, et que leur somme correspond
@@ -461,16 +472,19 @@ export async function POST(request: Request) {
   // Absent/mal formé = imprimé par défaut, aucun changement de comportement.
   const imprimerTicketClient = body.imprimerTicketClient !== false;
 
-  // Nom et téléphone sont obligatoires pour tous les canaux, comme sur le
-  // site public (/api/commande) : jamais de vente anonyme, y compris au
-  // comptoir.
+  // Nom de famille jamais obligatoire en caisse (contrairement au site
+  // public) : rien n'en est fait d'utile pour une vente rapide au
+  // comptoir. Le prénom, lui, n'est requis qu'en livraison (le livreur a
+  // besoin d'un nom à annoncer à la porte) — sur place/à emporter, le
+  // numéro de commande suffit à appeler le client. Le téléphone reste
+  // obligatoire partout : c'est la seule donnée qui permet de retrouver
+  // le client et de suivre sa fidélité. Demande explicite du patron,
+  // 2026-10-22 : la queue au comptoir ne doit jamais attendre sur des
+  // champs superflus.
   const nom = (body.nom ?? "").trim();
-  if (!nom) {
-    return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
-  }
   const prenom = (body.prenom ?? "").trim();
-  if (!prenom) {
-    return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
+  if (body.canal === "livraison" && !prenom) {
+    return NextResponse.json({ error: "Le prénom est requis pour une livraison." }, { status: 400 });
   }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
@@ -652,9 +666,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // `nom_livraison` sert désormais de nom client pour tous les canaux (nom
-  // et téléphone sont obligatoires partout) et pas seulement pour la
-  // livraison — même convention que /api/commande.
+  // `nom_livraison` sert de nom client pour tous les canaux, pas
+  // seulement pour la livraison (même convention que /api/commande) —
+  // mais contrairement au site public, nom et prénom peuvent être tous
+  // les deux absents sur place/à emporter : `nomClientAffiche` renvoie
+  // alors `null`, et l'impression retombe sur le numéro de commande.
   //
   // Une livraison n'est jamais payée à cet instant (le client paie le
   // livreur à la remise), jamais le choix de la caissière. Pour les deux
@@ -693,7 +709,7 @@ export async function POST(request: Request) {
       commande_par: session.profilId,
       cout_matiere_total: coutMatiereTotal,
       tampons_utilises: tamponsUtilises,
-      nom_livraison: `${prenom} ${nom}`,
+      nom_livraison: nomClientAffiche(prenom, nom),
       prenom,
       adresse_livraison: adresse,
       zone_livraison: zone,
@@ -843,14 +859,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Mode de paiement invalide." }, { status: 400 });
   }
 
+  // Nom jamais requis, prénom requis seulement en livraison — même règle
+  // qu'à la création (POST), vérifiée plus bas une fois le canal final
+  // connu (il peut changer via cette modification).
   const nom = (body.nom ?? "").trim();
-  if (!nom) {
-    return NextResponse.json({ error: "Le nom est requis." }, { status: 400 });
-  }
   const prenom = (body.prenom ?? "").trim();
-  if (!prenom) {
-    return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
-  }
   const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
   if (!clientTelephone) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
@@ -976,6 +989,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Canal invalide." }, { status: 400 });
   }
   const canal = canalDemande as (typeof CANAUX_CAISSE)[number];
+  if (canal === "livraison" && !prenom) {
+    return NextResponse.json({ error: "Le prénom est requis pour une livraison." }, { status: 400 });
+  }
   if (canal === "livraison" && ancienCanal !== "livraison") {
     return NextResponse.json(
       {
@@ -1083,7 +1099,7 @@ export async function PATCH(request: Request) {
       mode_paiement: body.modePaiement,
       client_telephone: clientTelephone,
       cout_matiere_total: coutMatiereTotal,
-      nom_livraison: `${prenom} ${nom}`,
+      nom_livraison: nomClientAffiche(prenom, nom),
       prenom,
       adresse_livraison: adresse,
       zone_livraison: zone,

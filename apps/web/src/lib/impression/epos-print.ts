@@ -138,6 +138,17 @@ function formaterNumeroTicket(numero: number): string {
   return `#${String(numero).padStart(4, "0")}`;
 }
 
+/**
+ * Nom et prénom peuvent être tous les deux absents sur une commande sur
+ * place/à emporter prise en caisse (seul le téléphone reste obligatoire,
+ * demande explicite du patron, 2026-10-22) — dans ce cas, le numéro de
+ * commande sert à appeler le client, comme dans la plupart des
+ * fast-foods.
+ */
+function nomOuNumeroAffiche(commande: CommandePourImpression): string {
+  return commande.nom.trim() || `Commande ${formaterNumeroTicket(commande.numero)}`;
+}
+
 const MENTION_LEGALE = "3 Sauces — Auto-entrepreneur — SIRET 532 276 581 00040 — TVA non applicable, art. 293 B du CGI";
 const CONTACT_RESTAURANT = "3sauces.fr — 06 39 63 81 78";
 
@@ -315,7 +326,7 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
   b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
   b.ligne(libelleCanal(commande.canal).toUpperCase(), { align: "center", gras: true, taille: 2 });
   b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
-  b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
     b.brut(`<feed line="1"/>`);
     b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "left", gras: true, taille: 2 });
@@ -434,7 +445,7 @@ function construireContenuTicketClient(
     b.ligne("VERIFIER / ENCAISSER", { align: "center", gras: true, taille: 2 });
   }
 
-  b.ligne(commande.nom, { align: "left", gras: true, taille: 2 });
+  b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
   separateur(b);
 
   regrouperLignesParCategorie(commande.lignes).forEach((groupe, index) => {
@@ -530,7 +541,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   } else if (commande.modePaiement === "stripe") {
     b.ligne("PAIEMENT EN LIGNE NON CONFIRME", { align: "center", gras: true, taille: 1 });
   }
-  b.ligne(commande.nom, { align: "center", gras: true, taille: 2 });
+  b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
     b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: true, taille: 1 });
   }

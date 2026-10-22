@@ -150,9 +150,12 @@ function platVide(numero: number): PlatGroupeCaisse {
  * jour") demande un prix du jour dans QuantiteModalPublique, cas qui
  * n'existe jamais côté public.
  *
- * Nom et téléphone sont obligatoires pour encaisser (comme nom/téléphone le
- * sont pour commander sur le site public), quel que soit le canal —
- * l'adresse ne l'est que pour la livraison.
+ * Le téléphone est seul obligatoire pour encaisser sur place/à emporter
+ * (le nom l'est toujours sur le site public, mais pas ici : la file au
+ * comptoir ne doit jamais attendre sur un champ superflu, demande
+ * explicite du patron, 2026-10-22). En livraison, le prénom redevient
+ * obligatoire (le livreur a besoin d'un nom à annoncer), tout comme
+ * l'adresse — le nom de famille, lui, reste facultatif partout.
  *
  * Même écran de choix "Commande simple / Commande groupée" qu'au site
  * public, systématique : un client au comptoir peut tout aussi bien
@@ -367,8 +370,8 @@ export function CaisseApp({
   // Créneau souhaité pour tous les canaux (comme le site public : "Heure de
   // passage souhaitée" pour sur place/à emporter, "Créneau de livraison
   // souhaité" pour la livraison) ; adresse/zone restent propres à la
-  // livraison. Nom et téléphone sont obligatoires pour tous les canaux,
-  // comme sur le site public.
+  // livraison. Voir `infosClientIncompletes` plus bas pour les champs
+  // réellement obligatoires (moins stricts qu'au site public).
   const creneauxValides = useMemo(
     () => creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
     [dateCommande, parametres.heureDebut, parametres.heureFin]
@@ -606,7 +609,12 @@ export function CaisseApp({
   // redescend sans attendre un second rendu.
   const maxTamponsUtilisables = Math.min(clientInfo?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTamponsAUtiliser, maxTamponsUtilisables);
-  const infosClientIncompletes = !prenom.trim() || !nom.trim() || !telephone.trim();
+  // Nom jamais requis en caisse. Prénom requis seulement en livraison (le
+  // livreur a besoin d'un nom à annoncer) — sur place/à emporter, seul le
+  // téléphone est obligatoire : le numéro de commande suffit à appeler le
+  // client. Demande explicite du patron, 2026-10-22, pour fluidifier la
+  // file au comptoir.
+  const infosClientIncompletes = !telephone.trim() || (canal === "livraison" && !prenom.trim());
 
   // Remise de lancement : jamais pour une commande créée ici (toujours
   // `commande_par` non nul dès la création) — ne peut survivre que lors de
@@ -1768,7 +1776,9 @@ export function CaisseApp({
 
             <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-gray-500">Prénom</label>
+                <label className="text-xs text-gray-500">
+                  Prénom{canal === "livraison" ? "" : " (facultatif)"}
+                </label>
                 <input
                   value={prenom}
                   onChange={(e) => setPrenom(e.target.value)}
@@ -1776,7 +1786,7 @@ export function CaisseApp({
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">Nom</label>
+                <label className="text-xs text-gray-500">Nom (facultatif)</label>
                 <input
                   value={nom}
                   onChange={(e) => setNom(e.target.value)}
