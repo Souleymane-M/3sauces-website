@@ -83,6 +83,12 @@ export async function POST(request: Request) {
       metadata: { commande_id: commande.id, numero: String(commande.numero) },
       success_url: `${origine}/commande-confirmee?canal=${commande.canal}&commande=${commande.id}&paiement=stripe&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origine}/commander?paiementAnnule=1`,
+      // Minimum autorisé par Stripe (30 min) plutôt que les 24h par défaut :
+      // dès que la session expire, le webhook checkout.session.expired
+      // libère immédiatement le stock et les tampons réservés par cette
+      // commande — jamais besoin d'attendre pour détecter un panier
+      // abandonné (commande #455, 2026-10-21).
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     });
   } catch (erreur) {
     console.error("[/api/commande/paiement] échec création session Stripe :", erreur);
