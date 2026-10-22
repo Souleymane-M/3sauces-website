@@ -107,11 +107,21 @@ interface LignesValidees {
  * "commande groupée" (boisson 2L offerte). Lève `ErreurValidation` pour
  * toute erreur imputable au client — jamais un throw générique, pour que
  * l'appelant puisse toujours répondre 400 avec un message clair.
+ *
+ * `lignesExistantes` (PATCH uniquement) : quantités déjà réservées par la
+ * commande qu'on modifie, à "rendre" avant de vérifier le stock du jour —
+ * sinon un plat déjà entièrement réservé par CETTE commande (donc à
+ * `stock_jour: 0` depuis sa création) semble en rupture dès qu'on touche
+ * à n'importe quelle autre ligne, même en ne retirant qu'une boisson. Bug
+ * réel constaté le 2026-10-22 : retirer une boisson d'une commande avec
+ * poisson bloquait la modification en annonçant le poisson épuisé, alors
+ * qu'il était déjà dans le panier du client.
  */
 async function validerLignesCommande(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
   lignesBrutes: unknown,
-  boissonOfferteSaveursBrut: unknown
+  boissonOfferteSaveursBrut: unknown,
+  lignesExistantes?: { produitId?: string; quantite?: number }[]
 ): Promise<LignesValidees> {
   if (!Array.isArray(lignesBrutes) || lignesBrutes.length === 0) {
     throw new ErreurValidation("Requête invalide : au moins une ligne de commande est requise.");
@@ -129,6 +139,13 @@ async function validerLignesCommande(
     .in("id", produitIds);
   if (erreurProduits) {
     throw new Error("Erreur serveur (produits).");
+  }
+
+  const dejaReserveParProduit = new Map<string, number>();
+  for (const l of lignesExistantes ?? []) {
+    if (l.produitId && l.quantite) {
+      dejaReserveParProduit.set(l.produitId, (dejaReserveParProduit.get(l.produitId) ?? 0) + l.quantite);
+    }
   }
 
   const { data: viandesActives, error: erreurViandes } = await supabase.from("viandes").select("nom").eq("actif", true);
@@ -177,10 +194,19 @@ async function validerLignesCommande(
     }
 
     // Pré-check informatif (stock du jour, ex: plats du jour) — le vrai
-    // garde-fou contre la concurrence est le décrément atomique juste avant
-    // l'insertion/mise à jour de la commande (cf. plus bas).
-    if (produit.stock_jour !== null && quantite > produit.stock_jour) {
-      throw new ErreurValidation(`Il ne reste que ${produit.stock_jour} ${produit.nom} disponible(s) aujourd'hui.`);
+    // garde-fou contre la concurrence est le décrément/ajustement atomique
+    // juste avant l'insertion/mise à jour de la commande (cf. plus bas). En
+    // modification, on rend d'abord la quantité déjà réservée par CETTE
+    // commande : sinon un plat qu'elle a déjà entièrement épuisé (stock_jour
+    // à 0 depuis sa création) semble en rupture dès qu'on retouche la
+    // commande, même pour une ligne sans rapport (ex: retirer une boisson).
+    if (produit.stock_jour !== null) {
+      const stockDisponiblePourCetteCommande = produit.stock_jour + (dejaReserveParProduit.get(produit.id) ?? 0);
+      if (quantite > stockDisponiblePourCetteCommande) {
+        throw new ErreurValidation(
+          `Il ne reste que ${stockDisponiblePourCetteCommande} ${produit.nom} disponible(s) aujourd'hui.`
+        );
+      }
     }
 
     const viandes = Array.isArray(ligneBrute.viandes) ? ligneBrute.viandes : [];
@@ -902,6 +928,13 @@ export async function PATCH(request: Request) {
     );
   }
 
+  // Quantités déjà réservées par cette commande (avant modification) — à
+  // rendre avant de revalider le stock du jour, cf. commentaire sur
+  // `validerLignesCommande`. Réutilisé plus bas pour l'ajustement atomique.
+  const anciennesLignes = Array.isArray(commandeExistante.contenu)
+    ? (commandeExistante.contenu as { produitId?: string; quantite?: number }[])
+    : [];
+
   const [{ data: parametres, error: erreurParametres }, { data: zones, error: erreurZones }] = await Promise.all([
     supabase
       .from("parametres_livraison")
@@ -953,7 +986,7 @@ export async function PATCH(request: Request) {
 
   let validation;
   try {
-    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveurs);
+    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveurs, anciennesLignes);
   } catch (e) {
     if (e instanceof ErreurValidation) {
       return NextResponse.json({ error: e.message }, { status: 400 });
@@ -1052,12 +1085,9 @@ export async function PATCH(request: Request) {
     .eq("telephone", clientTelephone);
 
   // Ajustement atomique du stock du jour : restitue les anciennes quantités
-  // (contenu avant modification) puis décompte les nouvelles, dans la même
-  // transaction — jamais de stock à moitié ajusté si la nouvelle
-  // composition dépasse ce qu'il reste.
-  const anciennesLignes = Array.isArray(commandeExistante.contenu)
-    ? (commandeExistante.contenu as { produitId?: string; quantite?: number }[])
-    : [];
+  // (contenu avant modification, déjà extraites plus haut) puis décompte
+  // les nouvelles, dans la même transaction — jamais de stock à moitié
+  // ajusté si la nouvelle composition dépasse ce qu'il reste.
   const anciensAVerifier = new Map<string, number>();
   for (const l of anciennesLignes) {
     if (l.produitId && l.quantite) {
