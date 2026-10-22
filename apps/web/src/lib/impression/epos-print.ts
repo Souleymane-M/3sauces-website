@@ -139,6 +139,7 @@ function formaterNumeroTicket(numero: number): string {
 }
 
 const MENTION_LEGALE = "3 Sauces — Auto-entrepreneur — SIRET 532 276 581 00040 — TVA non applicable, art. 293 B du CGI";
+const CONTACT_RESTAURANT = "3sauces.fr — 06 39 63 81 78";
 
 function formaterDateHeure(iso: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -488,6 +489,7 @@ function construireContenuTicketClient(
   imprimerBlocCommunication(b, commande);
 
   separateur(b);
+  b.ligne(CONTACT_RESTAURANT, { align: "center", gras: true, taille: 1 });
   b.ligne(MENTION_LEGALE, { align: "center", gras: false, taille: 1 });
 
   b.brut(`<feed line="2"/><cut type="feed"/>`);
