@@ -80,6 +80,16 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // volontairement "ouvert", jamais "envoyé", pour rester honnête sur ce
   // qu'on peut savoir).
   const [whatsappOuverts, setWhatsappOuverts] = useState<Set<string>>(new Set());
+  // Recherche locale parmi les livraisons déjà assignées — utile dès que
+  // le livreur en a plusieurs en main et veut retrouver vite un client par
+  // numéro de commande, nom ou adresse, sans faire défiler toute la liste.
+  const [recherche, setRecherche] = useState("");
+  const rechercheNormalisee = recherche.trim().toLowerCase();
+  const livraisonsFiltrees = rechercheNormalisee
+    ? livraisons.filter((l) =>
+        [`#${l.numero}`, l.nom, l.adresse ?? ""].some((champ) => champ.toLowerCase().includes(rechercheNormalisee))
+      )
+    : livraisons;
 
   // Sondage en direct des deux listes — jamais pendant qu'une déclaration de
   // paiement ou une prise en charge est en cours, pour ne jamais écraser une
@@ -213,9 +223,21 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
         </div>
       )}
 
-      {livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
+      {livraisons.length > 1 && (
+        <input
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher une commande (numéro, nom, adresse)"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base text-gray-900"
+        />
+      )}
 
-      {livraisons.map((livraison) => {
+      {livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
+      {livraisons.length > 0 && livraisonsFiltrees.length === 0 && (
+        <p className="text-base text-gray-400">Aucune livraison ne correspond à &quot;{recherche}&quot;.</p>
+      )}
+
+      {livraisonsFiltrees.map((livraison) => {
         const declaration = declarationsOuvertes[livraison.id];
         const totalGroupeDeclare = declaration
           ? Math.round(
