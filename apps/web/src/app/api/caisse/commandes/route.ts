@@ -1121,6 +1121,26 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Passage sur place/à emporter -> livraison : crée le suivi livreur
+  // (même logique qu'à la création, cf. POST plus haut) — AVANT de rendre
+  // la commande de nouveau imprimable (ci-dessous) : sinon une course est
+  // possible avec le sondage de l'imprimante (Server Direct Print, ~5s) —
+  // si elle imprime entre les deux, le ticket "LIVRAISON" sort sans QR,
+  // pour de bon (rien ne la remet jamais dans la file après ça). Bug réel
+  // constaté deux fois le 2026-10-23 : d'abord un suivi jamais créé du
+  // tout (commande #570), puis cette course une fois corrigé (commande
+  // #580, suivi bien créé mais après l'impression). Best effort, même
+  // raison qu'à la création : ne doit jamais faire échouer la commande
+  // déjà enregistrée.
+  if (passageVersLivraison) {
+    const { error: erreurCreationLivraison } = await supabase
+      .from("livraisons")
+      .insert({ commande_id: body.commandeId, heure_souhaitee: heureSouhaitee.toISOString() });
+    if (erreurCreationLivraison) {
+      console.error("[/api/caisse/commandes PATCH] échec création suivi livraison :", erreurCreationLivraison.message);
+    }
+  }
+
   const { error: erreurMaj } = await supabase
     .from("commandes")
     .update({
@@ -1164,22 +1184,6 @@ export async function PATCH(request: Request) {
     const { error: erreurSuppressionLivraison } = await supabase.from("livraisons").delete().eq("commande_id", body.commandeId);
     if (erreurSuppressionLivraison) {
       console.error("[/api/caisse/commandes PATCH] échec suppression suivi livraison :", erreurSuppressionLivraison.message);
-    }
-  }
-
-  // Passage sur place/à emporter -> livraison : crée le suivi livreur
-  // (même logique qu'à la création, cf. POST plus haut) — sans cette
-  // ligne, le ticket imprimait "livraison" mais sans QR, aucun moyen pour
-  // un livreur de la prendre en charge. Bug réel constaté le 2026-10-23,
-  // commande #570 : premier cas réel de ce nouveau sens de passage,
-  // introduit la veille (jamais permis avant), et cette ligne manquante
-  // était passée inaperçue. Best effort, même raison qu'à la création.
-  if (passageVersLivraison) {
-    const { error: erreurCreationLivraison } = await supabase
-      .from("livraisons")
-      .insert({ commande_id: body.commandeId, heure_souhaitee: heureSouhaitee.toISOString() });
-    if (erreurCreationLivraison) {
-      console.error("[/api/caisse/commandes PATCH] échec création suivi livraison :", erreurCreationLivraison.message);
     }
   }
 
