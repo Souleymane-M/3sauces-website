@@ -1011,11 +1011,17 @@ export async function PATCH(request: Request) {
   }
 
   // Le canal peut changer, sauf dans un sens : une commande sur place/à
-  // emporter est toujours déjà payée (paiement_statut="paye" dès la
-  // création, cf. POST) — en faire une livraison impliquerait de "dépayer"
-  // et reverser la fidélité déjà créditée, trop risqué depuis cet écran.
-  // L'autre sens (livraison non payée -> sur place/à emporter) est sans
-  // risque : le paiement est simplement collecté maintenant, cf. plus bas.
+  // emporter DÉJÀ PAYÉE (paiement_statut="paye" — ce n'est PAS automatique
+  // depuis le 2026-10-07, cf. `encaisserMaintenant` plus bas : une
+  // réservation par téléphone ou pour un autre jour reste "non_paye") ne
+  // peut pas devenir une livraison depuis cet écran : ça impliquerait de
+  // "dépayer" et reverser la fidélité déjà créditée, trop risqué ici.
+  // Toujours vérifié sur le VRAI statut de paiement, jamais déduit du
+  // canal — bug réel constaté le 2026-10-23, commande #570 : une commande
+  // à emporter jamais payée (réservation) se voyait bloquée en pensant à
+  // tort qu'elle était déjà payée. Les trois autres cas restent libres :
+  // sur place/à emporter non payé -> livraison, et livraison (jamais
+  // payée avant remise, cf. plus bas) -> sur place/à emporter.
   const ancienCanal = commandeExistante.canal;
   const canalDemande = typeof body.canal === "string" ? body.canal : ancienCanal;
   if (!CANAUX_CAISSE.includes(canalDemande as (typeof CANAUX_CAISSE)[number])) {
@@ -1025,7 +1031,7 @@ export async function PATCH(request: Request) {
   if (canal === "livraison" && !prenom) {
     return NextResponse.json({ error: "Le prénom est requis pour une livraison." }, { status: 400 });
   }
-  if (canal === "livraison" && ancienCanal !== "livraison") {
+  if (canal === "livraison" && ancienCanal !== "livraison" && commandeExistante.paiement_statut === "paye") {
     return NextResponse.json(
       {
         error:
