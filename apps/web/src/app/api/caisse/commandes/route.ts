@@ -1041,6 +1041,7 @@ export async function PATCH(request: Request) {
     );
   }
   const passageVersRetrait = ancienCanal === "livraison" && canal !== "livraison";
+  const passageVersLivraison = canal === "livraison" && ancienCanal !== "livraison";
 
   let adresse: string | null = null;
   let zone: string | null = null;
@@ -1163,6 +1164,22 @@ export async function PATCH(request: Request) {
     const { error: erreurSuppressionLivraison } = await supabase.from("livraisons").delete().eq("commande_id", body.commandeId);
     if (erreurSuppressionLivraison) {
       console.error("[/api/caisse/commandes PATCH] échec suppression suivi livraison :", erreurSuppressionLivraison.message);
+    }
+  }
+
+  // Passage sur place/à emporter -> livraison : crée le suivi livreur
+  // (même logique qu'à la création, cf. POST plus haut) — sans cette
+  // ligne, le ticket imprimait "livraison" mais sans QR, aucun moyen pour
+  // un livreur de la prendre en charge. Bug réel constaté le 2026-10-23,
+  // commande #570 : premier cas réel de ce nouveau sens de passage,
+  // introduit la veille (jamais permis avant), et cette ligne manquante
+  // était passée inaperçue. Best effort, même raison qu'à la création.
+  if (passageVersLivraison) {
+    const { error: erreurCreationLivraison } = await supabase
+      .from("livraisons")
+      .insert({ commande_id: body.commandeId, heure_souhaitee: heureSouhaitee.toISOString() });
+    if (erreurCreationLivraison) {
+      console.error("[/api/caisse/commandes PATCH] échec création suivi livraison :", erreurCreationLivraison.message);
     }
   }
 
