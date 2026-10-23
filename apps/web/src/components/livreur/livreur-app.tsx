@@ -56,6 +56,30 @@ function declarationVide(): DeclarationEnCours {
   };
 }
 
+const CLE_WHATSAPP_OUVERTS = "livreur_whatsapp_ouverts";
+
+/** Borné au jour en cours (clé incluant la date) : jamais besoin de nettoyer manuellement, les anciennes marques disparaissent toutes seules le lendemain. */
+function chargerWhatsappOuverts(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const brut = localStorage.getItem(CLE_WHATSAPP_OUVERTS);
+    if (!brut) return new Set();
+    const { jour, ids } = JSON.parse(brut) as { jour: string; ids: string[] };
+    return jour === new Date().toISOString().slice(0, 10) ? new Set(ids) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function sauvegarderWhatsappOuverts(ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CLE_WHATSAPP_OUVERTS, JSON.stringify({ jour: new Date().toISOString().slice(0, 10), ids: [...ids] }));
+  } catch {
+    // Échec silencieux (mode privé, stockage plein...) : jamais bloquant, juste moins pratique.
+  }
+}
+
 // Toujours la date ET l'heure, jamais l'heure seule — sinon impossible de
 // distinguer une livraison de la veille restée bloquée d'une du jour même.
 function formaterHeure(iso: string | null): string {
@@ -78,8 +102,15 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // Mémorise lesquelles ont déjà été tapotées (on sait seulement que le
   // lien a été ouvert, jamais que le message a vraiment été envoyé — texte
   // volontairement "ouvert", jamais "envoyé", pour rester honnête sur ce
-  // qu'on peut savoir).
-  const [whatsappOuverts, setWhatsappOuverts] = useState<Set<string>>(new Set());
+  // qu'on peut savoir). Persisté sur le téléphone (localStorage), borné au
+  // jour en cours : sans ça, revenir sur /livreur après être passé par une
+  // autre page (ex: scanner le ticket d'une nouvelle commande) rechargeait
+  // tout le composant et faisait réapparaître le bouton comme si rien
+  // n'avait été envoyé — bug réel constaté le 2026-10-23.
+  const [whatsappOuverts, setWhatsappOuverts] = useState<Set<string>>(() => chargerWhatsappOuverts());
+  useEffect(() => {
+    sauvegarderWhatsappOuverts(whatsappOuverts);
+  }, [whatsappOuverts]);
   // Recherche locale parmi les livraisons déjà assignées — utile dès que
   // le livreur en a plusieurs en main et veut retrouver vite un client par
   // numéro de commande, nom ou adresse, sans faire défiler toute la liste.
