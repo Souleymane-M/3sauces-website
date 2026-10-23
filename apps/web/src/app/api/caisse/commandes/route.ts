@@ -1166,11 +1166,17 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Sur place/à emporter sont payés dès la création (cf. POST) : la
-  // modification peut changer le mode et/ou le montant, donc les lignes de
-  // `paiements` déjà enregistrées sont remplacées pour rester cohérentes —
-  // jamais pour une livraison, dont le paiement n'existe pas encore ici.
-  if (canal !== "livraison") {
+  // Sur place/à emporter DÉJÀ PAYÉ (à la création, ou à l'instant via
+  // `passageVersRetrait`) : la modification peut changer le mode et/ou le
+  // montant, donc les lignes de `paiements` déjà enregistrées sont
+  // remplacées pour rester cohérentes. Jamais pour une livraison (le
+  // paiement n'existe pas encore) NI pour une réservation sur place/à
+  // emporter jamais payée (`paiement_statut !== "paye"`, possible depuis
+  // le 2026-10-07) — sinon une commande jamais encaissée se retrouvait
+  // avec une ligne `paiements` fictive, qui aurait fini en double le jour
+  // de sa régularisation réelle. Bug de la même famille que le blocage
+  // livraison constaté sur la commande #570, 2026-10-23.
+  if (canal !== "livraison" && (passageVersRetrait || commandeExistante.paiement_statut === "paye")) {
     const { error: erreurSuppressionPaiements } = await supabase.from("paiements").delete().eq("commande_id", body.commandeId);
     if (erreurSuppressionPaiements) {
       console.error("[/api/caisse/commandes PATCH] échec suppression anciens paiements :", erreurSuppressionPaiements.message);
