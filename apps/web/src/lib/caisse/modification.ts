@@ -17,6 +17,18 @@ export interface CommandeAModifier {
   lignes: LigneCommande[];
   /** `null` = commande d'origine publique (site) — seule éligible à la remise de lancement, y compris après modification ici. */
   commandePar: string | null;
+  /**
+   * Vrai UNIQUEMENT si réellement encaissée (`paiement_statut === "paye"`)
+   * — jamais déduit du canal : une commande sur place/à emporter n'est PAS
+   * automatiquement payée depuis le 2026-10-07 (réservation par téléphone
+   * ou pour un autre jour, reste "non_paye" jusqu'à l'encaissement réel).
+   * Sert à décider si le passage vers "livraison" est permis depuis cet
+   * écran — bug réel constaté le 2026-10-23, commande #570 : une
+   * commande jamais payée se voyait bloquée en pensant à tort qu'elle
+   * l'était déjà (le serveur ET le client faisaient tous les deux cette
+   * hypothèse fausse).
+   */
+  dejaPayee: boolean;
 }
 
 /**
@@ -45,7 +57,7 @@ export async function chargerCommandePourModification(
   const { data, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, canal, statut, contenu, nom_livraison, prenom, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, tampons_utilises, commande_par"
+      "id, numero, canal, statut, contenu, nom_livraison, prenom, client_telephone, adresse_livraison, zone_livraison, heure_souhaitee, mode_paiement, tampons_utilises, commande_par, paiement_statut"
     )
     .eq("id", commandeId)
     .maybeSingle();
@@ -97,6 +109,7 @@ export async function chargerCommandePourModification(
       modePaiement: data.mode_paiement,
       lignes: Array.isArray(data.contenu) ? (data.contenu as LigneCommande[]) : [],
       commandePar: data.commande_par,
+      dejaPayee: data.paiement_statut === "paye",
     },
     erreur: null,
   };

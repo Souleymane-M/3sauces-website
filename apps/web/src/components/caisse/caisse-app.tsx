@@ -269,6 +269,12 @@ export function CaisseApp({
   // seul cas). L'autre sens (livraison non payée -> sur place/à emporter,
   // paiement collecté maintenant) est sans risque et donc autorisé.
   const [canalOriginalEdition] = useState<Canal | null>(() => commandeExistante?.canal ?? null);
+  // Vrai blocage : seulement si la commande est RÉELLEMENT déjà payée,
+  // jamais déduit du seul canal (cf. `CommandeAModifier.dejaPayee`) — bug
+  // réel constaté le 2026-10-23, commande #570, bloquée à tort alors
+  // qu'elle n'avait jamais été payée.
+  const livraisonBloqueeParPaiement =
+    enModeEdition && canalOriginalEdition !== "livraison" && (commandeExistante?.dejaPayee ?? false);
   const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
 
   // Restauration du panier après un rechargement accidentel de l'iPad : on
@@ -1900,7 +1906,7 @@ export function CaisseApp({
                 <button
                   type="button"
                   onClick={() => setCanal("livraison")}
-                  disabled={!livraisonPossible || (enModeEdition && canalOriginalEdition !== "livraison")}
+                  disabled={!livraisonPossible || livraisonBloqueeParPaiement}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
                   }`}
@@ -1909,7 +1915,7 @@ export function CaisseApp({
                 </button>
               </div>
               {!canal && <p className="mt-2 text-xs text-[#8B2020]">👆 Choisis une option avant d&apos;encaisser.</p>}
-              {enModeEdition && canalOriginalEdition !== "livraison" && (
+              {livraisonBloqueeParPaiement && (
                 <p className="mt-2 text-xs text-gray-400">
                   Passage à &quot;Livraison&quot; impossible ici (commande déjà payée) — annule et recrée-la si besoin.
                 </p>
