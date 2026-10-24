@@ -96,6 +96,7 @@ export interface Database {
           salade_prix_option: number | null;
           accompagnement_inclus: boolean;
           stock_jour: number | null;
+          rupture_le: string | null;
           created_at: string;
           updated_at: string;
         };

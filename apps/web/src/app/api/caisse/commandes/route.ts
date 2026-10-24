@@ -134,7 +134,7 @@ async function validerLignesCommande(
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, stock_jour"
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, stock_jour, rupture_le"
     )
     .in("id", produitIds);
   if (erreurProduits) {
@@ -182,8 +182,8 @@ async function validerLignesCommande(
 
   for (const ligneBrute of lignesBrutes as LigneCommandePayload[]) {
     const produit = produitParId.get(ligneBrute.produitId);
-    if (!produit || !produit.actif) {
-      throw new ErreurValidation(`Produit introuvable ou inactif : ${ligneBrute.produitId}`);
+    if (!produit || !produit.actif || produit.rupture_le === dateMayotteIso()) {
+      throw new ErreurValidation(`Produit introuvable, inactif ou en rupture aujourd'hui : ${ligneBrute.produitId}`);
     }
 
     const quantite = Number(ligneBrute.quantite);

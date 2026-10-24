@@ -46,6 +46,8 @@ export interface ProduitCaisse extends Omit<ProduitPublic, "prix"> {
   coutMatiere: number | null;
   estPlatDuJour: boolean;
   estDesactivable: boolean;
+  /** Masqué du site public pour aujourd'hui, mais toujours visible en caisse (barré) pour pouvoir le réactiver d'un tap — cf. lib/caisse/rupture.ts. */
+  enRupture: boolean;
 }
 
 export interface ViandeCaisse {

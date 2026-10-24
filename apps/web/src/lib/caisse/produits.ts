@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
+import { dateMayotteIso } from "@/lib/commande-publique/creneau";
 import type { ProduitCaisse, ViandeCaisse, SauceCaisse, SaveurCaisse } from "./types";
 
 /**
@@ -18,7 +19,7 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
   const { data, error } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, description, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, est_plat_du_jour, est_desactivable, salade_incluse, salade_prix_option, accompagnement_inclus, stock_jour"
+      "id, nom, categorie, prix, description, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, est_plat_du_jour, est_desactivable, salade_incluse, salade_prix_option, accompagnement_inclus, stock_jour, rupture_le"
     )
     .eq("actif", true)
     .order("categorie", { ascending: true })
@@ -28,6 +29,7 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
     throw new Error(`Impossible de charger la carte : ${error.message}`);
   }
 
+  const aujourdHui = dateMayotteIso();
   return (data ?? []).map((p) => ({
     id: p.id,
     nom: p.nom,
@@ -47,6 +49,7 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
     saladePrixOption: p.salade_prix_option,
     accompagnementInclus: p.accompagnement_inclus,
     stockJour: p.stock_jour,
+    enRupture: p.rupture_le === aujourdHui,
   }));
 }
 
