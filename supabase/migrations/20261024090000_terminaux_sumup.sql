@@ -15,3 +15,7 @@ comment on table terminaux_sumup is
   'Boîtiers SumUp Solo jumelés avec le compte marchand, gérés depuis /patron. Le Solo Lite (livraison) ne peut pas être jumelé ici — il fonctionne en Bluetooth avec un téléphone, pas via la Cloud API.';
 comment on column terminaux_sumup.reader_id is
   'Identifiant SumUp du lecteur ("rdr_..."), renvoyé lors du jumelage — utilisé pour cibler ce boîtier précis dans les appels Cloud API.';
+
+-- Jamais d'accès anon/authenticated : uniquement la clé service-role côté
+-- serveur, comme toutes les autres tables du projet (ex: livraisons).
+alter table terminaux_sumup enable row level security;
