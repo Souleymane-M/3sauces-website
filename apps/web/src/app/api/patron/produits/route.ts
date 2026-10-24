@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/get-session";
+import { requireRoleMetier } from "@/lib/auth/get-session";
 import { listerProduitsAdmin, creerProduit, mettreAJourProduit, supprimerProduit } from "@/lib/patron/produits";
 import { CATEGORIES, type ProduitAdminInput, type ProduitAdminPatch } from "@/lib/patron/produits-types";
 import type { Categorie } from "@3sauces/supabase";
@@ -29,7 +29,7 @@ function validerEntierEntre(valeur: unknown, min: number, max: number): number |
 }
 
 export async function GET() {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["produits"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
@@ -39,7 +39,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["produits"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["produits"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
@@ -205,7 +205,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["produits"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }

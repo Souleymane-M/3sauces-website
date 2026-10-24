@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Canal, RoleMetier } from "@3sauces/supabase";
 import type { StatistiquesDurees, SeuilDeuxiemeLivreur, RepartitionMotifs } from "@/lib/patron/statistiques-equipe";
 import type { UtilisateurEquipe } from "@/lib/patron/utilisateurs";
+import { ProduitsView } from "./produits-view";
 
-type Onglet = "stats" | "parametres" | "utilisateurs";
+type Onglet = "stats" | "parametres" | "utilisateurs" | "produits";
 
 const LIBELLES_MOTIF: Record<string, string> = {
   no_show: "Client non venu (no-show)",
@@ -254,7 +255,7 @@ function UtilisateursSection() {
           </select>
           {role === "employe" && (
             <div className="flex gap-3">
-              {(["cuisine", "comptoir"] as const).map((r) => (
+              {(["cuisine", "comptoir", "produits"] as const).map((r) => (
                 <label key={r} className="flex items-center gap-1 text-sm">
                   <input
                     type="checkbox"
@@ -268,7 +269,7 @@ function UtilisateursSection() {
                       })
                     }
                   />
-                  {r === "cuisine" ? "Cuisine" : "Comptoir"}
+                  {r === "cuisine" ? "Cuisine" : r === "comptoir" ? "Comptoir" : "Produits"}
                 </label>
               ))}
             </div>
@@ -304,10 +305,10 @@ function UtilisateursSection() {
             </div>
             {u.role === "employe" && (
               <div className="mt-1 flex gap-3">
-                {(["cuisine", "comptoir"] as const).map((r) => (
+                {(["cuisine", "comptoir", "produits"] as const).map((r) => (
                   <label key={r} className="flex items-center gap-1 text-xs">
                     <input type="checkbox" checked={u.rolesMetier.includes(r)} onChange={() => basculerRole(u.id, u.rolesMetier, r)} />
-                    {r === "cuisine" ? "Cuisine" : "Comptoir"}
+                    {r === "cuisine" ? "Cuisine" : r === "comptoir" ? "Comptoir" : "Produits"}
                   </label>
                 ))}
               </div>
@@ -329,6 +330,7 @@ export function PilotageView() {
           ["stats", "Statistiques"],
           ["parametres", "Paramètres"],
           ["utilisateurs", "Utilisateurs"],
+          ["produits", "Produits"],
         ] as [Onglet, string][]).map(([valeur, libelle]) => (
           <button
             key={valeur}
@@ -340,12 +342,10 @@ export function PilotageView() {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-gray-500">
-        Catalogue produits : toujours géré depuis <a href="/patron" className="underline">/patron</a> pour l&apos;instant.
-      </p>
       {onglet === "stats" && <StatsSection />}
       {onglet === "parametres" && <ParametresSection />}
       {onglet === "utilisateurs" && <UtilisateursSection />}
+      {onglet === "produits" && <ProduitsView />}
     </div>
   );
 }

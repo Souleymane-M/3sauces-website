@@ -10,6 +10,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { CuisineView } from "./cuisine-view";
 import { ComptoirView } from "./comptoir-view";
 import { PilotageView } from "./pilotage-view";
+import { ProduitsView } from "./produits-view";
 import { useVerrouAppareil } from "./use-verrou-appareil";
 
 const INTERVALLE_POLLING_MS = 5000;
@@ -19,6 +20,7 @@ const LIBELLES_ROLE_METIER: Record<RoleMetier, string> = {
   comptoir: "Comptoir",
   livreur: "Livreur",
   patron: "Pilotage",
+  produits: "Produits",
 };
 
 interface SessionEquipe {
@@ -97,7 +99,8 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
     return () => clearInterval(intervalle);
   }, []);
 
-  const vueActiveConstruite = roleActif === "cuisine" || roleActif === "comptoir" || roleActif === "patron";
+  const vueActiveConstruite =
+    roleActif === "cuisine" || roleActif === "comptoir" || roleActif === "patron" || roleActif === "produits";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -135,6 +138,7 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
         <ComptoirView profilId={session.profilId} nom={session.nom} seuilAlerteMin={seuilAlerteMin} />
       )}
       {session && roleActif === "patron" && <PilotageView />}
+      {session && roleActif === "produits" && <ProduitsView />}
       {session && roleActif && !vueActiveConstruite && (
         <p className="mt-3 text-sm text-gray-500">
           Vue « {LIBELLES_ROLE_METIER[roleActif]} » — pas encore construite dans l&apos;interface équipe unifiée.

@@ -3,7 +3,7 @@ import type { RoleMetier } from "@3sauces/supabase";
 import { requireRoleMetier } from "@/lib/auth/get-session";
 import { definirActif, reinitialiserPin, definirRolesMetier } from "@/lib/patron/utilisateurs";
 
-const ROLES_METIER_VALIDES: RoleMetier[] = ["cuisine", "comptoir", "livreur", "patron"];
+const ROLES_METIER_VALIDES: RoleMetier[] = ["cuisine", "comptoir", "livreur", "patron", "produits"];
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireRoleMetier(["patron"]);

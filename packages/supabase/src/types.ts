@@ -9,7 +9,7 @@
 
 export type Role = "employe" | "livreur" | "patron";
 
-export type RoleMetier = "cuisine" | "comptoir" | "livreur" | "patron";
+export type RoleMetier = "cuisine" | "comptoir" | "livreur" | "patron" | "produits";
 
 export type Categorie =
   | "menu_special"
