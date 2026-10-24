@@ -463,6 +463,22 @@ export interface Database {
         Relationships: [];
       };
 
+      terminaux_sumup: {
+        Row: {
+          id: string;
+          nom: string;
+          reader_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          nom: string;
+          reader_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["terminaux_sumup"]["Insert"]>;
+        Relationships: [];
+      };
+
       commandes_evenements: {
         Row: {
           id: string;

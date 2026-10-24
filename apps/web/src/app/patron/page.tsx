@@ -5,6 +5,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { ProduitsApp } from "@/components/patron/produits-app";
 import { OptionsApp } from "@/components/patron/options-app";
 import { ImprimantesApp } from "@/components/patron/imprimantes-app";
+import { TerminauxSumupApp } from "@/components/patron/terminaux-sumup-app";
 import { CommandesHistoriqueApp } from "@/components/patron/commandes-historique-app";
 import { EncaissementsLivraisonApp } from "@/components/patron/encaissements-livraison-app";
 import { EncaissementsJourApp } from "@/components/patron/encaissements-jour-app";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/patron/parametres";
 import { listerOptionsAdmin } from "@/lib/patron/options";
 import { listerImprimantesAdmin } from "@/lib/patron/imprimantes";
+import { listerTerminauxSumupAdmin } from "@/lib/patron/terminaux-sumup";
 import { listerHistoriqueCommandes, calculerTempsPreparationMoyenParEmploye } from "@/lib/patron/commandes-historique";
 import { listerLivreursActifs } from "@/lib/cuisine/commandes";
 import {
@@ -76,6 +78,7 @@ export default async function PatronPage() {
     clients,
     messageMoment,
     livraisonActive,
+    terminauxSumup,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -97,6 +100,7 @@ export default async function PatronPage() {
     listerClientsAdmin(),
     chargerMessageDuMoment(),
     chargerLivraisonActive(),
+    listerTerminauxSumupAdmin(),
   ]);
 
   return (
@@ -185,6 +189,11 @@ export default async function PatronPage() {
                 <MessageMomentApp texteInitial={messageMoment.texte} actifInitial={messageMoment.actif} />
               </>
             ),
+          },
+          {
+            id: "paiement",
+            label: "Paiement",
+            contenu: <TerminauxSumupApp terminauxInitiaux={terminauxSumup} />,
           },
         ]}
       />
