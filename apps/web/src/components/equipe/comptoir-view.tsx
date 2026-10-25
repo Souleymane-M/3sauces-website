@@ -9,6 +9,8 @@ import type { LivraisonAEncaisser } from "@/lib/encaissements-livraison-types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { CaisseApp } from "@/components/caisse/caisse-app";
 import { EncaissementsLivraisonCaisse } from "@/components/caisse/encaissements-livraison-caisse";
+import { EtatSiteApp } from "@/components/patron/etat-site-app";
+import { LivraisonActiveApp } from "@/components/patron/livraison-active-app";
 import { ConfirmationPin } from "./confirmation-pin";
 import { FinServiceView } from "./fin-service-view";
 
@@ -114,6 +116,25 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
       setChargementCatalogue(false);
     }
   }
+
+  // Chargé une fois au montage (pas seulement à l'ouverture d'une sous-vue)
+  // pour que les interrupteurs Site/Livraison, affichés sur l'écran liste,
+  // aient leur état initial dès l'arrivée — demande explicite du patron,
+  // 2026-10-25. Fetch direct plutôt que `chargerCatalogue()` : évite le
+  // `setChargementCatalogue(true)` synchrone en tête de celle-ci (inutile
+  // ici, ce chargement est silencieux, pas un clic utilisateur).
+  useEffect(() => {
+    let annule = false;
+    fetch("/api/equipe/comptoir/catalogue")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && !annule) setCatalogue(data);
+      })
+      .catch(() => {});
+    return () => {
+      annule = true;
+    };
+  }, []);
 
   async function ouvrirVueAvecCatalogue(cible: "nouvelle_commande" | "encaissements") {
     const data = await chargerCatalogue();
@@ -240,6 +261,16 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
 
   return (
     <div className="mt-4">
+      {catalogue && (
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row">
+          <div className="flex-1">
+            <EtatSiteApp ouvertInitial={catalogue.parametres.siteOuvert} />
+          </div>
+          <div className="flex-1">
+            <LivraisonActiveApp actifInitial={catalogue.parametres.livraisonActive} />
+          </div>
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap justify-end gap-2">
         <button
           type="button"

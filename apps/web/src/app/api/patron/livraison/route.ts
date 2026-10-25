@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/get-session";
+import { requireRoleMetier } from "@/lib/auth/get-session";
 import { basculerLivraisonActive } from "@/lib/patron/parametres";
 
 export async function PATCH(request: Request) {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["comptoir"]);
   if (!session) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
