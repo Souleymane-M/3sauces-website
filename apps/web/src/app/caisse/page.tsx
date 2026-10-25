@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { CaisseApp } from "@/components/caisse/caisse-app";
+import { RappelFondsCaisse } from "@/components/caisse/rappel-fonds-caisse";
 import {
   listerProduitsActifs,
   listerViandesActives,
@@ -83,6 +84,12 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
             )}
           </Link>
           <Link
+            href="/caisse/tiroir"
+            className="rounded bg-gray-700 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+          >
+            Tiroir-caisse
+          </Link>
+          <Link
             href="/caisse/encaissements"
             className="flex items-center gap-2 rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white shadow-sm"
           >
@@ -99,6 +106,7 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
       <p className="mt-1 mb-6 text-sm text-gray-600">
         Prise de commande. Le stock/approvisionnement arrive avec le Module 3.
       </p>
+      <RappelFondsCaisse />
       <CaisseApp
         produits={produits}
         viandes={viandes}

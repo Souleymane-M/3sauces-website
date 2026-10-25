@@ -39,6 +39,8 @@ import {
 } from "@/lib/encaissements-livraison";
 import { chargerStatistiquesJour } from "@/lib/patron/statistiques";
 import { listerClientsAdmin } from "@/lib/patron/clients";
+import { listerHistoriqueTiroir } from "@/lib/caisse/tiroir";
+import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +81,7 @@ export default async function PatronPage() {
     messageMoment,
     livraisonActive,
     terminauxSumup,
+    historiqueTiroir,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -101,6 +104,8 @@ export default async function PatronPage() {
     chargerMessageDuMoment(),
     chargerLivraisonActive(),
     listerTerminauxSumupAdmin(),
+    // Ne jamais casser tout /patron si la table du tiroir n'existe pas encore.
+    listerHistoriqueTiroir().catch(() => []),
   ]);
 
   return (
@@ -134,6 +139,11 @@ export default async function PatronPage() {
                 <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
               </>
             ),
+          },
+          {
+            id: "caisse",
+            label: "Caisse",
+            contenu: <TiroirCaissePatronApp joursInitiaux={historiqueTiroir} />,
           },
           {
             id: "clients",

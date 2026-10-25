@@ -8,6 +8,7 @@ import type { CommandeAModifier } from "@/lib/caisse/modification";
 import type { LivraisonAEncaisser } from "@/lib/encaissements-livraison-types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { CaisseApp } from "@/components/caisse/caisse-app";
+import { BandeauFondsCaisse, TiroirCaisseApp } from "@/components/caisse/tiroir-caisse-app";
 import { EncaissementsLivraisonCaisse } from "@/components/caisse/encaissements-livraison-caisse";
 import { EtatSiteApp } from "@/components/patron/etat-site-app";
 import { LivraisonActiveApp } from "@/components/patron/livraison-active-app";
@@ -47,7 +48,7 @@ interface Catalogue {
   livraisonsAEncaisser: LivraisonAEncaisser[];
 }
 
-type Vue = "liste" | "nouvelle_commande" | "modifier_commande" | "encaissements" | "fin_service";
+type Vue = "liste" | "nouvelle_commande" | "modifier_commande" | "encaissements" | "fin_service" | "tiroir";
 
 /**
  * Vue COMPTOIR : montants et coordonnées client visibles (nécessaires
@@ -208,6 +209,10 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
     }
   }
 
+  if (vue === "tiroir") {
+    return <TiroirCaisseApp onFermer={() => setVue("nouvelle_commande")} />;
+  }
+
   if (vue === "fin_service") {
     return <FinServiceView profilId={profilId} onFermer={() => setVue("liste")} />;
   }
@@ -245,12 +250,20 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
           </button>
           <button
             type="button"
+            onClick={() => setVue("tiroir")}
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+          >
+            Tiroir-caisse
+          </button>
+          <button
+            type="button"
             onClick={() => setVue("fin_service")}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
           >
             Fin de service
           </button>
         </div>
+        <BandeauFondsCaisse onOuvrir={() => setVue("tiroir")} />
         <CaisseApp
           produits={catalogue.produits}
           viandes={catalogue.viandes}

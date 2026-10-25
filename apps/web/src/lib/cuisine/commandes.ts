@@ -291,7 +291,7 @@ export async function changerStatutCommande({
 
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
-    .select("id, canal, statut, mode_paiement, paiement_statut")
+    .select("id, canal, statut, mode_paiement, paiement_statut, montant")
     .eq("id", commandeId)
     .maybeSingle();
   if (erreurCommande || !commande) {
@@ -323,9 +323,30 @@ export async function changerStatutCommande({
     misesAJour.paiement_statut = "paye";
   }
 
-  const { error: erreurMaj } = await supabase.from("commandes").update(misesAJour).eq("id", commandeId);
+  // Mise à jour conditionnelle : seul l'appel qui fait réellement passer la
+  // commande à "payé" enregistre le paiement (pas de doublon si deux
+  // écrans valident la remise en même temps).
+  let requeteMaj = supabase.from("commandes").update(misesAJour).eq("id", commandeId);
+  if (misesAJour.paiement_statut) requeteMaj = requeteMaj.neq("paiement_statut", "paye");
+  const { data: lignesMaj, error: erreurMaj } = await requeteMaj.select("id");
   if (erreurMaj) {
     throw new Error(`Impossible de mettre à jour le statut : ${erreurMaj.message}`);
+  }
+
+  // Sans ligne `paiements`, l'encaissement fait à la remise n'apparaissait
+  // ni dans le total espèces/CB du jour ni dans le comptage du tiroir. Un
+  // paiement "mixte" n'a pas de répartition connue ici : on ne l'invente pas.
+  if (
+    misesAJour.paiement_statut &&
+    (lignesMaj ?? []).length > 0 &&
+    (commande.mode_paiement === "especes" || commande.mode_paiement === "cb")
+  ) {
+    const { error: erreurPaiement } = await supabase
+      .from("paiements")
+      .insert({ commande_id: commandeId, montant: Number(commande.montant), mode: commande.mode_paiement });
+    if (erreurPaiement) {
+      console.error("[cuisine/commandes] échec enregistrement paiement à la remise :", erreurPaiement.message);
+    }
   }
 
   // Effets de bord sur `livraisons` : alimentent les vues déjà présentes en

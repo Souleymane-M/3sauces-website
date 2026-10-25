@@ -479,6 +479,38 @@ export interface Database {
         Relationships: [];
       };
 
+      mouvements_caisse: {
+        Row: {
+          id: string;
+          date_jour: string;
+          type: "ouverture" | "sortie" | "cloture";
+          montant: number;
+          detail: Record<string, number> | null;
+          motif: string | null;
+          attendu: number | null;
+          ecart: number | null;
+          profil_id: string;
+          created_at: string;
+          annule_le: string | null;
+          annule_par: string | null;
+        };
+        Insert: {
+          id?: string;
+          date_jour: string;
+          type: "ouverture" | "sortie" | "cloture";
+          montant: number;
+          detail?: Record<string, number> | null;
+          motif?: string | null;
+          attendu?: number | null;
+          ecart?: number | null;
+          profil_id: string;
+          annule_le?: string | null;
+          annule_par?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["mouvements_caisse"]["Insert"]>;
+        Relationships: [];
+      };
+
       commandes_evenements: {
         Row: {
           id: string;
