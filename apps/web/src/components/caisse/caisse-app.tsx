@@ -163,7 +163,7 @@ function platVide(numero: number): PlatGroupeCaisse {
  * question de canal de prise de commande, seulement du nombre de plats.
  */
 export function CaisseApp({
-  produits: produitsInitiaux,
+  produits,
   viandes,
   sauces,
   saveurs,
@@ -176,40 +176,6 @@ export function CaisseApp({
   const router = useRouter();
   const enModeEdition = commandeExistante != null;
   const terminerModification = onTerminerModification ?? (() => router.push("/commandes"));
-
-  // État local (plutôt que la prop directement) uniquement pour permettre
-  // la bascule optimiste de la rupture du jour, cf. `basculerRupture` —
-  // demande explicite du patron, 2026-10-24 : un tap depuis la caisse,
-  // jamais besoin de repasser par l'écran Produits complet en plein coup
-  // de feu.
-  const [produits, setProduits] = useState<ProduitCaisse[]>(produitsInitiaux);
-  const [rupturesEnCours, setRupturesEnCours] = useState<Set<string>>(new Set());
-
-  async function basculerRupture(produit: ProduitCaisse) {
-    const enRupture = !produit.enRupture;
-    setRupturesEnCours((prec) => new Set(prec).add(produit.id));
-    setProduits((prec) => prec.map((p) => (p.id === produit.id ? { ...p, enRupture } : p)));
-    try {
-      const reponse = await fetch("/api/caisse/produits/rupture", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ produitId: produit.id, enRupture }),
-      });
-      if (!reponse.ok) {
-        // Échec : on annule l'affichage optimiste plutôt que de laisser
-        // croire que c'est fait alors que ça ne l'est pas réellement.
-        setProduits((prec) => prec.map((p) => (p.id === produit.id ? { ...p, enRupture: !enRupture } : p)));
-      }
-    } catch {
-      setProduits((prec) => prec.map((p) => (p.id === produit.id ? { ...p, enRupture: !enRupture } : p)));
-    } finally {
-      setRupturesEnCours((prec) => {
-        const suivant = new Set(prec);
-        suivant.delete(produit.id);
-        return suivant;
-      });
-    }
-  }
 
   /**
    * Convertit une ligne persistée (`commandes.contenu`) en ligne de panier en
@@ -856,7 +822,7 @@ export function CaisseApp({
     const ligne = ligneAuPanierDirect(produit.id, saveur);
     const q = ligne?.quantite ?? 0;
     const pieces = piecesParPaquet(produit.nom);
-    const epuise = produit.stockJour === 0 || produit.enRupture;
+    const epuise = produit.stockJour === 0;
     const prix = produit.prix ?? 0;
     const sousLigne =
       `${prix.toFixed(2)} €` +
@@ -867,12 +833,9 @@ export function CaisseApp({
           <p className={`truncate text-sm font-medium ${epuise ? "text-gray-400" : "text-gray-900"}`}>
             {saveur ?? produit.nom}
           </p>
-          <p className="text-xs text-gray-400">
-            {produit.enRupture ? "Rupture signalée" : produit.stockJour === 0 ? "Épuisé aujourd'hui" : sousLigne}
-          </p>
+          <p className="text-xs text-gray-400">{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {saveur === null && boutonRupture(produit)}
           {q > 0 && (
             <span className="min-w-[3.5rem] text-right text-sm font-extrabold text-[#8B2020]">
               {(prix * q).toFixed(2)} €
@@ -902,32 +865,6 @@ export function CaisseApp({
     );
   }
 
-  /**
-   * Bouton de bascule "rupture du jour" — un tap, accessible depuis la
-   * caisse sans passer par l'écran Produits complet (demande explicite du
-   * patron, 2026-10-24). `stopPropagation` : évite de déclencher l'ajout
-   * au panier quand ce bouton est imbriqué dans la carte cliquable de la
-   * grille.
-   */
-  function boutonRupture(produit: ProduitCaisse) {
-    const enCours = rupturesEnCours.has(produit.id);
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!enCours) basculerRupture(produit);
-        }}
-        disabled={enCours}
-        className={`shrink-0 rounded px-2 py-1 text-[11px] font-bold normal-case ${
-          produit.enRupture ? "bg-white text-[#2D5A27]" : "bg-black/20 text-white"
-        } disabled:opacity-40`}
-      >
-        {produit.enRupture ? "✅ Remettre en stock" : "⚠️ Rupture"}
-      </button>
-    );
-  }
-
   /** Rendu d'une section générique (bandeau de titre + grille de produits ou liste +/-) — réutilisé pour afficher deux sections côte à côte. */
   function afficherSection(section: Section, produitsAAfficher: ProduitCaisse[] = section.produits) {
     return (
@@ -943,37 +880,28 @@ export function CaisseApp({
           afficherGroupeAjoutDirect(produitsAAfficher, `${section.key}-liste`)
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {produitsAAfficher.map((produit) => {
-              const indisponible = produit.stockJour === 0 || produit.enRupture;
-              return (
-                <div
-                  key={produit.id}
-                  className={`relative rounded-lg border shadow-sm ${
-                    indisponible ? "border-gray-200 bg-gray-100 opacity-60" : "border-gray-200 bg-white"
-                  }`}
-                >
-                  <div className="absolute top-1 right-1">{boutonRupture(produit)}</div>
-                  <button
-                    onClick={() => !indisponible && surClicProduit(produit)}
-                    disabled={indisponible}
-                    className="w-full p-3 pr-16 text-left text-sm active:bg-gray-50"
-                  >
-                    <div className="font-medium text-gray-900">{produit.nom}</div>
-                    {produit.description && <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>}
-                    <div className="mt-1 font-semibold text-gray-900">
-                      {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
-                    </div>
-                    {produit.enRupture && <div className="mt-1 text-xs font-bold text-red-600">Rupture signalée</div>}
-                    {!produit.enRupture && produit.stockJour === 0 && (
-                      <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>
-                    )}
-                    {!produit.enRupture && produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
-                      <div className="mt-1 text-xs font-semibold text-orange-600">Plus que {produit.stockJour} !</div>
-                    )}
-                  </button>
+            {produitsAAfficher.map((produit) => (
+              <button
+                key={produit.id}
+                onClick={() => produit.stockJour !== 0 && surClicProduit(produit)}
+                disabled={produit.stockJour === 0}
+                className={`rounded-lg border p-3 text-left text-sm shadow-sm ${
+                  produit.stockJour === 0
+                    ? "border-gray-200 bg-gray-100 opacity-60"
+                    : "border-gray-200 bg-white active:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium text-gray-900">{produit.nom}</div>
+                {produit.description && <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>}
+                <div className="mt-1 font-semibold text-gray-900">
+                  {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
                 </div>
-              );
-            })}
+                {produit.stockJour === 0 && <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>}
+                {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
+                  <div className="mt-1 text-xs font-semibold text-orange-600">Plus que {produit.stockJour} !</div>
+                )}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -989,11 +917,10 @@ export function CaisseApp({
             ? [
                 <div
                   key={`${produit.id}-titre`}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
+                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
                   style={{ backgroundColor: "#C2540C" }}
                 >
-                  <span>{produit.nom}</span>
-                  {boutonRupture(produit)}
+                  {produit.nom}
                 </div>,
                 ...(produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) => ligneAjoutDirect(produit, s.nom)),
               ]

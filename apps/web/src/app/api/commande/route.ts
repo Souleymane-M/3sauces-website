@@ -242,7 +242,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, stock_jour, rupture_le"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, stock_jour"
     )
     .in("id", produitIds);
 
@@ -315,7 +315,7 @@ export async function POST(request: Request) {
     // Le site public n'affiche que des produits actifs à prix fixe (prix non
     // null) : un produit inactif ou à prix libre ici ne peut venir que d'une
     // requête trafiquée.
-    if (!produit || !produit.actif || produit.prix === null || produit.rupture_le === dateMayotteIso()) {
+    if (!produit || !produit.actif || produit.prix === null) {
       return NextResponse.json(
         { error: `Produit indisponible : ${ligneBrute.produitId}` },
         { status: 400 }

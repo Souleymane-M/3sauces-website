@@ -1,6 +1,5 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import { dateMayotteIso } from "./creneau";
 import type { ProduitPublic, ViandePublique, SaucePublique, SaveurPublique } from "./types";
 
 /**
@@ -16,7 +15,7 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
   const { data, error } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, salade_incluse, salade_prix_option, accompagnement_inclus, stock_jour, rupture_le"
+      "id, nom, categorie, prix, description, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, salade_incluse, salade_prix_option, accompagnement_inclus, stock_jour"
     )
     .eq("actif", true)
     .not("prix", "is", null)
@@ -27,15 +26,8 @@ export async function listerProduitsPublics(): Promise<ProduitPublic[]> {
     throw new Error(`Impossible de charger la carte : ${error.message}`);
   }
 
-  // Rupture signalée pour aujourd'hui (cf. lib/caisse/rupture.ts) : jamais
-  // proposé au client, se réinitialise tout seul le lendemain sans action
-  // manuelle. Filtré en JS, pas en SQL : un `.neq` sur une colonne
-  // nullable exclurait aussi, à tort, tous les produits jamais marqués
-  // (NULL != 'today' vaut NULL, pas vrai, en SQL).
-  const aujourdHui = dateMayotteIso();
   return (data ?? [])
     .filter((p): p is typeof p & { prix: number } => p.prix !== null)
-    .filter((p) => p.rupture_le !== aujourdHui)
     .map((p) => ({
       id: p.id,
       nom: p.nom,
