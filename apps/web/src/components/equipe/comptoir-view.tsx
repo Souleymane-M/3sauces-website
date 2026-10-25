@@ -70,7 +70,12 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
   const [annulationAvecMotifPour, setAnnulationAvecMotifPour] = useState<string | null>(null);
   const [motifChoisi, setMotifChoisi] = useState("");
   const [confirmationMotifOuverte, setConfirmationMotifOuverte] = useState(false);
-  const [vue, setVue] = useState<Vue>("liste");
+  // La caisse (prise de commande) est l'écran le plus utilisé : on y
+  // arrive directement en ouvrant Comptoir, exactement comme /caisse
+  // seule — demande explicite du patron, 2026-10-25. Les autres écrans
+  // (liste/remise/annuler, encaissements, fin de service) restent
+  // accessibles via les boutons d'en-tête, jamais supprimés.
+  const [vue, setVue] = useState<Vue>("nouvelle_commande");
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [chargementCatalogue, setChargementCatalogue] = useState(false);
   const [commandeAModifier, setCommandeAModifier] = useState<CommandeAModifier | null>(null);
@@ -207,12 +212,45 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
     return <FinServiceView profilId={profilId} onFermer={() => setVue("liste")} />;
   }
 
+  if (vue === "nouvelle_commande" && !catalogue) {
+    return <p className="mt-6 text-gray-500">Chargement…</p>;
+  }
+
   if (vue === "nouvelle_commande" && catalogue) {
     return (
       <div className="mt-4">
-        <button type="button" onClick={() => setVue("liste")} className="mb-3 text-sm text-gray-500 underline">
-          ← Retour à la liste
-        </button>
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setVue("liste")}
+            className="flex items-center gap-2 rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+          >
+            Commandes en cours
+            {commandes.length > 0 && (
+              <span className="rounded-full bg-gray-700 px-2 py-0.5 text-xs font-bold text-white">{commandes.length}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => ouvrirVueAvecCatalogue("encaissements")}
+            disabled={chargementCatalogue}
+            className="flex items-center gap-2 rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 disabled:opacity-50"
+          >
+            Encaissements
+            {catalogue.livraisonsAEncaisser.length > 0 && (
+              <span className="rounded-full bg-[#8B2020] px-2 py-0.5 text-xs font-bold text-white">
+                {catalogue.livraisonsAEncaisser.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setVue("fin_service")}
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+          >
+            Fin de service
+          </button>
+        </div>
         <CaisseApp
           produits={catalogue.produits}
           viandes={catalogue.viandes}

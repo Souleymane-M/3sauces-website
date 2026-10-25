@@ -400,8 +400,19 @@ export function CaisseApp({
   const encaisserEffectif = paiementImmediatPossible && encaisserMaintenant;
 
   // Choix du client au comptoir : certains ne veulent pas de papier. Le
-  // bon de cuisine, lui, n'est jamais concerné par cette case.
-  const [imprimerTicketClient, setImprimerTicketClient] = useState(true);
+  // bon de cuisine, lui, n'est jamais concerné par ce choix. `null` tant
+  // que la caissière n'a pas explicitement tranché (Oui/Non) — jamais de
+  // case précochée, pour forcer un choix actif à chaque commande (demande
+  // explicite du patron, 2026-10-25). Obligatoire (toujours imprimé, choix
+  // jamais proposé) pour une livraison ou une commande encaissée plus
+  // tard (réservation téléphonique) : personne n'est en face pour décider,
+  // et le ticket sert alors de preuve/suivi. `!encaisserEffectif` couvre
+  // déjà les deux cas : une livraison a toujours `encaisserEffectif`
+  // faux (jamais payée à la prise de commande, cf. `paiementImmediatPossible`
+  // juste au-dessus), inutile de re-tester `canal === "livraison"` à part.
+  const impressionTicketObligatoire = !encaisserEffectif;
+  const [choixImpressionTicket, setChoixImpressionTicket] = useState<boolean | null>(null);
+  const imprimerTicketClient = impressionTicketObligatoire ? true : choixImpressionTicket;
 
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
@@ -1255,7 +1266,7 @@ export function CaisseApp({
           adresse: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
-          imprimerTicketClient,
+          imprimerTicketClient: imprimerTicketClient ?? true,
         }),
       });
       const data = await reponse.json();
@@ -1285,7 +1296,7 @@ export function CaisseApp({
       setCanal(null);
       setDateCommande(datesOuvertes[0] ?? aujourdHui);
       setEncaisserMaintenant(true);
-      setImprimerTicketClient(true);
+      setChoixImpressionTicket(null);
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -2092,15 +2103,41 @@ export function CaisseApp({
             </div>
 
             {!enModeEdition && (
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={imprimerTicketClient}
-                  onChange={(e) => setImprimerTicketClient(e.target.checked)}
-                  className="h-5 w-5"
-                />
-                Imprimer le ticket client (le bon de cuisine s&apos;imprime toujours)
-              </label>
+              <div>
+                {impressionTicketObligatoire ? (
+                  <p className="text-sm text-gray-500">
+                    🖨️ Ticket client imprimé automatiquement pour cette commande (bon de cuisine toujours imprimé).
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-700">Imprimer le ticket client ?</p>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setChoixImpressionTicket(true)}
+                        className={`rounded border py-2 text-sm font-bold uppercase ${
+                          choixImpressionTicket === true
+                            ? "border-[#8B2020] bg-[#8B2020] text-white"
+                            : "border-gray-300 text-gray-700"
+                        }`}
+                      >
+                        Oui
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChoixImpressionTicket(false)}
+                        className={`rounded border py-2 text-sm font-bold uppercase ${
+                          choixImpressionTicket === false
+                            ? "border-[#8B2020] bg-[#8B2020] text-white"
+                            : "border-gray-300 text-gray-700"
+                        }`}
+                      >
+                        Non
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
@@ -2112,6 +2149,7 @@ export function CaisseApp({
                 envoiEnCours ||
                 canalLivraisonBloque ||
                 infosClientIncompletes ||
+                (!enModeEdition && !impressionTicketObligatoire && choixImpressionTicket === null) ||
                 (enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
                 (palierGroupeReel === "GROUPE_4" &&
                   boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes)
