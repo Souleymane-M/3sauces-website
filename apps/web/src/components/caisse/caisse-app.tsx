@@ -122,6 +122,53 @@ const SECTIONS_AJOUT_DIRECT = new Set(["grillade", "accompagnement", "boisson"])
  * ou dans un autre onglet.
  */
 const CLE_PANIER_CAISSE = "3sauces_caisse_panier";
+const CLE_COMMANDES_EN_ATTENTE = "3sauces_caisse_en_attente";
+
+/**
+ * Instantané complet d'une commande "mise en attente" — demande explicite
+ * du patron, 2026-10-25 : pouvoir servir un autre client sans perdre ce
+ * qui a déjà été saisi. Capture tous les champs du formulaire (jamais les
+ * états purement transitoires comme `envoiEnCours`/`erreur`), persisté en
+ * sessionStorage comme le panier courant, pour survivre à un rechargement
+ * accidentel de l'iPad. Illimité, pas de plafond.
+ */
+interface CommandeEnAttente {
+  id: string;
+  libelle: string;
+  creeLe: string;
+  modeCommande: ModeCommande;
+  panierSimple: LignePanier[];
+  plats: PlatGroupeCaisse[];
+  platDeplie: string | null;
+  platActifId: string;
+  canal: Canal | null;
+  boissonOfferteSaveurs: string[];
+  modePaiement: ModePaiementCommande;
+  montantEspecesMixte: string;
+  telephone: string;
+  clientInfo: ClientInfo | null;
+  nbTamponsAUtiliser: number;
+  dateCommande: string;
+  creneauHeure: string;
+  encaisserMaintenant: boolean;
+  choixImpressionTicket: boolean | null;
+  nom: string;
+  prenom: string;
+  email: string;
+  adresse: string;
+  zone: string;
+  montantRecuEspeces: string;
+}
+
+function chargerCommandesEnAttente(): CommandeEnAttente[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const brut = sessionStorage.getItem(CLE_COMMANDES_EN_ATTENTE);
+    return brut ? JSON.parse(brut) : [];
+  } catch {
+    return [];
+  }
+}
 
 interface ClientInfo {
   existe: boolean;
@@ -337,6 +384,22 @@ export function CaisseApp({
     boissonOfferteSaveurs,
   ]);
 
+  // Commandes mises de côté pendant la saisie (demande explicite du
+  // patron, 2026-10-25) : jamais en mode édition (modifier une commande
+  // déjà soumise est un flux à part). Persisté en sessionStorage comme le
+  // panier courant, pour survivre à un rechargement accidentel.
+  const [commandesEnAttente, setCommandesEnAttente] = useState<CommandeEnAttente[]>(() =>
+    enModeEdition ? [] : chargerCommandesEnAttente()
+  );
+  useEffect(() => {
+    if (enModeEdition) return;
+    try {
+      sessionStorage.setItem(CLE_COMMANDES_EN_ATTENTE, JSON.stringify(commandesEnAttente));
+    } catch {
+      // Stockage plein ou indisponible : la session continue simplement sans persistance.
+    }
+  }, [enModeEdition, commandesEnAttente]);
+
   const [modePaiement, setModePaiement] = useState<ModePaiementCommande>(() => commandeExistante?.modePaiement ?? "especes");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   // Pur calcul d'appoint à l'écran, jamais envoyé au serveur ni enregistré —
@@ -424,6 +487,118 @@ export function CaisseApp({
   const [email, setEmail] = useState("");
   const [adresse, setAdresse] = useState(() => commandeExistante?.adresse ?? "");
   const [zone, setZone] = useState(() => commandeExistante?.zone ?? parametres.zonesActives[0] ?? "");
+
+  /** Vrai dès que quoi que ce soit a été saisi pour la commande en cours — sert à décider si on doit la mettre de côté automatiquement avant d'en reprendre une autre. */
+  function saisieEnCours(): boolean {
+    return (
+      panierSimple.length > 0 ||
+      plats.some((p) => p.lignes.length > 0) ||
+      nom.trim() !== "" ||
+      prenom.trim() !== "" ||
+      telephone.trim() !== "" ||
+      canal !== null
+    );
+  }
+
+  function capturerCommandeEnAttente(libelle: string): CommandeEnAttente {
+    return {
+      id: crypto.randomUUID(),
+      libelle,
+      creeLe: new Date().toISOString(),
+      modeCommande,
+      panierSimple,
+      plats,
+      platDeplie,
+      platActifId,
+      canal,
+      boissonOfferteSaveurs,
+      modePaiement,
+      montantEspecesMixte,
+      telephone,
+      clientInfo,
+      nbTamponsAUtiliser,
+      dateCommande,
+      creneauHeure,
+      encaisserMaintenant,
+      choixImpressionTicket,
+      nom,
+      prenom,
+      email,
+      adresse,
+      zone,
+      montantRecuEspeces,
+    };
+  }
+
+  /** Vide intégralement le formulaire — réutilisé après un encaissement réussi et avant de mettre une commande de côté. */
+  function reinitialiserFormulaire() {
+    setModeCommande(null);
+    setPanierSimple([]);
+    setPlats([platVide(1)]);
+    setPlatDeplie(null);
+    setBoissonOfferteSaveurs([]);
+    setModePaiement("especes");
+    setMontantEspecesMixte("");
+    setTelephone("");
+    setClientInfo(null);
+    setNbTamponsAUtiliser(0);
+    setNom("");
+    setPrenom("");
+    setEmail("");
+    setAdresse("");
+    setZone(parametres.zonesActives[0] ?? "");
+    setMontantRecuEspeces("");
+    setCanal(null);
+    setDateCommande(datesOuvertes[0] ?? aujourdHui);
+    setEncaisserMaintenant(true);
+    setChoixImpressionTicket(null);
+  }
+
+  function appliquerCommandeEnAttente(c: CommandeEnAttente) {
+    setModeCommande(c.modeCommande);
+    setPanierSimple(c.panierSimple);
+    setPlats(c.plats);
+    setPlatDeplie(c.platDeplie);
+    setPlatActifId(c.platActifId);
+    setCanal(c.canal);
+    setBoissonOfferteSaveurs(c.boissonOfferteSaveurs);
+    setModePaiement(c.modePaiement);
+    setMontantEspecesMixte(c.montantEspecesMixte);
+    setTelephone(c.telephone);
+    setClientInfo(c.clientInfo);
+    setNbTamponsAUtiliser(c.nbTamponsAUtiliser);
+    setDateCommande(c.dateCommande);
+    setCreneauHeure(c.creneauHeure);
+    setEncaisserMaintenant(c.encaisserMaintenant);
+    setChoixImpressionTicket(c.choixImpressionTicket);
+    setNom(c.nom);
+    setPrenom(c.prenom);
+    setEmail(c.email);
+    setAdresse(c.adresse);
+    setZone(c.zone);
+    setMontantRecuEspeces(c.montantRecuEspeces);
+  }
+
+  function mettreEnAttente() {
+    const libelle = `${prenom.trim()} ${nom.trim()}`.trim() || telephone.trim() || "Client";
+    setCommandesEnAttente((prec) => [...prec, capturerCommandeEnAttente(libelle)]);
+    reinitialiserFormulaire();
+  }
+
+  function reprendreCommande(id: string) {
+    const cible = commandesEnAttente.find((c) => c.id === id);
+    if (!cible) return;
+    setCommandesEnAttente((prec) => {
+      // Si une saisie est déjà en cours (non sauvegardée), on la met de
+      // côté à son tour plutôt que de l'écraser silencieusement — jamais
+      // rien perdu, demande explicite du patron, 2026-10-25.
+      const suite = saisieEnCours()
+        ? [...prec.filter((c) => c.id !== id), capturerCommandeEnAttente(`${prenom.trim()} ${nom.trim()}`.trim() || telephone.trim() || "Client")]
+        : prec.filter((c) => c.id !== id);
+      return suite;
+    });
+    appliquerCommandeEnAttente(cible);
+  }
 
   // Impression thermique (comptoir + cuisine) : la config réseau est
   // re-récupérée juste avant chaque impression (pas seulement au chargement)
@@ -1281,22 +1456,7 @@ export function CaisseApp({
       // les secondes qui suivent (cf. lib/caisse/nouvelles-commandes.ts,
       // app/api/print/epson/[token]) — plus aucun appel depuis le
       // navigateur, plus de dépendance au relais local.
-      setPanierSimple([]);
-      setPlats([platVide(1)]);
-      setPlatDeplie(null);
-      setModeCommande(null);
-      setTelephone("");
-      setClientInfo(null);
-      setNbTamponsAUtiliser(0);
-      setNom("");
-      setPrenom("");
-      setEmail("");
-      setAdresse("");
-      setMontantRecuEspeces("");
-      setCanal(null);
-      setDateCommande(datesOuvertes[0] ?? aujourdHui);
-      setEncaisserMaintenant(true);
-      setChoixImpressionTicket(null);
+      reinitialiserFormulaire();
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -1474,6 +1634,26 @@ export function CaisseApp({
 
   return (
     <div className={`space-y-4 ${modeCommande !== null ? "pb-20" : ""}`}>
+      {!enModeEdition && commandesEnAttente.length > 0 && (
+        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+            {commandesEnAttente.length} commande{commandesEnAttente.length > 1 ? "s" : ""} en attente
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {commandesEnAttente.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => reprendreCommande(c.id)}
+                className="rounded-full border border-[#8B2020] bg-white px-3 py-1.5 text-sm font-semibold text-[#8B2020]"
+              >
+                ▶ {c.libelle}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {modeCommande === null ? (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-center font-semibold text-gray-900">Le client commande pour lui, ou pour un groupe ?</p>
@@ -2138,6 +2318,16 @@ export function CaisseApp({
                   </>
                 )}
               </div>
+            )}
+
+            {!enModeEdition && panierActuel.length > 0 && (
+              <button
+                type="button"
+                onClick={mettreEnAttente}
+                className="w-full rounded border border-gray-400 py-2 text-sm font-semibold text-gray-700"
+              >
+                ⏸ Mettre cette commande en attente
+              </button>
             )}
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
