@@ -56,6 +56,74 @@ const inputClasse = "w-full rounded border border-gray-600 bg-gray-900 p-2 text-
  * Plats du jour côte à côte comme sur le site public ; tri par `ordre`
  * (colonne configurable via les flèches ▲▼, remplace l'ordre alphabétique).
  */
+/**
+ * Quantité exacte d'un plat du jour : boutons − / + et saisie directe, avec
+ * un bouton « Illimité » explicite (un champ vide avec un simple
+ * placeholder ne ressemblait pas à quelque chose de modifiable, demande du
+ * patron, 2026-10-26). Chaque action enregistre tout de suite.
+ */
+function StockJourEditeur({ stockJour, onChanger }: { stockJour: number | null; onChanger: (valeur: string) => void }) {
+  const [brouillon, setBrouillon] = useState<string | null>(null);
+  const affiche = brouillon ?? (stockJour === null ? "" : String(stockJour));
+
+  function valider(texte: string) {
+    setBrouillon(null);
+    onChanger(texte);
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="text-xs text-gray-400">
+        Quantité disponible aujourd&apos;hui :{" "}
+        <span className={stockJour === null ? "font-semibold text-orange-400" : "font-semibold text-green-400"}>
+          {stockJour === null ? "illimité" : `${stockJour} restant${stockJour > 1 ? "s" : ""}`}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Retirer 1"
+          onClick={() => valider(String(Math.max(0, (stockJour ?? 0) - 1)))}
+          disabled={stockJour === null}
+          className="h-9 w-9 rounded border border-gray-600 bg-gray-800 text-lg font-bold text-white disabled:opacity-40"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={999}
+          value={affiche}
+          placeholder="0"
+          onChange={(e) => setBrouillon(e.target.value)}
+          onBlur={() => brouillon !== null && brouillon.trim() !== "" && valider(brouillon)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && brouillon !== null && brouillon.trim() !== "") valider(brouillon);
+          }}
+          className="h-9 w-20 rounded border border-gray-600 bg-gray-800 text-center text-base text-white"
+        />
+        <button
+          type="button"
+          aria-label="Ajouter 1"
+          onClick={() => valider(String((stockJour ?? 0) + 1))}
+          className="h-9 w-9 rounded border border-gray-600 bg-gray-800 text-lg font-bold text-white"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => valider("")}
+          disabled={stockJour === null}
+          className="h-9 rounded border border-gray-600 px-3 text-xs font-semibold text-gray-300 disabled:opacity-40"
+        >
+          Illimité
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   const [produits, setProduits] = useState<ProduitAdmin[]>(produitsInitiaux);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -485,17 +553,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                       {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}
                     </div>
                     {produit.categorie === "plat_du_jour" && (
-                      <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
-                        Stock du jour :
-                        <input
-                          type="number"
-                          min={0}
-                          defaultValue={produit.stockJour ?? ""}
-                          placeholder="illimité"
-                          onBlur={(e) => mettreAJourStock(produit, e.target.value)}
-                          className="w-16 rounded border border-gray-600 bg-gray-800 p-1 text-white"
-                        />
-                      </label>
+                      <StockJourEditeur stockJour={produit.stockJour} onChanger={(valeur) => mettreAJourStock(produit, valeur)} />
                     )}
                   </div>
                   <InterrupteurActif actif={produit.actif} onBasculer={() => basculerActif(produit)} />
