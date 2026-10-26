@@ -44,12 +44,15 @@ export async function listerMouvementsJour(date: string): Promise<MouvementCaiss
 }
 
 export async function chargerEtatTiroir(date: string = dateMayotteIso()): Promise<EtatTiroir> {
-  const lignes = (await listerMouvementsJour(date)).filter((m) => !m.annule);
+  const toutes = await listerMouvementsJour(date);
+  const lignes = toutes.filter((m) => !m.annule);
+  const annulees = (type: "ouverture" | "cloture") => toutes.filter((m) => m.annule && m.type === type).length;
   return {
     date,
     ouverture: lignes.find((m) => m.type === "ouverture") ?? null,
     cloture: lignes.find((m) => m.type === "cloture") ?? null,
     sorties: lignes.filter((m) => m.type === "sortie"),
+    recomptages: { ouverture: annulees("ouverture"), cloture: annulees("cloture") },
   };
 }
 
@@ -215,4 +218,37 @@ export async function listerHistoriqueTiroir(jours = 14): Promise<JourTiroir[]> 
   return [...parJour.entries()]
     .sort(([a], [b]) => (a < b ? 1 : -1))
     .map(([date, mouvements]) => ({ date, mouvements }));
+}
+
+/**
+ * Recomptage (erreur de l'employé, ou second compteur) : l'ancienne ligne
+ * est annulée mais reste visible dans l'historique, puis la nouvelle est
+ * enregistrée. Les deux comptages — et leur auteur — restent donc toujours
+ * consultables par le patron. L'écart du premier comptage n'est jamais perdu.
+ */
+export async function recompter(
+  profilId: string,
+  type: "ouverture" | "cloture",
+  detail: unknown
+): Promise<ResultatSaisie & { bilan?: BilanTiroir; compte?: number }> {
+  if (totalBilletage(detail) === null) return { ok: false, erreur: "Comptage invalide.", statut: 400 };
+  const etat = await chargerEtatTiroir();
+  const existante = etat[type];
+  if (!existante) return { ok: false, erreur: "Rien à recompter : fais d'abord le premier comptage.", statut: 409 };
+  if (type === "ouverture" && etat.cloture) {
+    return { ok: false, erreur: "Le fonds ne peut plus être recompté après la clôture : demande au patron.", statut: 409 };
+  }
+  if (!(await annulerMouvement(existante.id, profilId))) {
+    return { ok: false, erreur: "Ce comptage vient d'être modifié, recharge l'écran.", statut: 409 };
+  }
+  try {
+    const r = type === "ouverture" ? await enregistrerOuverture(profilId, detail) : await enregistrerCloture(profilId, detail);
+    if (!r.ok) throw new Error(r.erreur);
+    return r;
+  } catch (e) {
+    // Échec de la nouvelle ligne : on remet l'ancienne en vigueur, jamais de trou.
+    const supabase = createServiceSupabaseClient();
+    await supabase.from("mouvements_caisse").update({ annule_le: null, annule_par: null }).eq("id", existante.id);
+    return { ok: false, erreur: e instanceof Error ? e.message : "Recomptage impossible.", statut: 500 };
+  }
 }

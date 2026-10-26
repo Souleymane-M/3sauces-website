@@ -47,4 +47,6 @@ export interface EtatTiroir {
   ouverture: MouvementCaisse | null;
   cloture: MouvementCaisse | null;
   sorties: MouvementCaisse[];
+  /** Nombre de lignes annulées (donc remplacées par un recomptage) ce jour-là. */
+  recomptages: { ouverture: number; cloture: number };
 }

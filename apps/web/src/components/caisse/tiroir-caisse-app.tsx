@@ -54,9 +54,14 @@ function GrilleComptage({ saisie, onChange }: { saisie: Record<string, string>; 
 
 type Mode = "accueil" | "ouverture" | "sortie" | "cloture";
 
+function libelleRecomptages(n: number): string {
+  return n > 0 ? ` · recompté ${n} fois (le patron voit tous les comptages)` : "";
+}
+
 export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
   const [etat, setEtat] = useState<EtatTiroir | null>(null);
   const [mode, setMode] = useState<Mode>("accueil");
+  const [recomptage, setRecomptage] = useState(false);
   const [saisie, setSaisie] = useState<Record<string, string>>({});
   const [montantSortie, setMontantSortie] = useState("");
   const [motif, setMotif] = useState("");
@@ -101,6 +106,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
       setMontantSortie("");
       setMotif("");
       setMode("accueil");
+      setRecomptage(false);
     } catch {
       setErreur("Échec de l'enregistrement.");
     } finally {
@@ -110,6 +116,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
 
   function annulerSaisie() {
     setMode("accueil");
+    setRecomptage(false);
     setSaisie({});
     setErreur(null);
   }
@@ -125,7 +132,15 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
     const ouverture = mode === "ouverture";
     return (
       <div className="mt-4 space-y-3">
-        <h2 className="text-xl font-bold text-black">{ouverture ? "Fonds de caisse (début de service)" : "Comptage de fin de journée"}</h2>
+        <h2 className="text-xl font-bold text-black">
+          {recomptage ? "Recomptage — " : ""}
+          {ouverture ? "Fonds de caisse (début de service)" : "Comptage de fin de journée"}
+        </h2>
+        {recomptage && (
+          <p className="rounded bg-orange-50 p-2 text-sm text-orange-800">
+            Le comptage précédent est conservé dans l&apos;historique et sera barré. Recompte tout depuis le début.
+          </p>
+        )}
         <p className="text-sm text-gray-600">
           {ouverture
             ? "Compte tout ce qui est dans le tiroir avant d'ouvrir. Saisis le nombre de chaque billet et pièce."
@@ -143,7 +158,9 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
             disabled={enCours || (ouverture && total <= 0)}
             onClick={() => {
               const texte = `${ouverture ? "Enregistrer le fonds de caisse" : "Valider le comptage"} : ${euros(total)} ?`;
-              if (window.confirm(texte)) envoyer({ action: mode, detail: versBilletage(saisie) });
+              if (window.confirm(texte)) {
+                envoyer({ action: recomptage ? `recompter_${mode}` : mode, detail: versBilletage(saisie) });
+              }
             }}
             className="flex-1 rounded bg-[#8B2020] px-4 py-2 font-bold text-white disabled:opacity-50"
           >
@@ -211,9 +228,23 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
       <div className="rounded border border-gray-200 bg-white p-3">
         <p className="text-sm font-semibold text-gray-600">Fonds de caisse</p>
         {etat.ouverture ? (
-          <p className="text-lg font-bold text-black">
-            {euros(etat.ouverture.montant)} <span className="text-sm font-normal text-gray-500">à {heure(etat.ouverture.creeLe)}, par {etat.ouverture.profilNom}</span>
-          </p>
+          <>
+            <p className="text-lg font-bold text-black">
+              {euros(etat.ouverture.montant)} <span className="text-sm font-normal text-gray-500">à {heure(etat.ouverture.creeLe)}, par {etat.ouverture.profilNom}{libelleRecomptages(etat.recomptages.ouverture)}</span>
+            </p>
+            {!cloture && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRecomptage(true);
+                  setMode("ouverture");
+                }}
+                className="mt-2 rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+              >
+                Je me suis trompé / recompter
+              </button>
+            )}
+          </>
         ) : (
           <>
             <p className="text-orange-700">Pas encore enregistré aujourd&apos;hui.</p>
@@ -268,8 +299,18 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
             )}
             {!etat.ouverture && <p className="text-sm text-orange-700">⚠ Pas de fonds de caisse enregistré : il compte pour 0.</p>}
             <p className="text-xs text-gray-500">
-              Clôturé à {heure(cloture.creeLe)} par {cloture.profilNom}. Une erreur se corrige par le patron.
+              Clôturé à {heure(cloture.creeLe)} par {cloture.profilNom}{libelleRecomptages(etat.recomptages.cloture)}.
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setRecomptage(true);
+                setMode("cloture");
+              }}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700"
+            >
+              Recompter (erreur ou second compteur)
+            </button>
           </div>
         ) : (
           <button type="button" onClick={() => setMode("cloture")} className="mt-2 rounded bg-[#2D5A27] px-4 py-2 font-bold text-white">

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { chargerEtatTiroir, enregistrerCloture, enregistrerOuverture, enregistrerSortie } from "@/lib/caisse/tiroir";
+import { chargerEtatTiroir, enregistrerCloture, enregistrerOuverture, enregistrerSortie, recompter } from "@/lib/caisse/tiroir";
 
 // Les employés ne voient jamais le montant attendu avant d'avoir validé leur
 // comptage (comptage à l'aveugle) : seule la réponse de la clôture le porte.
@@ -39,6 +39,11 @@ export async function POST(request: Request) {
     }
     if (body.action === "cloture") {
       const r = await enregistrerCloture(session.profilId, body.detail);
+      if (!r.ok) return NextResponse.json({ error: r.erreur }, { status: r.statut });
+      return NextResponse.json({ etat: await chargerEtatTiroir(), bilan: r.bilan, compte: r.compte });
+    }
+    if (body.action === "recompter_ouverture" || body.action === "recompter_cloture") {
+      const r = await recompter(session.profilId, body.action === "recompter_ouverture" ? "ouverture" : "cloture", body.detail);
       if (!r.ok) return NextResponse.json({ error: r.erreur }, { status: r.statut });
       return NextResponse.json({ etat: await chargerEtatTiroir(), bilan: r.bilan, compte: r.compte });
     }
