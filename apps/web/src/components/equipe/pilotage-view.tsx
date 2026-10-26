@@ -5,8 +5,11 @@ import type { Canal, RoleMetier } from "@3sauces/supabase";
 import type { StatistiquesDurees, SeuilDeuxiemeLivreur, RepartitionMotifs } from "@/lib/patron/statistiques-equipe";
 import type { UtilisateurEquipe } from "@/lib/patron/utilisateurs";
 import { ProduitsView } from "./produits-view";
+import { EnDirectApp } from "@/components/patron/en-direct-app";
+import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
+import type { JourTiroir } from "@/lib/caisse/tiroir";
 
-type Onglet = "stats" | "parametres" | "utilisateurs" | "produits";
+type Onglet = "stats" | "parametres" | "utilisateurs" | "produits" | "en_direct" | "caisse";
 
 const LIBELLES_MOTIF: Record<string, string> = {
   no_show: "Client non venu (no-show)",
@@ -320,17 +323,38 @@ function UtilisateursSection() {
   );
 }
 
+function CaisseSection() {
+  const [jours, setJours] = useState<JourTiroir[] | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/patron/tiroir", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.jours)) setJours(d.jours);
+        else setErreur(d.error ?? "Échec du chargement.");
+      })
+      .catch(() => setErreur("Erreur réseau, réessaie."));
+  }, []);
+
+  if (erreur) return <p className="mt-4 text-sm text-red-600">{erreur}</p>;
+  if (!jours) return <p className="mt-4 text-gray-500">Chargement…</p>;
+  return <TiroirCaissePatronApp joursInitiaux={jours} />;
+}
+
 export function PilotageView() {
   const [onglet, setOnglet] = useState<Onglet>("stats");
 
   return (
     <div className="mt-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {([
           ["stats", "Statistiques"],
           ["parametres", "Paramètres"],
           ["utilisateurs", "Utilisateurs"],
           ["produits", "Produits"],
+          ["en_direct", "En direct"],
+          ["caisse", "Caisse"],
         ] as [Onglet, string][]).map(([valeur, libelle]) => (
           <button
             key={valeur}
@@ -346,6 +370,16 @@ export function PilotageView() {
       {onglet === "parametres" && <ParametresSection />}
       {onglet === "utilisateurs" && <UtilisateursSection />}
       {onglet === "produits" && <ProduitsView />}
+      {onglet === "en_direct" && (
+        <div className="mt-4">
+          <EnDirectApp />
+        </div>
+      )}
+      {onglet === "caisse" && (
+        <div className="mt-4">
+          <CaisseSection />
+        </div>
+      )}
     </div>
   );
 }
