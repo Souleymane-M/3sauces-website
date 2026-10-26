@@ -479,6 +479,22 @@ export interface Database {
         Relationships: [];
       };
 
+      commandes_en_attente_caisse: {
+        Row: {
+          id: string;
+          contenu: Record<string, unknown>;
+          cree_par: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          contenu: Record<string, unknown>;
+          cree_par?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["commandes_en_attente_caisse"]["Insert"]>;
+        Relationships: [];
+      };
+
       mouvements_caisse: {
         Row: {
           id: string;

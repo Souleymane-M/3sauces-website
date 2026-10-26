@@ -118,8 +118,14 @@ function jourMayotte(iso: string): string {
  * 2026-10-16) — ce signal rend la différence visible d'un coup d'œil,
  * sans rien cacher.
  */
-function estAncienne(creeLe: string): boolean {
-  return jourMayotte(creeLe) !== jourMayotte(new Date().toISOString());
+function estAncienne(creeLe: string, heureSouhaitee: string | null = null): boolean {
+  const aujourdHui = jourMayotte(new Date().toISOString());
+  // Commande passée à l'avance (ex: dimanche, jour fermé, pour lundi) :
+  // tant que son jour prévu n'est pas passé, elle n'a rien d'anormal —
+  // seul l'avertissement "jamais finalisée" nous intéresse ici, demande
+  // du patron, 2026-10-26 (#602).
+  if (heureSouhaitee) return jourMayotte(heureSouhaitee) < aujourdHui;
+  return jourMayotte(creeLe) !== aujourdHui;
 }
 
 function formaterDepuis(iso: string): string {
@@ -205,7 +211,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
   const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
 
   const prioritaire = estPrioritaire(commande);
-  const ancienne = estAncienne(commande.creeLe);
+  const ancienne = estAncienne(commande.creeLe, commande.heureSouhaitee);
   const minutesDansEtape = minutesDepuis(commande.statutChangeLe ?? commande.creeLe);
   const enRetard =
     !ancienne &&

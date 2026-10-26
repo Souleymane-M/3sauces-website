@@ -103,7 +103,7 @@ export function EquipeApp({ session, tableauInitial, seuilAlerteMin, dureeVerrou
     roleActif === "cuisine" || roleActif === "comptoir" || roleActif === "patron" || roleActif === "produits";
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={roleActif === "comptoir" ? "mx-auto w-full" : "mx-auto max-w-3xl"}>
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-black">Équipe — 3 Sauces</h1>
         {session && (

@@ -122,15 +122,14 @@ const SECTIONS_AJOUT_DIRECT = new Set(["grillade", "accompagnement", "boisson"])
  * ou dans un autre onglet.
  */
 const CLE_PANIER_CAISSE = "3sauces_caisse_panier";
-const CLE_COMMANDES_EN_ATTENTE = "3sauces_caisse_en_attente";
 
 /**
  * Instantané complet d'une commande "mise en attente" — demande explicite
  * du patron, 2026-10-25 : pouvoir servir un autre client sans perdre ce
  * qui a déjà été saisi. Capture tous les champs du formulaire (jamais les
- * états purement transitoires comme `envoiEnCours`/`erreur`), persisté en
- * sessionStorage comme le panier courant, pour survivre à un rechargement
- * accidentel de l'iPad. Illimité, pas de plafond.
+ * états purement transitoires comme `envoiEnCours`/`erreur`), enregistré en
+ * base et partagé entre tous les appareils de la caisse. Illimité, pas de
+ * plafond.
  */
 interface CommandeEnAttente {
   id: string;
@@ -158,16 +157,6 @@ interface CommandeEnAttente {
   adresse: string;
   zone: string;
   montantRecuEspeces: string;
-}
-
-function chargerCommandesEnAttente(): CommandeEnAttente[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const brut = sessionStorage.getItem(CLE_COMMANDES_EN_ATTENTE);
-    return brut ? JSON.parse(brut) : [];
-  } catch {
-    return [];
-  }
 }
 
 interface ClientInfo {
@@ -386,19 +375,34 @@ export function CaisseApp({
 
   // Commandes mises de côté pendant la saisie (demande explicite du
   // patron, 2026-10-25) : jamais en mode édition (modifier une commande
-  // déjà soumise est un flux à part). Persisté en sessionStorage comme le
-  // panier courant, pour survivre à un rechargement accidentel.
-  const [commandesEnAttente, setCommandesEnAttente] = useState<CommandeEnAttente[]>(() =>
-    enModeEdition ? [] : chargerCommandesEnAttente()
-  );
+  // déjà soumise est un flux à part). Depuis le 2026-10-26 la liste vit en
+  // base et se synchronise toutes les 4 s : une commande mise en attente
+  // sur un appareil apparaît sur tous les autres.
+  const [commandesEnAttente, setCommandesEnAttente] = useState<CommandeEnAttente[]>([]);
+  // Incrémenté à chaque action locale terminée : une réponse de synchro
+  // partie avant elle est périmée et ignorée (sinon une commande qu'on
+  // vient d'ajouter pourrait disparaître une seconde).
+  const versionEnAttente = useRef(0);
   useEffect(() => {
     if (enModeEdition) return;
-    try {
-      sessionStorage.setItem(CLE_COMMANDES_EN_ATTENTE, JSON.stringify(commandesEnAttente));
-    } catch {
-      // Stockage plein ou indisponible : la session continue simplement sans persistance.
-    }
-  }, [enModeEdition, commandesEnAttente]);
+    let annule = false;
+    const synchroniser = () => {
+      const version = versionEnAttente.current;
+      fetch("/api/caisse/en-attente")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (annule || !d?.commandes || version !== versionEnAttente.current) return;
+          setCommandesEnAttente(d.commandes as CommandeEnAttente[]);
+        })
+        .catch(() => {});
+    };
+    synchroniser();
+    const intervalle = setInterval(synchroniser, 4000);
+    return () => {
+      annule = true;
+      clearInterval(intervalle);
+    };
+  }, [enModeEdition]);
 
   const [modePaiement, setModePaiement] = useState<ModePaiementCommande>(() => commandeExistante?.modePaiement ?? "especes");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
@@ -599,31 +603,67 @@ export function CaisseApp({
     return contenu ? `${heure} · ${contenu}` : heure;
   }
 
-  function mettreEnAttente() {
-    setCommandesEnAttente((prec) => [...prec, capturerCommandeEnAttente(libelleEnAttente(prec))]);
-    reinitialiserFormulaire();
+  async function appelEnAttente(methode: "POST" | "DELETE", c: CommandeEnAttente) {
+    const res =
+      methode === "POST"
+        ? await fetch("/api/caisse/en-attente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c) })
+        : await fetch(`/api/caisse/en-attente?id=${encodeURIComponent(c.id)}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Échec de la synchronisation.");
+    const d = (await res.json()) as { commandes: CommandeEnAttente[]; supprimee?: boolean };
+    versionEnAttente.current += 1;
+    setCommandesEnAttente(d.commandes);
+    return d;
+  }
+
+  // La saisie n'est effacée qu'une fois la commande bien enregistrée côté
+  // serveur : en cas d'échec réseau, rien n'est perdu.
+  async function mettreEnAttente() {
+    try {
+      await appelEnAttente("POST", capturerCommandeEnAttente(libelleEnAttente(commandesEnAttente)));
+      reinitialiserFormulaire();
+    } catch {
+      window.alert("Impossible de mettre la commande en attente (connexion ?). Elle est toujours à l'écran.");
+    }
   }
 
   // Suppression définitive d'une commande mise de côté (client parti) :
   // toujours confirmée, rien ne se perd par un simple appui involontaire.
-  function supprimerEnAttente(c: CommandeEnAttente) {
+  async function supprimerEnAttente(c: CommandeEnAttente) {
     if (!window.confirm(`Supprimer la commande en attente "${c.libelle}" ? Son contenu sera perdu.`)) return;
-    setCommandesEnAttente((prec) => prec.filter((x) => x.id !== c.id));
+    try {
+      await appelEnAttente("DELETE", c);
+    } catch {
+      window.alert("Suppression impossible (connexion ?).");
+    }
   }
 
-  function reprendreCommande(id: string) {
+  async function reprendreCommande(id: string) {
     const cible = commandesEnAttente.find((c) => c.id === id);
     if (!cible) return;
-    setCommandesEnAttente((prec) => {
+    try {
+      // Reprise = retrait côté serveur : un seul appareil peut la récupérer.
+      const { supprimee, commandes } = await appelEnAttente("DELETE", cible);
+      if (!supprimee) {
+        window.alert("Cette commande vient d'être reprise sur un autre appareil.");
+        return;
+      }
       // Si une saisie est déjà en cours (non sauvegardée), on la met de
       // côté à son tour plutôt que de l'écraser silencieusement — jamais
       // rien perdu, demande explicite du patron, 2026-10-25.
-      const suite = saisieEnCours()
-        ? [...prec.filter((c) => c.id !== id), capturerCommandeEnAttente(libelleEnAttente(prec.filter((c) => c.id !== id)))]
-        : prec.filter((c) => c.id !== id);
-      return suite;
-    });
-    appliquerCommandeEnAttente(cible);
+      if (saisieEnCours()) {
+        try {
+          await appelEnAttente("POST", capturerCommandeEnAttente(libelleEnAttente(commandes)));
+        } catch {
+          // Remise de la commande reprise en attente : on ne perd ni l'une ni l'autre.
+          await appelEnAttente("POST", cible).catch(() => {});
+          window.alert("Impossible de mettre la saisie en cours de côté (connexion ?). Rien n'a été changé.");
+          return;
+        }
+      }
+      appliquerCommandeEnAttente(cible);
+    } catch {
+      window.alert("Reprise impossible (connexion ?).");
+    }
   }
 
   // Impression thermique (comptoir + cuisine) : la config réseau est
