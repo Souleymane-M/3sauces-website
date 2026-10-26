@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/get-session";
+import { requireRoleMetier } from "@/lib/auth/get-session";
 import { chargerEtatSuivi } from "@/lib/suivi/etat";
 
 export async function GET() {
-  const session = await requireRole(["patron"]);
+  const session = await requireRoleMetier(["patron"]);
   if (!session) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   try {
     return NextResponse.json({ etat: await chargerEtatSuivi() }, { headers: { "Cache-Control": "no-store" } });
