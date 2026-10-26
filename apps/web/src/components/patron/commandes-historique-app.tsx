@@ -1,5 +1,6 @@
 "use client";
 
+import { libellePayee } from "@/lib/libelle-paiement";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL, type LivreurActif } from "@/lib/cuisine/types";
@@ -178,7 +179,7 @@ export function CommandesHistoriqueApp({
                   )}
                   {c.dejaPayee && (
                     <span className="ml-2 rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-bold text-green-400">
-                      ✅ DÉJÀ PAYÉE EN LIGNE
+                      ✅ {libellePayee(c.modePaiement)}
                     </span>
                   )}
                   {c.modePaiement === "stripe" && !c.dejaPayee && (

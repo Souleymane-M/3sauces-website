@@ -1,5 +1,6 @@
 "use client";
 
+import { libellePayee } from "@/lib/libelle-paiement";
 import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivraisonEnCours } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
@@ -281,7 +282,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           <p className="text-sm text-gray-500">Commandée le {formaterDateHeureComplete(commande.creeLe)}</p>
           {commande.dejaPayee && (
             <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-2 text-center">
-              <p className="text-lg font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+              <p className="text-lg font-extrabold text-[#2D5A27]">✅ {libellePayee(commande.modePaiement)}</p>
               <p className="text-sm font-semibold text-[#2D5A27]">Ne rien faire payer au client</p>
             </div>
           )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { libellePayeeCourt } from "@/lib/libelle-paiement";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ModePaiement } from "@3sauces/supabase";
@@ -227,7 +228,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
           ))}
         </div>
         <p className="mt-2 text-lg font-bold text-gray-900">
-          {livraison.dejaPayee ? "Déjà payée en ligne" : `À récupérer : ${montantDu.toFixed(2)} €`}
+          {livraison.dejaPayee ? libellePayeeCourt(livraison.modePaiement) : `À récupérer : ${montantDu.toFixed(2)} €`}
         </p>
       </div>
 

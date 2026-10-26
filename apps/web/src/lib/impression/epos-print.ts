@@ -1,4 +1,5 @@
 import type { CommandePourImpression } from "./types";
+import { libellePayeeTicket } from "@/lib/libelle-paiement";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -463,7 +464,7 @@ function construireContenuTicketClient(
   b.ligne(formaterDateHeure(commande.creeLe), { align: "center", gras: false, taille: 1 });
 
   if (commande.dejaPayee) {
-    b.ligne("*** DEJA PAYEE EN LIGNE ***", { align: "center", gras: true, taille: 2 });
+    b.ligne(`*** ${libellePayeeTicket(commande.modePaiement)} ***`, { align: "center", gras: true, taille: 2 });
     b.ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
   } else if (commande.modePaiement === "stripe") {
     // Paiement en ligne choisi mais jamais confirmé (abandon de checkout) —

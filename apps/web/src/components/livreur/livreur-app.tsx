@@ -1,5 +1,6 @@
 "use client";
 
+import { libellePayee } from "@/lib/libelle-paiement";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
@@ -354,7 +355,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
 
             {livraison.dejaPayee ? (
               <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-3 text-center">
-                <p className="text-xl font-extrabold text-[#2D5A27]">✅ DÉJÀ PAYÉE EN LIGNE</p>
+                <p className="text-xl font-extrabold text-[#2D5A27]">✅ {libellePayee(livraison.modePaiement)}</p>
                 <p className="text-base font-semibold text-[#2D5A27]">Rien à récupérer — ne rien demander au client</p>
               </div>
             ) : (
