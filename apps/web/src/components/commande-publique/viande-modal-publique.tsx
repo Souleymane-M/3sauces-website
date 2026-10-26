@@ -8,7 +8,11 @@ import type {
   SaveurPublique,
 } from "@/lib/commande-publique/types";
 import { GROUPE_ACCOMPAGNEMENT_COMBINABLE, GROUPE_ACCOMPAGNEMENT_EXCLUSIF } from "@/lib/commande-publique/accompagnements";
-import { MONTANT_REDUCTION_SANS_BOISSON, NOM_PRODUIT_MENU_ETUDIANT } from "@/lib/commande-publique/types";
+import {
+  MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
+  NOM_PRODUIT_MENU_ETUDIANT,
+} from "@/lib/commande-publique/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
 
 export interface ExtrasChoisis {
@@ -97,6 +101,9 @@ export function ViandeModalPublique({
   // clique rien pour ne pas en avoir — un seul geste au lieu de deux.
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
+  // "Salade ou boisson" : le client peut prendre l'une, l'autre ou les deux
+  // (les deux = supplément). `saladeGardee` vaut true si la salade est prise.
+  const [boissonVoulue, setBoissonVoulue] = useState(false);
   const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
   const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
 
@@ -115,7 +122,7 @@ export function ViandeModalPublique({
   const demandeSaladeOuBoisson = produit.saladeOuBoisson;
   const sansBoisson = proposeSansBoisson && boissonChoisie === null;
   const boissonRetenue = demandeSaladeOuBoisson
-    ? saladeGardee === false
+    ? boissonVoulue
       ? boissonChoisie
       : null
     : !produit.canetteIncluse || sansBoisson
@@ -144,7 +151,8 @@ export function ViandeModalPublique({
     (!demandeSauce || saucesChoisies.length >= 1) &&
     (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
-    (!demandeSaladeOuBoisson || saladeGardee === true || (saladeGardee === false && boissonChoisie !== null)) &&
+    (!demandeSaladeOuBoisson ||
+      ((saladeGardee === true || boissonVoulue) && (!boissonVoulue || boissonChoisie !== null))) &&
     (!demandeAccompagnement || accompagnementsChoisis.length >= 1);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
@@ -351,11 +359,13 @@ export function ViandeModalPublique({
 
         {demandeSaladeOuBoisson && (
           <div className="mt-5">
-            <p className="text-sm font-bold text-[#2D5A27]">Au choix, inclus : salade ou boisson</p>
+            <p className="text-sm font-bold text-[#2D5A27]">
+              Inclus au choix : salade ou boisson (les deux : +{MONTANT_SUPPLEMENT_SALADE_ET_BOISSON.toFixed(2)} €)
+            </p>
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
-                onClick={() => setSaladeGardee(true)}
+                onClick={() => setSaladeGardee((prec) => (prec === true ? false : true))}
                 className={`rounded-full border px-4 py-1.5 text-sm ${
                   saladeGardee === true
                     ? "border-[#2D5A27] bg-[#2D5A27] text-white"
@@ -366,9 +376,9 @@ export function ViandeModalPublique({
               </button>
               <button
                 type="button"
-                onClick={() => setSaladeGardee(false)}
+                onClick={() => setBoissonVoulue((prec) => !prec)}
                 className={`rounded-full border px-4 py-1.5 text-sm ${
-                  saladeGardee === false
+                  boissonVoulue
                     ? "border-[#C2540C] bg-[#C2540C] text-white"
                     : "border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}
@@ -376,7 +386,7 @@ export function ViandeModalPublique({
                 Boisson
               </button>
             </div>
-            {saladeGardee === false && (
+            {boissonVoulue && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {saveurs.map((s) => (
                   <button
@@ -393,6 +403,11 @@ export function ViandeModalPublique({
                   </button>
                 ))}
               </div>
+            )}
+            {saladeGardee === true && boissonVoulue && (
+              <p className="mt-2 text-sm font-semibold text-[#8B2020]">
+                Salade + boisson : +{MONTANT_SUPPLEMENT_SALADE_ET_BOISSON.toFixed(2)} €
+              </p>
             )}
           </div>
         )}
@@ -638,7 +653,7 @@ export function ViandeModalPublique({
                   saucesSupplementaires: extraSauces,
                 },
                 boissonRetenue,
-                produit.saladeIncluse || demandeSaladeOuBoisson ? saladeGardee : null,
+                produit.saladeIncluse ? saladeGardee : demandeSaladeOuBoisson ? saladeGardee === true : null,
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
                 sansBoisson,

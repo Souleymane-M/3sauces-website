@@ -7,6 +7,7 @@ import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifi
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import {
@@ -320,9 +321,12 @@ async function validerLignesCommande(
         throw new ErreurValidation(`Choix salade requis sur ${produit.nom}.`);
       }
       saladeIncluse = ligneBrute.saladeIncluse;
-      // "Salade OU boisson" : exactement l'un des deux, jamais les deux ni aucun.
-      if (produit.salade_ou_boisson && saladeIncluse === (boissonIncluse !== null)) {
+      // "Salade OU boisson" : au moins l'un des deux (les deux = supplément).
+      if (produit.salade_ou_boisson && !saladeIncluse && boissonIncluse === null) {
         throw new ErreurValidation(`Choisis la salade ou la boisson sur ${produit.nom}.`);
+      }
+      if (produit.salade_ou_boisson && saladeIncluse && boissonIncluse !== null) {
+        prixUnitaire = Math.round((prixUnitaire + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON) * 100) / 100;
       }
     } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
       throw new ErreurValidation(`Salade non proposée sur ${produit.nom}.`);

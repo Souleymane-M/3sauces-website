@@ -20,6 +20,7 @@ import type {
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
@@ -481,8 +482,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Choix salade requis sur ${produit.nom}.` }, { status: 400 });
       }
       saladeIncluse = ligneBrute.saladeIncluse;
-      // "Salade OU boisson" : exactement l'un des deux, jamais les deux ni aucun.
-      if (produit.salade_ou_boisson && saladeIncluse === (boissonIncluse !== null)) {
+      // "Salade OU boisson" : au moins l'un des deux (les deux = supplément).
+      if (produit.salade_ou_boisson && !saladeIncluse && boissonIncluse === null) {
         return NextResponse.json({ error: `Choisis la salade ou la boisson sur ${produit.nom}.` }, { status: 400 });
       }
     } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
@@ -539,7 +540,9 @@ export async function POST(request: Request) {
       prixUnitaire:
         produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
           ? Math.round((produit.prix + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
-          : produit.prix,
+          : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
+            ? Math.round((produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON) * 100) / 100
+            : produit.prix,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
       sauces,

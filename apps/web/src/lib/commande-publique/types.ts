@@ -75,6 +75,8 @@ export const NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE = "Sauce supplémentaire";
 export const NOM_PRODUIT_SALADE_SUPPLEMENTAIRE = "Salade supplémentaire";
 /** Réduction pour une formule à canette incluse (Tacos, Barquette, Bowl) commandée sans la canette. */
 export const MONTANT_REDUCTION_SANS_BOISSON = 1.5;
+/** Supplément quand le client prend la salade ET la boisson d'un plat "salade ou boisson" (ex: Poisson grillé 13 € → 15 €). */
+export const MONTANT_SUPPLEMENT_SALADE_ET_BOISSON = 2;
 /** Seule formule à canette incluse jamais éligible à "Sans boisson" — décision explicite du patron. */
 export const NOM_PRODUIT_MENU_ETUDIANT = "Menu Étudiant";
 

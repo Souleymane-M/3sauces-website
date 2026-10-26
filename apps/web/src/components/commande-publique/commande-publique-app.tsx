@@ -19,6 +19,7 @@ import {
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
@@ -474,7 +475,8 @@ export function CommandePubliqueApp({
     l.produit.prix +
     (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
       ? MONTANT_REDUCTION_SANS_BOISSON
-      : 0);
+      : 0) +
+    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
   // ceux dans lesquels le client a effectivement mis quelque chose.

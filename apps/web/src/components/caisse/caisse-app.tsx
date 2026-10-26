@@ -12,6 +12,7 @@ import {
   NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
   prochainCreneauValide,
@@ -847,7 +848,8 @@ export function CaisseApp({
     (l.produit.prix ?? l.prixSaisi ?? 0) +
     (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
       ? MONTANT_REDUCTION_SANS_BOISSON
-      : 0);
+      : 0) +
+    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
