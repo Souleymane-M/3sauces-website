@@ -659,7 +659,11 @@ export function CommandePubliqueApp({
 
   /** La ligne du panier correspondant à ce produit (+ cette saveur, s'il y en a une), pour afficher/ajuster sa quantité directement sur la page — sections `SECTIONS_AJOUT_DIRECT` uniquement, jamais de viande/sauce/salade sur ces produits. */
   function ligneAuPanierDirect(produitId: string, saveur: string | null) {
-    return panierActuel.find((l) => l.produit.id === produitId && (l.saveurs[0] ?? null) === saveur);
+    // En commande groupée, uniquement les lignes du plat ACTIF : les + / −
+    // agissent sur le plat en cours, jamais sur celui d'avant (bug : la
+    // quantité du plat précédent restait affichée sur le plat suivant).
+    const lignes = modeCommande === "groupee" ? platActif.lignes : panierSimple;
+    return lignes.find((l) => l.produit.id === produitId && (l.saveurs[0] ?? null) === saveur);
   }
 
   /**
