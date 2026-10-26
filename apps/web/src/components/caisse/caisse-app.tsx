@@ -604,6 +604,13 @@ export function CaisseApp({
     reinitialiserFormulaire();
   }
 
+  // Suppression définitive d'une commande mise de côté (client parti) :
+  // toujours confirmée, rien ne se perd par un simple appui involontaire.
+  function supprimerEnAttente(c: CommandeEnAttente) {
+    if (!window.confirm(`Supprimer la commande en attente "${c.libelle}" ? Son contenu sera perdu.`)) return;
+    setCommandesEnAttente((prec) => prec.filter((x) => x.id !== c.id));
+  }
+
   function reprendreCommande(id: string) {
     const cible = commandesEnAttente.find((c) => c.id === id);
     if (!cible) return;
@@ -1660,15 +1667,20 @@ export function CaisseApp({
           </p>
           <div className="flex flex-wrap gap-2">
             {commandesEnAttente.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => reprendreCommande(c.id)}
-                className="rounded-2xl border border-[#8B2020] bg-white px-3 py-1.5 text-left text-[#8B2020]"
-              >
-                <span className="block text-sm font-semibold">▶ {c.libelle}</span>
-                <span className="block text-xs font-normal text-gray-600">{resumeEnAttente(c)}</span>
-              </button>
+              <div key={c.id} className="flex items-stretch overflow-hidden rounded-2xl border border-[#8B2020] bg-white">
+                <button type="button" onClick={() => reprendreCommande(c.id)} className="px-3 py-1.5 text-left text-[#8B2020]">
+                  <span className="block text-sm font-semibold">▶ {c.libelle}</span>
+                  <span className="block text-xs font-normal text-gray-600">{resumeEnAttente(c)}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Supprimer la commande en attente ${c.libelle}`}
+                  onClick={() => supprimerEnAttente(c)}
+                  className="border-l border-[#8B2020]/30 px-3 text-lg font-bold text-gray-500 active:bg-gray-100"
+                >
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
         </div>
