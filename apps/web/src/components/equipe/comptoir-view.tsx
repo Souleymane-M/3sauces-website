@@ -23,6 +23,12 @@ const INTERVALLE_POLLING_MS = 5000;
 // encore changer. Demande explicite du patron, 2026-10-19.
 const STATUTS_MODIFIABLES = new Set(["en_attente", "en_preparation", "pret"]);
 
+const LIBELLES_CANAL: Record<string, string> = {
+  sur_place: "Sur place",
+  emporter: "À emporter",
+  livraison: "Livraison",
+};
+
 const LIBELLES_MOTIF: Record<string, string> = {
   no_show: "Client non venu (no-show)",
   erreur: "Erreur",
@@ -71,6 +77,11 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
   const [annulationAvecMotifPour, setAnnulationAvecMotifPour] = useState<string | null>(null);
   const [motifChoisi, setMotifChoisi] = useState("");
   const [confirmationMotifOuverte, setConfirmationMotifOuverte] = useState(false);
+  // Changement du mode de retrait (sur place / à emporter / livraison) d'une commande en cours.
+  const [canalEnEdition, setCanalEnEdition] = useState<string | null>(null);
+  const [nouveauCanal, setNouveauCanal] = useState<"sur_place" | "emporter" | "livraison" | null>(null);
+  const [adresseCanal, setAdresseCanal] = useState("");
+  const [zoneCanal, setZoneCanal] = useState("");
   // La caisse (prise de commande) est l'écran le plus utilisé : on y
   // arrive directement en ouvrant Comptoir, exactement comme /caisse
   // seule — demande explicite du patron, 2026-10-25. Les autres écrans
@@ -183,6 +194,35 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
         setErreur(data.error ?? "Erreur.");
         return;
       }
+      await charger();
+    } finally {
+      setEnCours(null);
+    }
+  }
+
+  async function appliquerChangementCanal(commandeId: string) {
+    if (!nouveauCanal) return;
+    setEnCours(commandeId);
+    setErreur(null);
+    try {
+      const res = await fetch("/api/equipe/comptoir/action", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commandeId,
+          action: "changer_canal",
+          profilId,
+          canal: nouveauCanal,
+          adresse: adresseCanal,
+          zone: zoneCanal,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErreur(data.error ?? "Erreur.");
+        return;
+      }
+      setCanalEnEdition(null);
       await charger();
     } finally {
       setEnCours(null);
@@ -399,6 +439,21 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                     Modifier
                   </button>
                 )}
+                {modifiable && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCanalEnEdition(canalEnEdition === c.id ? null : c.id);
+                      setNouveauCanal(null);
+                      setAdresseCanal(c.adresse ?? "");
+                      setZoneCanal("");
+                    }}
+                    disabled={enCours === c.id}
+                    className="rounded border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 disabled:opacity-50"
+                  >
+                    Mode de retrait
+                  </button>
+                )}
                 {c.statut === "en_attente" ? (
                   <button
                     type="button"
@@ -432,6 +487,73 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                   </button>
                 )}
               </div>
+
+              {canalEnEdition === c.id && (
+                <div className="mt-2 space-y-2 rounded border border-gray-300 bg-gray-50 p-2">
+                  <p className="text-sm font-semibold text-black">
+                    Actuellement : {LIBELLES_CANAL[c.canal] ?? c.canal}. Nouveau mode de retrait :
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(["sur_place", "emporter", "livraison"] as const)
+                      .filter((k) => k !== c.canal)
+                      .map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setNouveauCanal(k)}
+                          className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                            nouveauCanal === k ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 bg-white text-gray-700"
+                          }`}
+                        >
+                          {LIBELLES_CANAL[k]}
+                        </button>
+                      ))}
+                  </div>
+                  {nouveauCanal === "livraison" && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={adresseCanal}
+                        onChange={(e) => setAdresseCanal(e.target.value)}
+                        placeholder="Adresse de livraison"
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black"
+                      />
+                      <select
+                        value={zoneCanal}
+                        onChange={(e) => setZoneCanal(e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black"
+                      >
+                        <option value="">Commune de livraison…</option>
+                        {(catalogue?.parametres.zonesActives ?? []).map((z) => (
+                          <option key={z} value={z}>
+                            {z}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => appliquerChangementCanal(c.id)}
+                      disabled={
+                        enCours === c.id ||
+                        !nouveauCanal ||
+                        (nouveauCanal === "livraison" && (!adresseCanal.trim() || !zoneCanal))
+                      }
+                      className="rounded bg-black px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      Appliquer
+                    </button>
+                    <button type="button" onClick={() => setCanalEnEdition(null)} className="text-sm text-gray-500 underline">
+                      Fermer
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Le contenu et le paiement ne changent pas. Le ticket repart à l&apos;impression avec le bon mode.
+                  </p>
+                </div>
+              )}
 
               {annulationAvecMotifPour === c.id && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-red-200 bg-red-50 p-2">

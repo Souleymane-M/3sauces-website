@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { requireRoleMetier } from "@/lib/auth/get-session";
 import { changerStatutCommande, annulerCommande } from "@/lib/cuisine/commandes";
 import { relacherLivraison } from "@/lib/livreur/commandes";
+import { changerCanalCommande } from "@/lib/cuisine/changer-canal";
 
-const ACTIONS_VALIDES = ["remise", "annuler", "relacher_livreur"] as const;
+const ACTIONS_VALIDES = ["remise", "annuler", "relacher_livreur", "changer_canal"] as const;
 type Action = (typeof ACTIONS_VALIDES)[number];
 
 /**
@@ -21,7 +22,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; action?: string; profilId?: string; motif?: string }
+    | { commandeId?: string; action?: string; profilId?: string; motif?: string; canal?: string; adresse?: string; zone?: string }
     | null;
 
   const { commandeId, action, profilId, motif } = body ?? {};
@@ -32,6 +33,8 @@ export async function PATCH(request: Request) {
   try {
     if (action === "remise") {
       await changerStatutCommande({ commandeId, statut: "remis_au_client", profilId, roleMetier: "comptoir" });
+    } else if (action === "changer_canal") {
+      await changerCanalCommande({ commandeId, canal: body?.canal ?? "", adresse: body?.adresse, zone: body?.zone });
     } else if (action === "annuler") {
       await annulerCommande({ commandeId, profilId, motif });
     } else {
