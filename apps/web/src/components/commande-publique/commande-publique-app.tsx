@@ -87,6 +87,8 @@ interface Section {
   titre: string;
   /** Bandeau de titre pleine largeur, alterné rouge/vert d'une section à l'autre — jamais de section sans bandeau. */
   couleur: "rouge" | "vert";
+  /** Courte légende sous le bandeau : ce que le client reçoit dans l'assiette. */
+  sousTitre?: string;
   produits: ProduitPublic[];
 }
 
@@ -339,8 +341,8 @@ export function CommandePubliqueApp({
   const [erreurPlat, setErreurPlat] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
 
-  // Ordre imposé : Menus spéciaux, Tacos, Barquettes & Bowls, Grillades,
-  // puis Boissons en dernier (discrètes). "Tacos" et "Barquettes & Bowls"
+  // Ordre imposé : Menus spéciaux, Tacos, Barquettes, Tacos Bowls, Grillades,
+  // puis Boissons en dernier (discrètes). "Tacos", "Barquettes" et "Tacos Bowls"
   // partagent tous les deux la catégorie DB `snacking` — on les distingue
   // ici par le nom du produit plutôt que par une nouvelle catégorie, pour
   // ne pas complexifier le back-office pour un simple regroupement
@@ -367,13 +369,16 @@ export function CommandePubliqueApp({
     // toute la page faute de correspondance exacte.
     const nomMinuscule = (p: (typeof snacking)[number]) => p.nom.toLowerCase();
     const tacos = snacking.filter((p) => nomMinuscule(p).includes("tacos") && !nomMinuscule(p).includes("bowl"));
-    const barquettesBowls = snacking.filter(
-      (p) => nomMinuscule(p).includes("barquette") || nomMinuscule(p).includes("bowl")
-    );
+    // Deux sections distinctes : les clients confondaient Barquette et
+    // Tacos Bowl quand elles étaient mélangées (demande du patron,
+    // 2026-10-26).
+    const barquettes = snacking.filter((p) => nomMinuscule(p).includes("barquette"));
+    const bowls = snacking.filter((p) => nomMinuscule(p).includes("bowl"));
 
     const liste: Omit<Section, "couleur">[] = [
       { key: "tacos", titre: "Tacos", produits: tacos },
-      { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
+      { key: "barquettes", titre: "Barquettes", sousTitre: "Frites, salade, sauces et viande", produits: barquettes },
+      { key: "bowls", titre: "Tacos Bowls", sousTitre: "Frites, sauce fromagère, sauces et viande", produits: bowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
       {
         key: "accompagnement",
@@ -720,6 +725,7 @@ export function CommandePubliqueApp({
         >
           {section.titre}
         </div>
+        {section.sousTitre && <p className="mb-2 text-xs font-medium text-gray-700">{section.sousTitre}</p>}
 
         {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
           afficherGroupeAjoutDirect(produitsAAfficher, `${section.key}-liste`)
@@ -1321,7 +1327,8 @@ export function CommandePubliqueApp({
               {(() => {
                 const parKey = new Map(sections.map((s) => [s.key, s]));
                 const tacos = parKey.get("tacos");
-                const barquettesBowls = parKey.get("barquettes_bowls");
+                const barquettes = parKey.get("barquettes");
+                const bowls = parKey.get("bowls");
                 const grillade = parKey.get("grillade");
                 const accompagnement = parKey.get("accompagnement");
                 const boisson = parKey.get("boisson");
@@ -1338,12 +1345,9 @@ export function CommandePubliqueApp({
 
                 return (
                   <>
-                    {(tacos || barquettesBowls) && (
-                      <div className={tacos && barquettesBowls ? "grid grid-cols-2 gap-3" : ""}>
-                        {tacos && afficherSection(tacos)}
-                        {barquettesBowls && afficherSection(barquettesBowls)}
-                      </div>
-                    )}
+                    {tacos && afficherSection(tacos)}
+                    {barquettes && afficherSection(barquettes)}
+                    {bowls && afficherSection(bowls)}
                     {/* grid-cols-1 : les noms de produits de ces listes compactes (+/-)
                         se tronquent illisiblement en 2 colonnes sur mobile,
                         contrairement aux grandes cartes Tacos/Barquettes —
