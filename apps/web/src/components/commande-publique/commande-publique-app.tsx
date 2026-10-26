@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { suivreEvenement, suivrePresence } from "@/lib/suivi/client";
+import type { EtapeVisiteur } from "@/lib/suivi/types";
 import { useRouter } from "next/navigation";
 import type { ModePaiement } from "@3sauces/supabase";
 import type {
@@ -332,6 +334,40 @@ export function CommandePubliqueApp({
   );
   const [nbTampons, setNbTampons] = useState(0);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+
+  // Suivi anonyme (voir lib/suivi) : compteurs d'étapes et présence en
+  // direct pour /patron → En direct. Jamais de donnée personnelle, jamais
+  // d'effet sur la commande.
+  const lignesSuivi = useMemo(() => [...panierSimple, ...plats.flatMap((p) => p.lignes)], [panierSimple, plats]);
+  const etapeSuivie: EtapeVisiteur = modeCommande === null ? "choix_mode" : envoiEnCours ? "validation" : lignesSuivi.length > 0 ? "panier" : "menu";
+  const etapeSuivieRef = useRef(etapeSuivie);
+  const lignesConnuesSuivi = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    suivreEvenement("visite");
+    const minuteur = setInterval(() => {
+      if (document.visibilityState === "visible") suivrePresence(etapeSuivieRef.current);
+    }, 20_000);
+    return () => clearInterval(minuteur);
+  }, []);
+  useEffect(() => {
+    etapeSuivieRef.current = etapeSuivie;
+    suivrePresence(etapeSuivie);
+  }, [etapeSuivie]);
+  useEffect(() => {
+    if (modeCommande !== null) suivreEvenement("mode_choisi");
+  }, [modeCommande]);
+  useEffect(() => {
+    if (!pretPourPersistance) return;
+    const connues = lignesConnuesSuivi.current;
+    lignesConnuesSuivi.current = new Set(lignesSuivi.map((l) => l.id));
+    // Premier passage : panier restauré après un rechargement, pas un nouvel ajout.
+    if (!connues) return;
+    const nouvelles = lignesSuivi.filter((l) => !connues.has(l.id));
+    if (nouvelles.length === 0) return;
+    suivreEvenement("ajout_panier");
+    for (const l of nouvelles) suivreEvenement("produit_ajoute", l.produit.nom);
+  }, [pretPourPersistance, lignesSuivi]);
+
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   // Erreur spécifique à la navigation entre plats (seuil de 5€ non atteint) —
@@ -1042,6 +1078,8 @@ export function CommandePubliqueApp({
         setErreur(data.error ?? "Échec de l'envoi de la commande.");
         return;
       }
+
+      suivreEvenement("commande_validee");
 
       if (modePaiementEffectif === "stripe") {
         // La commande existe déjà (non_paye) : si cet appel échoue, elle

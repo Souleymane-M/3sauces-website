@@ -495,6 +495,32 @@ export interface Database {
         Relationships: [];
       };
 
+      visiteurs_site: {
+        Row: { visiteur: string; etape: string; premiere_vue: string; derniere_activite: string };
+        Insert: { visiteur: string; etape: string; premiere_vue?: string; derniere_activite?: string };
+        Update: Partial<Database["public"]["Tables"]["visiteurs_site"]["Insert"]>;
+        Relationships: [];
+      };
+
+      evenements_site: {
+        Row: {
+          id: number;
+          visiteur: string;
+          type: "visite" | "mode_choisi" | "ajout_panier" | "produit_ajoute" | "commande_validee";
+          produit: string;
+          date_jour: string;
+          created_at: string;
+        };
+        Insert: {
+          visiteur: string;
+          type: "visite" | "mode_choisi" | "ajout_panier" | "produit_ajoute" | "commande_validee";
+          produit?: string;
+          date_jour: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["evenements_site"]["Insert"]>;
+        Relationships: [];
+      };
+
       mouvements_caisse: {
         Row: {
           id: string;

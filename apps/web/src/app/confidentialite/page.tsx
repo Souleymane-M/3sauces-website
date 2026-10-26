@@ -26,6 +26,16 @@ export default function ConfidentialitePage() {
       </section>
 
       <section className="space-y-1">
+        <h2 className="font-semibold text-gray-900">Mesure d&apos;audience anonyme</h2>
+        <p>
+          Pour améliorer le site, nous comptons de façon anonyme les visites et les étapes de la
+          commande (par exemple : plat ajouté au panier). Aucun cookie n&apos;est déposé, aucune donnée
+          personnelle ni adresse IP n&apos;est enregistrée : seul un identifiant aléatoire, propre à
+          votre onglet et effacé à sa fermeture, est utilisé.
+        </p>
+      </section>
+
+      <section className="space-y-1">
         <h2 className="font-semibold text-gray-900">Finalité</h2>
         <p>Ces données sont utilisées uniquement pour :</p>
         <ul className="list-disc space-y-0.5 pl-5">

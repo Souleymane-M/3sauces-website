@@ -40,6 +40,7 @@ import {
 import { chargerStatistiquesJour } from "@/lib/patron/statistiques";
 import { listerClientsAdmin } from "@/lib/patron/clients";
 import { listerHistoriqueTiroir } from "@/lib/caisse/tiroir";
+import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 
 export const dynamic = "force-dynamic";
@@ -139,6 +140,11 @@ export default async function PatronPage() {
                 <EncaissementsLivraisonApp livraisonsInitiales={livraisonsAEncaisser} />
               </>
             ),
+          },
+          {
+            id: "en_direct",
+            label: "En direct",
+            contenu: <EnDirectApp />,
           },
           {
             id: "caisse",
