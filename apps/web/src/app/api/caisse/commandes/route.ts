@@ -134,7 +134,7 @@ async function validerLignesCommande(
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, stock_jour"
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, salade_ou_boisson, stock_jour"
     )
     .in("id", produitIds);
   if (erreurProduits) {
@@ -269,7 +269,7 @@ async function validerLignesCommande(
     // si le produit inclut effectivement une canette.
     const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
     if (boissonIncluse !== null) {
-      if (!produit.canette_incluse) {
+      if (!produit.canette_incluse && !produit.salade_ou_boisson) {
         throw new ErreurValidation(`Pas de canette incluse sur ${produit.nom}.`);
       }
       if (!nomsSaveursValides.has(boissonIncluse)) {
@@ -315,11 +315,15 @@ async function validerLignesCommande(
     // qu'au site public. La salade en option payante (Tacos/Bowl) est un
     // produit "Salade supplémentaire" comme un autre, pas de champ dédié ici.
     let saladeIncluse: boolean | null = null;
-    if (produit.salade_incluse) {
+    if (produit.salade_incluse || produit.salade_ou_boisson) {
       if (typeof ligneBrute.saladeIncluse !== "boolean") {
         throw new ErreurValidation(`Choix salade requis sur ${produit.nom}.`);
       }
       saladeIncluse = ligneBrute.saladeIncluse;
+      // "Salade OU boisson" : exactement l'un des deux, jamais les deux ni aucun.
+      if (produit.salade_ou_boisson && saladeIncluse === (boissonIncluse !== null)) {
+        throw new ErreurValidation(`Choisis la salade ou la boisson sur ${produit.nom}.`);
+      }
     } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
       throw new ErreurValidation(`Salade non proposée sur ${produit.nom}.`);
     }

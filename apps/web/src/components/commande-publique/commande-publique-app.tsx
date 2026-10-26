@@ -1132,7 +1132,7 @@ export function CommandePubliqueApp({
         {l.boissonIncluse && (
           <div className="text-xs text-gray-400">
             <div>Boisson incluse : {l.boissonIncluse}</div>
-            {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && (
+            {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && l.produit.canetteIncluse && (
               <button
                 type="button"
                 onClick={() => retirerBoisson(l.id)}

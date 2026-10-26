@@ -32,6 +32,8 @@ export interface ProduitPublic {
   saladePrixOption: number | null;
   /** Si vrai, le configurateur propose un choix gratuit obligatoire parmi les accompagnements actifs aujourd'hui (ex: Plats du jour) — jamais la "Salade" elle-même, incluse automatiquement sans choix quand elle fait partie de la recette. */
   accompagnementInclus: boolean;
+  /** Si vrai, le client choisit une salade OU une boisson, incluse dans le prix (ex: Poisson grillé) — jamais les deux, jamais de supplément. */
+  saladeOuBoisson: boolean;
   /** Quantité restante aujourd'hui (plats du jour) — null = illimité. */
   stockJour: number | null;
 }

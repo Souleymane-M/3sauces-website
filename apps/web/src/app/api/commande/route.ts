@@ -242,7 +242,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, stock_jour"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, salade_ou_boisson, stock_jour"
     )
     .in("id", produitIds);
 
@@ -435,7 +435,7 @@ export async function POST(request: Request) {
     // N'a de sens que si le produit inclut effectivement une canette.
     const boissonIncluse = typeof ligneBrute.boissonIncluse === "string" ? ligneBrute.boissonIncluse : null;
     if (boissonIncluse !== null) {
-      if (!produit.canette_incluse) {
+      if (!produit.canette_incluse && !produit.salade_ou_boisson) {
         return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
       }
       if (!nomsSaveursValides.has(boissonIncluse)) {
@@ -476,11 +476,15 @@ export async function POST(request: Request) {
     // c'est un produit "Salade supplémentaire" comme un autre, poussé en
     // ligne de panier séparée, déjà couvert par cette même boucle.
     let saladeIncluse: boolean | null = null;
-    if (produit.salade_incluse) {
+    if (produit.salade_incluse || produit.salade_ou_boisson) {
       if (typeof ligneBrute.saladeIncluse !== "boolean") {
         return NextResponse.json({ error: `Choix salade requis sur ${produit.nom}.` }, { status: 400 });
       }
       saladeIncluse = ligneBrute.saladeIncluse;
+      // "Salade OU boisson" : exactement l'un des deux, jamais les deux ni aucun.
+      if (produit.salade_ou_boisson && saladeIncluse === (boissonIncluse !== null)) {
+        return NextResponse.json({ error: `Choisis la salade ou la boisson sur ${produit.nom}.` }, { status: 400 });
+      }
     } else if (ligneBrute.saladeIncluse !== undefined && ligneBrute.saladeIncluse !== null) {
       return NextResponse.json({ error: `Salade non proposée sur ${produit.nom}.` }, { status: 400 });
     }

@@ -109,9 +109,16 @@ export function ViandeModalPublique({
   // faut pouvoir choisir "aucune"), seulement s'il y a plusieurs saveurs
   // pour les formules à boisson obligatoire (Menu Étudiant).
   const demandeChoixBoisson = produit.canetteIncluse && (proposeSansBoisson || saveurs.length > 1);
+  // "Salade OU boisson" (ex: Poisson grillé) : un choix obligatoire entre
+  // les deux, inclus dans le prix. `saladeGardee` vaut true (salade) ou
+  // false (boisson, saveur à choisir dans `boissonChoisie`).
+  const demandeSaladeOuBoisson = produit.saladeOuBoisson;
   const sansBoisson = proposeSansBoisson && boissonChoisie === null;
-  const boissonRetenue =
-    !produit.canetteIncluse || sansBoisson
+  const boissonRetenue = demandeSaladeOuBoisson
+    ? saladeGardee === false
+      ? boissonChoisie
+      : null
+    : !produit.canetteIncluse || sansBoisson
       ? null
       : demandeChoixBoisson
         ? boissonChoisie
@@ -129,13 +136,15 @@ export function ViandeModalPublique({
   // Ajout rapide de canette, uniquement pour les produits SANS canette
   // incluse dans le prix (ex: Poisson grillé) — jamais en même temps que le
   // choix de canette incluse des formules Tacos/Barquette ci-dessous.
-  const proposeCanetteRapide = !produit.canetteIncluse && !!canetteRapideProduit && canetteRapideSaveurs.length > 0;
+  const proposeCanetteRapide =
+    !produit.canetteIncluse && !produit.saladeOuBoisson && !!canetteRapideProduit && canetteRapideSaveurs.length > 0;
   const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
     (!demandeSauce || saucesChoisies.length >= 1) &&
     (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
+    (!demandeSaladeOuBoisson || saladeGardee === true || (saladeGardee === false && boissonChoisie !== null)) &&
     (!demandeAccompagnement || accompagnementsChoisis.length >= 1);
 
   function ajouterOccurrence(setter: (fn: (precedent: string[]) => string[]) => void, nom: string, max?: number) {
@@ -337,6 +346,54 @@ export function ViandeModalPublique({
                 Sans salade
               </button>
             </div>
+          </div>
+        )}
+
+        {demandeSaladeOuBoisson && (
+          <div className="mt-5">
+            <p className="text-sm font-bold text-[#2D5A27]">Au choix, inclus : salade ou boisson</p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSaladeGardee(true)}
+                className={`rounded-full border px-4 py-1.5 text-sm ${
+                  saladeGardee === true
+                    ? "border-[#2D5A27] bg-[#2D5A27] text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Salade
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaladeGardee(false)}
+                className={`rounded-full border px-4 py-1.5 text-sm ${
+                  saladeGardee === false
+                    ? "border-[#C2540C] bg-[#C2540C] text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Boisson
+              </button>
+            </div>
+            {saladeGardee === false && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {saveurs.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setBoissonChoisie(s.nom)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      boissonChoisie === s.nom
+                        ? "border-[#C2540C] bg-[#C2540C] text-white"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s.nom}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -581,7 +638,7 @@ export function ViandeModalPublique({
                   saucesSupplementaires: extraSauces,
                 },
                 boissonRetenue,
-                produit.saladeIncluse ? saladeGardee : null,
+                produit.saladeIncluse || demandeSaladeOuBoisson ? saladeGardee : null,
                 saladeOptionCochee,
                 demandeAccompagnement ? accompagnementsChoisis : [],
                 sansBoisson,

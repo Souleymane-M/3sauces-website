@@ -18,6 +18,8 @@ function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
   if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
+  if (l.saladeIncluse === true) details.push("Avec salade");
+  if (l.saladeIncluse === false) details.push("SANS SALADE");
   if (l.accompagnementsInclus?.length)
     details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);

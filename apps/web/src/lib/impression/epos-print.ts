@@ -205,6 +205,8 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
   if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
+  if (l.saladeIncluse === true) details.push("Avec salade");
+  if (l.saladeIncluse === false) details.push("SANS SALADE");
   if (l.accompagnementsInclus?.length)
     details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
@@ -229,6 +231,8 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (l.sauces && l.sauces.length > 0) attributs.push({ label: "Sauces", valeur: l.sauces.join(", ") });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
   if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
+  if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
+  if (l.saladeIncluse === false) attributs.push({ label: "Salade", valeur: "SANS SALADE" });
   if (l.accompagnementsInclus?.length)
     attributs.push({ label: "Accompagnement", valeur: l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ") });
   return attributs;
@@ -247,6 +251,7 @@ function cleLigne(l: LigneCommande): string {
     [...(l.saveurs ?? [])].sort(),
     l.boissonIncluse ?? null,
     l.sansBoisson ?? false,
+    l.saladeIncluse ?? null,
     [...(l.accompagnementsInclus ?? [])].sort(),
     l.pourQui ?? null,
     l.platIndex,
