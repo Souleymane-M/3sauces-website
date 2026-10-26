@@ -102,6 +102,8 @@ interface Section {
   key: string;
   titre: string;
   couleur: "rouge" | "vert";
+  /** Courte légende sous le bandeau : ce que le client reçoit dans l'assiette. */
+  sousTitre?: string;
   produits: ProduitCaisse[];
 }
 
@@ -775,9 +777,8 @@ export function CaisseApp({
     // toute la page faute de correspondance exacte.
     const nomMinuscule = (p: (typeof snacking)[number]) => p.nom.toLowerCase();
     const tacos = snacking.filter((p) => nomMinuscule(p).includes("tacos") && !nomMinuscule(p).includes("bowl"));
-    const barquettesBowls = snacking.filter(
-      (p) => nomMinuscule(p).includes("barquette") || nomMinuscule(p).includes("bowl")
-    );
+    const barquettes = snacking.filter((p) => nomMinuscule(p).includes("barquette"));
+    const bowls = snacking.filter((p) => nomMinuscule(p).includes("bowl"));
 
     const liste: Omit<Section, "couleur">[] = [
       {
@@ -792,7 +793,8 @@ export function CaisseApp({
         produits: produits.filter((p) => p.categorie === "plat_du_jour"),
       },
       { key: "tacos", titre: "Tacos", produits: tacos },
-      { key: "barquettes_bowls", titre: "Barquettes & Bowls", produits: barquettesBowls },
+      { key: "barquettes", titre: "Barquettes", sousTitre: "Frites, salade, sauces et viande", produits: barquettes },
+      { key: "bowls", titre: "Tacos Bowls", sousTitre: "Frites, sauce fromagère, sauces et viande", produits: bowls },
       { key: "grillade", titre: "Grillades", produits: produits.filter((p) => p.categorie === "grillade") },
       {
         key: "accompagnement",
@@ -1127,6 +1129,7 @@ export function CaisseApp({
         >
           {section.titre}
         </div>
+        {section.sousTitre && <p className="mb-2 text-xs font-medium text-gray-700">{section.sousTitre}</p>}
 
         {SECTIONS_AJOUT_DIRECT.has(section.key) ? (
           afficherGroupeAjoutDirect(produitsAAfficher, `${section.key}-liste`)
@@ -1784,9 +1787,10 @@ export function CaisseApp({
           <div className="lg:col-span-2 space-y-6">
             {(() => {
               const parKey = new Map(sections.map((s) => [s.key, s]));
-              const clesAppariees = new Set(["tacos", "barquettes_bowls", "grillade", "accompagnement", "boisson"]);
+              const clesAppariees = new Set(["tacos", "barquettes", "bowls", "grillade", "accompagnement", "boisson"]);
               const tacos = parKey.get("tacos");
-              const barquettesBowls = parKey.get("barquettes_bowls");
+              const barquettes = parKey.get("barquettes");
+              const bowls = parKey.get("bowls");
               const grillade = parKey.get("grillade");
               const accompagnement = parKey.get("accompagnement");
               const boisson = parKey.get("boisson");
@@ -1805,12 +1809,9 @@ export function CaisseApp({
               return (
                 <>
                   {sections.filter((s) => !clesAppariees.has(s.key)).map((section) => afficherSection(section))}
-                  {(tacos || barquettesBowls) && (
-                    <div className={tacos && barquettesBowls ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
-                      {tacos && afficherSection(tacos)}
-                      {barquettesBowls && afficherSection(barquettesBowls)}
-                    </div>
-                  )}
+                  {tacos && afficherSection(tacos)}
+                  {barquettes && afficherSection(barquettes)}
+                  {bowls && afficherSection(bowls)}
                   {(grillade || accompagnement) && (
                     <div className={grillade && accompagnement ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
                       {grillade && afficherSection(grillade)}
