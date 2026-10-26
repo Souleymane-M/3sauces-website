@@ -579,9 +579,28 @@ export function CaisseApp({
     setMontantRecuEspeces(c.montantRecuEspeces);
   }
 
+  // Sans nom ni téléphone : "Client 1", "Client 2"… (premier numéro libre),
+  // pour que plusieurs clients en attente restent distinguables — avec en
+  // plus l'heure et le contenu du panier sur le bouton de reprise.
+  function libelleEnAttente(deja: CommandeEnAttente[]): string {
+    const nomSaisi = `${prenom.trim()} ${nom.trim()}`.trim() || telephone.trim();
+    if (nomSaisi) return nomSaisi;
+    const pris = new Set(deja.map((c) => c.libelle));
+    let n = 1;
+    while (pris.has(`Client ${n}`)) n += 1;
+    return `Client ${n}`;
+  }
+
+  function resumeEnAttente(c: CommandeEnAttente): string {
+    const lignes = c.modeCommande === "groupee" ? c.plats.flatMap((p) => p.lignes) : c.panierSimple;
+    const texte = lignes.map((l) => `${l.quantite}× ${l.produit.nom}`).join(", ");
+    const heure = new Date(c.creeLe).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Indian/Mayotte" });
+    const contenu = texte.length > 34 ? `${texte.slice(0, 33)}…` : texte;
+    return contenu ? `${heure} · ${contenu}` : heure;
+  }
+
   function mettreEnAttente() {
-    const libelle = `${prenom.trim()} ${nom.trim()}`.trim() || telephone.trim() || "Client";
-    setCommandesEnAttente((prec) => [...prec, capturerCommandeEnAttente(libelle)]);
+    setCommandesEnAttente((prec) => [...prec, capturerCommandeEnAttente(libelleEnAttente(prec))]);
     reinitialiserFormulaire();
   }
 
@@ -593,7 +612,7 @@ export function CaisseApp({
       // côté à son tour plutôt que de l'écraser silencieusement — jamais
       // rien perdu, demande explicite du patron, 2026-10-25.
       const suite = saisieEnCours()
-        ? [...prec.filter((c) => c.id !== id), capturerCommandeEnAttente(`${prenom.trim()} ${nom.trim()}`.trim() || telephone.trim() || "Client")]
+        ? [...prec.filter((c) => c.id !== id), capturerCommandeEnAttente(libelleEnAttente(prec.filter((c) => c.id !== id)))]
         : prec.filter((c) => c.id !== id);
       return suite;
     });
@@ -1645,9 +1664,10 @@ export function CaisseApp({
                 key={c.id}
                 type="button"
                 onClick={() => reprendreCommande(c.id)}
-                className="rounded-full border border-[#8B2020] bg-white px-3 py-1.5 text-sm font-semibold text-[#8B2020]"
+                className="rounded-2xl border border-[#8B2020] bg-white px-3 py-1.5 text-left text-[#8B2020]"
               >
-                ▶ {c.libelle}
+                <span className="block text-sm font-semibold">▶ {c.libelle}</span>
+                <span className="block text-xs font-normal text-gray-600">{resumeEnAttente(c)}</span>
               </button>
             ))}
           </div>
