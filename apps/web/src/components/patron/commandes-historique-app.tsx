@@ -98,6 +98,36 @@ export function CommandesHistoriqueApp({
   const [enCoursId, setEnCoursId] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
+  async function corrigerPaiement(c: CommandeHistorique) {
+    const nouveau = c.modePaiement === "cb" ? "especes" : "cb";
+    if (
+      !window.confirm(
+        `Commande #${String(c.numero).padStart(4, "0")} : passer le paiement de ${libelleModePaiement(c.modePaiement)} à ${libelleModePaiement(nouveau)} ? La correction sera enregistrée à ton nom.`
+      )
+    ) {
+      return;
+    }
+    setErreur(null);
+    setEnCoursId(c.id);
+    try {
+      const reponse = await fetch("/api/patron/correction-paiement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: c.id, mode: nouveau }),
+      });
+      if (!reponse.ok) {
+        const data = await reponse.json().catch(() => ({}));
+        setErreur(data.error ?? "Correction impossible.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setErreur("Erreur réseau, réessaie.");
+    } finally {
+      setEnCoursId(null);
+    }
+  }
+
   async function appliquerChangement(commandeId: string, statut: string, livreurId?: string, motif?: string) {
     setErreur(null);
     setEnCoursId(commandeId);
@@ -196,6 +226,16 @@ export function CommandesHistoriqueApp({
                   <p>
                     Total : {c.montant.toFixed(2)} € — Paiement : {libelleModePaiement(c.modePaiement)}
                   </p>
+                  {c.dejaPayee && (c.modePaiement === "especes" || c.modePaiement === "cb") && (
+                    <button
+                      type="button"
+                      onClick={() => corrigerPaiement(c)}
+                      disabled={enCoursId === c.id}
+                      className="mt-1 rounded border border-gray-500 px-2 py-1 text-xs font-semibold text-gray-300 disabled:opacity-40"
+                    >
+                      Corriger le mode de paiement (→ {libelleModePaiement(c.modePaiement === "cb" ? "especes" : "cb")})
+                    </button>
+                  )}
                 </div>
 
                 <ul className="mt-2 space-y-1 border-t border-gray-700 pt-2 text-xs">

@@ -522,6 +522,26 @@ export interface Database {
         Relationships: [];
       };
 
+      corrections_paiement: {
+        Row: {
+          id: string;
+          commande_id: string;
+          ancien_mode: string;
+          nouveau_mode: string;
+          profil_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          commande_id: string;
+          ancien_mode: string;
+          nouveau_mode: string;
+          profil_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["corrections_paiement"]["Insert"]>;
+        Relationships: [];
+      };
+
       mouvements_caisse: {
         Row: {
           id: string;
