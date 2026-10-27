@@ -865,6 +865,23 @@ export function CaisseApp({
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
   const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
+  // Boissons 2L offertes dont le parfum n'est pas encore choisi : bloque
+  // "Encaisser" tant que > 0 — rendu très visible (bandeau, bouton, barre du
+  // bas) car un simple message se noyait dans le panier (4 pilaou poulpe,
+  // 2026-10-27 : la caissière ne comprenait pas pourquoi elle ne pouvait pas valider).
+  const boissonsOffertesAChoisir =
+    palierGroupeReel === "GROUPE_4"
+      ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
+      : 0;
+  const alerteBoissonRef = useRef(false);
+  useEffect(() => {
+    const maintenant = boissonsOffertesAChoisir > 0;
+    // Dès que la boisson offerte se débloque, on amène la caissière dessus.
+    if (maintenant && !alerteBoissonRef.current) {
+      document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    alerteBoissonRef.current = maintenant;
+  }, [boissonsOffertesAChoisir]);
 
   // Dérivé plutôt que synchronisé par effet : si le panier repasse sous le
   // nombre de tampons choisis (ex: article retiré), le nombre effectif
@@ -2012,11 +2029,24 @@ export function CaisseApp({
                   return null;
                 })()}
               {palierGroupeReel === "GROUPE_4" && (
-                <div className="mt-2 rounded-lg border border-gray-300 bg-gray-50 p-2">
-                  <p className="text-xs font-semibold text-gray-900">
-                    🎁 Parfum{nbBoissonsOffertes > 1 ? "s" : ""} de la{nbBoissonsOffertes > 1 ? "s" : ""} boisson
-                    {nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte{nbBoissonsOffertes > 1 ? "s" : ""}
+                <div
+                  id="boisson-offerte"
+                  className={`mt-2 rounded-lg border-2 p-3 ${
+                    boissonsOffertesAChoisir > 0
+                      ? "bordure-urgence-clignotante border-red-600 bg-red-50"
+                      : "border-[#2D5A27] bg-green-50"
+                  }`}
+                >
+                  <p className={`text-base font-extrabold ${boissonsOffertesAChoisir > 0 ? "text-red-700" : "text-[#2D5A27]"}`}>
+                    {boissonsOffertesAChoisir > 0
+                      ? `🎁 À FAIRE : choisis le parfum de la boisson 2L offerte${nbBoissonsOffertes > 1 ? " (×" + nbBoissonsOffertes + ")" : ""}`
+                      : "✅ Boisson 2L offerte choisie"}
                   </p>
+                  {boissonsOffertesAChoisir > 0 && (
+                    <p className="text-sm font-semibold text-red-700">
+                      La commande donne droit à une boisson offerte : sans ce choix, impossible de valider.
+                    </p>
+                  )}
                   {Array.from({ length: nbBoissonsOffertes }, (_, index) => (
                     <div key={index} className="mt-1">
                       {nbBoissonsOffertes > 1 && (
@@ -2034,7 +2064,7 @@ export function CaisseApp({
                                 return suivant;
                               })
                             }
-                            className={`rounded-full border px-2.5 py-1 text-xs ${
+                            className={`rounded-full border px-3 py-2 text-sm font-semibold ${
                               boissonOfferteSaveurs[index] === s.nom
                                 ? "border-[#8B2020] bg-[#8B2020] text-white"
                                 : "border-gray-300 text-gray-700"
@@ -2411,6 +2441,16 @@ export function CaisseApp({
 
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
+            {boissonsOffertesAChoisir > 0 && (
+              <button
+                type="button"
+                onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="w-full rounded-lg border-2 border-red-600 bg-red-50 py-2 text-sm font-bold text-red-700"
+              >
+                🎁 Choisis d&apos;abord la boisson 2L offerte pour pouvoir valider ↑
+              </button>
+            )}
+
             <button
               onClick={enModeEdition ? enregistrerModification : encaisser}
               disabled={
@@ -2427,7 +2467,9 @@ export function CaisseApp({
             >
               {envoiEnCours
                 ? "Envoi…"
-                : enModeEdition
+                : boissonsOffertesAChoisir > 0
+                  ? "Choisis la boisson 2L offerte"
+                  : enModeEdition
                   ? "Enregistrer les modifications"
                   : encaisserEffectif
                     ? "Encaisser"
@@ -2455,14 +2497,24 @@ export function CaisseApp({
                   </div>
                   <div className="text-xs text-gray-500">{total.toFixed(2)} €</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                  style={{ backgroundColor: ROUGE }}
-                >
-                  Voir le panier
-                </button>
+                {boissonsOffertesAChoisir > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                    className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white"
+                  >
+                    🎁 Choisir la boisson offerte
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
+                    style={{ backgroundColor: ROUGE }}
+                  >
+                    Voir le panier
+                  </button>
+                )}
               </>
             )}
           </div>

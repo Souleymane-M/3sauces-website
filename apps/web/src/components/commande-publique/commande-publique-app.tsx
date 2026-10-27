@@ -501,6 +501,10 @@ export function CommandePubliqueApp({
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
   const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
+  const boissonsOffertesAChoisir =
+    palierGroupeReel === "GROUPE_4"
+      ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
+      : 0;
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -1641,9 +1645,14 @@ export function CommandePubliqueApp({
               </div>
 
               {palierGroupeReel === "GROUPE_4" && (
-                <div className="rounded-lg border border-gray-200 bg-white p-3">
-                  <p className="text-sm font-semibold text-gray-900">
-                    🎁 Choisis le{nbBoissonsOffertes > 1 ? "s" : ""} parfum{nbBoissonsOffertes > 1 ? "s" : ""} de ta
+                <div
+                  id="boisson-offerte"
+                  className={`rounded-lg border-2 p-3 ${
+                    boissonsOffertesAChoisir > 0 ? "border-red-600 bg-red-50" : "border-[#2D5A27] bg-green-50"
+                  }`}
+                >
+                  <p className="text-sm font-bold text-gray-900">
+                    {boissonsOffertesAChoisir > 0 ? "👉 " : "✅ "}🎁 Choisis le{nbBoissonsOffertes > 1 ? "s" : ""} parfum{nbBoissonsOffertes > 1 ? "s" : ""} de ta
                     {nbBoissonsOffertes > 1 ? "" : " boisson 2L offerte"}
                     {nbBoissonsOffertes > 1 ? ` ${nbBoissonsOffertes} boissons 2L offertes` : ""}
                   </p>
