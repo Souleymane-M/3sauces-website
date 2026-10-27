@@ -1,6 +1,7 @@
 "use client";
 
 import { libellePayee } from "@/lib/libelle-paiement";
+import { libelleBoissonLigne, libellePrixUnitaire } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
@@ -17,7 +18,8 @@ function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
   if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
-  if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  const boisson = libelleBoissonLigne(l);
+  if (boisson) details.push(boisson);
   if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
   if (l.saladeIncluse === true) details.push("Avec salade");
   if (l.saladeIncluse === false) details.push("SANS SALADE");
@@ -118,6 +120,10 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // le livreur en a plusieurs en main et veut retrouver vite un client par
   // numéro de commande, nom ou adresse, sans faire défiler toute la liste.
   const [recherche, setRecherche] = useState("");
+  // Deux listes bien séparées (demande du patron, 2026-10-27) : celles que
+  // le livreur a déjà flashées et prises en main ("En livraison"), et celles
+  // pas encore scannées ("À récupérer"), qui le noyaient au milieu.
+  const [onglet, setOnglet] = useState<"livraison" | "attente">("livraison");
   const rechercheNormalisee = recherche.trim().toLowerCase();
   const livraisonsFiltrees = rechercheNormalisee
     ? livraisons.filter((l) =>
@@ -231,10 +237,35 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
     <div className="mt-4 space-y-4">
       {erreur && <p className="text-lg text-red-600">{erreur}</p>}
 
-      {enAttente.length > 0 && (
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setOnglet("livraison")}
+          className={`rounded-lg py-3 text-base font-bold ${
+            onglet === "livraison" ? "bg-[#2D5A27] text-white" : "border border-gray-300 text-gray-700"
+          }`}
+        >
+          En livraison ({livraisons.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setOnglet("attente")}
+          className={`rounded-lg py-3 text-base font-bold ${
+            onglet === "attente" ? "bg-orange-500 text-white" : "border border-gray-300 text-gray-700"
+          }`}
+        >
+          À récupérer ({enAttente.length})
+        </button>
+      </div>
+
+      {onglet === "attente" && enAttente.length === 0 && (
+        <p className="text-xl text-gray-400">Aucune livraison en attente.</p>
+      )}
+
+      {onglet === "attente" && enAttente.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-bold text-gray-900">
-            {enAttente.length} livraison{enAttente.length > 1 ? "s" : ""} en attente — dépêche-toi de rentrer !
+            {enAttente.length} livraison{enAttente.length > 1 ? "s" : ""} pas encore scannée{enAttente.length > 1 ? "s" : ""}
           </h2>
           {enAttente.map((livraison) => (
             <div key={livraison.id} className="rounded-xl border-2 border-dashed border-gray-300 p-4">
@@ -257,7 +288,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
         </div>
       )}
 
-      {livraisons.length > 1 && (
+      {onglet === "livraison" && livraisons.length > 1 && (
         <input
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
@@ -266,12 +297,12 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
         />
       )}
 
-      {livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
-      {livraisons.length > 0 && livraisonsFiltrees.length === 0 && (
+      {onglet === "livraison" && livraisons.length === 0 && <p className="text-xl text-gray-400">Aucune livraison en cours.</p>}
+      {onglet === "livraison" && livraisons.length > 0 && livraisonsFiltrees.length === 0 && (
         <p className="text-base text-gray-400">Aucune livraison ne correspond à &quot;{recherche}&quot;.</p>
       )}
 
-      {livraisonsFiltrees.map((livraison) => {
+      {(onglet === "livraison" ? livraisonsFiltrees : []).map((livraison) => {
         const declaration = declarationsOuvertes[livraison.id];
         const totalGroupeDeclare = declaration
           ? Math.round(
@@ -340,11 +371,15 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                           <span className="font-semibold">
                             {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
                           </span>
+                          <span className="ml-2 text-base font-bold text-[#8B2020]">
+                            {(l.prixUnitaire * l.quantite).toFixed(2).replace(".", ",")} €
+                          </span>
                           {detailLigne(l).map((detail, j) => (
                             <div key={j} className="text-sm text-gray-600">
                               {detail}
                             </div>
                           ))}
+                          {libellePrixUnitaire(l) && <div className="text-sm font-semibold text-gray-700">{libellePrixUnitaire(l)}</div>}
                         </li>
                       ))}
                     </ul>

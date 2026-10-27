@@ -1,5 +1,6 @@
 import type { CommandePourImpression } from "./types";
 import { libellePayeeTicket } from "@/lib/libelle-paiement";
+import { libelleBoissonLigne, libellePrixUnitaire } from "@/lib/libelle-ligne";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -204,13 +205,16 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
-  if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
+  const boisson = libelleBoissonLigne(l);
+  if (boisson) details.push(boisson);
   if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
   if (l.saladeIncluse === true) details.push("Avec salade");
   if (l.saladeIncluse === false) details.push("SANS SALADE");
   if (l.accompagnementsInclus?.length)
     details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
+  const prixPiece = libellePrixUnitaire(l);
+  if (prixPiece) details.push(prixPiece);
   return details;
 }
 
@@ -455,7 +459,7 @@ function construireContenuTicketClient(
     b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
   }
 
-  b.ligne("3 SAUCES", { align: "center", gras: true, taille: 2 });
+  b.ligne("3 Sauces", { align: "center", gras: true, taille: 2 });
   b.ligne(formaterNumeroTicket(commande.numero), { align: "center", gras: true, taille: 2 });
   // Distingue une commande saisie en caisse d'une commande passée par le
   // client sur le site — demande explicite du patron, 2026-10-20 : à la
