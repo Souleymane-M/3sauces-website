@@ -1,4 +1,5 @@
 import "server-only";
+import { modeGlobalDepuisPaiements } from "@/lib/libelle-paiement";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { ModePaiement } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
@@ -198,9 +199,10 @@ export async function declarerEtValiderManuellement(
     throw new Error(`Impossible d'enregistrer les paiements : ${erreurPaiements.message}`);
   }
 
+  const modeReel = modeGlobalDepuisPaiements(paiements.map((p) => p.mode));
   const { error: erreurMaj } = await supabase
     .from("commandes")
-    .update({ paiement_statut: "paye" })
+    .update({ paiement_statut: "paye", ...(modeReel ? { mode_paiement: modeReel } : {}) })
     .eq("id", commandeId);
   if (erreurMaj) {
     throw new Error(`Impossible de valider l'encaissement : ${erreurMaj.message}`);

@@ -1,4 +1,5 @@
 import "server-only";
+import { modeGlobalDepuisPaiements } from "@/lib/libelle-paiement";
 import type { RoleMetier, StatutCommande } from "@3sauces/supabase";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
@@ -239,9 +240,12 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
   // silencieusement. Le montant est déjà revérifié exactement ci-dessus,
   // donc "paye" directement, jamais "declare" (cf. commentaire de
   // `declarerLivraison`).
+  // L'étiquette "mode de paiement" de la commande suit ce qui a vraiment
+  // été encaissé (le client a pu dire "espèces" puis payer par carte).
+  const modeReel = modeGlobalDepuisPaiements(paiements.map((p) => p.mode));
   const { error: erreurStatutPaiement } = await supabase
     .from("commandes")
-    .update({ paiement_statut: "paye" })
+    .update({ paiement_statut: "paye", ...(modeReel ? { mode_paiement: modeReel } : {}) })
     .eq("id", commandeId);
   if (erreurStatutPaiement) {
     throw new Error(`Impossible d'enregistrer le paiement : ${erreurStatutPaiement.message}`);

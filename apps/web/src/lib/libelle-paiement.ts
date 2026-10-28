@@ -28,3 +28,17 @@ export function libellePayeeTicket(mode: ModePaye): string {
   if (mode === "mixte") return "PAYEE (ESPECES + CARTE)";
   return "DEJA PAYEE";
 }
+
+/**
+ * Mode de paiement global d'une commande d'après ses lignes de paiement
+ * réelles : un seul mode -> ce mode, plusieurs -> "mixte". Sert à garder
+ * l'étiquette de la commande alignée sur ce qui a vraiment été encaissé
+ * (avant le 2026-10-28, seule la ligne de paiement était mise à jour).
+ */
+export function modeGlobalDepuisPaiements(modes: string[]): "especes" | "cb" | "stripe" | "mixte" | null {
+  const distincts = [...new Set(modes)];
+  if (distincts.length === 0) return null;
+  if (distincts.length > 1) return "mixte";
+  const m = distincts[0];
+  return m === "especes" || m === "cb" || m === "stripe" ? m : null;
+}

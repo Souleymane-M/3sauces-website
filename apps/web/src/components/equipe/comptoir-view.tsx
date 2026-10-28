@@ -82,6 +82,9 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
   const [nouveauCanal, setNouveauCanal] = useState<"sur_place" | "emporter" | "livraison" | null>(null);
   const [adresseCanal, setAdresseCanal] = useState("");
   const [zoneCanal, setZoneCanal] = useState("");
+  // Remise d'une commande payée en "mixte" : la répartition espèces/carte est demandée.
+  const [remiseMixteId, setRemiseMixteId] = useState<string | null>(null);
+  const [especesMixte, setEspecesMixte] = useState("");
   // La caisse (prise de commande) est l'écran le plus utilisé : on y
   // arrive directement en ouvrant Comptoir, exactement comme /caisse
   // seule — demande explicite du patron, 2026-10-25. Les autres écrans
@@ -194,6 +197,37 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
         setErreur(data.error ?? "Erreur.");
         return;
       }
+      await charger();
+    } finally {
+      setEnCours(null);
+    }
+  }
+
+  async function remettreMixte(commande: CommandeCuisine) {
+    const especes = Number(especesMixte.replace(",", "."));
+    if (!Number.isFinite(especes) || especes < 0 || especes > commande.montant) {
+      setErreur("Montant en espèces invalide.");
+      return;
+    }
+    const carte = Math.round((commande.montant - especes) * 100) / 100;
+    const paiements = [
+      ...(especes > 0 ? [{ mode: "especes", montant: especes }] : []),
+      ...(carte > 0 ? [{ mode: "cb", montant: carte }] : []),
+    ];
+    setEnCours(commande.id);
+    setErreur(null);
+    try {
+      const res = await fetch("/api/equipe/comptoir/action", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: commande.id, action: "remise", profilId, paiements }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErreur(data.error ?? "Erreur.");
+        return;
+      }
+      setRemiseMixteId(null);
       await charger();
     } finally {
       setEnCours(null);
@@ -422,7 +456,14 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                 {c.statut === "pret" && c.canal !== "livraison" && (
                   <button
                     type="button"
-                    onClick={() => appliquer(c.id, "remise")}
+                    onClick={() => {
+                      if (c.modePaiement === "mixte" && !c.dejaPayee) {
+                        setRemiseMixteId(remiseMixteId === c.id ? null : c.id);
+                        setEspecesMixte("");
+                      } else {
+                        appliquer(c.id, "remise");
+                      }
+                    }}
                     disabled={enCours === c.id}
                     className="rounded bg-[#2D5A27] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
@@ -487,6 +528,40 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                   </button>
                 )}
               </div>
+
+              {remiseMixteId === c.id && (
+                <div className="mt-2 space-y-2 rounded border border-gray-300 bg-gray-50 p-2">
+                  <p className="text-sm font-semibold text-black">
+                    Paiement mixte — total {c.montant.toFixed(2)} €. Combien le client paie-t-il en espèces ?
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={especesMixte}
+                    onChange={(e) => setEspecesMixte(e.target.value)}
+                    placeholder="Montant en espèces (0 si tout en carte)"
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black"
+                  />
+                  {especesMixte.trim() !== "" && Number.isFinite(Number(especesMixte.replace(",", "."))) && (
+                    <p className="text-sm text-gray-700">
+                      Carte : {(c.montant - Number(especesMixte.replace(",", "."))).toFixed(2)} €
+                    </p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => remettreMixte(c)}
+                      disabled={enCours === c.id || especesMixte.trim() === ""}
+                      className="rounded bg-[#2D5A27] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      Valider la remise
+                    </button>
+                    <button type="button" onClick={() => setRemiseMixteId(null)} className="text-sm text-gray-500 underline">
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {canalEnEdition === c.id && (
                 <div className="mt-2 space-y-2 rounded border border-gray-300 bg-gray-50 p-2">

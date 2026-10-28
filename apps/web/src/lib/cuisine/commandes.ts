@@ -250,6 +250,8 @@ interface ChangementStatut {
   livreurId?: string;
   /** Sous quel rôle métier l'action a été faite (interface équipe unifiée) — absent pour les appelants existants. */
   roleMetier?: RoleMetier;
+  /** Répartition espèces/carte, exigée à la remise d'une commande "mixte" non encore payée. */
+  paiementsMixte?: { mode: "especes" | "cb"; montant: number }[];
 }
 
 /**
@@ -275,6 +277,7 @@ export async function changerStatutCommande({
   profilId,
   livreurId,
   roleMetier,
+  paiementsMixte,
 }: ChangementStatut): Promise<void> {
   const supabase = createServiceSupabaseClient();
 
@@ -323,6 +326,25 @@ export async function changerStatutCommande({
     misesAJour.paiement_statut = "paye";
   }
 
+  // Commande "mixte" payée à la remise : la répartition espèces/carte est
+  // indispensable pour que l'argent apparaisse dans les bons totaux et dans
+  // le comptage du tiroir (cas #681, 2026-10-27 : 68 € sans aucune ligne).
+  // Vérifiée AVANT de toucher à la commande.
+  let lignesMixte: { mode: "especes" | "cb"; montant: number }[] | null = null;
+  if (misesAJour.paiement_statut && commande.mode_paiement === "mixte") {
+    const lignes = paiementsMixte ?? [];
+    const valides =
+      lignes.length > 0 &&
+      lignes.every((l) => (l.mode === "especes" || l.mode === "cb") && Number.isFinite(l.montant) && l.montant > 0) &&
+      Math.round(lignes.reduce((t, l) => t + l.montant, 0) * 100) === Math.round(Number(commande.montant) * 100);
+    if (!valides) {
+      throw new Error(
+        `Commande payée en mixte : indique combien en espèces et combien en carte (total ${Number(commande.montant).toFixed(2)} €).`
+      );
+    }
+    lignesMixte = lignes;
+  }
+
   // Mise à jour conditionnelle : seul l'appel qui fait réellement passer la
   // commande à "payé" enregistre le paiement (pas de doublon si deux
   // écrans valident la remise en même temps).
@@ -346,6 +368,13 @@ export async function changerStatutCommande({
       .insert({ commande_id: commandeId, montant: Number(commande.montant), mode: commande.mode_paiement });
     if (erreurPaiement) {
       console.error("[cuisine/commandes] échec enregistrement paiement à la remise :", erreurPaiement.message);
+    }
+  } else if (lignesMixte && (lignesMaj ?? []).length > 0) {
+    const { error: erreurPaiementMixte } = await supabase
+      .from("paiements")
+      .insert(lignesMixte.map((l) => ({ commande_id: commandeId, montant: l.montant, mode: l.mode })));
+    if (erreurPaiementMixte) {
+      console.error("[cuisine/commandes] échec enregistrement paiement mixte à la remise :", erreurPaiementMixte.message);
     }
   }
 
