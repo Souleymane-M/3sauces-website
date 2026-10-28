@@ -57,7 +57,7 @@ const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 // de quantité par ligne que la caisse (demande explicite du patron,
 // 2026-10-19) : un article à 2€ (ex: Brochettes bœuf x3) dépasse vite 20
 // paquets sur une grosse commande groupée, même passée depuis le site.
-const MAX_LIGNES_PAR_COMMANDE = 30;
+const MAX_LIGNES_PAR_COMMANDE = 300;
 const MAX_QUANTITE_PAR_LIGNE = 99;
 
 /**

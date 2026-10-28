@@ -84,7 +84,7 @@ function validerPaiementsMixte(
 // (50€ = 25 paquets, cas réel bloqué le 2026-10-19, sans aucun message
 // expliquant pourquoi). Le personnel de caisse est de confiance — rien à
 // protéger ici comme sur le site public, qui garde son propre plafond à 20.
-const MAX_LIGNES_PAR_COMMANDE = 30;
+const MAX_LIGNES_PAR_COMMANDE = 300;
 const MAX_QUANTITE_PAR_LIGNE = 99;
 
 /** Levée par `validerLignesCommande` pour toute erreur imputable au client (400) — jamais une erreur serveur. */
