@@ -414,10 +414,13 @@ interface AnnulationCommande {
   motif?: string;
 }
 
+/** Statuts où une commande peut encore être annulée (jamais déjà livrée/remise/annulée). */
+const STATUTS_ANNULABLES = ["en_attente", "en_preparation", "pret", "pris_par_livreur"] as const;
+
 /**
- * Annule une commande — volontairement limité aux commandes encore
- * "en_attente" : au-delà, la préparation a déjà commencé, ça se gère de
- * vive voix avec la cuisine, pas depuis un écran. Restitue le stock du
+ * Annule une commande à tout moment avant qu'elle soit livrée/remise —
+ * demande du patron, 2026-10-28 : en pleine préparation, un client peut
+ * appeler pour annuler. (Avant, limité à "en_attente".) Restitue le stock du
  * jour déjà décompté (plats du jour). Si la commande était payée, le
  * trigger DB `commandes_appliquer_fidelite` reverse l'accumulation déjà
  * créditée — jamais le cas d'une récompense déjà consommée sur cette
@@ -447,17 +450,21 @@ export async function annulerCommande({ commandeId, profilId, motif }: Annulatio
   if (erreurCommande || !commande) {
     throw new Error("Commande introuvable.");
   }
-  if (commande.statut !== "en_attente") {
-    throw new Error('Seules les commandes encore "En attente" peuvent être annulées.');
+  if (!(STATUTS_ANNULABLES as readonly string[]).includes(commande.statut)) {
+    throw new Error("Cette commande est déjà livrée, remise ou annulée : elle ne peut plus être annulée.");
   }
 
-  const { error: erreurMaj } = await supabase
+  const { data: annulees, error: erreurMaj } = await supabase
     .from("commandes")
     .update({ statut: "annulee", motif_annulation: motif?.trim() || null })
-    .eq("id", commandeId);
+    .eq("id", commandeId)
+    .in("statut", [...STATUTS_ANNULABLES])
+    .select("id");
   if (erreurMaj) {
     throw new Error(`Impossible d'annuler la commande : ${erreurMaj.message}`);
   }
+  // Déjà annulée/livrée entre-temps par quelqu'un d'autre : rien à refaire (et surtout pas rendre le stock deux fois).
+  if ((annulees ?? []).length === 0) return;
 
   const lignes = Array.isArray(commande.contenu)
     ? (commande.contenu as { produitId?: string; quantite?: number }[])

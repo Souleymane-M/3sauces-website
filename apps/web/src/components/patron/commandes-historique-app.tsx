@@ -305,16 +305,14 @@ export function CommandesHistoriqueApp({
                     >
                       Modifier
                     </a>
-                    {c.statut === "en_attente" && (
-                      <button
-                        type="button"
-                        onClick={() => demanderAnnulation(c.id)}
-                        disabled={enCoursId === c.id}
-                        className="flex-1 rounded border border-red-600 py-2 text-xs font-semibold text-red-500 disabled:opacity-40"
-                      >
-                        Annuler la commande
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => demanderAnnulation(c.id)}
+                      disabled={enCoursId === c.id}
+                      className="flex-1 rounded border border-red-600 py-2 text-xs font-semibold text-red-500 disabled:opacity-40"
+                    >
+                      Annuler la commande
+                    </button>
                   </div>
                 )}
               </details>

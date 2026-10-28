@@ -386,14 +386,12 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           >
             Modifier
           </a>
-          {commande.statut === "en_attente" && (
-            <button
-              onClick={() => demanderAnnulation(commande.id)}
-              className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
-            >
-              Annuler la commande
-            </button>
-          )}
+          <button
+            onClick={() => demanderAnnulation(commande.id)}
+            className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
+          >
+            Annuler la commande
+          </button>
         </div>
       )}
       <button
