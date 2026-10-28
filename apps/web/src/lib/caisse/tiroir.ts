@@ -137,7 +137,7 @@ export async function enregistrerOuverture(profilId: string, detail: unknown): P
 
 export async function enregistrerSortie(profilId: string, montant: unknown, motif: unknown): Promise<ResultatSaisie> {
   const m = typeof montant === "number" ? Math.round(montant * 100) / 100 : NaN;
-  if (!Number.isFinite(m) || m <= 0 || m > 5000) return { ok: false, erreur: "Montant invalide.", statut: 400 };
+  if (!Number.isFinite(m) || m <= 0 || m > 1_000_000) return { ok: false, erreur: "Montant invalide.", statut: 400 };
   const texte = typeof motif === "string" ? motif.trim() : "";
   if (texte.length < 3 || texte.length > 200) return { ok: false, erreur: "Le motif est obligatoire (3 à 200 caractères).", statut: 400 };
   const supabase = createServiceSupabaseClient();

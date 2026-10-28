@@ -84,8 +84,9 @@ function validerPaiementsMixte(
 // (50€ = 25 paquets, cas réel bloqué le 2026-10-19, sans aucun message
 // expliquant pourquoi). Le personnel de caisse est de confiance — rien à
 // protéger ici comme sur le site public, qui garde son propre plafond à 20.
-const MAX_LIGNES_PAR_COMMANDE = 300;
-const MAX_QUANTITE_PAR_LIGNE = 99;
+// Caisse = employé connecté, pas ouverte à internet : plafonds très larges, simple filet contre une saisie aberrante.
+const MAX_LIGNES_PAR_COMMANDE = 2000;
+const MAX_QUANTITE_PAR_LIGNE = 9999;
 
 /** Levée par `validerLignesCommande` pour toute erreur imputable au client (400) — jamais une erreur serveur. */
 class ErreurValidation extends Error {}
@@ -190,7 +191,7 @@ async function validerLignesCommande(
     const quantite = Number(ligneBrute.quantite);
     if (!Number.isInteger(quantite) || quantite < 1 || quantite > MAX_QUANTITE_PAR_LIGNE) {
       throw new ErreurValidation(
-        `Quantité invalide pour ${produit.nom} : maximum ${MAX_QUANTITE_PAR_LIGNE} par ligne, sépare en deux lignes si besoin de plus.`
+        `Quantité invalide pour ${produit.nom} : maximum ${MAX_QUANTITE_PAR_LIGNE} par ligne.`
       );
     }
 
