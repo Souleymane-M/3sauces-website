@@ -918,7 +918,7 @@ export async function PATCH(request: Request) {
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")
-    .select("id, canal, statut, contenu, montant, paiement_statut, tampons_utilises, commande_par")
+    .select("id, canal, statut, contenu, montant, paiement_statut, tampons_utilises, commande_par, heure_souhaitee")
     .eq("id", body.commandeId)
     .maybeSingle();
   if (erreurExistante || !commandeExistante) {
@@ -964,7 +964,17 @@ export async function PATCH(request: Request) {
   if (typeof creneauHeure !== "string" || !creneauHeure) {
     return NextResponse.json({ error: "Créneau horaire requis." }, { status: 400 });
   }
-  if (!creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
+  const dateCommande = typeof body.date === "string" && body.date ? body.date : dateMayotteIso();
+  // Date et heure inchangées par rapport à la commande enregistrée : on ne
+  // re-vérifie ni la plage d'ouverture ni "créneau passé" ni "jour ouvert" —
+  // modifier une commande dont le créneau est dépassé ne doit jamais être
+  // refusé pour ça (retour du patron, 2026-10-28).
+  const heureCandidate = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
+  const creneauInchange =
+    heureCandidate !== null &&
+    commandeExistante.heure_souhaitee !== null &&
+    heureCandidate.getTime() === new Date(commandeExistante.heure_souhaitee).getTime();
+  if (!creneauInchange && !creneauDansPlage(creneauHeure, parametres.heure_debut, parametres.heure_fin)) {
     return NextResponse.json(
       {
         error: `Créneau invalide : choisis une heure entre ${parametres.heure_debut.slice(0, 5)} et ${parametres.heure_fin.slice(0, 5)}.`,
@@ -973,15 +983,14 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const dateCommande = typeof body.date === "string" && body.date ? body.date : dateMayotteIso();
   const datesOuvertes = prochainesDatesOuvertes(parametres.jours_fermeture, parametres.heure_debut, parametres.heure_fin);
-  if (!dateIsoValide(dateCommande) || !datesOuvertes.includes(dateCommande)) {
+  if (!dateIsoValide(dateCommande) || (!creneauInchange && !datesOuvertes.includes(dateCommande))) {
     return NextResponse.json(
       { error: "Date de retrait indisponible : choisis une date parmi les prochains jours d'ouverture." },
       { status: 400 }
     );
   }
-  if (dateCommande === dateMayotteIso()) {
+  if (!creneauInchange && dateCommande === dateMayotteIso()) {
     const [heureCreneau, minuteCreneau] = creneauHeure.split(":").map(Number);
     if (heureCreneau * 60 + minuteCreneau < heureActuelleMayotteMinutes()) {
       return NextResponse.json({ error: "Ce créneau vient de passer. Choisis une heure à venir." }, { status: 400 });

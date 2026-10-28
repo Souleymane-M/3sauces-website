@@ -13,6 +13,8 @@ export interface CommandeAModifier {
   adresse: string | null;
   zone: string | null;
   creneauHeure: string;
+  /** Jour (Mayotte, "AAAA-MM-JJ") de la commande — conservé tel quel en modification, même s'il est passé ou si le créneau est dépassé. */
+  date: string;
   modePaiement: ModePaiementCommande;
   lignes: LigneCommande[];
   /** `null` = commande d'origine publique (site) — seule éligible à la remise de lancement, y compris après modification ici. */
@@ -106,6 +108,9 @@ export async function chargerCommandePourModification(
       adresse: data.adresse_livraison,
       zone: data.zone_livraison,
       creneauHeure,
+      date: data.heure_souhaitee
+        ? new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date(data.heure_souhaitee))
+        : "",
       modePaiement: data.mode_paiement,
       lignes: Array.isArray(data.contenu) ? (data.contenu as LigneCommande[]) : [],
       commandePar: data.commande_par,

@@ -441,17 +441,29 @@ export function CaisseApp({
     () => prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin),
     [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin]
   );
-  const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
+  // En modification, on garde la date ET l'heure déjà enregistrées, même
+  // si elles sont dépassées (retour du patron, 2026-10-28 : modifier une
+  // commande dont le créneau est passé était refusé).
+  const [dateCommande, setDateCommande] = useState(() => commandeExistante?.date || (datesOuvertes[0] ?? aujourdHui));
+  const dateOrigine = commandeExistante?.date ?? "";
+  const creneauOrigine = commandeExistante?.creneauHeure ?? "";
+  const datesAffichees = useMemo(
+    () => (dateOrigine && !datesOuvertes.includes(dateOrigine) ? [dateOrigine, ...datesOuvertes] : datesOuvertes),
+    [dateOrigine, datesOuvertes]
+  );
 
   // Créneau souhaité pour tous les canaux (comme le site public : "Heure de
   // passage souhaitée" pour sur place/à emporter, "Créneau de livraison
   // souhaité" pour la livraison) ; adresse/zone restent propres à la
   // livraison. Voir `infosClientIncompletes` plus bas pour les champs
   // réellement obligatoires (moins stricts qu'au site public).
-  const creneauxValides = useMemo(
-    () => creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
-    [dateCommande, parametres.heureDebut, parametres.heureFin]
-  );
+  const creneauxValides = useMemo(() => {
+    const base = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
+    // Le créneau d'origine reste toujours proposé (jamais de "créneau passé" imposé en modification).
+    return creneauOrigine && dateCommande === dateOrigine && !base.includes(creneauOrigine)
+      ? [creneauOrigine, ...base]
+      : base;
+  }, [dateCommande, parametres.heureDebut, parametres.heureFin, creneauOrigine, dateOrigine]);
   const [creneauHeure, setCreneauHeure] = useState(
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
@@ -487,6 +499,7 @@ export function CaisseApp({
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
     const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    if (nouvelleDate === dateOrigine && creneauOrigine) creneaux.unshift(creneauOrigine);
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
   }
   const [nom, setNom] = useState(() => commandeExistante?.nom ?? "");
@@ -2261,7 +2274,7 @@ export function CaisseApp({
             )}
 
             <DatePicker
-              dates={datesOuvertes}
+              dates={datesAffichees}
               aujourdHui={aujourdHui}
               valeur={dateCommande}
               onChange={changerDate}
