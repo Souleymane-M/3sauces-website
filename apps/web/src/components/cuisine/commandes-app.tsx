@@ -145,6 +145,11 @@ function formaterDepuis(iso: string): string {
 /** Minutes écoulées depuis le dernier changement de statut (remis à zéro à chaque étape, demande explicite du patron 2026-10-16) — 15 min sans action dans "En attente"/"En préparation"/"Prête" déclenche un bandeau discret, pas de son (contrairement à une nouvelle commande ou une livraison signalée : ça arriverait trop souvent en période de rush pour rester sonore sans lasser). */
 const SEUIL_RETARD_ETAPE_MIN = 15;
 
+// Mêmes statuts que côté serveur (STATUTS_MODIFIABLES de lib/caisse/modification.ts,
+// "server-only" donc non importable ici) : avant qu'une commande ne parte vraiment,
+// son contenu peut encore changer — pas seulement en "en attente".
+const STATUTS_MODIFIABLES: string[] = ["en_attente", "en_preparation", "pret"];
+
 /**
  * Une commande "en attente"/"en préparation" passée très à l'avance (ex:
  * retrait à 13h30, commandée à 8h15) ne doit jamais clignoter juste parce
@@ -373,7 +378,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           </button>
         </div>
       )}
-      {commande.statut === "en_attente" && (
+      {STATUTS_MODIFIABLES.includes(commande.statut) && (
         <div className="mt-2 flex gap-2">
           <a
             href={`/caisse?modifier=${commande.id}`}
@@ -381,12 +386,14 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           >
             Modifier
           </a>
-          <button
-            onClick={() => demanderAnnulation(commande.id)}
-            className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
-          >
-            Annuler la commande
-          </button>
+          {commande.statut === "en_attente" && (
+            <button
+              onClick={() => demanderAnnulation(commande.id)}
+              className="flex-1 rounded border border-red-600 py-2 text-sm font-semibold text-red-600"
+            >
+              Annuler la commande
+            </button>
+          )}
         </div>
       )}
       <button
