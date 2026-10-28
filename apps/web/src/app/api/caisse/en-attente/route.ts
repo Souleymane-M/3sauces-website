@@ -3,7 +3,8 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const TAILLE_MAX_CONTENU = 200_000;
+// Taille des DONNÉES de la commande (pas son montant) : large marge pour les très grosses commandes groupées.
+const TAILLE_MAX_CONTENU = 3_000_000;
 
 async function listerContenus() {
   const supabase = createServiceSupabaseClient();
