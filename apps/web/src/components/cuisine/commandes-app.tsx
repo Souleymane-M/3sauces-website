@@ -93,6 +93,7 @@ function detailLigne(l: CommandeCuisine["lignes"][number]): string[] {
   const details: string[] = [];
   if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
+  if (l.sansSauce) details.push("SANS SAUCE");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
   if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");

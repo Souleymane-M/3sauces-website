@@ -231,6 +231,8 @@ async function validerLignesCommande(
     // "double mayo"), même mécanique que les viandes.
     const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
     const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
+    // "Sans sauce" : choix explicite du client, jamais déduit d'une liste vide.
+    const sansSauce = ligneBrute.sansSauce === true;
     if (estSauceSupplementaire) {
       if (sauces.length !== 1) {
         throw new ErreurValidation("Sélectionne exactement une sauce supplémentaire.");
@@ -242,7 +244,10 @@ async function validerLignesCommande(
           maxSaucesIncluses === 0 ? `Sauces non disponibles sur ${produit.nom}.` : `Maximum ${maxSaucesIncluses} sauces sur ${produit.nom}.`
         );
       }
-      if (maxSaucesIncluses > 0 && sauces.length === 0) {
+      if (sansSauce && (maxSaucesIncluses === 0 || sauces.length > 0)) {
+        throw new ErreurValidation(`Choix "sans sauce" incohérent sur ${produit.nom}.`);
+      }
+      if (maxSaucesIncluses > 0 && sauces.length === 0 && !sansSauce) {
         throw new ErreurValidation(`Choisis au moins 1 sauce sur ${produit.nom}.`);
       }
     }
@@ -373,6 +378,7 @@ async function validerLignesCommande(
       coutMatiereUnitaire: produit.cout_matiere,
       viandes,
       sauces,
+      sansSauce,
       saveurs,
       boissonIncluse,
       sansBoisson,

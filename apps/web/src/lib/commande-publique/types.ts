@@ -106,6 +106,8 @@ export interface LigneCommandePubliquePayload {
   boissonIncluse: string | null;
   /** Client a explicitement refusé la canette incluse (-1,50€) — jamais déduit de `boissonIncluse === null`. */
   sansBoisson?: boolean;
+  /** Le client ne veut aucune sauce (produit à sauces incluses). */
+  sansSauce?: boolean;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */

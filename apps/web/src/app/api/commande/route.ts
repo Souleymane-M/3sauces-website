@@ -378,6 +378,8 @@ export async function POST(request: Request) {
     // mécanique que les viandes — jamais rejetés comme "en double".
     const sauces = Array.isArray(ligneBrute.sauces) ? ligneBrute.sauces : [];
     const estSauceSupplementaire = produit.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE;
+    // "Sans sauce" : choix explicite du client, jamais déduit d'une liste vide.
+    const sansSauce = ligneBrute.sansSauce === true;
     if (estSauceSupplementaire) {
       if (sauces.length !== 1) {
         return NextResponse.json(
@@ -401,7 +403,10 @@ export async function POST(request: Request) {
       // Choix d'au moins 1 sauce obligatoire dès que le produit en propose
       // (Tacos/Barquette/Bowl/Menu Étudiant/Menu Collégien) — jamais une
       // commande sans sauce précisée pour la cuisine.
-      if (maxSaucesIncluses > 0 && sauces.length === 0) {
+      if (sansSauce && (maxSaucesIncluses === 0 || sauces.length > 0)) {
+        return NextResponse.json({ error: `Choix "sans sauce" incohérent sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (maxSaucesIncluses > 0 && sauces.length === 0 && !sansSauce) {
         return NextResponse.json({ error: `Choisis au moins 1 sauce sur ${produit.nom}.` }, { status: 400 });
       }
     }
@@ -546,6 +551,7 @@ export async function POST(request: Request) {
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
       sauces,
+      sansSauce,
       saveurs,
       boissonIncluse,
       sansBoisson,

@@ -51,7 +51,8 @@ interface ViandeModalPubliqueProps {
     accompagnementsInclus: string[],
     sansBoisson: boolean,
     quantite: number,
-    canettesRapidesChoisies: string[]
+    canettesRapidesChoisies: string[],
+    sansSauce: boolean
   ) => void;
   onAnnuler: () => void;
   /** Plafond de quantité sélectionnable — stock du jour restant (déjà net de ce qui est présent au panier) si limité, 20 sinon. */
@@ -93,6 +94,8 @@ export function ViandeModalPublique({
   const [quantite, setQuantite] = useState(1);
   const [viandesChoisies, setViandesChoisies] = useState<string[]>([]);
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
+  // "Sans sauce" : certains clients n'en veulent aucune.
+  const [sansSauce, setSansSauce] = useState(false);
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
   const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
@@ -148,7 +151,7 @@ export function ViandeModalPublique({
   const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
   const toutSelectionne =
     (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
-    (!demandeSauce || saucesChoisies.length >= 1) &&
+    (!demandeSauce || sansSauce || saucesChoisies.length >= 1) &&
     (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
     (!demandeSaladeOuBoisson ||
@@ -293,6 +296,18 @@ export function ViandeModalPublique({
               Choisis au moins 1 sauce (jusqu&apos;à {produit.nbSaucesIncluses}) — {saucesChoisies.length}/
               {produit.nbSaucesIncluses}
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSansSauce((prec) => !prec);
+                setSaucesChoisies([]);
+              }}
+              className={`mt-2 rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                sansSauce ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Sans sauce
+            </button>
             <div className="mt-2 flex flex-wrap gap-2">
               {sauces.map((s) => {
                 const count = saucesChoisies.filter((c) => c === s.nom).length;
@@ -302,7 +317,10 @@ export function ViandeModalPublique({
                     key={s.id}
                     type="button"
                     disabled={desactivee}
-                    onClick={() => ajouterOccurrence(setSaucesChoisies, s.nom, produit.nbSaucesIncluses)}
+                    onClick={() => {
+                      setSansSauce(false);
+                      ajouterOccurrence(setSaucesChoisies, s.nom, produit.nbSaucesIncluses);
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-sm ${
                       count > 0
                         ? "border-[#2D5A27] bg-[#2D5A27] text-white"
@@ -658,7 +676,8 @@ export function ViandeModalPublique({
                 demandeAccompagnement ? accompagnementsChoisis : [],
                 sansBoisson,
                 quantite,
-                canettesRapides
+                canettesRapides,
+                demandeSauce && sansSauce
               )
             }
             className="flex-1 rounded bg-[#8B2020] py-2.5 text-sm font-semibold text-white disabled:opacity-40"

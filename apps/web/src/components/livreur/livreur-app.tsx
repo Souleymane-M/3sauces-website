@@ -17,6 +17,7 @@ function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
   const details: string[] = [];
   if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
+  if (l.sansSauce) details.push("SANS SAUCE");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   const boisson = libelleBoissonLigne(l);
   if (boisson) details.push(boisson);

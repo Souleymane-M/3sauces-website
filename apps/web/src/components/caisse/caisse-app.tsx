@@ -62,6 +62,7 @@ interface LignePanier {
   saveurs: string[];
   boissonIncluse: string | null;
   sansBoisson: boolean;
+  sansSauce: boolean;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
@@ -236,6 +237,7 @@ export function CaisseApp({
       saveurs: l.saveurs ?? [],
       boissonIncluse: l.boissonIncluse ?? null,
       sansBoisson: l.sansBoisson ?? false,
+      sansSauce: l.sansSauce ?? false,
       prixSaisi: produit.prix === null ? l.prixUnitaire : undefined,
       saladeIncluse: l.saladeIncluse ?? null,
       accompagnementsInclus: l.accompagnementsInclus ?? [],
@@ -966,7 +968,8 @@ export function CaisseApp({
     prixSaisi?: number,
     saladeIncluse: boolean | null = null,
     accompagnementsInclus: string[] = [],
-    sansBoisson: boolean = false
+    sansBoisson: boolean = false,
+    sansSauce: boolean = false
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -976,6 +979,7 @@ export function CaisseApp({
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
       l.sansBoisson === sansBoisson &&
+      (l.sansSauce === true) === sansSauce &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanier => ({
@@ -987,6 +991,7 @@ export function CaisseApp({
       saveurs: saveursChoisies,
       boissonIncluse,
       sansBoisson,
+      sansSauce,
       prixSaisi,
       saladeIncluse,
       accompagnementsInclus,
@@ -1412,6 +1417,7 @@ export function CaisseApp({
             saveurs: l.saveurs,
             boissonIncluse: l.boissonIncluse,
             sansBoisson: l.sansBoisson,
+            sansSauce: l.sansSauce === true,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
@@ -1427,6 +1433,7 @@ export function CaisseApp({
           saveurs: l.saveurs,
           boissonIncluse: l.boissonIncluse,
           sansBoisson: l.sansBoisson,
+            sansSauce: l.sansSauce === true,
           prixSaisi: l.prixSaisi,
           saladeIncluse: l.saladeIncluse,
           accompagnementsInclus: l.accompagnementsInclus,
@@ -1689,6 +1696,7 @@ export function CaisseApp({
         {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
+        {l.sansSauce === true && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
         {l.boissonIncluse && (
           <div className="text-xs text-gray-400">
             <div>Boisson incluse : {l.boissonIncluse}</div>
@@ -2588,7 +2596,8 @@ export function CaisseApp({
             accompagnementsInclus,
             sansBoisson,
             quantite,
-            canettesRapidesChoisies
+            canettesRapidesChoisies,
+            sansSauce
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -2600,7 +2609,8 @@ export function CaisseApp({
               undefined,
               saladeIncluse,
               accompagnementsInclus,
-              sansBoisson
+              sansBoisson,
+              sansSauce
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

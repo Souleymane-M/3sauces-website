@@ -62,6 +62,7 @@ interface LignePanierPublique {
   saveurs: string[];
   boissonIncluse: string | null;
   sansBoisson: boolean;
+  sansSauce: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
 }
@@ -570,7 +571,8 @@ export function CommandePubliqueApp({
     quantite: number = 1,
     saladeIncluse: boolean | null = null,
     accompagnementsInclus: string[] = [],
-    sansBoisson: boolean = false
+    sansBoisson: boolean = false,
+    sansSauce: boolean = false
   ) {
     declencherPulse();
     const cle = (l: LignePanierPublique) =>
@@ -580,6 +582,7 @@ export function CommandePubliqueApp({
       JSON.stringify([...l.saveurs].sort()) === JSON.stringify([...saveursChoisies].sort()) &&
       l.boissonIncluse === boissonIncluse &&
       l.sansBoisson === sansBoisson &&
+      l.sansSauce === sansSauce &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanierPublique => ({
@@ -591,6 +594,7 @@ export function CommandePubliqueApp({
       saveurs: saveursChoisies,
       boissonIncluse,
       sansBoisson,
+      sansSauce,
       saladeIncluse,
       accompagnementsInclus,
     });
@@ -1035,6 +1039,7 @@ export function CommandePubliqueApp({
                 saveurs: l.saveurs,
                 boissonIncluse: l.boissonIncluse,
                 sansBoisson: l.sansBoisson,
+                sansSauce: l.sansSauce,
                 saladeIncluse: l.saladeIncluse,
                 accompagnementsInclus: l.accompagnementsInclus,
                 platIndex: index,
@@ -1049,6 +1054,7 @@ export function CommandePubliqueApp({
               saveurs: l.saveurs,
               boissonIncluse: l.boissonIncluse,
               sansBoisson: l.sansBoisson,
+                sansSauce: l.sansSauce,
               saladeIncluse: l.saladeIncluse,
               accompagnementsInclus: l.accompagnementsInclus,
               platIndex: null,
@@ -1139,6 +1145,7 @@ export function CommandePubliqueApp({
         {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
+        {l.sansSauce && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
         {l.boissonIncluse && (
           <div className="text-xs text-gray-400">
             <div>Boisson incluse : {l.boissonIncluse}</div>
@@ -1858,7 +1865,8 @@ export function CommandePubliqueApp({
             accompagnementsInclus,
             sansBoisson,
             quantite,
-            canettesRapidesChoisies
+            canettesRapidesChoisies,
+            sansSauce
           ) => {
             ajouterAuPanier(
               produitEnSelection,
@@ -1869,7 +1877,8 @@ export function CommandePubliqueApp({
               quantite,
               saladeIncluse,
               accompagnementsInclus,
-              sansBoisson
+              sansBoisson,
+              sansSauce
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {

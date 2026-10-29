@@ -22,6 +22,8 @@ export interface LigneCommande {
   boissonIncluse?: string | null;
   /** Client a explicitement refusé la canette incluse (-1,50€) — jamais déduit de `boissonIncluse === null`. */
   sansBoisson?: boolean;
+  /** Le client ne veut aucune sauce (produit à sauces incluses) — jamais déduit de `sauces` vide seul. */
+  sansSauce?: boolean;
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
@@ -71,6 +73,7 @@ export interface LigneCommandePayload {
   saveurs: string[];
   boissonIncluse: string | null;
   sansBoisson?: boolean;
+  sansSauce?: boolean;
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
   saladeIncluse: boolean | null;
