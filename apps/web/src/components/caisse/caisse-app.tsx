@@ -10,7 +10,6 @@ import type { ParametresLivraisonPublic } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-  NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
@@ -63,6 +62,7 @@ interface LignePanier {
   boissonIncluse: string | null;
   sansBoisson: boolean;
   sansSauce: boolean;
+  saladeOption: boolean;
   prixSaisi?: number;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
@@ -238,6 +238,7 @@ export function CaisseApp({
       boissonIncluse: l.boissonIncluse ?? null,
       sansBoisson: l.sansBoisson ?? false,
       sansSauce: l.sansSauce ?? false,
+      saladeOption: l.saladeOption ?? false,
       prixSaisi: produit.prix === null ? l.prixUnitaire : undefined,
       saladeIncluse: l.saladeIncluse ?? null,
       accompagnementsInclus: l.accompagnementsInclus ?? [],
@@ -833,10 +834,6 @@ export function CaisseApp({
     () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
-  const produitSaladeSupplementaire = useMemo(
-    () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
-    [produits]
-  );
   // Accompagnements proposés en choix gratuit inclus (Plats du jour) —
   // jamais "Salade", qui est incluse automatiquement sans choix quand elle
   // fait partie de la recette (pas le même mécanisme que ce choix libre).
@@ -865,6 +862,7 @@ export function CaisseApp({
     (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
       ? MONTANT_REDUCTION_SANS_BOISSON
       : 0) +
+    (l.saladeOption === true ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
@@ -969,7 +967,8 @@ export function CaisseApp({
     saladeIncluse: boolean | null = null,
     accompagnementsInclus: string[] = [],
     sansBoisson: boolean = false,
-    sansSauce: boolean = false
+    sansSauce: boolean = false,
+    saladeOption: boolean = false
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -980,6 +979,7 @@ export function CaisseApp({
       l.boissonIncluse === boissonIncluse &&
       l.sansBoisson === sansBoisson &&
       (l.sansSauce === true) === sansSauce &&
+      (l.saladeOption === true) === saladeOption &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanier => ({
@@ -992,6 +992,7 @@ export function CaisseApp({
       boissonIncluse,
       sansBoisson,
       sansSauce,
+      saladeOption,
       prixSaisi,
       saladeIncluse,
       accompagnementsInclus,
@@ -1418,6 +1419,7 @@ export function CaisseApp({
             boissonIncluse: l.boissonIncluse,
             sansBoisson: l.sansBoisson,
             sansSauce: l.sansSauce === true,
+            saladeOption: l.saladeOption === true,
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
@@ -1434,6 +1436,7 @@ export function CaisseApp({
           boissonIncluse: l.boissonIncluse,
           sansBoisson: l.sansBoisson,
             sansSauce: l.sansSauce === true,
+            saladeOption: l.saladeOption === true,
           prixSaisi: l.prixSaisi,
           saladeIncluse: l.saladeIncluse,
           accompagnementsInclus: l.accompagnementsInclus,
@@ -1697,6 +1700,7 @@ export function CaisseApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.sansSauce === true && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
+        {l.saladeOption === true && <div className="text-xs text-gray-400">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
         {l.boissonIncluse && (
           <div className="text-xs text-gray-400">
             <div>Boisson incluse : {l.boissonIncluse}</div>
@@ -2610,7 +2614,8 @@ export function CaisseApp({
               saladeIncluse,
               accompagnementsInclus,
               sansBoisson,
-              sansSauce
+              sansSauce,
+              saladeOption
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
@@ -2621,9 +2626,6 @@ export function CaisseApp({
               for (const nomSauce of extras.saucesSupplementaires) {
                 ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce], [], null, 1, undefined, null);
               }
-            }
-            if (saladeOption && produitSaladeSupplementaire) {
-              ajouterAuPanier(produitSaladeSupplementaire, [], [], [], null, 1, undefined, null);
             }
             if (produitCanetteRapide) {
               for (const saveur of canettesRapidesChoisies) {

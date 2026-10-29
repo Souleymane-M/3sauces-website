@@ -243,7 +243,7 @@ export async function POST(request: Request) {
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, accompagnement_inclus, salade_ou_boisson, stock_jour"
+      "id, nom, categorie, prix, nb_viandes_max, actif, viande_imposee, nb_sauces_incluses, nb_saveurs_max, canette_incluse, salade_incluse, salade_prix_option, accompagnement_inclus, salade_ou_boisson, stock_jour"
     )
     .in("id", produitIds);
 
@@ -533,6 +533,15 @@ export async function POST(request: Request) {
     // le regroupement n'est jamais déduit du contenu de la ligne.
     const platIndex = typeof ligneBrute.platIndex === "number" ? ligneBrute.platIndex : null;
 
+    // Salade en supplément payant (Tacos/Bowl) : intégrée à la ligne du
+    // produit (comme les sauces), jamais une ligne "Salade supplémentaire"
+    // à part sur le ticket (demande du patron, 2026-10-29).
+    const saladeOption = ligneBrute.saladeOption === true;
+    if (saladeOption && produit.salade_prix_option === null) {
+      return NextResponse.json({ error: `Salade en supplément non proposée sur ${produit.nom}.` }, { status: 400 });
+    }
+    const supplementSalade = saladeOption ? Number(produit.salade_prix_option) : 0;
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -543,15 +552,20 @@ export async function POST(request: Request) {
       // Le Menu Étudiant fait exception : sa boisson est incluse
       // obligatoirement dans son prix de base, jamais de supplément.
       prixUnitaire:
-        produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
-          ? Math.round((produit.prix + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100
-          : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
-            ? Math.round((produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON) * 100) / 100
-            : produit.prix,
+        Math.round(
+          ((produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
+            ? produit.prix + MONTANT_REDUCTION_SANS_BOISSON
+            : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
+              ? produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON
+              : produit.prix) +
+            supplementSalade) *
+            100
+        ) / 100,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
       viandes,
       sauces,
       sansSauce,
+      saladeOption,
       saveurs,
       boissonIncluse,
       sansBoisson,

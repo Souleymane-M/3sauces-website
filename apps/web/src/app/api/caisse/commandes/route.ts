@@ -136,7 +136,7 @@ async function validerLignesCommande(
   const { data: produits, error: erreurProduits } = await supabase
     .from("produits")
     .select(
-      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, accompagnement_inclus, salade_ou_boisson, stock_jour"
+      "id, nom, categorie, prix, cout_matiere, canette_incluse, nb_viandes_max, viande_imposee, nb_sauces_incluses, nb_saveurs_max, actif, salade_incluse, salade_prix_option, accompagnement_inclus, salade_ou_boisson, stock_jour"
     )
     .in("id", produitIds);
   if (erreurProduits) {
@@ -318,6 +318,13 @@ async function validerLignesCommande(
       prixUnitaire = Math.round((prixUnitaire + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
     }
 
+    // Salade en supplément payant (Tacos/Bowl) : intégrée à la ligne du produit.
+    const saladeOption = ligneBrute.saladeOption === true;
+    if (saladeOption && produit.salade_prix_option === null) {
+      throw new ErreurValidation(`Salade en supplément non proposée sur ${produit.nom}.`);
+    }
+    if (saladeOption) prixUnitaire = Math.round((prixUnitaire + Number(produit.salade_prix_option)) * 100) / 100;
+
     // Salade incluse (Barquettes) : choix obligatoire, gratuit — même règle
     // qu'au site public. La salade en option payante (Tacos/Bowl) est un
     // produit "Salade supplémentaire" comme un autre, pas de champ dédié ici.
@@ -379,6 +386,7 @@ async function validerLignesCommande(
       viandes,
       sauces,
       sansSauce,
+      saladeOption,
       saveurs,
       boissonIncluse,
       sansBoisson,

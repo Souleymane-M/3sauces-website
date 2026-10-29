@@ -24,6 +24,8 @@ export interface LigneCommande {
   sansBoisson?: boolean;
   /** Le client ne veut aucune sauce (produit à sauces incluses) — jamais déduit de `sauces` vide seul. */
   sansSauce?: boolean;
+  /** Salade en supplément payant intégrée à la ligne (Tacos/Bowl) — son prix est déjà dans `prixUnitaire`. */
+  saladeOption?: boolean;
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
@@ -74,6 +76,7 @@ export interface LigneCommandePayload {
   boissonIncluse: string | null;
   sansBoisson?: boolean;
   sansSauce?: boolean;
+  saladeOption?: boolean;
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
   saladeIncluse: boolean | null;

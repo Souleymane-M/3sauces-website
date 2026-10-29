@@ -108,6 +108,8 @@ export interface LigneCommandePubliquePayload {
   sansBoisson?: boolean;
   /** Le client ne veut aucune sauce (produit à sauces incluses). */
   sansSauce?: boolean;
+  /** Salade en supplément payant (Tacos/Bowl), intégrée à la ligne. */
+  saladeOption?: boolean;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */

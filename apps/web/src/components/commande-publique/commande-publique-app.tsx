@@ -16,7 +16,6 @@ import type {
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-  NOM_PRODUIT_SALADE_SUPPLEMENTAIRE,
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
@@ -63,6 +62,7 @@ interface LignePanierPublique {
   boissonIncluse: string | null;
   sansBoisson: boolean;
   sansSauce: boolean;
+  saladeOption: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
 }
@@ -446,10 +446,6 @@ export function CommandePubliqueApp({
     () => produits.find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE) ?? null,
     [produits]
   );
-  const produitSaladeSupplementaire = useMemo(
-    () => produits.find((p) => p.nom === NOM_PRODUIT_SALADE_SUPPLEMENTAIRE) ?? null,
-    [produits]
-  );
   // Accompagnements proposés en choix gratuit inclus (Plats du jour) —
   // jamais "Salade", qui est incluse automatiquement sans choix quand elle
   // fait partie de la recette (pas le même mécanisme que ce choix libre).
@@ -477,6 +473,7 @@ export function CommandePubliqueApp({
     (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
       ? MONTANT_REDUCTION_SANS_BOISSON
       : 0) +
+    (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   // Un plat fraîchement ouvert et encore vide ne compte pas — seulement
@@ -572,7 +569,8 @@ export function CommandePubliqueApp({
     saladeIncluse: boolean | null = null,
     accompagnementsInclus: string[] = [],
     sansBoisson: boolean = false,
-    sansSauce: boolean = false
+    sansSauce: boolean = false,
+    saladeOption: boolean = false
   ) {
     declencherPulse();
     const cle = (l: LignePanierPublique) =>
@@ -583,6 +581,7 @@ export function CommandePubliqueApp({
       l.boissonIncluse === boissonIncluse &&
       l.sansBoisson === sansBoisson &&
       l.sansSauce === sansSauce &&
+      l.saladeOption === saladeOption &&
       l.saladeIncluse === saladeIncluse &&
       JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
     const nouvelleLigne = (): LignePanierPublique => ({
@@ -595,6 +594,7 @@ export function CommandePubliqueApp({
       boissonIncluse,
       sansBoisson,
       sansSauce,
+      saladeOption,
       saladeIncluse,
       accompagnementsInclus,
     });
@@ -1040,6 +1040,7 @@ export function CommandePubliqueApp({
                 boissonIncluse: l.boissonIncluse,
                 sansBoisson: l.sansBoisson,
                 sansSauce: l.sansSauce,
+                saladeOption: l.saladeOption,
                 saladeIncluse: l.saladeIncluse,
                 accompagnementsInclus: l.accompagnementsInclus,
                 platIndex: index,
@@ -1055,6 +1056,7 @@ export function CommandePubliqueApp({
               boissonIncluse: l.boissonIncluse,
               sansBoisson: l.sansBoisson,
                 sansSauce: l.sansSauce,
+                saladeOption: l.saladeOption,
               saladeIncluse: l.saladeIncluse,
               accompagnementsInclus: l.accompagnementsInclus,
               platIndex: null,
@@ -1146,6 +1148,7 @@ export function CommandePubliqueApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
         {l.sansSauce && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
+        {l.saladeOption && <div className="text-xs text-gray-400">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
         {l.boissonIncluse && (
           <div className="text-xs text-gray-400">
             <div>Boisson incluse : {l.boissonIncluse}</div>
@@ -1878,7 +1881,8 @@ export function CommandePubliqueApp({
               saladeIncluse,
               accompagnementsInclus,
               sansBoisson,
-              sansSauce
+              sansSauce,
+              saladeOption
             );
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
@@ -1889,9 +1893,6 @@ export function CommandePubliqueApp({
               for (const nomSauce of extras.saucesSupplementaires) {
                 ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
               }
-            }
-            if (saladeOption && produitSaladeSupplementaire) {
-              ajouterAuPanier(produitSaladeSupplementaire, [], []);
             }
             if (produitCanetteRapide) {
               for (const saveur of canettesRapidesChoisies) {

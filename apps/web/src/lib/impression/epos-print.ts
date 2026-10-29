@@ -205,6 +205,7 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.sansSauce) details.push("SANS SAUCE");
+  if (l.saladeOption) details.push("+ Salade");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   const boisson = libelleBoissonLigne(l);
   if (boisson) details.push(boisson);
@@ -236,6 +237,7 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (l.viandes.length > 0) attributs.push({ label: "Viande", valeur: l.viandes.join(", ") });
   if (l.sauces && l.sauces.length > 0) attributs.push({ label: "Sauces", valeur: l.sauces.join(", ") });
   if (l.sansSauce) attributs.push({ label: "Sauces", valeur: "SANS SAUCE" });
+  if (l.saladeOption) attributs.push({ label: "Salade", valeur: "EN PLUS" });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
   if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
   if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
@@ -256,6 +258,7 @@ function cleLigne(l: LigneCommande): string {
     [...l.viandes].sort(),
     [...(l.sauces ?? [])].sort(),
     l.sansSauce ?? false,
+    l.saladeOption ?? false,
     [...(l.saveurs ?? [])].sort(),
     l.boissonIncluse ?? null,
     l.sansBoisson ?? false,

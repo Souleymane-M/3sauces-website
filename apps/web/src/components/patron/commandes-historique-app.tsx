@@ -39,6 +39,7 @@ function detailLigne(l: CommandeHistorique["lignes"][number]): string[] {
   if (l.viandes && l.viandes.length > 0) details.push(l.viandes.join(", "));
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.sansSauce) details.push("Sans sauce");
+  if (l.saladeOption) details.push("+ Salade");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
   if (l.sansBoisson) details.push("Sans boisson");
