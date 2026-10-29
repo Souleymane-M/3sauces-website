@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/get-session";
 import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { ActiviteAppareil } from "@/components/auth/activite-appareil";
 import { CaisseApp } from "@/components/caisse/caisse-app";
 import { RappelFondsCaisse } from "@/components/caisse/rappel-fonds-caisse";
 import {
@@ -69,6 +70,7 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
 
   return (
     <main className="min-h-screen bg-[#F5F0E8] p-8">
+      <ActiviteAppareil />
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Caisse — 3 Sauces</h1>
         <div className="flex items-center gap-3">

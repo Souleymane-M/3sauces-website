@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { derniereActivite, noterActivite, verrouSuspendu } from "@/lib/verrou-appareil";
+
+const EVENEMENTS = ["click", "keydown", "pointerdown", "touchstart", "scroll", "input"] as const;
 
 /**
  * Verrouillage automatique de l'appareil après X secondes d'inactivité
@@ -9,6 +12,11 @@ import { useRouter } from "next/navigation";
  * d'une autre personne. Pas de "session molle" à réactiver : plus sûr, et
  * ça garantit que l'horodatage de la prochaine action est attribué à qui
  * vient réellement de taper son code.
+ *
+ * Ne se déclenche jamais pendant qu'une saisie est en cours (commande en
+ * cours de prise au comptoir) ni si un autre onglet du même appareil
+ * (/caisse) a été utilisé récemment — le cookie de session est partagé, le
+ * supprimer coupait la caisse en plein encaissement (2026-10-29).
  */
 export function useVerrouAppareil(actif: boolean, dureeSec: number): void {
   const router = useRouter();
@@ -22,19 +30,32 @@ export function useVerrouAppareil(actif: boolean, dureeSec: number): void {
       router.refresh();
     }
 
-    function reinitialiser() {
+    function planifier(delaiMs: number) {
       if (minuteur.current) clearTimeout(minuteur.current);
-      minuteur.current = setTimeout(verrouiller, dureeSec * 1000);
+      minuteur.current = setTimeout(verifier, delaiMs);
     }
 
-    reinitialiser();
-    window.addEventListener("click", reinitialiser);
-    window.addEventListener("keydown", reinitialiser);
+    function verifier() {
+      const inactifDepuisMs = Date.now() - derniereActivite();
+      if (verrouSuspendu() || inactifDepuisMs < dureeSec * 1000) {
+        // Encore actif (ici ou dans un autre onglet), ou saisie en cours : on revérifie plus tard.
+        planifier(verrouSuspendu() ? 5000 : Math.max(1000, dureeSec * 1000 - inactifDepuisMs));
+        return;
+      }
+      verrouiller();
+    }
+
+    function activite() {
+      noterActivite();
+    }
+
+    noterActivite();
+    planifier(dureeSec * 1000);
+    for (const e of EVENEMENTS) window.addEventListener(e, activite, { passive: true, capture: true });
 
     return () => {
       if (minuteur.current) clearTimeout(minuteur.current);
-      window.removeEventListener("click", reinitialiser);
-      window.removeEventListener("keydown", reinitialiser);
+      for (const e of EVENEMENTS) window.removeEventListener(e, activite, { capture: true });
     };
   }, [actif, dureeSec, router]);
 }

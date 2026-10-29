@@ -1,5 +1,6 @@
 "use client";
 
+import { suspendreVerrou } from "@/lib/verrou-appareil";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Canal, ModePaiement, ModePaiementCommande } from "@3sauces/supabase";
@@ -886,6 +887,14 @@ export function CaisseApp({
     palierGroupeReel === "GROUPE_4"
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
+  // Saisie en cours : le verrouillage automatique de l'appareil (45 s sans
+  // toucher l'écran) est suspendu — il coupait la session en pleine commande.
+  const saisieActive =
+    panierActuel.length > 0 || nom.trim() !== "" || prenom.trim() !== "" || telephone.trim() !== "" || canal !== null;
+  useEffect(() => {
+    if (!saisieActive) return;
+    return suspendreVerrou();
+  }, [saisieActive]);
   const alerteBoissonRef = useRef(false);
   useEffect(() => {
     const maintenant = boissonsOffertesAChoisir > 0;
@@ -1551,7 +1560,11 @@ export function CaisseApp({
       });
       const data = await reponse.json();
       if (!reponse.ok) {
-        setErreur(data.error ?? "Échec de l'encaissement.");
+        setErreur(
+          reponse.status === 401
+            ? "Tu as été déconnecté (session expirée). Recharge la page et retape ton code : ta commande est gardée."
+            : (data.error ?? "Échec de l'encaissement.")
+        );
         return;
       }
       setConfirmation({ commandeId: data.commandeId, montant: data.montant, canal, encaisse: encaisserEffectif });
