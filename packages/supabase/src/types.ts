@@ -542,6 +542,23 @@ export interface Database {
         Relationships: [];
       };
 
+      produits_historique_dispo: {
+        Row: {
+          id: number;
+          produit_id: string;
+          produit_nom: string;
+          evenement: "active" | "desactive" | "epuise" | "reapprovisionne" | "etat_initial_actif" | "etat_initial_inactif";
+          created_at: string;
+        };
+        Insert: {
+          produit_id: string;
+          produit_nom: string;
+          evenement: "active" | "desactive" | "epuise" | "reapprovisionne" | "etat_initial_actif" | "etat_initial_inactif";
+        };
+        Update: Partial<Database["public"]["Tables"]["produits_historique_dispo"]["Insert"]>;
+        Relationships: [];
+      };
+
       mouvements_caisse: {
         Row: {
           id: string;
