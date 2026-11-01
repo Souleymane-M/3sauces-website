@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Categorie } from "@3sauces/supabase";
 import { CATEGORIES, type ProduitAdmin } from "@/lib/patron/produits-types";
+import { FAMILLES_BOISSON, libelleFamilleBoisson } from "@/lib/boissons";
 
 interface ProduitsAppProps {
   produitsInitiaux: ProduitAdmin[];
@@ -22,6 +23,7 @@ interface Brouillon {
   saladeIncluse: boolean;
   saladePrixOption: string;
   accompagnementInclus: boolean;
+  familleBoisson: string;
 }
 
 function versBrouillon(p: ProduitAdmin): Brouillon {
@@ -39,7 +41,13 @@ function versBrouillon(p: ProduitAdmin): Brouillon {
     saladeIncluse: p.saladeIncluse,
     saladePrixOption: p.saladePrixOption !== null ? String(p.saladePrixOption) : "",
     accompagnementInclus: p.accompagnementInclus,
+    familleBoisson: p.familleBoisson ?? "",
   };
+}
+
+function rangFamille(famille: ProduitAdmin["familleBoisson"]): number {
+  const i = FAMILLES_BOISSON.findIndex((f) => f.valeur === famille);
+  return i === -1 ? FAMILLES_BOISSON.length : i;
 }
 
 function libelleDe(categorie: Categorie): string {
@@ -149,7 +157,12 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
     }
     return CATEGORIES.map((c) => ({
       ...c,
-      produits: (groupes.get(c.valeur) ?? []).sort((a, b) => a.ordre - b.ordre),
+      // Boissons : regroupées par famille (canettes, 2L, 50cl, eau, puis à classer), puis par `ordre`.
+      produits: (groupes.get(c.valeur) ?? []).sort((a, b) =>
+        c.valeur === "boisson"
+          ? rangFamille(a.familleBoisson) - rangFamille(b.familleBoisson) || a.ordre - b.ordre
+          : a.ordre - b.ordre
+      ),
     }));
   }, [produits]);
 
@@ -218,7 +231,12 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
   // toujours recalculé depuis l'état courant (jamais depuis la liste déjà
   // triée passée au rendu, qui peut être obsolète après un clic précédent).
   async function deplacer(produit: ProduitAdmin, direction: "haut" | "bas") {
-    const memeCategorie = produits.filter((p) => p.categorie === produit.categorie).sort((a, b) => a.ordre - b.ordre);
+    const memeCategorie = produits
+      .filter(
+        (p) =>
+          p.categorie === produit.categorie && (produit.categorie !== "boisson" || p.familleBoisson === produit.familleBoisson)
+      )
+      .sort((a, b) => a.ordre - b.ordre);
     const index = memeCategorie.findIndex((p) => p.id === produit.id);
     const voisinIndex = direction === "haut" ? index - 1 : index + 1;
     if (voisinIndex < 0 || voisinIndex >= memeCategorie.length) return;
@@ -308,6 +326,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
         accompagnementInclus: brouillon.accompagnementInclus,
+        familleBoisson: brouillon.categorie === "boisson" && brouillon.familleBoisson ? brouillon.familleBoisson : null,
       };
       const reponse = await fetch("/api/patron/produits", {
         method: "PATCH",
@@ -334,6 +353,7 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
         saladeIncluse: brouillon.saladeIncluse,
         saladePrixOption,
         accompagnementInclus: brouillon.accompagnementInclus,
+        familleBoisson: payload.familleBoisson as ProduitAdmin["familleBoisson"],
       };
       setProduits((precedent) => precedent.map((p) => (p.id === produit.id ? produitMisAJour : p)));
       fermerEdition();
@@ -429,6 +449,23 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                   categorieActuelle={brouillon.categorie}
                   onConfirmer={(c) => modifierBrouillon("categorie", c)}
                 />
+                {brouillon.categorie === "boisson" && (
+                  <label className="block text-xs text-gray-500">
+                    Type de boisson (pour bien les séparer sur le site et en caisse)
+                    <select
+                      value={brouillon.familleBoisson}
+                      onChange={(e) => modifierBrouillon("familleBoisson", e.target.value)}
+                      className={`mt-1 ${inputClasse}`}
+                    >
+                      <option value="">À classer</option>
+                      {FAMILLES_BOISSON.map((f) => (
+                        <option key={f.valeur} value={f.valeur}>
+                          {f.libelle}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
                 <input
                   value={brouillon.description}
@@ -548,6 +585,15 @@ export function ProduitsApp({ produitsInitiaux }: ProduitsAppProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="font-medium text-white">{produit.nom}</div>
+                    {produit.categorie === "boisson" && (
+                      <div
+                        className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                          produit.familleBoisson ? "bg-gray-700 text-gray-200" : "bg-orange-900/60 text-orange-300"
+                        }`}
+                      >
+                        {libelleFamilleBoisson(produit.familleBoisson)}
+                      </div>
+                    )}
                     {produit.description && <div className="text-xs text-gray-400">{produit.description}</div>}
                     <div className="mt-0.5 text-sm text-gray-300">
                       {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix libre"}

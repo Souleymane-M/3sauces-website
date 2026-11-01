@@ -20,7 +20,7 @@ import type { ProduitAdmin, ProduitAdminInput, ProduitAdminPatch } from "./produ
  * géré via les flèches ▲▼ de `ProduitsApp`, jamais saisi à la main.
  */
 const SELECT_ADMIN =
-  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus, stock_jour";
+  "id, nom, categorie, description, prix, actif, nb_viandes_max, viande_imposee, nb_sauces_incluses, autorise_extras, nb_saveurs_max, canette_incluse, ordre, salade_incluse, salade_prix_option, accompagnement_inclus, famille_boisson, stock_jour";
 
 function versProduitAdmin(p: {
   id: string;
@@ -39,6 +39,7 @@ function versProduitAdmin(p: {
   salade_incluse: boolean;
   salade_prix_option: number | null;
   accompagnement_inclus: boolean;
+  famille_boisson: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
   stock_jour: number | null;
 }): ProduitAdmin {
   return {
@@ -58,6 +59,7 @@ function versProduitAdmin(p: {
     saladeIncluse: p.salade_incluse,
     saladePrixOption: p.salade_prix_option,
     accompagnementInclus: p.accompagnement_inclus,
+    familleBoisson: p.famille_boisson,
     stockJour: p.stock_jour,
   };
 }
@@ -136,6 +138,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
     salade_incluse?: boolean;
     salade_prix_option?: number | null;
     accompagnement_inclus?: boolean;
+    famille_boisson?: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
     stock_jour?: number | null;
   } = {};
   if (input.nom !== undefined) update.nom = input.nom;
@@ -153,6 +156,7 @@ export async function mettreAJourProduit(id: string, input: ProduitAdminPatch): 
   if (input.saladeIncluse !== undefined) update.salade_incluse = input.saladeIncluse;
   if (input.saladePrixOption !== undefined) update.salade_prix_option = input.saladePrixOption;
   if (input.accompagnementInclus !== undefined) update.accompagnement_inclus = input.accompagnementInclus;
+  if (input.familleBoisson !== undefined) update.famille_boisson = input.familleBoisson;
   if (input.stockJour !== undefined) update.stock_jour = input.stockJour;
 
   const { error } = await supabase.from("produits").update(update).eq("id", id);

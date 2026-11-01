@@ -34,6 +34,8 @@ export interface ProduitPublic {
   accompagnementInclus: boolean;
   /** Si vrai, le client choisit une salade OU une boisson, incluse dans le prix (ex: Poisson grillé) — jamais les deux, jamais de supplément. */
   saladeOuBoisson: boolean;
+  /** Famille d'une boisson (canette, 2L, 50cl, eau), null pour un produit qui n'est pas une boisson ou pas encore classé. */
+  familleBoisson: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
   /** Quantité restante aujourd'hui (plats du jour) — null = illimité. */
   stockJour: number | null;
 }

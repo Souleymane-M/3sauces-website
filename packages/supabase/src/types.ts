@@ -96,6 +96,7 @@ export interface Database {
           salade_prix_option: number | null;
           accompagnement_inclus: boolean;
           salade_ou_boisson: boolean;
+          famille_boisson: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
           stock_jour: number | null;
           created_at: string;
           updated_at: string;

@@ -35,6 +35,8 @@ export interface ProduitAdmin {
   saladeIncluse: boolean;
   saladePrixOption: number | null;
   accompagnementInclus: boolean;
+  /** Famille de boisson (canette, 2L, 50cl, eau) — null hors boissons ou pas encore classée. */
+  familleBoisson: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
   /** Quantité restante aujourd'hui (plats du jour) — null = illimité, saisi chaque matin par le patron. */
   stockJour: number | null;
 }
@@ -68,5 +70,6 @@ export interface ProduitAdminPatch {
   saladeIncluse?: boolean;
   saladePrixOption?: number | null;
   accompagnementInclus?: boolean;
+  familleBoisson?: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
   stockJour?: number | null;
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { familleBoissonValide } from "@/lib/boissons";
 import { requireRoleMetier } from "@/lib/auth/get-session";
 import { listerProduitsAdmin, creerProduit, mettreAJourProduit, supprimerProduit } from "@/lib/patron/produits";
 import { CATEGORIES, type ProduitAdminInput, type ProduitAdminPatch } from "@/lib/patron/produits-types";
@@ -184,6 +185,15 @@ export async function PATCH(request: Request) {
   }
   if (typeof body.accompagnementInclus === "boolean") {
     patch.accompagnementInclus = body.accompagnementInclus;
+  }
+  if (body.familleBoisson !== undefined) {
+    if (body.familleBoisson === null || body.familleBoisson === "") {
+      patch.familleBoisson = null;
+    } else if (familleBoissonValide(body.familleBoisson)) {
+      patch.familleBoisson = body.familleBoisson;
+    } else {
+      return NextResponse.json({ error: "Famille de boisson invalide." }, { status: 400 });
+    }
   }
   if (body.stockJour !== undefined) {
     if (body.stockJour === null || body.stockJour === "") {

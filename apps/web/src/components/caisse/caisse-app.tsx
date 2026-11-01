@@ -1,5 +1,6 @@
 "use client";
 
+import { FAMILLES_BOISSON } from "@/lib/boissons";
 import { suspendreVerrou } from "@/lib/verrou-appareil";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -1215,19 +1216,28 @@ export function CaisseApp({
   }
 
   /** Liste "+/-" (grillades, accompagnements, boissons) — un bandeau orange par produit à choix de saveur (ex: "Boisson 2L"), sinon une simple ligne. */
-  function afficherGroupeAjoutDirect(produits: ProduitCaisse[], cle: string) {
+  function afficherGroupeAjoutDirect(produits: ProduitCaisse[], cle: string, titreFamille?: string) {
     return (
       <div key={cle} className="rounded-lg border border-gray-200 bg-white">
+        {titreFamille && (
+          <div className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "#C2540C" }}>
+            {titreFamille}
+          </div>
+        )}
         {produits.flatMap((produit) =>
           produit.nbSaveursMax > 0
             ? [
-                <div
-                  key={`${produit.id}-titre`}
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
-                  style={{ backgroundColor: "#C2540C" }}
-                >
-                  {produit.nom}
-                </div>,
+                ...(titreFamille
+                  ? []
+                  : [
+                      <div
+                        key={`${produit.id}-titre`}
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white"
+                        style={{ backgroundColor: "#C2540C" }}
+                      >
+                        {produit.nom}
+                      </div>,
+                    ]),
                 ...(produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) => ligneAjoutDirect(produit, s.nom)),
               ]
             : [ligneAjoutDirect(produit, null)]
@@ -1861,11 +1871,18 @@ export function CaisseApp({
               // grid-cols-1 : les listes compactes (+/-) tronquent les noms
               // en 2 colonnes sur petit écran, contrairement aux grandes
               // cartes Tacos/Barquettes — 2 colonnes à partir de sm:.
-              const indexCanette = boisson?.produits.findIndex((p) => p.nom === "Canette 33cl") ?? -1;
-              const [boissons2L, canettes] =
-                boisson && indexCanette > 0
-                  ? [boisson.produits.slice(0, indexCanette), boisson.produits.slice(indexCanette)]
-                  : [boisson?.produits ?? [], []];
+              const groupesBoisson = [
+    ...FAMILLES_BOISSON.map((f) => ({
+      cle: `boisson-${f.valeur}`,
+      titre: f.libelle,
+      produits: boisson?.produits.filter((p) => p.familleBoisson === f.valeur) ?? [],
+    })),
+    {
+      cle: "boisson-autres",
+      titre: "Autres boissons",
+      produits: boisson?.produits.filter((p) => !p.familleBoisson) ?? [],
+    },
+  ].filter((g) => g.produits.length > 0);
 
               return (
                 <>
@@ -1879,15 +1896,11 @@ export function CaisseApp({
                       {accompagnement && afficherSection(accompagnement)}
                     </div>
                   )}
-                  {boisson &&
-                    (canettes.length > 0 ? (
+                  {boisson && (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {afficherGroupeAjoutDirect(boissons2L, "boisson-2l")}
-                        {afficherGroupeAjoutDirect(canettes, "boisson-canette")}
+                        {groupesBoisson.map((g) => afficherGroupeAjoutDirect(g.produits, g.cle, g.titre))}
                       </div>
-                    ) : (
-                      afficherSection(boisson)
-                    ))}
+                    )}
                 </>
               );
             })()}
