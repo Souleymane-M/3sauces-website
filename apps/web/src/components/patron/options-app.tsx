@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { OptionAdmin, TypeOption } from "@/lib/patron/options-types";
 import type { ProduitAdmin } from "@/lib/patron/produits-types";
-import { FAMILLES_BOISSON } from "@/lib/boissons";
+import { FAMILLES_BOISSON, type FamilleBoisson } from "@/lib/boissons";
 
 interface OptionsAppProps {
   viandesInitiales: OptionAdmin[];
@@ -164,9 +164,50 @@ function ListeOptions({ type, optionsInitiales }: { type: TypeOption; optionsIni
 }
 
 /** Produits d'une famille de boissons (ex: Coca 50cl, Eau 1,5L) : activer/désactiver et prix, directement ici. */
-function ListeProduitsBoisson({ produitsInitiaux }: { produitsInitiaux: ProduitAdmin[] }) {
+function ListeProduitsBoisson({
+  produitsInitiaux,
+  famille,
+}: {
+  produitsInitiaux: ProduitAdmin[];
+  /** Famille attribuée aux nouveaux produits ajoutés dans ce bloc (null = pas d'ajout). */
+  famille: FamilleBoisson | null;
+}) {
   const [produits, setProduits] = useState<ProduitAdmin[]>(produitsInitiaux);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [nouveauNom, setNouveauNom] = useState("");
+  const [nouveauPrix, setNouveauPrix] = useState("");
+  const [ajoutEnCours, setAjoutEnCours] = useState(false);
+
+  async function ajouter() {
+    const nom = nouveauNom.trim();
+    const prix = Number(nouveauPrix.replace(",", "."));
+    if (!nom) return setErreur("Indique un nom.");
+    if (!Number.isFinite(prix) || prix <= 0) return setErreur("Indique un prix valide (ex : 2,50).");
+    setErreur(null);
+    setAjoutEnCours(true);
+    try {
+      const reponse = await fetch("/api/patron/produits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom, categorie: "boisson", prix, familleBoisson: famille }),
+      });
+      const data = await reponse.json().catch(() => ({}));
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Échec de la création.");
+        return;
+      }
+      const relecture = await fetch("/api/patron/produits", { cache: "no-store" });
+      const relectureData = await relecture.json().catch(() => ({ produits: [] }));
+      const tous: ProduitAdmin[] = relectureData.produits ?? [];
+      setProduits(
+        tous.filter((p) => p.categorie === "boisson" && p.familleBoisson === famille && p.nbSaveursMax === 0)
+      );
+      setNouveauNom("");
+      setNouveauPrix("");
+    } finally {
+      setAjoutEnCours(false);
+    }
+  }
 
   async function modifier(produit: ProduitAdmin, changement: { actif?: boolean; prix?: number }) {
     setErreur(null);
@@ -184,15 +225,15 @@ function ListeProduitsBoisson({ produitsInitiaux }: { produitsInitiaux: ProduitA
     }
   }
 
-  if (produits.length === 0) return <p className="text-xs text-gray-600">Aucun produit dans cette famille.</p>;
   return (
     <div className="space-y-2">
       {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
+      {produits.length === 0 && <p className="text-xs text-gray-500">Aucun produit dans cette famille.</p>}
       <ul className="space-y-2">
         {produits.map((produit) => (
           <li key={produit.id} className="flex items-center gap-2 rounded border border-gray-700 p-2">
             <input type="checkbox" checked={produit.actif} onChange={() => modifier(produit, { actif: !produit.actif })} />
-            <span className="flex-1 text-sm text-white">{produit.nom}</span>
+            <span className="flex-1 rounded border border-gray-600 bg-gray-900 p-1.5 text-sm text-white">{produit.nom}</span>
             <input
               defaultValue={produit.prix !== null ? produit.prix.toFixed(2) : ""}
               inputMode="decimal"
@@ -207,6 +248,30 @@ function ListeProduitsBoisson({ produitsInitiaux }: { produitsInitiaux: ProduitA
           </li>
         ))}
       </ul>
+      {famille && (
+        <div className="flex items-center gap-2 rounded border border-dashed border-gray-700 p-2">
+          <input
+            value={nouveauNom}
+            onChange={(e) => setNouveauNom(e.target.value)}
+            placeholder="Nouvelle boisson"
+            className="flex-1 rounded border border-gray-600 bg-gray-900 p-1.5 text-sm text-white placeholder:text-gray-500"
+          />
+          <input
+            value={nouveauPrix}
+            onChange={(e) => setNouveauPrix(e.target.value)}
+            placeholder="Prix"
+            inputMode="decimal"
+            className="w-20 rounded border border-gray-600 bg-gray-900 p-1.5 text-right text-sm text-white placeholder:text-gray-500"
+          />
+          <button
+            onClick={ajouter}
+            disabled={ajoutEnCours}
+            className="rounded bg-white px-3 py-1.5 text-sm font-semibold text-black disabled:opacity-40"
+          >
+            Ajouter
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -214,7 +279,7 @@ function ListeProduitsBoisson({ produitsInitiaux }: { produitsInitiaux: ProduitA
 function BlocFamille({ titre, children }: { titre: string; children: ReactNode }) {
   return (
     <section className="space-y-3 rounded-lg border border-gray-700 p-3">
-      <h3 className="text-sm font-bold uppercase tracking-wide text-orange-400">{titre}</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wide text-[#B65A27]">{titre}</h3>
       {children}
     </section>
   );
@@ -254,14 +319,14 @@ export function OptionsApp({
             {famille.valeur === "canette" && <ListeOptions type="saveurs" optionsInitiales={saveursInitiales} />}
             {famille.valeur === "boisson_2l" && <ListeOptions type="parfums2l" optionsInitiales={parfums2lInitiales} />}
             {(famille.valeur === "boisson_50cl" || famille.valeur === "eau" || produitsSansSaveurs.length > 0) && (
-              <ListeProduitsBoisson produitsInitiaux={produitsSansSaveurs} />
+              <ListeProduitsBoisson produitsInitiaux={produitsSansSaveurs} famille={famille.valeur} />
             )}
           </BlocFamille>
         );
       })}
       {produitsBoissons.some((p) => !p.familleBoisson) && (
         <BlocFamille titre="À classer">
-          <ListeProduitsBoisson produitsInitiaux={produitsBoissons.filter((p) => !p.familleBoisson)} />
+          <ListeProduitsBoisson produitsInitiaux={produitsBoissons.filter((p) => !p.familleBoisson)} famille={null} />
         </BlocFamille>
       )}
     </div>

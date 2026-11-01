@@ -113,6 +113,7 @@ export async function creerProduit(input: ProduitAdminInput): Promise<void> {
     salade_incluse: false,
     salade_prix_option: null,
     accompagnement_inclus: false,
+    famille_boisson: input.familleBoisson ?? null,
   });
 
   if (error) {

@@ -57,6 +57,7 @@ export async function POST(request: Request) {
         autoriseExtras?: boolean;
         nbSaveursMax?: number;
         canetteIncluse?: boolean;
+        familleBoisson?: string | null;
       }
     | null;
 
@@ -97,6 +98,12 @@ export async function POST(request: Request) {
   if (body?.viandeImposee !== undefined) input.viandeImposee = body.viandeImposee.trim() || null;
   if (body?.autoriseExtras !== undefined) input.autoriseExtras = Boolean(body.autoriseExtras);
   if (body?.canetteIncluse !== undefined) input.canetteIncluse = Boolean(body.canetteIncluse);
+  if (body?.familleBoisson) {
+    if (!familleBoissonValide(body.familleBoisson)) {
+      return NextResponse.json({ error: "Famille de boisson invalide." }, { status: 400 });
+    }
+    input.familleBoisson = body.familleBoisson;
+  }
 
   try {
     await creerProduit(input);

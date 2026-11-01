@@ -52,6 +52,7 @@ export interface ProduitAdminInput {
   autoriseExtras?: boolean;
   nbSaveursMax?: number;
   canetteIncluse?: boolean;
+  familleBoisson?: "canette" | "boisson_2l" | "boisson_50cl" | "eau" | null;
 }
 
 export interface ProduitAdminPatch {
