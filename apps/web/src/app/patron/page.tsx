@@ -182,6 +182,7 @@ export default async function PatronPage() {
                   saucesInitiales={sauces}
                   saveursInitiales={saveurs}
                   parfums2lInitiales={parfums2l}
+                  produitsBoissons={produits.filter((p) => p.categorie === "boisson")}
                 />
               </>
             ),

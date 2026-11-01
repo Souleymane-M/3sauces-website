@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { OptionAdmin, TypeOption } from "@/lib/patron/options-types";
+import type { ProduitAdmin } from "@/lib/patron/produits-types";
+import { FAMILLES_BOISSON } from "@/lib/boissons";
 
 interface OptionsAppProps {
   viandesInitiales: OptionAdmin[];
   saucesInitiales: OptionAdmin[];
   saveursInitiales: OptionAdmin[];
   parfums2lInitiales: OptionAdmin[];
+  /** Produits de la catégorie « Boisson » — rangés par famille (canettes, 2L, 50cl, eau). */
+  produitsBoissons: ProduitAdmin[];
 }
 
 const LIBELLES: Record<TypeOption, string> = {
   viandes: "Viandes",
   sauces: "Sauces",
-  saveurs: "Saveurs (boissons)",
-  parfums2l: "Parfums Boisson 2L",
+  saveurs: "Saveurs des canettes 33cl",
+  parfums2l: "Parfums des boissons 2L",
 };
 
 function ListeOptions({ type, optionsInitiales }: { type: TypeOption; optionsInitiales: OptionAdmin[] }) {
@@ -159,6 +163,63 @@ function ListeOptions({ type, optionsInitiales }: { type: TypeOption; optionsIni
   );
 }
 
+/** Produits d'une famille de boissons (ex: Coca 50cl, Eau 1,5L) : activer/désactiver et prix, directement ici. */
+function ListeProduitsBoisson({ produitsInitiaux }: { produitsInitiaux: ProduitAdmin[] }) {
+  const [produits, setProduits] = useState<ProduitAdmin[]>(produitsInitiaux);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  async function modifier(produit: ProduitAdmin, changement: { actif?: boolean; prix?: number }) {
+    setErreur(null);
+    const avant = produits;
+    setProduits((prec) => prec.map((p) => (p.id === produit.id ? { ...p, ...changement } : p)));
+    const reponse = await fetch("/api/patron/produits", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: produit.id, ...changement }),
+    });
+    if (!reponse.ok) {
+      setProduits(avant);
+      const data = await reponse.json().catch(() => ({}));
+      setErreur(data.error ?? "Échec de la mise à jour.");
+    }
+  }
+
+  if (produits.length === 0) return <p className="text-xs text-gray-600">Aucun produit dans cette famille.</p>;
+  return (
+    <div className="space-y-2">
+      {erreur && <p className="text-xs text-orange-400">{erreur}</p>}
+      <ul className="space-y-2">
+        {produits.map((produit) => (
+          <li key={produit.id} className="flex items-center gap-2 rounded border border-gray-700 p-2">
+            <input type="checkbox" checked={produit.actif} onChange={() => modifier(produit, { actif: !produit.actif })} />
+            <span className="flex-1 text-sm text-white">{produit.nom}</span>
+            <input
+              defaultValue={produit.prix !== null ? produit.prix.toFixed(2) : ""}
+              inputMode="decimal"
+              aria-label={`Prix de ${produit.nom}`}
+              onBlur={(e) => {
+                const prix = Number(e.target.value.replace(",", "."));
+                if (Number.isFinite(prix) && prix > 0 && prix !== produit.prix) modifier(produit, { prix });
+              }}
+              className="w-20 rounded border border-gray-600 bg-gray-900 p-1.5 text-right text-sm text-white"
+            />
+            <span className="text-xs text-gray-500">€</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BlocFamille({ titre, children }: { titre: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-lg border border-gray-700 p-3">
+      <h3 className="text-sm font-bold uppercase tracking-wide text-orange-400">{titre}</h3>
+      {children}
+    </section>
+  );
+}
+
 /**
  * Gestion des référentiels d'options (Page 3 / Module 6) : viandes,
  * sauces, saveurs — cf. lib/patron/options.ts.
@@ -168,6 +229,7 @@ export function OptionsApp({
   saucesInitiales,
   saveursInitiales,
   parfums2lInitiales,
+  produitsBoissons,
 }: OptionsAppProps) {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
@@ -178,8 +240,30 @@ export function OptionsApp({
       </p>
       <ListeOptions type="viandes" optionsInitiales={viandesInitiales} />
       <ListeOptions type="sauces" optionsInitiales={saucesInitiales} />
-      <ListeOptions type="saveurs" optionsInitiales={saveursInitiales} />
-      <ListeOptions type="parfums2l" optionsInitiales={parfums2lInitiales} />
+      <h2 className="pt-2 text-lg font-bold">Boissons</h2>
+      <p className="text-xs text-gray-500">
+        Quatre familles distinctes, comme sur le site et en caisse. Pour changer la famille d&apos;un produit : Produits
+        → Modifier → « Type de boisson ».
+      </p>
+      {FAMILLES_BOISSON.map((famille) => {
+        const produitsFamille = produitsBoissons.filter((p) => p.familleBoisson === famille.valeur);
+        // Un produit à saveurs (ex: « Canette 33cl ») est géré par sa liste de saveurs ci-dessous, pas ligne à ligne.
+        const produitsSansSaveurs = produitsFamille.filter((p) => p.nbSaveursMax === 0);
+        return (
+          <BlocFamille key={famille.valeur} titre={famille.libelle}>
+            {famille.valeur === "canette" && <ListeOptions type="saveurs" optionsInitiales={saveursInitiales} />}
+            {famille.valeur === "boisson_2l" && <ListeOptions type="parfums2l" optionsInitiales={parfums2lInitiales} />}
+            {(famille.valeur === "boisson_50cl" || famille.valeur === "eau" || produitsSansSaveurs.length > 0) && (
+              <ListeProduitsBoisson produitsInitiaux={produitsSansSaveurs} />
+            )}
+          </BlocFamille>
+        );
+      })}
+      {produitsBoissons.some((p) => !p.familleBoisson) && (
+        <BlocFamille titre="À classer">
+          <ListeProduitsBoisson produitsInitiaux={produitsBoissons.filter((p) => !p.familleBoisson)} />
+        </BlocFamille>
+      )}
     </div>
   );
 }
