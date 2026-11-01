@@ -69,12 +69,12 @@ export function QuantiteModalPublique({
           <button
             onClick={onAnnuler}
             aria-label="Fermer"
-            className="-mr-1 -mt-1 rounded p-1 text-gray-400 hover:bg-gray-100"
+            className="-mr-1 -mt-1 rounded p-1 text-gray-600 hover:bg-gray-100"
           >
             ✕
           </button>
         </div>
-        {produit.description && <p className="text-sm text-gray-500">{produit.description}</p>}
+        {produit.description && <p className="text-sm text-gray-700">{produit.description}</p>}
 
         {demandePrixLibre ? (
           <div className="mt-3">
@@ -88,7 +88,7 @@ export function QuantiteModalPublique({
             />
           </div>
         ) : (
-          <p className="mt-1 text-sm text-gray-500">{prixUnitaire.toFixed(2)} € / unité</p>
+          <p className="mt-1 text-sm text-gray-700">{prixUnitaire.toFixed(2)} € / unité</p>
         )}
 
         <div className="mt-6 flex items-center justify-center gap-5">
@@ -119,10 +119,10 @@ export function QuantiteModalPublique({
           ).toFixed(2)} €
         </p>
         {nbPiecesParPaquet > 1 && (
-          <p className="mt-1 text-center text-sm text-gray-500">Soit {quantite * nbPiecesParPaquet} pièces</p>
+          <p className="mt-1 text-center text-sm text-gray-700">Soit {quantite * nbPiecesParPaquet} pièces</p>
         )}
         {produit.stockJour !== null && (
-          <p className="mt-1 text-center text-xs text-gray-400">Stock du jour : {produit.stockJour} restant(s)</p>
+          <p className="mt-1 text-center text-xs text-gray-600">Stock du jour : {produit.stockJour} restant(s)</p>
         )}
 
         {canetteProduit && canetteSaveurs.length > 0 && (
@@ -161,7 +161,7 @@ export function QuantiteModalPublique({
                     <button
                       type="button"
                       onClick={() => retirerCanette(nom)}
-                      className="text-gray-400 hover:text-gray-700"
+                      className="text-gray-600 hover:text-gray-700"
                       aria-label={`Retirer une unité de ${nom}`}
                     >
                       ✕

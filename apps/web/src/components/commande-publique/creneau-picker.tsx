@@ -47,7 +47,7 @@ export function CreneauPicker({ creneauxValides, valeur, onChange, label }: Cren
 
   return (
     <div>
-      <label className="text-xs text-gray-500">{label}</label>
+      <label className="text-xs text-gray-700">{label}</label>
       <div className="mt-1 flex gap-2">
         <select
           value={heureActuelle}

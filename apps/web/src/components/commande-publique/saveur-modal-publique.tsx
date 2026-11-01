@@ -42,7 +42,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
           <button
             onClick={onAnnuler}
             aria-label="Fermer"
-            className="-mr-1 -mt-1 rounded p-1 text-gray-400 hover:bg-gray-100"
+            className="-mr-1 -mt-1 rounded p-1 text-gray-600 hover:bg-gray-100"
           >
             ✕
           </button>
@@ -82,7 +82,7 @@ export function SaveurModalPublique({ produit, saveurs, onValider, onAnnuler }: 
                   <button
                     type="button"
                     onClick={() => retirerOccurrence(nom)}
-                    className="text-gray-400 hover:text-gray-700"
+                    className="text-gray-600 hover:text-gray-700"
                     aria-label={`Retirer une unité de ${nom}`}
                   >
                     ✕

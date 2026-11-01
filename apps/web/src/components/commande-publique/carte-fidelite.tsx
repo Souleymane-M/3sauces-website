@@ -183,11 +183,11 @@ export function CarteFidelite({
           placeholder="ton@email.com"
           className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
         />
-        {enCours && <p className="text-xs text-gray-500">Vérification…</p>}
+        {enCours && <p className="text-xs text-gray-700">Vérification…</p>}
       </div>
 
       {etape === "nouveau_client" && (
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-700">
           Pas encore de compte avec ces infos — pas de souci, remplis le reste du formulaire, tout sera enregistré
           pour la prochaine fois.
         </p>
@@ -240,11 +240,11 @@ export function CarteFidelite({
                 </button>
               </div>
               {maxUtilisable === 0 && (
-                <p className="mt-1 text-xs text-gray-500">Disponible à partir de {MONTANT_RECOMPENSE}€ de commande.</p>
+                <p className="mt-1 text-xs text-gray-700">Disponible à partir de {MONTANT_RECOMPENSE}€ de commande.</p>
               )}
             </div>
           )}
-          <Link href="/fidelite" className="text-xs text-gray-500 underline">
+          <Link href="/fidelite" className="text-xs text-gray-700 underline">
             Comment ça marche ?
           </Link>
         </div>

@@ -63,15 +63,15 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
           {estLivraison ? `Vous serez livré ${libelleHeure}.` : `Vous pourrez récupérer votre commande ${libelleHeure}.`}
         </p>
       )}
-      {paiementConfirme === true && <p className="text-sm text-gray-500">Paiement en ligne reçu, commande confirmée.</p>}
+      {paiementConfirme === true && <p className="text-sm text-gray-700">Paiement en ligne reçu, commande confirmée.</p>}
       {paiementConfirme === false && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-700">
           Paiement en cours de confirmation — cette étape prend en général quelques secondes, tu recevras la
           confirmation par SMS.
         </p>
       )}
       {paiementConfirme === null && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-700">
           Paiement en espèces ou par carte, à la {estLivraison ? "livraison" : "prise en main"}.
         </p>
       )}

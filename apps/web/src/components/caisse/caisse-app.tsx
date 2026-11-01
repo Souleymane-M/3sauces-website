@@ -1136,10 +1136,10 @@ export function CaisseApp({
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-400" : "text-gray-900"}`}>
+          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-600" : "text-gray-900"}`}>
             {saveur ?? produit.nom}
           </p>
-          <p className="text-xs text-gray-400">{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
+          <p className={`text-sm ${epuise ? "font-semibold text-red-700" : "font-medium text-gray-700"}`}>{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {q > 0 && (
@@ -1199,7 +1199,7 @@ export function CaisseApp({
                 }`}
               >
                 <div className="font-medium text-gray-900">{produit.nom}</div>
-                {produit.description && <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>}
+                {produit.description && <div className="mt-0.5 text-xs text-gray-700">{produit.description}</div>}
                 <div className="mt-1 font-semibold text-gray-900">
                   {produit.prix !== null ? `${produit.prix.toFixed(2)} €` : "Prix du jour"}
                 </div>
@@ -1702,17 +1702,17 @@ export function CaisseApp({
       <li key={l.id} className="text-sm">
         <div className="flex items-center justify-between">
           <span className="text-gray-900">{l.produit.nom}</span>
-          <button onClick={() => retirerLigne(l.id)} className="text-gray-400 hover:text-gray-700">
+          <button onClick={() => retirerLigne(l.id)} className="text-gray-600 hover:text-gray-700">
             ✕
           </button>
         </div>
-        {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
-        {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
-        {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
-        {l.sansSauce === true && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
-        {l.saladeOption === true && <div className="text-xs text-gray-400">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
+        {l.viandes.length > 0 && <div className="text-xs text-gray-700">{l.viandes.join(", ")}</div>}
+        {l.saveurs.length > 0 && <div className="text-xs text-gray-700">{l.saveurs.join(", ")}</div>}
+        {l.sauces.length > 0 && <div className="text-xs text-gray-600">Sauces : {l.sauces.join(", ")}</div>}
+        {l.sansSauce === true && <div className="text-xs font-semibold text-gray-700">Sans sauce</div>}
+        {l.saladeOption === true && <div className="text-xs text-gray-600">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
         {l.boissonIncluse && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             <div>Boisson incluse : {l.boissonIncluse}</div>
             {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && l.produit.canetteIncluse && (
               <button
@@ -1738,15 +1738,15 @@ export function CaisseApp({
           </div>
         )}
         {l.accompagnementsInclus.length > 0 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             Accompagnement : {l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}
           </div>
         )}
         {l.saladeIncluse !== null && (
-          <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
+          <div className="text-xs text-gray-600">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
         )}
         {piecesParPaquet(l.produit.nom) > 1 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             = {l.quantite * piecesParPaquet(l.produit.nom)}{" "}
             {nomPluriel(nomSansMultiplicateur(l.produit.nom).toLowerCase(), l.quantite * piecesParPaquet(l.produit.nom))}{" "}
             au total
@@ -1776,7 +1776,7 @@ export function CaisseApp({
     <div className={`space-y-4 ${modeCommande !== null ? "pb-20" : ""}`}>
       {!enModeEdition && commandesEnAttente.length > 0 && (
         <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-700">
             {commandesEnAttente.length} commande{commandesEnAttente.length > 1 ? "s" : ""} en attente
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1790,7 +1790,7 @@ export function CaisseApp({
                   type="button"
                   aria-label={`Supprimer la commande en attente ${c.libelle}`}
                   onClick={() => supprimerEnAttente(c)}
-                  className="border-l border-[#8B2020]/30 px-3 text-lg font-bold text-gray-500 active:bg-gray-100"
+                  className="border-l border-[#8B2020]/30 px-3 text-lg font-bold text-gray-700 active:bg-gray-100"
                 >
                   ✕
                 </button>
@@ -1831,7 +1831,7 @@ export function CaisseApp({
                 <button
                   type="button"
                   onClick={() => terminerModification()}
-                  className="text-sm font-semibold text-gray-500 underline"
+                  className="text-sm font-semibold text-gray-700 underline"
                 >
                   Annuler la modification
                 </button>
@@ -1848,7 +1848,7 @@ export function CaisseApp({
             <button
               type="button"
               onClick={retourChoixMode}
-              className="text-sm font-semibold text-gray-500 underline"
+              className="text-sm font-semibold text-gray-700 underline"
             >
               ← Changer de mode ({enModeGroupe ? "commande groupée" : "commande simple"})
             </button>
@@ -1907,7 +1907,7 @@ export function CaisseApp({
           </div>
 
           <div id="panier-caisse" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-sm text-gray-500">Caissier·e : {nomEmploye}</p>
+            <p className="text-sm text-gray-700">Caissier·e : {nomEmploye}</p>
 
             {enModeGroupe && (
               <div className="rounded-lg border border-[#8B2020] p-3">
@@ -1954,12 +1954,12 @@ export function CaisseApp({
 
               {!enModeGroupe ? (
                 <>
-                  {panierSimple.length === 0 && <p className="mt-2 text-sm text-gray-400">Vide.</p>}
+                  {panierSimple.length === 0 && <p className="mt-2 text-sm text-gray-600">Vide.</p>}
                   <ul className="mt-2 space-y-2">{panierSimple.map(ligneJsx)}</ul>
                 </>
               ) : (
                 <>
-                  {panierActuel.length === 0 && <p className="mt-2 text-sm text-gray-400">Vide.</p>}
+                  {panierActuel.length === 0 && <p className="mt-2 text-sm text-gray-600">Vide.</p>}
                   <ul className="mt-2 space-y-2">
                     {plats.map((plat, index) => {
                       if (plat.lignes.length === 0) return null;
@@ -1978,7 +1978,7 @@ export function CaisseApp({
                               {plat.pourQui ? ` — ${plat.pourQui}` : ""} — {nbArticlesPlat} article
                               {nbArticlesPlat > 1 ? "s" : ""} — {totalPlat.toFixed(2)} €
                             </span>
-                            <span className="text-gray-400">{deplie ? "▲" : "▼"}</span>
+                            <span className="text-gray-600">{deplie ? "▲" : "▼"}</span>
                           </button>
 
                           {deplie && (
@@ -2101,7 +2101,7 @@ export function CaisseApp({
                   {Array.from({ length: nbBoissonsOffertes }, (_, index) => (
                     <div key={index} className="mt-1">
                       {nbBoissonsOffertes > 1 && (
-                        <p className="text-[11px] font-semibold text-gray-500">Boisson n°{index + 1}</p>
+                        <p className="text-[11px] font-semibold text-gray-700">Boisson n°{index + 1}</p>
                       )}
                       <div className="mt-0.5 flex flex-wrap gap-1.5">
                         {parfums2l.map((s) => (
@@ -2133,7 +2133,7 @@ export function CaisseApp({
 
             <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-gray-500">
+                <label className="text-xs text-gray-700">
                   Prénom{canal === "livraison" ? "" : " (facultatif)"}
                 </label>
                 <input
@@ -2143,7 +2143,7 @@ export function CaisseApp({
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">Nom (facultatif)</label>
+                <label className="text-xs text-gray-700">Nom (facultatif)</label>
                 <input
                   value={nom}
                   onChange={(e) => setNom(e.target.value)}
@@ -2153,7 +2153,7 @@ export function CaisseApp({
             </div>
 
             <div>
-              <label className="text-xs text-gray-500">Téléphone</label>
+              <label className="text-xs text-gray-700">Téléphone</label>
               <div className="mt-1.5 flex gap-2">
                 <input
                   value={telephone}
@@ -2210,15 +2210,15 @@ export function CaisseApp({
                       )}
                     </>
                   ) : (
-                    <p className="text-xs text-gray-500">Nouveau client (sera créé au paiement).</p>
+                    <p className="text-xs text-gray-700">Nouveau client (sera créé au paiement).</p>
                   )}
                 </div>
               )}
-              {!clientInfo && <p className="mt-2 text-xs text-gray-500">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}
+              {!clientInfo && <p className="mt-2 text-xs text-gray-700">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}
             </div>
 
             <div>
-              <label className="text-xs text-gray-500">Email (optionnel)</label>
+              <label className="text-xs text-gray-700">Email (optionnel)</label>
               <input
                 type="email"
                 value={email}
@@ -2234,7 +2234,7 @@ export function CaisseApp({
             </div>
 
             <div className="border-t border-gray-200 pt-3">
-              <label className="text-xs text-gray-500">Comment récupérer la commande ?</label>
+              <label className="text-xs text-gray-700">Comment récupérer la commande ?</label>
               <div className={`mt-1 grid grid-cols-3 gap-2 rounded-lg ${canal ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                 <button
                   type="button"
@@ -2267,7 +2267,7 @@ export function CaisseApp({
               </div>
               {!canal && <p className="mt-2 text-xs text-[#8B2020]">👆 Choisis une option avant d&apos;encaisser.</p>}
               {livraisonBloqueeParPaiement && (
-                <p className="mt-2 text-xs text-gray-400">
+                <p className="mt-2 text-xs text-gray-600">
                   Passage à &quot;Livraison&quot; impossible ici (commande déjà payée) — annule et recrée-la si besoin.
                 </p>
               )}
@@ -2287,7 +2287,7 @@ export function CaisseApp({
             {canal === "livraison" && (
               <div className="space-y-3 border-t border-gray-200 pt-3">
                 <div>
-                  <label className="text-xs text-gray-500">Adresse</label>
+                  <label className="text-xs text-gray-700">Adresse</label>
                   <input
                     value={adresse}
                     onChange={(e) => setAdresse(e.target.value)}
@@ -2295,7 +2295,7 @@ export function CaisseApp({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Zone</label>
+                  <label className="text-xs text-gray-700">Zone</label>
                   <select
                     value={zone}
                     onChange={(e) => setZone(e.target.value)}
@@ -2328,7 +2328,7 @@ export function CaisseApp({
 
             {canal !== null && canal !== "livraison" && (
               <div>
-                <label className="text-xs text-gray-500">Quand ce paiement est-il encaissé ?</label>
+                <label className="text-xs text-gray-700">Quand ce paiement est-il encaissé ?</label>
                 {paiementImmediatPossible ? (
                   <div className="mt-1 grid grid-cols-2 gap-2">
                     <button
@@ -2361,7 +2361,7 @@ export function CaisseApp({
             )}
 
             <div>
-              <label className="text-xs text-gray-500">Paiement</label>
+              <label className="text-xs text-gray-700">Paiement</label>
               <select
                 value={modePaiement}
                 onChange={(e) => setModePaiement(e.target.value as ModePaiementCommande)}
@@ -2434,7 +2434,7 @@ export function CaisseApp({
               )}
               Total : {totalApresRemises.toFixed(2)} €
               {total > 0 && (
-                <p className="mt-1 text-xs font-semibold text-gray-500">
+                <p className="mt-1 text-xs font-semibold text-gray-700">
                   {texteProgressionCommande(
                     calculerProgressionCommande(total, 0, clientInfo?.tamponsDisponibles ?? 0, nbTamponsEffectif)
                   )}
@@ -2445,7 +2445,7 @@ export function CaisseApp({
             {!enModeEdition && (
               <div>
                 {impressionTicketObligatoire ? (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-700">
                     🖨️ Ticket client imprimé automatiquement pour cette commande (bon de cuisine toujours imprimé).
                   </p>
                 ) : (
@@ -2535,7 +2535,7 @@ export function CaisseApp({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
             {panierActuel.length === 0 ? (
-              <span className="text-sm text-gray-400">Panier vide</span>
+              <span className="text-sm text-gray-600">Panier vide</span>
             ) : (
               <>
                 <div>
@@ -2546,7 +2546,7 @@ export function CaisseApp({
                           panierActuel.reduce((acc, l) => acc + l.quantite, 0) > 1 ? "s" : ""
                         }`}
                   </div>
-                  <div className="text-xs text-gray-500">{total.toFixed(2)} €</div>
+                  <div className="text-xs text-gray-700">{total.toFixed(2)} €</div>
                 </div>
                 {boissonsOffertesAChoisir > 0 ? (
                   <button
@@ -2705,7 +2705,7 @@ export function CaisseApp({
             <button
               type="button"
               onClick={() => setLigneCorrectionBoisson(null)}
-              className="mt-4 text-sm text-gray-500 underline"
+              className="mt-4 text-sm text-gray-700 underline"
             >
               Annuler
             </button>

@@ -122,7 +122,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
   }
 
   if (!etat) {
-    return <p className="mt-6 text-gray-500">{erreur ?? "Chargement…"}</p>;
+    return <p className="mt-6 text-gray-700">{erreur ?? "Chargement…"}</p>;
   }
 
   const total = totalSaisie(saisie);
@@ -219,7 +219,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
   return (
     <div className="mt-4 space-y-4">
       {onFermer && (
-        <button type="button" onClick={onFermer} className="text-sm text-gray-500 underline">
+        <button type="button" onClick={onFermer} className="text-sm text-gray-700 underline">
           ← Retour
         </button>
       )}
@@ -230,7 +230,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
         {etat.ouverture ? (
           <>
             <p className="text-lg font-bold text-black">
-              {euros(etat.ouverture.montant)} <span className="text-sm font-normal text-gray-500">à {heure(etat.ouverture.creeLe)}, par {etat.ouverture.profilNom}{libelleRecomptages(etat.recomptages.ouverture)}</span>
+              {euros(etat.ouverture.montant)} <span className="text-sm font-normal text-gray-700">à {heure(etat.ouverture.creeLe)}, par {etat.ouverture.profilNom}{libelleRecomptages(etat.recomptages.ouverture)}</span>
             </p>
             {!cloture && (
               <button
@@ -259,7 +259,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
 
       <div className="rounded border border-gray-200 bg-white p-3">
         <p className="text-sm font-semibold text-gray-600">Sorties de caisse</p>
-        {etat.sorties.length === 0 && <p className="text-gray-500">Aucune.</p>}
+        {etat.sorties.length === 0 && <p className="text-gray-700">Aucune.</p>}
         <ul className="divide-y divide-gray-100">
           {etat.sorties.map((s) => (
             <li key={s.id} className="flex justify-between gap-3 py-1 text-sm text-black">
@@ -298,7 +298,7 @@ export function TiroirCaisseApp({ onFermer }: { onFermer?: () => void }) {
               </p>
             )}
             {!etat.ouverture && <p className="text-sm text-orange-700">⚠ Pas de fonds de caisse enregistré : il compte pour 0.</p>}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-700">
               Clôturé à {heure(cloture.creeLe)} par {cloture.profilNom}{libelleRecomptages(etat.recomptages.cloture)}.
             </p>
             <button

@@ -731,10 +731,10 @@ export function CommandePubliqueApp({
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-400" : "text-gray-900"}`}>
+          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-600" : "text-gray-900"}`}>
             {saveur ?? produit.nom}
           </p>
-          <p className="text-xs text-gray-400">{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
+          <p className={`text-sm ${epuise ? "font-semibold text-red-700" : "font-medium text-gray-700"}`}>{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {q > 0 && (
@@ -794,7 +794,7 @@ export function CommandePubliqueApp({
                 }`}
               >
                 <div className="font-medium text-gray-900">{produit.nom}</div>
-                {produit.description && <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>}
+                {produit.description && <div className="mt-0.5 text-xs text-gray-700">{produit.description}</div>}
                 <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
                 {produit.stockJour === 0 && <div className="mt-1 text-xs font-bold text-red-600">Épuisé aujourd&apos;hui</div>}
                 {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
@@ -1150,17 +1150,17 @@ export function CommandePubliqueApp({
       <li key={l.id} className="text-sm">
         <div className="flex items-center justify-between">
           <span className="text-gray-900">{l.produit.nom}</span>
-          <button onClick={() => retirerLigne(l.id)} className="text-gray-400 hover:text-gray-700">
+          <button onClick={() => retirerLigne(l.id)} className="text-gray-600 hover:text-gray-700">
             ✕
           </button>
         </div>
-        {l.viandes.length > 0 && <div className="text-xs text-gray-500">{l.viandes.join(", ")}</div>}
-        {l.saveurs.length > 0 && <div className="text-xs text-gray-500">{l.saveurs.join(", ")}</div>}
-        {l.sauces.length > 0 && <div className="text-xs text-gray-400">Sauces : {l.sauces.join(", ")}</div>}
-        {l.sansSauce && <div className="text-xs font-semibold text-gray-500">Sans sauce</div>}
-        {l.saladeOption && <div className="text-xs text-gray-400">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
+        {l.viandes.length > 0 && <div className="text-xs text-gray-700">{l.viandes.join(", ")}</div>}
+        {l.saveurs.length > 0 && <div className="text-xs text-gray-700">{l.saveurs.join(", ")}</div>}
+        {l.sauces.length > 0 && <div className="text-xs text-gray-600">Sauces : {l.sauces.join(", ")}</div>}
+        {l.sansSauce && <div className="text-xs font-semibold text-gray-700">Sans sauce</div>}
+        {l.saladeOption && <div className="text-xs text-gray-600">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
         {l.boissonIncluse && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             <div>Boisson incluse : {l.boissonIncluse}</div>
             {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && l.produit.canetteIncluse && (
               <button
@@ -1186,15 +1186,15 @@ export function CommandePubliqueApp({
           </div>
         )}
         {l.accompagnementsInclus.length > 0 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             Accompagnement : {l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}
           </div>
         )}
         {l.saladeIncluse !== null && (
-          <div className="text-xs text-gray-400">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
+          <div className="text-xs text-gray-600">{l.saladeIncluse ? "Avec salade" : "Sans salade"}</div>
         )}
         {piecesParPaquet(l.produit.nom) > 1 && (
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-600">
             = {l.quantite * piecesParPaquet(l.produit.nom)}{" "}
             {nomPluriel(nomSansMultiplicateur(l.produit.nom).toLowerCase(), l.quantite * piecesParPaquet(l.produit.nom))}{" "}
             au total
@@ -1246,7 +1246,7 @@ export function CommandePubliqueApp({
                 >
                   Commande simple
                 </button>
-                <p className="mt-1 text-center text-xs text-gray-500">Pour une seule personne</p>
+                <p className="mt-1 text-center text-xs text-gray-700">Pour une seule personne</p>
               </div>
               <div>
                 <button
@@ -1256,7 +1256,7 @@ export function CommandePubliqueApp({
                 >
                   Commande groupée
                 </button>
-                <p className="mt-1 text-center text-xs text-gray-500">Dès {SEUIL_MINIMUM_GROUPE} personnes/plats</p>
+                <p className="mt-1 text-center text-xs text-gray-700">Dès {SEUIL_MINIMUM_GROUPE} personnes/plats</p>
               </div>
             </div>
           </div>
@@ -1265,7 +1265,7 @@ export function CommandePubliqueApp({
             <button
               type="button"
               onClick={retourChoixMode}
-              className="text-sm font-semibold text-gray-500 underline"
+              className="text-sm font-semibold text-gray-700 underline"
             >
               ← Changer de mode ({modeCommande === "groupee" ? "commande groupée" : "commande simple"})
             </button>
@@ -1342,7 +1342,7 @@ export function CommandePubliqueApp({
                           >
                             <div className="font-medium text-gray-900">{produit.nom}</div>
                             {produit.description && (
-                              <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
+                              <div className="mt-0.5 text-xs text-gray-700">{produit.description}</div>
                             )}
                             <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
                           </button>
@@ -1373,7 +1373,7 @@ export function CommandePubliqueApp({
                           >
                             <div className="font-medium text-gray-900">{produit.nom}</div>
                             {produit.description && (
-                              <div className="mt-0.5 text-xs text-gray-500">{produit.description}</div>
+                              <div className="mt-0.5 text-xs text-gray-700">{produit.description}</div>
                             )}
                             <div className="mt-1 font-semibold text-gray-900">{produit.prix.toFixed(2)} €</div>
                             {produit.stockJour === 0 && (
@@ -1448,7 +1448,7 @@ export function CommandePubliqueApp({
 
               {modeCommande === "simple" ? (
                 <>
-                  {panierSimple.length === 0 && <p className="text-sm text-gray-400">Vide.</p>}
+                  {panierSimple.length === 0 && <p className="text-sm text-gray-600">Vide.</p>}
                   <ul className="space-y-2">{panierSimple.map(ligneJsx)}</ul>
                   {/* Beaucoup de clients commandent à plusieurs en "Commande simple" sans jamais
                       découvrir les avantages du mode groupé (livraison prioritaire, boisson offerte) —
@@ -1478,7 +1478,7 @@ export function CommandePubliqueApp({
                 </>
               ) : (
                 <>
-                  {nbArticles === 0 && <p className="text-sm text-gray-400">Vide.</p>}
+                  {nbArticles === 0 && <p className="text-sm text-gray-600">Vide.</p>}
                   <ul className="space-y-2">
                     {plats.map((plat, index) => {
                       if (plat.lignes.length === 0) return null;
@@ -1497,7 +1497,7 @@ export function CommandePubliqueApp({
                               {plat.pourQui ? ` — ${plat.pourQui}` : ""} — {nbArticlesPlat} article
                               {nbArticlesPlat > 1 ? "s" : ""} — {totalPlat.toFixed(2)} €
                             </span>
-                            <span className="text-gray-400">{deplie ? "▲" : "▼"}</span>
+                            <span className="text-gray-600">{deplie ? "▲" : "▼"}</span>
                           </button>
 
                           {deplie && (
@@ -1571,7 +1571,7 @@ export function CommandePubliqueApp({
                   )
                 )}
                 {total > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-gray-500">
+                  <p className="mt-1 text-xs font-semibold text-gray-700">
                     {texteProgressionCommande(
                       calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
                     )}
@@ -1581,7 +1581,7 @@ export function CommandePubliqueApp({
 
               <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-gray-500">Prénom</label>
+                  <label className="text-xs text-gray-700">Prénom</label>
                   <input
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
@@ -1589,7 +1589,7 @@ export function CommandePubliqueApp({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Nom</label>
+                  <label className="text-xs text-gray-700">Nom</label>
                   <input
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
@@ -1599,7 +1599,7 @@ export function CommandePubliqueApp({
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Email</label>
+                <label className="text-xs text-gray-700">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -1615,7 +1615,7 @@ export function CommandePubliqueApp({
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Téléphone</label>
+                <label className="text-xs text-gray-700">Téléphone</label>
                 <input
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
@@ -1625,7 +1625,7 @@ export function CommandePubliqueApp({
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Comment récupérer ta commande ? (obligatoire)</label>
+                <label className="text-xs text-gray-700">Comment récupérer ta commande ? (obligatoire)</label>
                 <div className={`mt-1 grid grid-cols-3 gap-2 rounded-lg ${canal ? "" : "ring-2 ring-[#8B2020]/40"}`}>
                   <button
                     type="button"
@@ -1682,7 +1682,7 @@ export function CommandePubliqueApp({
                   {Array.from({ length: nbBoissonsOffertes }, (_, index) => (
                     <div key={index} className="mt-2">
                       {nbBoissonsOffertes > 1 && (
-                        <p className="text-xs font-semibold text-gray-500">Boisson offerte n°{index + 1}</p>
+                        <p className="text-xs font-semibold text-gray-700">Boisson offerte n°{index + 1}</p>
                       )}
                       <div className="mt-1 flex flex-wrap gap-2">
                         {parfums2l.map((s) => (
@@ -1714,7 +1714,7 @@ export function CommandePubliqueApp({
               {canal === "livraison" && (
                 <>
                   <div>
-                    <label className="text-xs text-gray-500">Adresse</label>
+                    <label className="text-xs text-gray-700">Adresse</label>
                     <input
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
@@ -1722,7 +1722,7 @@ export function CommandePubliqueApp({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500">Zone</label>
+                    <label className="text-xs text-gray-700">Zone</label>
                     <select
                       value={zone}
                       onChange={(e) => setZone(e.target.value)}
@@ -1754,7 +1754,7 @@ export function CommandePubliqueApp({
               />
 
               <div>
-                <label className="text-xs text-gray-500">
+                <label className="text-xs text-gray-700">
                   {commandeAvance || modePaiement === "stripe"
                     ? "Paiement"
                     : `Paiement (à la ${canal === "livraison" ? "livraison" : "prise en main"})`}
@@ -1816,7 +1816,7 @@ export function CommandePubliqueApp({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur">
           <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
             {nbArticles === 0 ? (
-              <span className="text-sm text-gray-400">Ton panier est vide</span>
+              <span className="text-sm text-gray-600">Ton panier est vide</span>
             ) : (
               <>
                 <div className={`transition-transform duration-200 ${pulse ? "scale-110" : "scale-100"}`}>
@@ -1825,7 +1825,7 @@ export function CommandePubliqueApp({
                       ? `${nbPlatsValides} plat${nbPlatsValides > 1 ? "s" : ""}`
                       : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
                   </div>
-                  <div className="text-xs text-gray-500">{total.toFixed(2)} €</div>
+                  <div className="text-xs text-gray-700">{total.toFixed(2)} €</div>
                 </div>
                 <button
                   onClick={voirPanier}
@@ -1970,7 +1970,7 @@ export function CommandePubliqueApp({
             <button
               type="button"
               onClick={() => setLigneCorrectionBoisson(null)}
-              className="mt-4 text-sm text-gray-500 underline"
+              className="mt-4 text-sm text-gray-700 underline"
             >
               Annuler
             </button>

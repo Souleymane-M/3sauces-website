@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function FooterLegal() {
   return (
-    <footer className="mt-8 border-t border-gray-200 pt-4 pb-2 text-center text-xs text-gray-500">
+    <footer className="mt-8 border-t border-gray-200 pt-4 pb-2 text-center text-xs text-gray-700">
       <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         <Link href="/fidelite" className="hover:underline">
           Fidélité
@@ -24,7 +24,7 @@ export function FooterLegal() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Instagram 3 Sauces"
-          className="text-gray-500 hover:text-gray-800"
+          className="text-gray-700 hover:text-gray-800"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="3" y="3" width="18" height="18" rx="5" />
@@ -37,7 +37,7 @@ export function FooterLegal() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Facebook 3 Sauces"
-          className="text-gray-500 hover:text-gray-800"
+          className="text-gray-700 hover:text-gray-800"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M15 8.5h2V5h-2c-2.2 0-4 1.8-4 4v2H9v3.5h2V21h3.5v-6.5H17l.5-3.5h-3V9c0-.6.4-1 1-1Z" />

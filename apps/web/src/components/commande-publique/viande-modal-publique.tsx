@@ -212,12 +212,12 @@ export function ViandeModalPublique({
           <button
             onClick={onAnnuler}
             aria-label="Fermer"
-            className="-mr-1 -mt-1 rounded p-1 text-gray-400 hover:bg-gray-100"
+            className="-mr-1 -mt-1 rounded p-1 text-gray-600 hover:bg-gray-100"
           >
             ✕
           </button>
         </div>
-        {produit.description && <p className="text-sm text-gray-500">{produit.description}</p>}
+        {produit.description && <p className="text-sm text-gray-700">{produit.description}</p>}
 
         <div className="mt-4 flex items-center justify-center gap-5">
           <button
@@ -241,7 +241,7 @@ export function ViandeModalPublique({
           </button>
         </div>
         {quantiteMax < QUANTITE_MAX_DEFAUT && (
-          <p className="mt-1 text-center text-xs text-gray-400">Stock du jour : {quantiteMax} restant(s)</p>
+          <p className="mt-1 text-center text-xs text-gray-600">Stock du jour : {quantiteMax} restant(s)</p>
         )}
 
         {produit.viandeImposee && (
@@ -282,7 +282,7 @@ export function ViandeModalPublique({
               <button
                 type="button"
                 onClick={() => setViandesChoisies([])}
-                className="mt-2 text-xs text-gray-400 underline"
+                className="mt-2 text-xs text-gray-600 underline"
               >
                 Réinitialiser
               </button>
@@ -337,7 +337,7 @@ export function ViandeModalPublique({
               <button
                 type="button"
                 onClick={() => setSaucesChoisies([])}
-                className="mt-2 text-xs text-gray-400 underline"
+                className="mt-2 text-xs text-gray-600 underline"
               >
                 Réinitialiser
               </button>
@@ -536,7 +536,7 @@ export function ViandeModalPublique({
                     <button
                       type="button"
                       onClick={() => retirerOccurrence(setExtraViandes, nom)}
-                      className="text-gray-400 hover:text-gray-700"
+                      className="text-gray-600 hover:text-gray-700"
                       aria-label={`Retirer une unité de ${nom}`}
                     >
                       ✕
@@ -587,7 +587,7 @@ export function ViandeModalPublique({
                     <button
                       type="button"
                       onClick={() => retirerOccurrence(setExtraSauces, nom)}
-                      className="text-gray-400 hover:text-gray-700"
+                      className="text-gray-600 hover:text-gray-700"
                       aria-label={`Retirer une unité de ${nom}`}
                     >
                       ✕
@@ -638,7 +638,7 @@ export function ViandeModalPublique({
                     <button
                       type="button"
                       onClick={() => retirerCanetteRapide(nom)}
-                      className="text-gray-400 hover:text-gray-700"
+                      className="text-gray-600 hover:text-gray-700"
                       aria-label={`Retirer une unité de ${nom}`}
                     >
                       ✕

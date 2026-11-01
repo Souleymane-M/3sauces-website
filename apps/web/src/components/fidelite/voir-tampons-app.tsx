@@ -130,7 +130,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
           >
             {enCours ? "…" : "Voir mes tampons"}
           </button>
-          <p className="text-xs text-gray-500">Jamais de spam — juste de quoi te prévenir quand une récompense est prête.</p>
+          <p className="text-xs text-gray-700">Jamais de spam — juste de quoi te prévenir quand une récompense est prête.</p>
         </div>
       )}
 
