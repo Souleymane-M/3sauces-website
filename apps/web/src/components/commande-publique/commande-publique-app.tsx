@@ -725,9 +725,7 @@ export function CommandePubliqueApp({
     const q = ligne?.quantite ?? 0;
     const pieces = piecesParPaquet(produit.nom);
     const epuise = produit.stockJour === 0;
-    const sousLigne =
-      `${produit.prix.toFixed(2)} €` +
-      (pieces > 1 ? ` — ${nomPluriel(nomSansMultiplicateur(produit.nom).toLowerCase(), pieces)} par unité` : "");
+    const sousLigne = `${produit.prix.toFixed(2)} €`;
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
         <div className="min-w-0 flex-1">
