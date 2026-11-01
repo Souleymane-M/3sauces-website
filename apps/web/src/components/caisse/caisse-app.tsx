@@ -1134,10 +1134,10 @@ export function CaisseApp({
     return (
       <div key={cleItem} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-sm font-medium ${epuise ? "text-gray-600" : "text-gray-900"}`}>
+          <p className={`text-sm font-medium leading-tight ${epuise ? "text-gray-600" : "text-gray-900"}`}>
             {saveur ?? produit.nom}
           </p>
-          <p className={`text-sm ${epuise ? "font-semibold text-red-700" : "font-medium text-gray-700"}`}>{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
+          <p className={`mt-0.5 text-sm font-semibold ${epuise ? "text-red-700" : "text-gray-900"}`}>{epuise ? "Épuisé aujourd'hui" : sousLigne}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {q > 0 && (
