@@ -195,11 +195,14 @@ export function ConfigurateurNouveau({
     });
   }
 
+  // Produit sans choix de viande ni de sauce (plat du jour, menu…) : petite fenêtre en bas, comme les autres ; snacks : plein écran.
+  const compact = !demandeViande && !demandeSauce;
   let numero = 0;
   const prochain = () => ++numero;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F5F0E8]">
+    <div className={compact ? "fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" : "fixed inset-0 z-50 bg-[#F5F0E8]"}>
+    <div className={compact ? "flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[#F5F0E8] sm:rounded-2xl" : "flex h-full flex-col"}>
       <div className="flex items-center gap-3 border-b border-gray-300 bg-white px-4 py-3">
         <button type="button" onClick={onAnnuler} aria-label="Retour" className="text-2xl font-bold text-gray-900">
           ←
@@ -555,6 +558,7 @@ export function ConfigurateurNouveau({
         )}
         {!toutSelectionne && <p className="mt-1 text-center text-sm font-bold" style={{ color: ROUGE }}>Termine tes choix pour ajouter.</p>}
       </div>
+    </div>
     </div>
   );
 }

@@ -772,34 +772,33 @@ export function CommandeNouvelleApp({
     const epuise = produit.stockJour === 0;
     const nomAffiche = saveur ?? produit.nom;
     return (
-      <div key={saveur ? `${produit.id}::${saveur}` : produit.id} className="border-b border-gray-200 bg-white px-3 py-2.5 last:border-0">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-lg font-bold leading-tight text-gray-900">{nomAffiche}</p>
+      <div key={saveur ? `${produit.id}::${saveur}` : produit.id} className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2.5 last:border-0">
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-bold leading-tight text-gray-900">{nomAffiche}</p>
+          {(q === 0 || epuise) && (
             <p className={`whitespace-nowrap text-xl font-extrabold ${epuise ? "text-red-700" : ""}`} style={epuise ? undefined : { color: ROUGE }}>
               {epuise ? "Épuisé aujourd'hui" : euros(produit.prix)}
             </p>
-          </div>
-          {q > 0 && ligne ? (
+          )}
+        </div>
+        {q > 0 && ligne ? (
+          <>
+            <span className="whitespace-nowrap text-xl font-extrabold" style={{ color: ROUGE }}>
+              {euros(produit.prix * q)}
+            </span>
             <Stepper
-              quantite={q}
+              quantite={q * pieces}
               onMoins={() => modifierQuantite(ligne.id, -1)}
               onPlus={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
               label={nomAffiche}
             />
-          ) : (
-            <BoutonPlus
-              onClick={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
-              label={`Ajouter ${nomAffiche}`}
-              disabled={epuise}
-            />
-          )}
-        </div>
-        {q > 0 && (
-          <p className="mt-1 rounded-md bg-[#F5F0E8] px-2 py-1 text-base font-extrabold text-gray-900">
-            {pieces > 1 ? `${q * pieces} pièces` : `${q} ${q > 1 ? "unités" : "unité"}`} ={" "}
-            <span style={{ color: ROUGE }}>{euros(produit.prix * q)}</span>
-          </p>
+          </>
+        ) : (
+          <BoutonPlus
+            onClick={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
+            label={`Ajouter ${nomAffiche}`}
+            disabled={epuise}
+          />
         )}
       </div>
     );
@@ -1068,8 +1067,7 @@ export function CommandeNouvelleApp({
             className="w-full rounded-xl p-5 text-left text-white shadow-md active:scale-[0.99]"
             style={{ backgroundColor: VERT }}
           >
-            <span className="block text-xl font-extrabold">Juste moi</span>
-            <span className="block text-sm font-medium">Je choisis mes produits et je commande.</span>
+            <span className="block text-2xl font-extrabold">Juste moi</span>
           </button>
           <button
             type="button"
@@ -1077,14 +1075,8 @@ export function CommandeNouvelleApp({
             className="w-full rounded-xl p-5 text-left text-white shadow-md active:scale-[0.99]"
             style={{ backgroundColor: ROUGE }}
           >
-            <span className="block text-xl font-extrabold">Plusieurs personnes</span>
-            <span className="block text-sm font-medium">
-              Chacun son plat, un seul paiement, un seul passage. Tu remplis un plat après l&apos;autre.
-            </span>
+            <span className="block text-2xl font-extrabold">Plusieurs personnes</span>
           </button>
-          <p className="text-center text-sm font-semibold text-gray-900">
-            Boisson 2 L offerte tous les {SEUIL_GROUPE_4_MONTANT} € de commande.
-          </p>
         </div>
       )}
 
