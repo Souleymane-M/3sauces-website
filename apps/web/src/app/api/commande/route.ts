@@ -604,7 +604,7 @@ export async function POST(request: Request) {
   // volontairement distinct de `nbPlats` (nb_plats stocké) : voir
   // `compterPlatsPourPalier`.
   const nbPlatsPalier = compterPlatsPourPalier(lignes);
-  const palierGroupe = palierGroupeActif(nbPlatsPalier, montant, heureActuelleMayotteMinutes());
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montant);
   if (palierGroupe === "GROUPE_4") {
     const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montant);
     const saveursBrutes = Array.isArray(body.boissonOfferteSaveurs) ? body.boissonOfferteSaveurs : [];

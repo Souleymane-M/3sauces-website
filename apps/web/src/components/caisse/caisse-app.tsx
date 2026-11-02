@@ -17,7 +17,6 @@ import {
 } from "@/lib/commande-publique/types";
 import {
   prochainCreneauValide,
-  heureActuelleMayotteMinutes,
   creneauxPourDate,
   prochainesDatesOuvertes,
   dateMayotteIso,
@@ -29,7 +28,7 @@ import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
 import { DatePicker } from "@/components/commande-publique/date-picker";
 import type { CommandePourImpression } from "@/lib/impression/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
-import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
+import { SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
   MONTANT_RECOMPENSE,
   MESSAGE_GENERIQUE_FIDELITE,
@@ -42,13 +41,9 @@ import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 import {
-  SEUIL_GROUPE_3_PLATS,
-  SEUIL_GROUPE_3_MONTANT,
-  SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
-  palierGroupeSelonQuantite,
   messageProgressionBoissonOfferte,
   nombreBoissonsOffertes,
 } from "@/lib/commande-publique/groupe-priorite";
@@ -875,10 +870,9 @@ export function CaisseApp({
   // les paliers ci-dessous. Voir `compterPlatsPourPalier` côté serveur.
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
-  const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
+  const palierGroupeReel = palierGroupeActif(nbArticles, total);
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
-  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
   // Boissons 2L offertes dont le parfum n'est pas encore choisi : bloque
   // "Encaisser" tant que > 0 — rendu très visible (bandeau, bouton, barre du
@@ -1942,12 +1936,7 @@ export function CaisseApp({
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
               <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                <p className="text-sm font-bold">🚀 Commande groupée, avant 11h</p>
-                <p className="text-xs text-white/90">
-                  {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
-                  <br />
-                  {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
-                </p>
+                <p className="text-sm font-bold">🎁 Boisson 2L offerte tous les {SEUIL_GROUPE_4_MONTANT}€</p>
               </div>
 
               {!enModeGroupe ? (
@@ -2026,57 +2015,15 @@ export function CaisseApp({
               {/* Progression vers priorité/boisson(s) offerte(s) — commune aux deux modes
                   depuis le 2026-10-14 (avant, invisible en mode simple même à montant
                   largement suffisant, ex: 90€ de grillades jamais reconnues). */}
-              {nbArticles > 0 && nbArticles < SEUIL_COMMANDE_PRIORITAIRE && (
-                <p className="mt-2 text-sm font-semibold text-orange-600">
-                  Encore {SEUIL_COMMANDE_PRIORITAIRE - nbArticles} article
-                  {SEUIL_COMMANDE_PRIORITAIRE - nbArticles > 1 ? "s" : ""} pour la livraison prioritaire 🚀
-                </p>
-              )}
-              {nbArticles >= SEUIL_COMMANDE_PRIORITAIRE &&
-                (() => {
-                  if (groupeTropTard) return null;
-                  // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
-                  // la priorité reste propre à la livraison.
-                  if (canal !== "livraison") {
-                    if (palierGroupeReel === "GROUPE_4") {
-                      return (
-                        <p className="mt-2 text-sm font-bold text-[#2D5A27]">
-                          🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
-                          {nbBoissonsOffertes > 1 ? "s" : ""} activée{nbBoissonsOffertes > 1 ? "s" : ""} !
-                        </p>
-                      );
-                    }
-                    return (
-                      <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
-                        {messageProgressionBoissonOfferte(nbArticles, total)}
-                      </p>
-                    );
-                  }
-                  if (palierGroupeReel === "GROUPE_4") {
-                    return (
-                      <p className="mt-2 text-sm font-bold text-[#2D5A27]">
-                        🚀 Priorité + 🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
-                        {nbBoissonsOffertes > 1 ? "s" : ""} activée{nbBoissonsOffertes > 1 ? "s" : ""} !
-                      </p>
-                    );
-                  }
-                  if (palierGroupeReel === "GROUPE_3") {
-                    return (
-                      <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
-                        🚀 Priorité activée ! {messageProgressionBoissonOfferte(nbArticles, total)}
-                      </p>
-                    );
-                  }
-                  const montantRestant = Math.max(0, SEUIL_GROUPE_3_MONTANT - total);
-                  if (montantRestant > 0) {
-                    return (
-                      <p className="mt-2 text-sm font-semibold text-[#2D5A27]">
-                        Encore {montantRestant.toFixed(2)}€ pour la livraison prioritaire 🚀
-                      </p>
-                    );
-                  }
-                  return null;
-                })()}
+              {nbArticles > 0 &&
+                (palierGroupeReel === "GROUPE_4" ? (
+                  <p className="mt-2 text-sm font-bold text-[#2D5A27]">
+                    🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
+                    {nbBoissonsOffertes > 1 ? "s" : ""} activée{nbBoissonsOffertes > 1 ? "s" : ""} !
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>
+                ))}
               {palierGroupeReel === "GROUPE_4" && (
                 <div
                   id="boisson-offerte"

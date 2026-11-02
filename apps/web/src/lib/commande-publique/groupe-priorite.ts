@@ -1,4 +1,3 @@
-export const HEURE_LIMITE_GROUPE_MINUTES = 11 * 60; // 11h00, heure de Mayotte
 export const SEUIL_GROUPE_3_PLATS = 3;
 export const SEUIL_GROUPE_3_MONTANT = 30;
 export const SEUIL_GROUPE_4_PLATS = 4;
@@ -23,22 +22,17 @@ export type PalierGroupe = "GROUPE_3" | "GROUPE_4" | null;
  * groupée le lendemain midi ne l'a pas, même si 12h < 11h+24h — seul le
  * moment du clic compte, jamais la date/heure de retrait choisie.
  */
-export function palierGroupeActif(nbPlats: number, montantBrut: number, minutesActuelles: number): PalierGroupe {
-  if (minutesActuelles >= HEURE_LIMITE_GROUPE_MINUTES) return null;
-  return palierGroupeSelonQuantite(nbPlats, montantBrut);
+export function palierGroupeActif(_nbPlats: number, montantBrut: number): PalierGroupe {
+  return palierGroupeSelonQuantite(_nbPlats, montantBrut);
 }
 
 /**
- * Même calcul que `palierGroupeActif`, sans la contrainte d'heure — utilisé
- * uniquement pour distinguer, côté affichage, "il manque des plats/€" de
- * "le panier suffit mais il est trop tard (après 11h)", deux messages très
- * différents pour le client. Ne jamais utiliser ce résultat pour activer
- * réellement l'avantage (stock, prix, badge) — seul `palierGroupeActif` fait foi.
+ * Boisson 2L offerte dès 40€ de commande (brut, avant remise), à toute heure
+ * et quel que soit le nombre d'articles — décision du patron, 2026-11-02 :
+ * plus de limite à 11h, plus de minimum de plats, plus de priorité livraison.
  */
-export function palierGroupeSelonQuantite(nbPlats: number, montantBrut: number): PalierGroupe {
-  if (nbPlats >= SEUIL_GROUPE_4_PLATS && montantBrut >= SEUIL_GROUPE_4_MONTANT) return "GROUPE_4";
-  if (nbPlats >= SEUIL_GROUPE_3_PLATS && montantBrut >= SEUIL_GROUPE_3_MONTANT) return "GROUPE_3";
-  return null;
+export function palierGroupeSelonQuantite(_nbPlats: number, montantBrut: number): PalierGroupe {
+  return montantBrut >= SEUIL_GROUPE_4_MONTANT ? "GROUPE_4" : null;
 }
 
 /**
@@ -62,8 +56,8 @@ export function compterPlatsPourPalier<T extends { quantite: number }>(lignes: T
  * le palier GROUPE_4 (4 plats et 40€) est atteint — 40€→1, 80€→2, 90€→2,
  * 120€→3... Jamais de boisson sous ce palier.
  */
-export function nombreBoissonsOffertes(nbPlats: number, montantBrut: number): number {
-  if (nbPlats < SEUIL_GROUPE_4_PLATS || montantBrut < SEUIL_GROUPE_4_MONTANT) return 0;
+export function nombreBoissonsOffertes(_nbPlats: number, montantBrut: number): number {
+  if (montantBrut < SEUIL_GROUPE_4_MONTANT) return 0;
   return Math.floor(montantBrut / SEUIL_GROUPE_4_MONTANT);
 }
 
@@ -80,14 +74,7 @@ export function libellePalierGroupe(palier: PalierGroupe): string | null {
  * ne doit jamais afficher "Encore 0,00€" tant qu'il manque des plats, ça
  * laisserait croire à tort que l'offre est sur le point de s'activer.
  */
-export function messageProgressionBoissonOfferte(nbPlatsValides: number, montantBrut: number): string {
-  const platsRestants = Math.max(0, SEUIL_GROUPE_4_PLATS - nbPlatsValides);
+export function messageProgressionBoissonOfferte(_nbPlatsValides: number, montantBrut: number): string {
   const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - montantBrut);
-  if (platsRestants > 0 && montantRestant > 0) {
-    return `Encore ${platsRestants} plat${platsRestants > 1 ? "s" : ""} et ${montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁`;
-  }
-  if (platsRestants > 0) {
-    return `Encore ${platsRestants} plat${platsRestants > 1 ? "s" : ""} pour la boisson 2L offerte 🎁`;
-  }
   return `Encore ${montantRestant.toFixed(2)}€ pour la boisson 2L offerte 🎁`;
 }

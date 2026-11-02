@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CommanderNouveauPage() {
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres] = await Promise.all([
+  const [produitsCatalogue, viandes, sauces, saveurs, parfums2l, parametres] = await Promise.all([
     listerProduitsPublics(),
     listerViandesPubliques(),
     listerSaucesPubliques(),
@@ -28,6 +28,9 @@ export default async function CommanderNouveauPage() {
     listerParfums2lPublics(),
     chargerParametresLivraisonPublics(),
   ]);
+
+  // Sauces à 0,50 € et viande à 3 € proposées sur tous les snacks de cette version (les produits « supplément » existent déjà).
+  const produits = produitsCatalogue.map((p) => (p.categorie === "snacking" ? { ...p, autoriseExtras: true } : p));
 
   const enTete = (
     <div className="flex flex-col items-center gap-2 bg-[#8B2020] py-4">

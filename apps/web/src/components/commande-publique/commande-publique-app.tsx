@@ -25,17 +25,12 @@ import {
   creneauxPourDate,
   prochainesDatesOuvertes,
   dateMayotteIso,
-  heureActuelleMayotteMinutes,
 } from "@/lib/commande-publique/creneau";
-import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
+import { SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
-  SEUIL_GROUPE_3_PLATS,
-  SEUIL_GROUPE_3_MONTANT,
-  SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
-  palierGroupeSelonQuantite,
   messageProgressionBoissonOfferte,
   nombreBoissonsOffertes,
   type PalierGroupe,
@@ -132,68 +127,24 @@ function platVide(numero: number): PlatGroupe {
 function BlocProgressionGroupe({
   nbArticles,
   total,
-  canal,
   palierGroupeReel,
-  groupeTropTard,
   nbBoissonsOffertes,
 }: {
   nbArticles: number;
   total: number;
-  canal: CanalPublic | null;
   palierGroupeReel: PalierGroupe;
-  groupeTropTard: boolean;
   nbBoissonsOffertes: number;
 }) {
-  if (nbArticles > 0 && nbArticles < SEUIL_COMMANDE_PRIORITAIRE) {
-    return (
-      <p className="text-sm font-semibold text-orange-600">
-        Encore {SEUIL_COMMANDE_PRIORITAIRE - nbArticles} article
-        {SEUIL_COMMANDE_PRIORITAIRE - nbArticles > 1 ? "s" : ""} pour la livraison prioritaire 🚀
-      </p>
-    );
-  }
-  if (nbArticles < SEUIL_COMMANDE_PRIORITAIRE) return null;
-
-  if (groupeTropTard) return null;
-  // La boisson offerte (GROUPE_4) s'applique quel que soit le canal ;
-  // la priorité livraison, elle, reste propre à ce canal.
-  if (canal !== "livraison") {
-    if (palierGroupeReel === "GROUPE_4") {
-      return (
-        <p className="text-sm font-bold text-[#2D5A27]">
-          🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
-          {nbBoissonsOffertes > 1 ? "s" : ""} !
-        </p>
-      );
-    }
-    return (
-      <p className="text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>
-    );
-  }
+  if (nbArticles === 0) return null;
   if (palierGroupeReel === "GROUPE_4") {
     return (
       <p className="text-sm font-bold text-[#2D5A27]">
-        🚀 Livraison prioritaire + 🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
+        🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
         {nbBoissonsOffertes > 1 ? "s" : ""} !
       </p>
     );
   }
-  if (palierGroupeReel === "GROUPE_3") {
-    return (
-      <p className="text-sm font-semibold text-[#2D5A27]">
-        🚀 Livraison prioritaire activée ! {messageProgressionBoissonOfferte(nbArticles, total)}
-      </p>
-    );
-  }
-  const montantRestant = Math.max(0, SEUIL_GROUPE_3_MONTANT - total);
-  if (montantRestant > 0) {
-    return (
-      <p className="text-sm font-semibold text-[#2D5A27]">
-        Encore {montantRestant.toFixed(2)}€ pour la livraison prioritaire 🚀
-      </p>
-    );
-  }
-  return null;
+  return <p className="text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>;
 }
 
 export function CommandePubliqueApp({
@@ -495,10 +446,9 @@ export function CommandePubliqueApp({
   // ici, jamais `nbPlatsValides` (plats-conteneurs du seul mode groupé,
   // toujours 0 en mode simple — une commande simple de 90€ de grillades ne
   // touchait donc jamais ce palier, repéré le 2026-10-14).
-  const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
+  const palierGroupeReel = palierGroupeActif(nbArticles, total);
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
-  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
   const boissonsOffertesAChoisir =
     palierGroupeReel === "GROUPE_4"
@@ -1222,14 +1172,7 @@ export function CommandePubliqueApp({
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="mx-auto max-w-lg space-y-6 p-4">
         <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
-          <p className="font-bold">🚀 Vous êtes plusieurs ? Commandez en groupe, avant 11h :</p>
-          <p className="mt-1 text-sm text-white/90">
-            Dès {SEUIL_MINIMUM_GROUPE} plats → commande groupée (un seul passage en caisse/livraison).
-            <br />
-            {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
-            <br />
-            {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
-          </p>
+          <p className="font-bold">🎁 Boisson 2L offerte tous les {SEUIL_GROUPE_4_MONTANT}€ !</p>
         </div>
 
         {modeCommande === null ? (
@@ -1545,9 +1488,7 @@ export function CommandePubliqueApp({
               <BlocProgressionGroupe
                 nbArticles={nbArticles}
                 total={total}
-                canal={canal}
                 palierGroupeReel={palierGroupeReel}
-                groupeTropTard={groupeTropTard}
                 nbBoissonsOffertes={nbBoissonsOffertes}
               />
 

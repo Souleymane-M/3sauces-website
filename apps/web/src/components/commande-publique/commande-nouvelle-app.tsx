@@ -25,18 +25,15 @@ import {
   creneauxPourDate,
   prochainesDatesOuvertes,
   dateMayotteIso,
-  heureActuelleMayotteMinutes,
 } from "@/lib/commande-publique/creneau";
 import {
-  SEUIL_GROUPE_4_PLATS,
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
-  palierGroupeSelonQuantite,
   nombreBoissonsOffertes,
 } from "@/lib/commande-publique/groupe-priorite";
 import { FooterLegal } from "@/components/legal/footer-legal";
-import { ViandeModalPublique } from "./viande-modal-publique";
+import { ConfigurateurNouveau } from "./configurateur-nouveau";
 import { SaveurModalPublique } from "./saveur-modal-publique";
 import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
@@ -45,6 +42,7 @@ import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
+import { SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 
@@ -61,7 +59,11 @@ interface LignePanierPublique {
   saladeOption: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
+  /** Index du plat (0 en commande simple) — jamais déduit du contenu, toujours choisi par le client. */
+  plat: number;
 }
+
+type ModeCommande = "simple" | "groupee" | null;
 
 interface CommandeNouvelleAppProps {
   produits: ProduitPublic[];
@@ -161,6 +163,12 @@ export function CommandeNouvelleApp({
   const [onglet, setOnglet] = useState<Onglet | null>(null);
   const [autresBoissonsOuvert, setAutresBoissonsOuvert] = useState(false);
   const [panier, setPanier] = useState<LignePanierPublique[]>([]);
+  // Commande simple ou à plusieurs : la question est posée avant le menu. En mode "plusieurs",
+  // chaque personne a son plat (index dans `nomsPlats`), jamais déduit automatiquement.
+  const [mode, setMode] = useState<ModeCommande>(null);
+  const [platActif, setPlatActif] = useState(0);
+  const [nomsPlats, setNomsPlats] = useState<string[]>([""]);
+  const [messagePlat, setMessagePlat] = useState<string | null>(null);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
@@ -182,7 +190,10 @@ export function CommandeNouvelleApp({
         const brut = sessionStorage.getItem(CLE_PANIER);
         if (brut) {
           const etat = JSON.parse(brut);
-          if (Array.isArray(etat.panier)) setPanier(etat.panier);
+          if (Array.isArray(etat.panier)) setPanier(etat.panier.map((l: LignePanierPublique) => ({ ...l, plat: l.plat ?? 0 })));
+          if (etat.mode === "simple" || etat.mode === "groupee") setMode(etat.mode);
+          if (typeof etat.platActif === "number") setPlatActif(etat.platActif);
+          if (Array.isArray(etat.nomsPlats) && etat.nomsPlats.length > 0) setNomsPlats(etat.nomsPlats);
           if (Array.isArray(etat.boissonOfferteSaveurs)) setBoissonOfferteSaveurs(etat.boissonOfferteSaveurs);
         }
       } catch {
@@ -206,11 +217,11 @@ export function CommandeNouvelleApp({
   useEffect(() => {
     if (!pretPourPersistance) return;
     try {
-      sessionStorage.setItem(CLE_PANIER, JSON.stringify({ panier, boissonOfferteSaveurs }));
+      sessionStorage.setItem(CLE_PANIER, JSON.stringify({ panier, boissonOfferteSaveurs, mode, platActif, nomsPlats }));
     } catch {
       // Stockage plein ou indisponible : la session continue sans persistance.
     }
-  }, [pretPourPersistance, panier, boissonOfferteSaveurs]);
+  }, [pretPourPersistance, panier, boissonOfferteSaveurs, mode, platActif, nomsPlats]);
 
   // Un email déjà enregistré pour ce numéro n'est pas redemandé (oui/non seulement, cf. /api/commande/email-connu).
   useEffect(() => {
@@ -294,7 +305,7 @@ export function CommandeNouvelleApp({
       bowls: snacking.filter((p) => nomMin(p).includes("bowl")),
       grillades: produits.filter((p) => p.categorie === "grillade"),
       accompagnements: produits.filter((p) => p.categorie === "accompagnement"),
-      boissons: produits.filter((p) => p.categorie === "boisson" && p.nom !== NOM_PRODUIT_BOISSON_OFFERTE),
+      boissons: produits.filter((p) => p.categorie === "boisson"),
     };
   }, [produits]);
 
@@ -337,10 +348,16 @@ export function CommandeNouvelleApp({
 
   const total = panier.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
+  const enGroupe = mode === "groupee";
+  const platCourant = enGroupe ? platActif : 0;
+  const totalDuPlat = (index: number) =>
+    panier.filter((l) => l.plat === index).reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
+  const nbPlatsRemplis = nomsPlats.filter((_, i) => panier.some((l) => l.plat === i)).length;
+  const totalPlatActif = totalDuPlat(platCourant);
+  const resteAuPlatActif = Math.max(0, SEUIL_MINIMUM_PLAT - totalPlatActif);
   const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
-  const palierGroupeReel = palierGroupeActif(nbArticles, total, heureActuelleMayotteMinutes());
-  const groupeTropTard = palierGroupeReel === null && palierGroupeSelonQuantite(nbArticles, total) !== null;
+  const palierGroupeReel = palierGroupeActif(nbArticles, total);
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
   const boissonsOffertesAChoisir =
     palierGroupeReel === "GROUPE_4"
@@ -349,19 +366,9 @@ export function CommandeNouvelleApp({
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
-  const avantDixHeures = heureActuelleMayotteMinutes() < 11 * 60;
-
-  // Progression vers la boisson 2 L offerte : visible seulement tant que l'offre peut encore s'obtenir (avant 11h).
-  const progressionOffre = useMemo(() => {
-    if (!avantDixHeures || palierGroupeReel === "GROUPE_4") return null;
-    const montantRestant = Math.max(0, SEUIL_GROUPE_4_MONTANT - total);
-    const platsRestants = Math.max(0, SEUIL_GROUPE_4_PLATS - nbArticles);
-    return {
-      pourcentage: Math.min(100, Math.round((total / SEUIL_GROUPE_4_MONTANT) * 100)),
-      montantRestant,
-      platsRestants,
-    };
-  }, [avantDixHeures, palierGroupeReel, total, nbArticles]);
+  // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
+  const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
+  const pourcentageProchaineBoisson = Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100);
 
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   function declencherPulse() {
@@ -402,6 +409,7 @@ export function CommandeNouvelleApp({
     const memeTri = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
     const cle = (l: LignePanierPublique) =>
       l.produit.id === produit.id &&
+      l.plat === platCourant &&
       memeTri(l.viandes, viandesChoisies) &&
       memeTri(l.sauces, saucesChoisies) &&
       memeTri(l.saveurs, saveursChoisies) &&
@@ -445,9 +453,11 @@ export function CommandeNouvelleApp({
           saladeOption,
           saladeIncluse,
           accompagnementsInclus,
+          plat: platCourant,
         },
       ];
     });
+    setMessagePlat(null);
   }
 
   function surClicProduit(produit: ProduitPublic) {
@@ -473,11 +483,12 @@ export function CommandeNouvelleApp({
   }
 
   function ligneAuPanierDirect(produitId: string, saveur: string | null) {
-    return panier.find((l) => l.produit.id === produitId && (l.saveurs[0] ?? null) === saveur);
+    // Uniquement les lignes du plat en cours : les + / − ne touchent jamais le plat d'une autre personne.
+    return panier.find((l) => l.produit.id === produitId && l.plat === platCourant && (l.saveurs[0] ?? null) === saveur);
   }
 
   function quantiteProduit(produitId: string) {
-    return panier.filter((l) => l.produit.id === produitId).reduce((somme, l) => somme + l.quantite, 0);
+    return panier.filter((l) => l.produit.id === produitId && l.plat === platCourant).reduce((somme, l) => somme + l.quantite, 0);
   }
 
   function appliquerBoisson(id: string, saveur: string | null) {
@@ -497,6 +508,56 @@ export function CommandeNouvelleApp({
     setPanier((precedent) => precedent.map((l) => (l.id === id ? { ...l, sansBoisson: true, boissonIncluse: null } : l)));
   }
 
+  function choisirMode(nouveau: "simple" | "groupee") {
+    setMode(nouveau);
+    setPlatActif(0);
+    setNomsPlats([""]);
+    setMessagePlat(null);
+    suivreEvenement("mode_choisi");
+  }
+
+  function changerMode() {
+    if (nbArticles > 0 && !window.confirm("Changer de mode videra le panier en cours. Continuer ?")) return;
+    setPanier([]);
+    setMode(null);
+    setPlatActif(0);
+    setNomsPlats([""]);
+    setMessagePlat(null);
+  }
+
+  /** « Plat suivant » : passe à la personne suivante (en crée une si besoin) — bloqué tant que le plat actuel n'atteint pas le minimum. */
+  function platSuivant() {
+    if (resteAuPlatActif > 0) return;
+    const suivant = platActif + 1;
+    setNomsPlats((n) => (suivant < n.length ? n : [...n, ""]));
+    setPlatActif(suivant);
+    setMessagePlat(`Plat ${suivant + 1} : que prend la personne suivante ?`);
+    setOnglet(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function ajouterUnPlat() {
+    const vide = nomsPlats.findIndex((_, i) => !panier.some((l) => l.plat === i));
+    const cible = vide !== -1 ? vide : nomsPlats.length;
+    if (vide === -1) setNomsPlats((n) => [...n, ""]);
+    setPlatActif(cible);
+    setMessagePlat(`Plat ${cible + 1} : que prend la personne suivante ?`);
+    aller("menu");
+  }
+
+  function modifierPlat(index: number) {
+    setPlatActif(index);
+    setMessagePlat(null);
+    aller("menu");
+  }
+
+  function supprimerPlat(index: number) {
+    if (nomsPlats.length <= 1) return;
+    setPanier((p) => p.filter((l) => l.plat !== index).map((l) => (l.plat > index ? { ...l, plat: l.plat - 1 } : l)));
+    setNomsPlats((n) => n.filter((_, i) => i !== index));
+    setPlatActif((a) => Math.max(0, a > index ? a - 1 : a === index ? Math.max(0, index - 1) : a));
+  }
+
   function aller(nouvelleVue: Vue) {
     setErreur(null);
     setVue(nouvelleVue);
@@ -513,6 +574,18 @@ export function CommandeNouvelleApp({
     if (palierGroupeReel === "GROUPE_4" && boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes) {
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
+    }
+    if (enGroupe) {
+      const indexPlatsRemplis = nomsPlats.map((_, i) => i).filter((i) => panier.some((l) => l.plat === i));
+      if (indexPlatsRemplis.length < 2) {
+        setErreur("Une commande à plusieurs doit contenir au moins 2 plats. Ajoute un plat, ou repasse en « Juste moi ».");
+        return;
+      }
+      const trop = indexPlatsRemplis.find((i) => totalDuPlat(i) < SEUIL_MINIMUM_PLAT);
+      if (trop !== undefined) {
+        setErreur(`Plat ${trop + 1} : il doit atteindre au moins ${SEUIL_MINIMUM_PLAT} € — ajoute un accompagnement ou une boisson.`);
+        return;
+      }
     }
     if (!canal) {
       setErreur("Choisis comment récupérer ta commande : sur place, à emporter ou en livraison.");
@@ -579,8 +652,8 @@ export function CommandeNouvelleApp({
         saladeOption: l.saladeOption,
         saladeIncluse: l.saladeIncluse,
         accompagnementsInclus: l.accompagnementsInclus,
-        platIndex: null,
-        pourQui: null,
+        platIndex: enGroupe ? l.plat : null,
+        pourQui: enGroupe ? nomsPlats[l.plat]?.trim() || null : null,
       }));
 
       const modePaiementEffectif: ModePaiement = commandeAvance ? "stripe" : modePaiement;
@@ -636,7 +709,7 @@ export function CommandeNouvelleApp({
         } catch {
           // Non bloquant.
         }
-        window.location.href = dataPaiement.url;
+        window.location.assign(dataPaiement.url);
         return;
       }
 
@@ -668,7 +741,7 @@ export function CommandeNouvelleApp({
           className="min-w-0 flex-1 text-left disabled:opacity-60"
         >
           <span className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-bold leading-tight text-gray-900">{produit.nom}</span>
+            <span className="text-lg font-bold leading-tight text-gray-900">{produit.nom}</span>
             {etiquette && (
               <span className="rounded-full bg-[#2D5A27] px-2 py-0.5 text-xs font-bold text-white">{etiquette}</span>
             )}
@@ -678,7 +751,9 @@ export function CommandeNouvelleApp({
           {epuise ? (
             <span className="mt-0.5 block text-sm font-bold text-red-700">Épuisé aujourd&apos;hui</span>
           ) : (
-            <span className="mt-0.5 block whitespace-nowrap text-base font-extrabold text-gray-900">{euros(produit.prix)}</span>
+            <span className="mt-0.5 block whitespace-nowrap text-xl font-extrabold" style={{ color: ROUGE }}>
+              {euros(produit.prix)}
+            </span>
           )}
           {produit.stockJour !== null && produit.stockJour > 0 && produit.stockJour <= 3 && (
             <span className="block text-sm font-bold text-orange-700">Plus que {produit.stockJour} !</span>
@@ -695,27 +770,36 @@ export function CommandeNouvelleApp({
     const q = ligne?.quantite ?? 0;
     const pieces = piecesParPaquet(produit.nom);
     const epuise = produit.stockJour === 0;
+    const nomAffiche = saveur ?? produit.nom;
     return (
-      <div key={saveur ? `${produit.id}::${saveur}` : produit.id} className="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2.5 last:border-0">
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold leading-tight text-gray-900">{saveur ?? produit.nom}</p>
-          <p className={`whitespace-nowrap text-base font-extrabold ${epuise ? "text-red-700" : "text-gray-900"}`}>
-            {epuise ? "Épuisé aujourd'hui" : euros(produit.prix)}
-          </p>
+      <div key={saveur ? `${produit.id}::${saveur}` : produit.id} className="border-b border-gray-200 bg-white px-3 py-2.5 last:border-0">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-bold leading-tight text-gray-900">{nomAffiche}</p>
+            <p className={`whitespace-nowrap text-xl font-extrabold ${epuise ? "text-red-700" : ""}`} style={epuise ? undefined : { color: ROUGE }}>
+              {epuise ? "Épuisé aujourd'hui" : euros(produit.prix)}
+            </p>
+          </div>
+          {q > 0 && ligne ? (
+            <Stepper
+              quantite={q}
+              onMoins={() => modifierQuantite(ligne.id, -1)}
+              onPlus={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
+              label={nomAffiche}
+            />
+          ) : (
+            <BoutonPlus
+              onClick={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
+              label={`Ajouter ${nomAffiche}`}
+              disabled={epuise}
+            />
+          )}
         </div>
-        {q > 0 && ligne ? (
-          <Stepper
-            quantite={q * pieces}
-            onMoins={() => modifierQuantite(ligne.id, -1)}
-            onPlus={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
-            label={saveur ?? produit.nom}
-          />
-        ) : (
-          <BoutonPlus
-            onClick={() => ajouterAuPanier(produit, [], [], saveur ? [saveur] : [])}
-            label={`Ajouter ${saveur ?? produit.nom}`}
-            disabled={epuise}
-          />
+        {q > 0 && (
+          <p className="mt-1 rounded-md bg-[#F5F0E8] px-2 py-1 text-base font-extrabold text-gray-900">
+            {pieces > 1 ? `${q * pieces} pièces` : `${q} ${q > 1 ? "unités" : "unité"}`} ={" "}
+            <span style={{ color: ROUGE }}>{euros(produit.prix * q)}</span>
+          </p>
         )}
       </div>
     );
@@ -726,7 +810,7 @@ export function CommandeNouvelleApp({
       <div className="overflow-hidden rounded-lg border border-gray-300">
         {liste.flatMap((produit) =>
           produit.nbSaveursMax > 0
-            ? saveurs.map((s) => ligneDirecte(produit, s.nom))
+            ? (produit.nom === NOM_PRODUIT_BOISSON_OFFERTE ? parfums2l : saveurs).map((s) => ligneDirecte(produit, s.nom))
             : [ligneDirecte(produit, null)]
         )}
       </div>
@@ -740,9 +824,9 @@ export function CommandeNouvelleApp({
       ...FAMILLES_BOISSON.map((f) => ({
         cle: f.valeur as string,
         titre: f.libelle,
-        liste: groupes.boissons.filter((p) => p.familleBoisson === f.valeur),
+        liste: groupes.boissons.filter((p) => p.familleBoisson === f.valeur && p.id !== produitCanetteRapide?.id),
       })),
-      { cle: "autres", titre: "Autres boissons", liste: groupes.boissons.filter((p) => !p.familleBoisson) },
+      { cle: "autres", titre: "Autres boissons", liste: groupes.boissons.filter((p) => !p.familleBoisson && p.id !== produitCanetteRapide?.id) },
     ].filter((g) => g.liste.length > 0);
     return (
       <div className="rounded-lg border border-gray-300 bg-white p-3">
@@ -907,8 +991,10 @@ export function CommandeNouvelleApp({
     return (
       <li key={l.id} className="rounded-lg border border-gray-300 bg-white p-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-base font-bold leading-tight text-gray-900">{l.produit.nom}</p>
-          <p className="whitespace-nowrap text-base font-extrabold text-gray-900">{euros(prixLigne(l) * l.quantite)}</p>
+          <p className="text-lg font-bold leading-tight text-gray-900">{l.produit.nom}</p>
+          <p className="whitespace-nowrap text-lg font-extrabold" style={{ color: ROUGE }}>
+            {euros(prixLigne(l) * l.quantite)}
+          </p>
         </div>
         <div className="mt-1 space-y-0.5 text-sm text-gray-800">
           {l.viandes.length > 0 && <p>{l.viandes.join(", ")}</p>}
@@ -967,15 +1053,79 @@ export function CommandeNouvelleApp({
     : "Aujourd'hui";
 
   return (
-    <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
+    <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
       {/* Bandeau fidélité : toujours visible */}
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
         10 € = 1 tampon · 10 tampons = 10 € offerts
       </div>
 
-      {vue === "menu" && (
+      {vue === "menu" && mode === null && (
+        <div className="mx-auto max-w-lg space-y-4 p-4">
+          <h2 className="pt-2 text-2xl font-extrabold text-gray-900">Tu commandes pour combien de personnes ?</h2>
+          <button
+            type="button"
+            onClick={() => choisirMode("simple")}
+            className="w-full rounded-xl p-5 text-left text-white shadow-md active:scale-[0.99]"
+            style={{ backgroundColor: VERT }}
+          >
+            <span className="block text-xl font-extrabold">Juste moi</span>
+            <span className="block text-sm font-medium">Je choisis mes produits et je commande.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => choisirMode("groupee")}
+            className="w-full rounded-xl p-5 text-left text-white shadow-md active:scale-[0.99]"
+            style={{ backgroundColor: ROUGE }}
+          >
+            <span className="block text-xl font-extrabold">Plusieurs personnes</span>
+            <span className="block text-sm font-medium">
+              Chacun son plat, un seul paiement, un seul passage. Tu remplis un plat après l&apos;autre.
+            </span>
+          </button>
+          <p className="text-center text-sm font-semibold text-gray-900">
+            Boisson 2 L offerte tous les {SEUIL_GROUPE_4_MONTANT} € de commande.
+          </p>
+        </div>
+      )}
+
+      {vue === "menu" && mode !== null && (
         <>
-          <div className="sticky top-0 z-30 border-b border-gray-300 bg-[#F5F0E8]/95 backdrop-blur">
+          <div className="sticky top-0 z-30">
+          {enGroupe && (
+            <div className="border-b-2 border-[#8B2020] bg-white shadow-sm">
+              <div className="mx-auto max-w-lg space-y-2 px-4 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-lg font-extrabold" style={{ color: ROUGE }}>
+                    Tu remplis le plat {platActif + 1}
+                  </p>
+                  <p className="whitespace-nowrap text-base font-extrabold text-gray-900">{euros(totalPlatActif)}</p>
+                </div>
+                <input
+                  value={nomsPlats[platActif] ?? ""}
+                  onChange={(e) => setNomsPlats((n) => n.map((v, i) => (i === platActif ? e.target.value : v)))}
+                  placeholder="Pour qui ? (prénom, facultatif)"
+                  className="w-full rounded-lg border border-gray-400 bg-white px-3 py-2 text-base text-gray-900"
+                />
+                <div className="flex gap-2 overflow-x-auto">
+                  {nomsPlats.map((nomPlat, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setPlatActif(i)}
+                      className={`shrink-0 whitespace-nowrap rounded-full border-2 px-3 py-1 text-sm font-bold ${
+                        i === platActif ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                      }`}
+                    >
+                      Plat {i + 1}
+                      {nomPlat.trim() ? ` · ${nomPlat.trim()}` : ""} · {euros(totalDuPlat(i))}
+                    </button>
+                  ))}
+                </div>
+                {messagePlat && <p className="rounded-lg bg-[#2D5A27] px-3 py-2 text-sm font-extrabold text-white">{messagePlat}</p>}
+              </div>
+            </div>
+          )}
+          <div className="border-b border-gray-300 bg-[#F5F0E8]/95 backdrop-blur">
             <div className="mx-auto flex max-w-lg gap-2 overflow-x-auto px-4 py-2">
               {onglets.map((o) => (
                 <button
@@ -991,6 +1141,7 @@ export function CommandeNouvelleApp({
               ))}
             </div>
           </div>
+          </div>
           <div className="mx-auto max-w-lg space-y-4 p-4">
             {contenuOnglet()}
             <FooterLegal />
@@ -1005,29 +1156,76 @@ export function CommandeNouvelleApp({
           </button>
           <h2 className="text-2xl font-extrabold text-gray-900">Ton panier</h2>
           {panier.length === 0 && <p className="text-base text-gray-800">Ton panier est vide.</p>}
-          <ul className="space-y-3">{panier.map(lignePanier)}</ul>
+          {enGroupe ? (
+            <div className="space-y-4">
+              {nomsPlats.map((nomPlat, i) => {
+                const lignesPlat = panier.filter((l) => l.plat === i);
+                if (lignesPlat.length === 0) return null;
+                const sous = totalDuPlat(i);
+                return (
+                  <div key={i} className="space-y-2 rounded-xl border-2 border-[#8B2020] bg-white/60 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-base font-extrabold text-gray-900">
+                        Plat {i + 1}
+                        {nomPlat.trim() ? ` · ${nomPlat.trim()}` : ""}
+                      </p>
+                      <p className="whitespace-nowrap text-base font-extrabold" style={{ color: ROUGE }}>
+                        {euros(sous)}
+                      </p>
+                    </div>
+                    {sous < SEUIL_MINIMUM_PLAT && (
+                      <p className="text-sm font-bold text-red-800">Encore {euros(SEUIL_MINIMUM_PLAT - sous)} pour valider ce plat.</p>
+                    )}
+                    <ul className="space-y-2">{lignesPlat.map(lignePanier)}</ul>
+                    <div className="flex gap-4">
+                      <button type="button" onClick={() => modifierPlat(i)} className="text-sm font-bold text-gray-900 underline">
+                        Modifier ce plat
+                      </button>
+                      {nomsPlats.length > 1 && (
+                        <button type="button" onClick={() => supprimerPlat(i)} className="text-sm font-bold text-red-800 underline">
+                          Supprimer ce plat
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={ajouterUnPlat}
+                className="w-full rounded-xl py-3 text-base font-extrabold text-white"
+                style={{ backgroundColor: VERT }}
+              >
+                + Ajouter un plat (une autre personne)
+              </button>
+              {nbPlatsRemplis < 2 && nbArticles > 0 && (
+                <p className="rounded-lg bg-amber-100 p-3 text-sm font-bold text-amber-950">
+                  Une commande à plusieurs doit avoir au moins 2 plats : ajoute un plat, ou{" "}
+                  <button type="button" onClick={changerMode} className="underline">
+                    repasse en « Juste moi »
+                  </button>
+                  .
+                </p>
+              )}
+            </div>
+          ) : (
+            <ul className="space-y-3">{panier.map(lignePanier)}</ul>
+          )}
 
-          {progressionOffre && nbArticles > 0 && (
+          {nbArticles > 0 && (
             <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
+              {palierGroupeReel === "GROUPE_4" && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
+                  Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
+                </p>
+              )}
               <p className="text-sm font-extrabold text-gray-900">
-                {progressionOffre.montantRestant > 0
-                  ? `Plus que ${euros(progressionOffre.montantRestant)} : boisson 2 L offerte`
-                  : `Plus que ${progressionOffre.platsRestants} article${progressionOffre.platsRestants > 1 ? "s" : ""} : boisson 2 L offerte`}
+                Plus que {euros(resteAvantProchaineBoisson)} : {palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
-                <div className="h-full rounded-full" style={{ width: `${progressionOffre.pourcentage}%`, backgroundColor: VERT }} />
+                <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
               </div>
             </div>
-          )}
-          {palierGroupeReel === "GROUPE_4" && (
-            <div className="rounded-lg bg-[#2D5A27] p-3 text-sm font-extrabold text-white">
-              Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
-            </div>
-          )}
-          {groupeTropTard && (
-            <p className="rounded-lg bg-amber-100 p-3 text-sm font-semibold text-amber-950">
-              La boisson 2 L offerte est réservée aux commandes passées avant 11h.
-            </p>
           )}
 
           {nbArticles > 0 && !aDejaUneBoisson && produitCanetteRapide && saveurs.length > 0 && (
@@ -1326,23 +1524,46 @@ export function CommandeNouvelleApp({
         </div>
       )}
 
-      {/* Barre de panier fixe */}
-      {vue === "menu" && nbArticles > 0 && (
+      {/* Barre du bas : « Plat suivant » en mode plusieurs, puis panier */}
+      {vue === "menu" && mode !== null && (enGroupe || nbArticles > 0) && (
         <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pt-2">
-          <button
-            type="button"
-            onClick={() => aller("panier")}
-            className={`mx-auto flex w-full max-w-lg items-center justify-between rounded-xl px-5 py-4 text-white shadow-lg transition-transform duration-200 ${
-              pulse ? "scale-105" : "scale-100"
-            }`}
-            style={{ backgroundColor: VERT }}
-          >
-            <span className="text-base font-extrabold">
-              {nbArticles} article{nbArticles > 1 ? "s" : ""}
-            </span>
-            <span className="text-base font-extrabold">Voir le panier</span>
-            <span className="whitespace-nowrap text-base font-extrabold">{euros(total)}</span>
-          </button>
+          <div className="mx-auto max-w-lg space-y-2">
+            {enGroupe &&
+              (resteAuPlatActif > 0 ? (
+                <div className="rounded-xl border-2 border-gray-500 bg-white px-4 py-3 text-center shadow-lg">
+                  <p className="text-sm font-extrabold text-gray-900">
+                    {totalPlatActif === 0
+                      ? `Choisis les produits du plat ${platActif + 1}`
+                      : `Ajoute encore ${euros(resteAuPlatActif)} pour passer au plat suivant`}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={platSuivant}
+                  className="w-full animate-pulse rounded-xl py-4 text-lg font-extrabold text-white shadow-lg active:scale-[0.99]"
+                  style={{ backgroundColor: VERT }}
+                >
+                  Plat {platActif + 1} terminé → Plat {platActif + 2}
+                </button>
+              ))}
+            {nbArticles > 0 && (
+              <button
+                type="button"
+                onClick={() => aller("panier")}
+                className={`flex w-full items-center justify-between rounded-xl px-5 py-3 text-white shadow-lg transition-transform duration-200 ${
+                  pulse ? "scale-105" : "scale-100"
+                }`}
+                style={{ backgroundColor: enGroupe ? ROUGE : VERT }}
+              >
+                <span className="text-base font-extrabold">
+                  {enGroupe ? `${nbPlatsRemplis} plat${nbPlatsRemplis > 1 ? "s" : ""}` : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
+                </span>
+                <span className="text-base font-extrabold">{enGroupe ? "C'est tout → voir le panier" : "Voir le panier"}</span>
+                <span className="whitespace-nowrap text-base font-extrabold">{euros(total)}</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1362,7 +1583,7 @@ export function CommandeNouvelleApp({
       )}
 
       {produitEnSelection && produitEnSelection.nbSaveursMax === 0 && (
-        <ViandeModalPublique
+        <ConfigurateurNouveau
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}

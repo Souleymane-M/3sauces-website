@@ -412,7 +412,7 @@ async function validerLignesCommande(
   // — calculée une seule fois ici, sur le montant brut. Nombre de plats
   // distinct de `nbPlats` (nb_plats stocké) : voir `compterPlatsPourPalier`.
   const nbPlatsPalier = compterPlatsPourPalier(lignes);
-  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantBrut, heureActuelleMayotteMinutes());
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantBrut);
   if (palierGroupe === "GROUPE_4") {
     const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantBrut);
     const saveursBrutes = Array.isArray(boissonOfferteSaveursBrut) ? boissonOfferteSaveursBrut : [];
