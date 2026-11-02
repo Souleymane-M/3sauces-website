@@ -27,6 +27,8 @@ export interface LivraisonAssignee {
    * un peu partout dans l'app.
    */
   dejaPayee: boolean;
+  /** Nom du collègue qui l'a prise au départ, si ce n'est pas le livreur connecté (il peut quand même la valider). */
+  priseParAutre?: string | null;
 }
 
 /**
@@ -63,6 +65,8 @@ export type EtatScan =
   // encore cliqué "Prête" — prise en charge quand même possible (le ticket
   // est déjà agrafé au sachet), juste un avertissement affiché au livreur.
   | { type: "a_prendre"; commandeId: string; livraison: LivraisonAssignee; exclu: boolean; pasEncorePrete: boolean }
-  | { type: "a_livrer"; commandeId: string; livraison: LivraisonAssignee }
+  // `priseParAutre` : nom du livreur qui l'avait prise au départ, si ce n'est pas celui qui scanne
+  // (il peut quand même valider la remise et le paiement).
+  | { type: "a_livrer"; commandeId: string; livraison: LivraisonAssignee; priseParAutre: string | null }
   | { type: "deja_prise_autre"; numero: number; nomLivreur: string | null }
   | { type: "deja_livree"; numero: number };
