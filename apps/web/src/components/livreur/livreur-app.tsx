@@ -331,11 +331,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                 {libellePalierGroupe(livraison.palierGroupe)} 🚀
               </div>
             )}
-            {livraison.priseParAutre && (
-              <p className="mb-2 rounded bg-sky-100 px-2 py-1 text-sm font-semibold text-sky-900">
-                Prise au départ par {livraison.priseParAutre} — tu peux la valider à sa place
-              </p>
-            )}
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-bold text-gray-900">Commande #{livraison.numero}</span>
               <span className="text-xl text-gray-900">{formaterHeure(livraison.heureSouhaitee)}</span>
