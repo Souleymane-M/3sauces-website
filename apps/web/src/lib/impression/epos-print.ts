@@ -575,6 +575,8 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
     taille: 2,
   });
   b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
+  // Date et heure de prise de la commande, comme sur le ticket client — demande du patron, 2026-11-02.
+  b.ligne(`Commandé le ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: true, taille: 1 });
 
   if (commande.dejaPayee) {
     b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
