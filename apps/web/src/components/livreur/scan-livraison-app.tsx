@@ -234,6 +234,12 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
       {erreur && <p className="text-sm font-semibold text-red-600">{erreur}</p>}
 
+      {etat.type === "a_livrer" && etat.priseParAutre && (
+        <p className="rounded border border-sky-400 bg-sky-50 p-3 text-sm font-semibold text-sky-900">
+          Prise au départ par {etat.priseParAutre} : tu peux valider la livraison et le paiement à sa place.
+        </p>
+      )}
+
       {etat.type === "a_prendre" && etat.exclu && (
         <p className="rounded border border-amber-400 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
           Tu viens de relâcher cette livraison — un collègue ou le comptoir doit la reprendre.

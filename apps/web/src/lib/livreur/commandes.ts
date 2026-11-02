@@ -28,10 +28,11 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
   const supabase = createServiceSupabaseClient();
   const { debut } = plageJourMayotteUtc(dateMayotteIso());
 
+  // Toutes les livraisons en cours du jour, pas seulement celles prises par ce livreur :
+  // celui qui flashe au départ n'est pas toujours celui qui remet et encaisse.
   const { data: livraisons, error: erreurLivraisons } = await supabase
     .from("livraisons")
-    .select("commande_id")
-    .eq("livreur_id", livreurId)
+    .select("commande_id, livreur_id")
     .eq("statut", "en_livraison")
     .gte("heure_depart_cuisine", debut.toISOString());
 
@@ -59,6 +60,14 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     throw new Error(`Impossible de charger les commandes : ${erreurCommandes.message}`);
   }
 
+  const livreurParCommande = new Map((livraisons ?? []).map((l) => [l.commande_id, l.livreur_id]));
+  const idsAutres = [...new Set((livraisons ?? []).map((l) => l.livreur_id).filter((id): id is string => !!id && id !== livreurId))];
+  const nomsAutres = new Map<string, string>();
+  if (idsAutres.length > 0) {
+    const { data: profils } = await supabase.from("profils").select("id, nom").in("id", idsAutres);
+    for (const p of profils ?? []) nomsAutres.set(p.id, p.nom);
+  }
+
   const livraisonsAssignees: LivraisonAssignee[] = (commandes ?? []).map((c) => ({
     id: c.id,
     numero: c.numero,
@@ -72,13 +81,18 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     palierGroupe: c.palier_groupe as PalierGroupe,
     modePaiement: c.mode_paiement,
     dejaPayee: c.paiement_statut === "paye",
+    priseParAutre: (() => {
+      const preneur = livreurParCommande.get(c.id);
+      return preneur && preneur !== livreurId ? (nomsAutres.get(preneur) ?? "un collègue") : null;
+    })(),
   }));
 
-  // Les livraisons ayant atteint un palier "commande groupée" en
-  // tête, sans perdre l'ordre chronologique existant à l'intérieur de
-  // chaque groupe (tri stable).
+  // Les siennes d'abord, puis celles des collègues ; à l'intérieur, les
+  // livraisons ayant atteint un palier "commande groupée" en tête (tri stable).
   return [...livraisonsAssignees].sort(
-    (a, b) => Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null)
+    (a, b) =>
+      Number(a.priseParAutre !== null) - Number(b.priseParAutre !== null) ||
+      Number(b.palierGroupe !== null) - Number(a.palierGroupe !== null)
   );
 }
 
@@ -201,12 +215,13 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     .select("livreur_id")
     .eq("commande_id", commandeId)
     .maybeSingle();
-  if (!livraison || livraison.livreur_id !== livreurId) {
-    throw new Error("Cette livraison n'est pas assignée à ce livreur.");
+  if (!livraison) {
+    throw new Error("Livraison introuvable.");
   }
 
   if (commande.mode_paiement === "stripe" && commande.paiement_statut === "paye") {
     await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
+    await attribuerLivraisonAuValideur(supabase, commandeId, livraison.livreur_id, livreurId);
     return;
   }
 
@@ -252,7 +267,27 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
   }
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
+  await attribuerLivraisonAuValideur(supabase, commandeId, livraison.livreur_id, livreurId);
   await notifierPaiementConfirme(commandeId);
+}
+
+/**
+ * Quand la livraison est validée par quelqu'un d'autre que celui qui l'avait
+ * prise, la fiche livraison suit celui qui a réellement remis la commande et
+ * encaissé (les chiffres « par livreur » restent justes) ; la prise initiale
+ * reste visible dans l'historique des étapes de la commande.
+ */
+async function attribuerLivraisonAuValideur(
+  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  commandeId: string,
+  livreurInitialId: string | null,
+  livreurValideurId: string
+): Promise<void> {
+  if (livreurInitialId === livreurValideurId) return;
+  const { error } = await supabase.from("livraisons").update({ livreur_id: livreurValideurId }).eq("commande_id", commandeId);
+  if (error) {
+    console.error("[livreur/commandes] échec réattribution de la livraison au valideur :", error.message);
+  }
 }
 
 /**
@@ -349,11 +384,16 @@ export async function lireEtatScan(qrCode: string, livreurId: string): Promise<E
   }
 
   if (commande.statut === "pris_par_livreur") {
-    if (livraison.livreur_id === livreurId) {
-      return { type: "a_livrer", commandeId: commande.id, livraison: livraisonAssignee };
-    }
-    const nomLivreur = livraison.livreur_id ? await nomProfil(supabase, livraison.livreur_id) : null;
-    return { type: "deja_prise_autre", numero: commande.numero, nomLivreur };
+    // Celui qui flashe au départ n'est pas toujours celui qui remet la commande
+    // et encaisse (un collègue, le patron qui aide...) : n'importe quel livreur
+    // connecté peut valider la livraison et le paiement — jamais de blocage
+    // « déjà prise » à ce stade (retour du patron, 2026-11-02 : #856 et #879
+    // sont restées bloquées parce que seul le preneur pouvait les valider).
+    const priseParAutre =
+      livraison.livreur_id && livraison.livreur_id !== livreurId
+        ? ((await nomProfil(supabase, livraison.livreur_id)) ?? "un collègue")
+        : null;
+    return { type: "a_livrer", commandeId: commande.id, livraison: livraisonAssignee, priseParAutre };
   }
 
   // "livre" (ou tout autre statut terminal futur) : rien à faire de plus.
@@ -472,8 +512,8 @@ export async function signalerLivraisonNonEffectuee(
   }
 
   const { data: livraison } = await supabase.from("livraisons").select("livreur_id").eq("commande_id", commandeId).maybeSingle();
-  if (!livraison || livraison.livreur_id !== livreurId) {
-    throw new Error("Cette livraison n'est pas assignée à ce livreur.");
+  if (!livraison) {
+    throw new Error("Livraison introuvable.");
   }
 
   const { error: erreurMaj } = await supabase
