@@ -383,6 +383,10 @@ export function CommandeNouvelleApp({
   const montantAPayer = totalApresTampons;
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
+  // Tampons gagnés en plus si le client ajoute juste ce qu'il manque pour la prochaine boisson offerte.
+  const tamponsEnPlusAuProchainPalier =
+    calculerProgressionCommande(total + resteAvantProchaineBoisson, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+      .tamponsGagnes - calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif).tamponsGagnes;
   const pourcentageProchaineBoisson = Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100);
 
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1268,6 +1272,9 @@ export function CommandeNouvelleApp({
               )}
               <p className="text-sm font-extrabold text-gray-900">
                 Plus que {euros(resteAvantProchaineBoisson)} : {palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte
+                {tamponsEnPlusAuProchainPalier > 0
+                  ? ` et ${tamponsEnPlusAuProchainPalier} tampon${tamponsEnPlusAuProchainPalier > 1 ? "s" : ""} en plus`
+                  : ""}
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
                 <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
