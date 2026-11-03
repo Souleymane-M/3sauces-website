@@ -39,7 +39,6 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
-import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -379,10 +378,7 @@ export function CommandeNouvelleApp({
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
-  // Même règle que le serveur : la remise de lancement ne se cumule pas avec des tampons.
-  const remiseLancement =
-    nbTamponsEffectif === 0 && parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT ? MONTANT_REMISE_LANCEMENT : 0;
-  const montantAPayer = Math.max(0, totalApresTampons - remiseLancement);
+  const montantAPayer = totalApresTampons;
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
   const pourcentageProchaineBoisson = Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100);
@@ -1099,9 +1095,7 @@ export function CommandeNouvelleApp({
   const messageTotalApayer =
     nbTamponsEffectif > 0
       ? `${nbTamponsEffectif} tampon${nbTamponsEffectif > 1 ? "s" : ""} fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
-      : parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT
-        ? `Remise lancement : −${euros(MONTANT_REMISE_LANCEMENT)}`
-        : null;
+      : null;
 
   const libelleQuand = commandeAvance
     ? `Le ${new Date(`${dateCommande}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}`
