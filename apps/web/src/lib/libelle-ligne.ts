@@ -24,7 +24,3 @@ export function libelleBoissonLigne(l: LigneMinimale): string | null {
     : `Boisson incluse : ${l.boissonIncluse}`;
 }
 
-/** "9,50 € pièce" dès qu'il y a plusieurs exemplaires, sinon rien (le prix de la ligne suffit). */
-export function libellePrixUnitaire(l: LigneMinimale): string | null {
-  return l.quantite > 1 ? `${euros(l.prixUnitaire)} pièce` : null;
-}
