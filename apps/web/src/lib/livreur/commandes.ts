@@ -50,6 +50,10 @@ export async function listerLivraisonsAssignees(livreurId: string): Promise<Livr
     )
     .in("id", idsCommandes)
     .eq("statut", "pris_par_livreur")
+    // « Impossible de livrer » signalé : la commande n'est plus une livraison en cours pour le
+    // livreur (un responsable est alerté et décide), elle disparaît donc de sa liste — jamais
+    // laissée au milieu des livraisons à faire (retour du patron, 2026-11-03).
+    .or("alerte_signalee.is.null,alerte_signalee.eq.false")
     // Une livraison déjà réglée en ligne (Stripe) ne doit jamais être
     // redemandée en espèces/CB au livreur.
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
