@@ -29,10 +29,7 @@ import {
 } from "@/lib/commande-publique/creneau";
 import { SEUIL_COMMANDE_PRIORITAIRE, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
-  SEUIL_GROUPE_3_PLATS,
   SEUIL_GROUPE_3_MONTANT,
-  SEUIL_GROUPE_4_PLATS,
-  SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
   palierGroupeSelonQuantite,
@@ -1220,43 +1217,28 @@ export function CommandePubliqueApp({
 
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
+      <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
+        10 € = 1 tampon · 10 tampons = 10 € offerts
+      </div>
       <div className="mx-auto max-w-lg space-y-6 p-4">
-        <div className="rounded-lg p-3 text-white" style={{ backgroundColor: VERT }}>
-          <p className="font-bold">🚀 Vous êtes plusieurs ? Commandez en groupe, avant 11h :</p>
-          <p className="mt-1 text-sm text-white/90">
-            Dès {SEUIL_MINIMUM_GROUPE} plats → commande groupée (un seul passage en caisse/livraison).
-            <br />
-            {SEUIL_GROUPE_3_PLATS} plats et {SEUIL_GROUPE_3_MONTANT}€ → livraison prioritaire.
-            <br />
-            {SEUIL_GROUPE_4_PLATS} plats et {SEUIL_GROUPE_4_MONTANT}€ → livraison prioritaire + boisson 2L offerte.
-          </p>
-        </div>
-
         {modeCommande === null ? (
-          <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-center font-semibold text-gray-900">Vous commandez pour vous, ou en groupe ?</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <button
-                  onClick={() => setModeCommande("simple")}
-                  className="bouton-choix-mode w-full rounded py-3 text-sm font-bold uppercase text-white"
-                  style={{ backgroundColor: VERT }}
-                >
-                  Commande simple
-                </button>
-                <p className="mt-1 text-center text-xs text-gray-700">Pour une seule personne</p>
-              </div>
-              <div>
-                <button
-                  onClick={() => setModeCommande("groupee")}
-                  className="bouton-choix-mode w-full rounded bg-[#8B2020] py-3 text-sm font-bold uppercase text-white"
-                  style={{ animationDelay: "0.3s" }}
-                >
-                  Commande groupée
-                </button>
-                <p className="mt-1 text-center text-xs text-gray-700">Dès {SEUIL_MINIMUM_GROUPE} personnes/plats</p>
-              </div>
-            </div>
+          <div className="space-y-4">
+            <h2 className="pt-2 text-2xl font-extrabold text-gray-900">Tu commandes pour combien de personnes ?</h2>
+            <button
+              type="button"
+              onClick={() => setModeCommande("simple")}
+              className="w-full rounded-xl p-5 text-left text-white shadow-md active:scale-[0.99]"
+              style={{ backgroundColor: VERT }}
+            >
+              <span className="block text-2xl font-extrabold">Juste moi</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModeCommande("groupee")}
+              className="w-full rounded-xl bg-[#8B2020] p-5 text-left text-white shadow-md active:scale-[0.99]"
+            >
+              <span className="block text-2xl font-extrabold">Plusieurs personnes</span>
+            </button>
           </div>
         ) : (
           <>
