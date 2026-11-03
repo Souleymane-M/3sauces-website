@@ -36,6 +36,18 @@ interface ConfigurateurNouveauProps {
   ) => void;
   onAnnuler: () => void;
   quantiteMax?: number;
+  /** Modification d'une ligne déjà au panier : les choix de départ, et le bouton devient « Enregistrer ». */
+  initial?: {
+    quantite: number;
+    viandes: string[];
+    sauces: string[];
+    sansSauce: boolean;
+    extraViandes: string[];
+    boisson: string | null;
+    saladeGardee: boolean | null;
+    saladeOption: boolean;
+    accompagnements: string[];
+  };
 }
 
 const ROUGE = "#8B2020";
@@ -108,19 +120,20 @@ export function ConfigurateurNouveau({
   onValider,
   onAnnuler,
   quantiteMax = QUANTITE_MAX_DEFAUT,
+  initial,
 }: ConfigurateurNouveauProps) {
-  const [quantite, setQuantite] = useState(1);
-  const [viandesChoisies, setViandesChoisies] = useState<string[]>([]);
+  const [quantite, setQuantite] = useState(initial?.quantite ?? 1);
+  const [viandesChoisies, setViandesChoisies] = useState<string[]>(initial && !produit.viandeImposee ? initial.viandes : []);
   // Ordre de sélection conservé : les N premières sont incluses, les suivantes payantes.
-  const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
-  const [sansSauce, setSansSauce] = useState(false);
-  const [extraViandes, setExtraViandes] = useState<string[]>([]);
+  const [saucesChoisies, setSaucesChoisies] = useState<string[]>(initial?.sauces ?? []);
+  const [sansSauce, setSansSauce] = useState(initial?.sansSauce ?? false);
+  const [extraViandes, setExtraViandes] = useState<string[]>(initial?.extraViandes ?? []);
   const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
-  const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
-  const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
-  const [boissonVoulue, setBoissonVoulue] = useState(false);
-  const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
-  const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
+  const [boissonChoisie, setBoissonChoisie] = useState<string | null>(initial?.boisson ?? null);
+  const [saladeGardee, setSaladeGardee] = useState<boolean | null>(initial?.saladeGardee ?? null);
+  const [boissonVoulue, setBoissonVoulue] = useState(initial ? !!initial.boisson : false);
+  const [saladeOptionCochee, setSaladeOptionCochee] = useState(initial?.saladeOption ?? false);
+  const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>(initial?.accompagnements ?? []);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
   const proposeSansBoisson = produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT;
@@ -548,7 +561,7 @@ export function ConfigurateurNouveau({
             className="flex-1 rounded-xl py-4 text-lg font-extrabold text-white disabled:opacity-40"
             style={{ backgroundColor: ROUGE }}
           >
-            Ajouter · {euros(prixTotal)}
+            {initial ? "Enregistrer" : "Ajouter"} · {euros(prixTotal)}
           </button>
         </div>
         {quantiteMax < QUANTITE_MAX_DEFAUT && (

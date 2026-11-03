@@ -173,6 +173,8 @@ export function CommandeNouvelleApp({
   const [messagePlat, setMessagePlat] = useState<string | null>(null);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
+  // Ligne du panier en cours de modification (même fenêtre, déjà remplie) — null pour un nouvel ajout.
+  const [ligneEnModification, setLigneEnModification] = useState<LignePanierPublique | null>(null);
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanierPublique | null>(null);
   // Aucun canal présélectionné : le client doit cliquer explicitement (cf. ancien site, 2026-10-07).
   const [canal, setCanal] = useState<CanalPublic | null>(null);
@@ -416,13 +418,15 @@ export function CommandeNouvelleApp({
     sansSauce: boolean = false,
     saladeOption: boolean = false,
     viandesSupp: string[] = [],
-    saucesSupp: string[] = []
+    saucesSupp: string[] = [],
+    platForce?: number
   ) {
     declencherPulse();
+    const platCible = platForce ?? platCourant;
     const memeTri = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
     const cle = (l: LignePanierPublique) =>
       l.produit.id === produit.id &&
-      l.plat === platCourant &&
+      l.plat === platCible &&
       memeTri(l.viandes, viandesChoisies) &&
       memeTri(l.sauces, saucesChoisies) &&
       memeTri(l.saveurs, saveursChoisies) &&
@@ -470,7 +474,7 @@ export function CommandeNouvelleApp({
           accompagnementsInclus,
           viandesSupp,
           saucesSupp,
-          plat: platCourant,
+          plat: platCible,
         },
       ];
     });
@@ -1064,9 +1068,24 @@ export function CommandeNouvelleApp({
             onPlus={() => modifierQuantite(l.id, 1)}
             label={l.produit.nom}
           />
-          <button type="button" onClick={() => setPanier((p) => p.filter((x) => x.id !== l.id))} className="text-sm font-semibold text-gray-800 underline">
-            Supprimer
-          </button>
+          <div className="flex items-center gap-4">
+            {["snacking", "menu_special", "plat_du_jour"].includes(l.produit.categorie) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLigneEnModification(l);
+                  setProduitEnSelection(l.produit);
+                }}
+                className="text-sm font-extrabold underline"
+                style={{ color: ROUGE }}
+              >
+                Modifier
+              </button>
+            )}
+            <button type="button" onClick={() => setPanier((p) => p.filter((x) => x.id !== l.id))} className="text-sm font-semibold text-gray-800 underline">
+              Supprimer
+            </button>
+          </div>
         </div>
       </li>
     );
@@ -1371,19 +1390,25 @@ export function CommandeNouvelleApp({
           {/* 2. Quand */}
           <section className="space-y-2 rounded-xl border border-gray-300 bg-white p-4">
             <h3 className="text-base font-extrabold text-gray-900">2. Quand ?</h3>
-            <button
-              type="button"
-              onClick={choisirAuPlusTot}
-              className={`w-full rounded-lg border-2 px-3 py-3 text-left text-base font-extrabold ${
-                quand === "asap" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 px-3 py-3 ${
+                quand === "asap" ? "border-[#8B2020] bg-[#8B2020]/10" : "border-gray-400 bg-white"
               }`}
             >
-              Dès que possible
-              <span className="block text-sm font-semibold">
-                {libelleQuand}
-                {creneauHeure ? ` à partir de ${creneauHeure}` : ""}
+              <input
+                type="checkbox"
+                checked={quand === "asap"}
+                onChange={(e) => (e.target.checked ? choisirAuPlusTot() : setQuand(null))}
+                className="h-7 w-7 shrink-0 accent-[#8B2020]"
+              />
+              <span className="text-base font-extrabold text-gray-900">
+                Dès que possible
+                <span className="block text-sm font-semibold text-gray-800">
+                  {libelleQuand}
+                  {creneauHeure ? ` à partir de ${creneauHeure}` : ""}
+                </span>
               </span>
-            </button>
+            </label>
             <p className="pt-1 text-sm font-extrabold text-gray-900">Ou choisis une heure :</p>
             <div className={`space-y-2 rounded-lg p-2 ${quand === "heure" ? "border-2 border-[#8B2020]" : "border border-gray-300"}`}>
               <DatePicker
@@ -1635,9 +1660,29 @@ export function CommandeNouvelleApp({
           canetteRapideProduit={produitEnSelection.categorie === "plat_du_jour" ? produitCanetteRapide : null}
           canetteRapideSaveurs={saveurs}
           quantiteMax={
-            produitEnSelection.stockJour !== null ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour) : undefined
+            produitEnSelection.stockJour !== null
+              ? plafonnerQuantite(produitEnSelection, ligneEnModification?.id ?? null, produitEnSelection.stockJour)
+              : undefined
           }
-          onAnnuler={() => setProduitEnSelection(null)}
+          initial={
+            ligneEnModification
+              ? {
+                  quantite: ligneEnModification.quantite,
+                  viandes: ligneEnModification.viandes,
+                  sauces: [...ligneEnModification.sauces, ...ligneEnModification.saucesSupp],
+                  sansSauce: ligneEnModification.sansSauce,
+                  extraViandes: ligneEnModification.viandesSupp,
+                  boisson: ligneEnModification.boissonIncluse,
+                  saladeGardee: ligneEnModification.saladeIncluse,
+                  saladeOption: ligneEnModification.saladeOption,
+                  accompagnements: ligneEnModification.accompagnementsInclus,
+                }
+              : undefined
+          }
+          onAnnuler={() => {
+            setProduitEnSelection(null);
+            setLigneEnModification(null);
+          }}
           onValider={(
             viandesChoisies,
             saucesChoisies,
@@ -1654,6 +1699,57 @@ export function CommandeNouvelleApp({
             // Les suppléments (viande / sauce en plus) font partie du tacos lui-même. Avec plusieurs
             // exemplaires, ils vont sur UN seul : jamais répétés sur chaque exemplaire par erreur.
             const aDesSupplements = extras.viandesSupplementaires.length > 0 || extras.saucesSupplementaires.length > 0;
+            if (ligneEnModification) {
+              // Modification : la ligne est remplacée à sa place (même plat), jamais supprimée puis recréée.
+              const ancienne = ligneEnModification;
+              const quantitePrincipale = aDesSupplements ? 1 : quantite;
+              setPanier((precedent) =>
+                precedent.map((x) =>
+                  x.id === ancienne.id
+                    ? {
+                        ...x,
+                        viandes: viandesChoisies,
+                        sauces: saucesChoisies,
+                        boissonIncluse,
+                        sansBoisson,
+                        sansSauce,
+                        saladeOption,
+                        saladeIncluse,
+                        accompagnementsInclus,
+                        viandesSupp: extras.viandesSupplementaires,
+                        saucesSupp: extras.saucesSupplementaires,
+                        quantite: Math.max(1, plafonnerQuantite(x.produit, x.id, quantitePrincipale)),
+                      }
+                    : x
+                )
+              );
+              if (aDesSupplements && quantite > 1) {
+                ajouterAuPanier(
+                  produitEnSelection,
+                  viandesChoisies,
+                  saucesChoisies,
+                  [],
+                  boissonIncluse,
+                  quantite - 1,
+                  saladeIncluse,
+                  accompagnementsInclus,
+                  sansBoisson,
+                  sansSauce,
+                  saladeOption,
+                  [],
+                  [],
+                  ancienne.plat
+                );
+              }
+              if (produitCanetteRapide) {
+                for (const saveur of canettesRapidesChoisies) {
+                  ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1, null, [], false, false, false, [], [], ancienne.plat);
+                }
+              }
+              setLigneEnModification(null);
+              setProduitEnSelection(null);
+              return;
+            }
             if (aDesSupplements && quantite > 1) {
               ajouterAuPanier(
                 produitEnSelection,
