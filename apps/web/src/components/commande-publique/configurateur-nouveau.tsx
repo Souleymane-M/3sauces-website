@@ -195,25 +195,23 @@ export function ConfigurateurNouveau({
     });
   }
 
-  // Produit sans choix de viande ni de sauce (plat du jour, menu…) : petite fenêtre en bas, comme les autres ; snacks : plein écran.
-  const compact = !demandeViande && !demandeSauce;
   let numero = 0;
   const prochain = () => ++numero;
 
   return (
-    <div className={compact ? "fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" : "fixed inset-0 z-50 bg-[#F5F0E8]"}>
-    <div className={compact ? "flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[#F5F0E8] sm:rounded-2xl" : "flex h-full flex-col"}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+    <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[#F5F0E8] sm:rounded-2xl">
       <div className="flex items-center gap-3 border-b border-gray-300 bg-white px-4 py-3">
-        <button type="button" onClick={onAnnuler} aria-label="Retour" className="text-2xl font-bold text-gray-900">
-          ←
-        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xl font-extrabold text-gray-900">{produit.nom}</p>
-          {produit.description && <p className="truncate text-sm font-medium text-gray-800">{produit.description}</p>}
+          <p className="text-xl font-extrabold leading-tight text-gray-900">{produit.nom}</p>
+          {produit.description && <p className="text-sm font-medium text-gray-800">{produit.description}</p>}
         </div>
         <p className="whitespace-nowrap text-xl font-extrabold" style={{ color: ROUGE }}>
           {euros(prixBase)}
         </p>
+        <button type="button" onClick={onAnnuler} aria-label="Fermer" className="-mr-1 px-2 text-2xl font-bold text-gray-900">
+          ✕
+        </button>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">

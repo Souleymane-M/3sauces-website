@@ -1,6 +1,6 @@
 import type { CommandePourImpression } from "./types";
 import { libellePayeeTicket } from "@/lib/libelle-paiement";
-import { libelleBoissonLigne, libellePrixUnitaire } from "@/lib/libelle-ligne";
+import { libelleBoissonLigne, libellePrixUnitaire, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -206,6 +206,9 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.sansSauce) details.push("SANS SAUCE");
   if (l.saladeOption) details.push("+ Salade");
+  const supp = libelleSupplementsLigne(l);
+  if (supp.viandes) details.push(`+ Viande en plus : ${supp.viandes}`);
+  if (supp.sauces) details.push(`+ Sauce en plus : ${supp.sauces}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   const boisson = libelleBoissonLigne(l);
   if (boisson) details.push(boisson);
@@ -238,6 +241,9 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (l.sauces && l.sauces.length > 0) attributs.push({ label: "Sauces", valeur: l.sauces.join(", ") });
   if (l.sansSauce) attributs.push({ label: "Sauces", valeur: "SANS SAUCE" });
   if (l.saladeOption) attributs.push({ label: "Salade", valeur: "EN PLUS" });
+  const supp = libelleSupplementsLigne(l);
+  if (supp.viandes) attributs.push({ label: "Viande en plus", valeur: supp.viandes });
+  if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
   if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
   if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
@@ -259,6 +265,8 @@ function cleLigne(l: LigneCommande): string {
     [...(l.sauces ?? [])].sort(),
     l.sansSauce ?? false,
     l.saladeOption ?? false,
+    [...(l.viandesSupplementaires ?? [])].sort(),
+    [...(l.saucesSupplementaires ?? [])].sort(),
     [...(l.saveurs ?? [])].sort(),
     l.boissonIncluse ?? null,
     l.sansBoisson ?? false,

@@ -112,6 +112,10 @@ export interface LigneCommandePubliquePayload {
   sansSauce?: boolean;
   /** Salade en supplément payant (Tacos/Bowl), intégrée à la ligne. */
   saladeOption?: boolean;
+  /** Viandes en supplément payant (une entrée par unité), intégrées à la ligne (snacks uniquement). */
+  viandesSupplementaires?: string[];
+  /** Sauces en supplément payant (une entrée par unité), intégrées à la ligne (snacks uniquement). */
+  saucesSupplementaires?: string[];
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */

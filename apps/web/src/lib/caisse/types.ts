@@ -26,6 +26,10 @@ export interface LigneCommande {
   sansSauce?: boolean;
   /** Salade en supplément payant intégrée à la ligne (Tacos/Bowl) — son prix est déjà dans `prixUnitaire`. */
   saladeOption?: boolean;
+  /** Viandes en supplément payant (une entrée par unité), intégrées à la ligne du produit — leur prix est déjà dans `prixUnitaire`. */
+  viandesSupplementaires?: string[];
+  /** Sauces en supplément payant (une entrée par unité), intégrées à la ligne du produit — leur prix est déjà dans `prixUnitaire`. */
+  saucesSupplementaires?: string[];
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;

@@ -18,6 +18,7 @@ import type {
   LigneCommandePubliquePayload,
 } from "@/lib/commande-publique/types";
 import {
+  NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
@@ -308,6 +309,21 @@ export async function POST(request: Request) {
   }
   const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
 
+  // Prix des suppléments payants (viande / sauce en plus) rattachés à une ligne de snack —
+  // lus en base, jamais envoyés par le client.
+  const { data: produitsSupplements, error: erreurSupplements } = await supabase
+    .from("produits")
+    .select("nom, prix")
+    .in("nom", [NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE, NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE])
+    .eq("actif", true);
+  if (erreurSupplements) {
+    return NextResponse.json({ error: "Erreur serveur (suppléments)." }, { status: 500 });
+  }
+  const prixViandeSupplementaire =
+    (produitsSupplements ?? []).find((p) => p.nom === NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE)?.prix ?? null;
+  const prixSauceSupplementaire =
+    (produitsSupplements ?? []).find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE)?.prix ?? null;
+
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
 
@@ -542,6 +558,34 @@ export async function POST(request: Request) {
     }
     const supplementSalade = saladeOption ? Number(produit.salade_prix_option) : 0;
 
+    // Viandes / sauces en plus (snacks) : intégrées à la ligne du produit, jamais
+    // des lignes « Suppléments » séparées — demande du patron, 2026-11-03.
+    const viandesSupplementaires = Array.isArray(ligneBrute.viandesSupplementaires) ? ligneBrute.viandesSupplementaires : [];
+    const saucesSupplementaires = Array.isArray(ligneBrute.saucesSupplementaires) ? ligneBrute.saucesSupplementaires : [];
+    if (viandesSupplementaires.length > 0 || saucesSupplementaires.length > 0) {
+      if (produit.categorie !== "snacking") {
+        return NextResponse.json({ error: `Suppléments non proposés sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (viandesSupplementaires.length > 20 || saucesSupplementaires.length > 20) {
+        return NextResponse.json({ error: `Trop de suppléments sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (viandesSupplementaires.some((v) => typeof v !== "string" || !nomsViandesValides.has(v))) {
+        return NextResponse.json({ error: `Viande supplémentaire invalide sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (saucesSupplementaires.some((v) => typeof v !== "string" || !nomsSaucesValides.has(v))) {
+        return NextResponse.json({ error: `Sauce supplémentaire invalide sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (viandesSupplementaires.length > 0 && prixViandeSupplementaire === null) {
+        return NextResponse.json({ error: "La viande supplémentaire n'est pas disponible." }, { status: 400 });
+      }
+      if (saucesSupplementaires.length > 0 && prixSauceSupplementaire === null) {
+        return NextResponse.json({ error: "La sauce supplémentaire n'est pas disponible." }, { status: 400 });
+      }
+    }
+    const supplementsPayants =
+      viandesSupplementaires.length * Number(prixViandeSupplementaire ?? 0) +
+      saucesSupplementaires.length * Number(prixSauceSupplementaire ?? 0);
+
     lignes.push({
       produitId: produit.id,
       nom: produit.nom,
@@ -558,7 +602,8 @@ export async function POST(request: Request) {
             : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
               ? produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON
               : produit.prix) +
-            supplementSalade) *
+            supplementSalade +
+            supplementsPayants) *
             100
         ) / 100,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
@@ -566,6 +611,8 @@ export async function POST(request: Request) {
       sauces,
       sansSauce,
       saladeOption,
+      viandesSupplementaires,
+      saucesSupplementaires,
       saveurs,
       boissonIncluse,
       sansBoisson,

@@ -35,7 +35,6 @@ import {
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ConfigurateurNouveau } from "./configurateur-nouveau";
 import { SaveurModalPublique } from "./saveur-modal-publique";
-import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
@@ -59,6 +58,9 @@ interface LignePanierPublique {
   saladeOption: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
+  /** Viandes / sauces en supplément payant, intégrées à la ligne (jamais des produits à part). */
+  viandesSupp: string[];
+  saucesSupp: string[];
   /** Index du plat (0 en commande simple) — jamais déduit du contenu, toujours choisi par le client. */
   plat: number;
 }
@@ -171,7 +173,6 @@ export function CommandeNouvelleApp({
   const [messagePlat, setMessagePlat] = useState<string | null>(null);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitPublic | null>(null);
-  const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitPublic | null>(null);
   const [ligneCorrectionBoisson, setLigneCorrectionBoisson] = useState<LignePanierPublique | null>(null);
   // Aucun canal présélectionné : le client doit cliquer explicitement (cf. ancien site, 2026-10-07).
   const [canal, setCanal] = useState<CanalPublic | null>(null);
@@ -190,7 +191,14 @@ export function CommandeNouvelleApp({
         const brut = sessionStorage.getItem(CLE_PANIER);
         if (brut) {
           const etat = JSON.parse(brut);
-          if (Array.isArray(etat.panier)) setPanier(etat.panier.map((l: LignePanierPublique) => ({ ...l, plat: l.plat ?? 0 })));
+          if (Array.isArray(etat.panier)) setPanier(
+              etat.panier.map((l: LignePanierPublique) => ({
+                ...l,
+                plat: l.plat ?? 0,
+                viandesSupp: l.viandesSupp ?? [],
+                saucesSupp: l.saucesSupp ?? [],
+              }))
+            );
           if (etat.mode === "simple" || etat.mode === "groupee") setMode(etat.mode);
           if (typeof etat.platActif === "number") setPlatActif(etat.platActif);
           if (Array.isArray(etat.nomsPlats) && etat.nomsPlats.length > 0) setNomsPlats(etat.nomsPlats);
@@ -255,7 +263,8 @@ export function CommandeNouvelleApp({
     [dateCommande, parametres.heureDebut, parametres.heureFin]
   );
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
-  const [choisirHeure, setChoisirHeure] = useState(false);
+  // Le client choisit lui-même : « dès que possible » ou une heure précise — jamais présélectionné.
+  const [quand, setQuand] = useState<"asap" | "heure" | null>(null);
   const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number } | null>(
@@ -344,7 +353,9 @@ export function CommandeNouvelleApp({
       ? MONTANT_REDUCTION_SANS_BOISSON
       : 0) +
     (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
-    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
+    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0) +
+    l.viandesSupp.length * (produitViandeSupplementaire?.prix ?? 0) +
+    l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0);
 
   const total = panier.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
@@ -403,7 +414,9 @@ export function CommandeNouvelleApp({
     accompagnementsInclus: string[] = [],
     sansBoisson: boolean = false,
     sansSauce: boolean = false,
-    saladeOption: boolean = false
+    saladeOption: boolean = false,
+    viandesSupp: string[] = [],
+    saucesSupp: string[] = []
   ) {
     declencherPulse();
     const memeTri = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -418,6 +431,8 @@ export function CommandeNouvelleApp({
       l.sansSauce === sansSauce &&
       l.saladeOption === saladeOption &&
       l.saladeIncluse === saladeIncluse &&
+      memeTri(l.viandesSupp, viandesSupp) &&
+      memeTri(l.saucesSupp, saucesSupp) &&
       memeTri(l.accompagnementsInclus, accompagnementsInclus);
 
     const stockRestantAvantAjout = produit.stockJour !== null ? plafonnerQuantite(produit, null, produit.stockJour) : null;
@@ -453,6 +468,8 @@ export function CommandeNouvelleApp({
           saladeOption,
           saladeIncluse,
           accompagnementsInclus,
+          viandesSupp,
+          saucesSupp,
           plat: platCourant,
         },
       ];
@@ -461,17 +478,8 @@ export function CommandeNouvelleApp({
   }
 
   function surClicProduit(produit: ProduitPublic) {
-    const besoinConfigurateur =
-      (!produit.viandeImposee && produit.nbViandesMax > 0) ||
-      produit.nbSaucesIncluses > 0 ||
-      produit.autoriseExtras ||
-      produit.nbSaveursMax > 0 ||
-      produit.accompagnementInclus;
-    if (besoinConfigurateur) {
-      setProduitEnSelection(produit);
-      return;
-    }
-    setProduitEnQuantite(produit);
+    // Une seule fenêtre pour tous les produits (plat du jour, menu, snack…) : mêmes étapes, même bouton « Ajouter · prix ».
+    setProduitEnSelection(produit);
   }
 
   function modifierQuantite(id: string, delta: number) {
@@ -558,6 +566,15 @@ export function CommandeNouvelleApp({
     setPlatActif((a) => Math.max(0, a > index ? a - 1 : a === index ? Math.max(0, index - 1) : a));
   }
 
+  /** « Dès que possible » : premier créneau de la première date ouverte. */
+  function choisirAuPlusTot() {
+    const premiereDate = datesOuvertes[0] ?? aujourdHui;
+    setDateCommande(premiereDate);
+    setCreneauHeure(creneauxPourDate(premiereDate, parametres.heureDebut, parametres.heureFin)[0] ?? "");
+    if (premiereDate !== aujourdHui) setModePaiement("stripe");
+    setQuand("asap");
+  }
+
   function aller(nouvelleVue: Vue) {
     setErreur(null);
     setVue(nouvelleVue);
@@ -589,6 +606,10 @@ export function CommandeNouvelleApp({
     }
     if (!canal) {
       setErreur("Choisis comment récupérer ta commande : sur place, à emporter ou en livraison.");
+      return;
+    }
+    if (quand === null) {
+      setErreur("Choisis « Dès que possible » ou une heure précise.");
       return;
     }
     if (!prenom.trim()) {
@@ -652,6 +673,8 @@ export function CommandeNouvelleApp({
         saladeOption: l.saladeOption,
         saladeIncluse: l.saladeIncluse,
         accompagnementsInclus: l.accompagnementsInclus,
+        viandesSupplementaires: l.viandesSupp,
+        saucesSupplementaires: l.saucesSupp,
         platIndex: enGroupe ? l.plat : null,
         pourQui: enGroupe ? nomsPlats[l.plat]?.trim() || null : null,
       }));
@@ -1001,6 +1024,16 @@ export function CommandeNouvelleApp({
           {l.sauces.length > 0 && <p>Sauces : {l.sauces.join(", ")}</p>}
           {l.sansSauce && <p className="font-semibold">Sans sauce</p>}
           {l.saladeOption && <p>+ Salade (+{euros(l.produit.saladePrixOption ?? 0)})</p>}
+          {l.viandesSupp.length > 0 && (
+            <p className="font-semibold">
+              + Viande en plus : {l.viandesSupp.join(", ")} (+{euros(l.viandesSupp.length * (produitViandeSupplementaire?.prix ?? 0))})
+            </p>
+          )}
+          {l.saucesSupp.length > 0 && (
+            <p className="font-semibold">
+              + Sauce en plus : {l.saucesSupp.join(", ")} (+{euros(l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0))})
+            </p>
+          )}
           {l.accompagnementsInclus.length > 0 && (
             <p>Accompagnement : {l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}</p>
           )}
@@ -1248,15 +1281,25 @@ export function CommandeNouvelleApp({
             {messageTotalApayer && <p className="mt-1 text-sm font-bold text-[#2D5A27]">{messageTotalApayer}</p>}
           </div>
 
-          <button
-            type="button"
-            onClick={() => aller("validation")}
-            disabled={nbArticles === 0}
-            className="w-full rounded-xl py-4 text-lg font-extrabold text-white disabled:opacity-40"
-            style={{ backgroundColor: ROUGE }}
-          >
-            Continuer
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => aller("menu")}
+              className="rounded-xl border-2 border-[#8B2020] bg-white py-4 text-base font-extrabold"
+              style={{ color: ROUGE }}
+            >
+              Continuer mes achats
+            </button>
+            <button
+              type="button"
+              onClick={() => aller("validation")}
+              disabled={nbArticles === 0}
+              className="rounded-xl py-4 text-base font-extrabold text-white disabled:opacity-40"
+              style={{ backgroundColor: VERT }}
+            >
+              Commander
+            </button>
+          </div>
         </div>
       )}
 
@@ -1328,36 +1371,42 @@ export function CommandeNouvelleApp({
           {/* 2. Quand */}
           <section className="space-y-2 rounded-xl border border-gray-300 bg-white p-4">
             <h3 className="text-base font-extrabold text-gray-900">2. Quand ?</h3>
-            {!choisirHeure ? (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-base font-bold text-gray-900">
-                  Dès que possible
-                  <span className="block text-sm font-medium text-gray-800">
-                    {libelleQuand}
-                    {creneauHeure ? ` à partir de ${creneauHeure}` : ""}
-                  </span>
-                </p>
-                <button type="button" onClick={() => setChoisirHeure(true)} className="shrink-0 text-sm font-bold text-gray-900 underline">
-                  Choisir une heure
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <DatePicker
-                  dates={datesOuvertes}
-                  aujourdHui={aujourdHui}
-                  valeur={dateCommande}
-                  onChange={changerDate}
-                  label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
-                />
-                <CreneauPicker
-                  creneauxValides={creneauxValides}
-                  valeur={creneauHeure}
-                  onChange={setCreneauHeure}
-                  label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
-                />
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={choisirAuPlusTot}
+              className={`w-full rounded-lg border-2 px-3 py-3 text-left text-base font-extrabold ${
+                quand === "asap" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+              }`}
+            >
+              Dès que possible
+              <span className="block text-sm font-semibold">
+                {libelleQuand}
+                {creneauHeure ? ` à partir de ${creneauHeure}` : ""}
+              </span>
+            </button>
+            <p className="pt-1 text-sm font-extrabold text-gray-900">Ou choisis une heure :</p>
+            <div className={`space-y-2 rounded-lg p-2 ${quand === "heure" ? "border-2 border-[#8B2020]" : "border border-gray-300"}`}>
+              <DatePicker
+                dates={datesOuvertes}
+                aujourdHui={aujourdHui}
+                valeur={dateCommande}
+                onChange={(d) => {
+                  setQuand("heure");
+                  changerDate(d);
+                }}
+                label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
+              />
+              <CreneauPicker
+                creneauxValides={creneauxValides}
+                valeur={creneauHeure}
+                onChange={(c) => {
+                  setQuand("heure");
+                  setCreneauHeure(c);
+                }}
+                label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
+              />
+            </div>
+            {quand === null && <p className="text-sm font-bold" style={{ color: ROUGE }}>Choisis « Dès que possible » ou une heure.</p>}
           </section>
 
           {/* 3. Coordonnées */}
@@ -1602,57 +1651,45 @@ export function CommandeNouvelleApp({
             canettesRapidesChoisies,
             sansSauce
           ) => {
+            // Les suppléments (viande / sauce en plus) font partie du tacos lui-même. Avec plusieurs
+            // exemplaires, ils vont sur UN seul : jamais répétés sur chaque exemplaire par erreur.
+            const aDesSupplements = extras.viandesSupplementaires.length > 0 || extras.saucesSupplementaires.length > 0;
+            if (aDesSupplements && quantite > 1) {
+              ajouterAuPanier(
+                produitEnSelection,
+                viandesChoisies,
+                saucesChoisies,
+                [],
+                boissonIncluse,
+                quantite - 1,
+                saladeIncluse,
+                accompagnementsInclus,
+                sansBoisson,
+                sansSauce,
+                saladeOption
+              );
+            }
             ajouterAuPanier(
               produitEnSelection,
               viandesChoisies,
               saucesChoisies,
               [],
               boissonIncluse,
-              quantite,
+              aDesSupplements ? 1 : quantite,
               saladeIncluse,
               accompagnementsInclus,
               sansBoisson,
               sansSauce,
-              saladeOption
+              saladeOption,
+              extras.viandesSupplementaires,
+              extras.saucesSupplementaires
             );
-            if (produitViandeSupplementaire) {
-              for (const nomViande of extras.viandesSupplementaires) {
-                ajouterAuPanier(produitViandeSupplementaire, [nomViande], []);
-              }
-            }
-            if (produitSauceSupplementaire) {
-              for (const nomSauce of extras.saucesSupplementaires) {
-                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce]);
-              }
-            }
             if (produitCanetteRapide) {
               for (const saveur of canettesRapidesChoisies) {
                 ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
               }
             }
             setProduitEnSelection(null);
-          }}
-        />
-      )}
-
-      {produitEnQuantite && (
-        <QuantiteModalPublique
-          produit={{
-            ...produitEnQuantite,
-            stockJour:
-              produitEnQuantite.stockJour !== null ? plafonnerQuantite(produitEnQuantite, null, produitEnQuantite.stockJour) : null,
-          }}
-          canetteProduit={produitEnQuantite.categorie === "plat_du_jour" ? produitCanetteRapide : null}
-          canetteSaveurs={saveurs}
-          onAnnuler={() => setProduitEnQuantite(null)}
-          onValider={(quantite, _prixSaisi, canettesChoisies) => {
-            ajouterAuPanier(produitEnQuantite, produitEnQuantite.viandeImposee ? [produitEnQuantite.viandeImposee] : [], [], [], null, quantite);
-            if (produitCanetteRapide) {
-              for (const saveur of canettesChoisies ?? []) {
-                ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
-              }
-            }
-            setProduitEnQuantite(null);
           }}
         />
       )}

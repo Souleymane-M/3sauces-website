@@ -1,7 +1,7 @@
 "use client";
 
 import { libellePayee } from "@/lib/libelle-paiement";
-import { libelleBoissonLigne, libellePrixUnitaire } from "@/lib/libelle-ligne";
+import { libelleBoissonLigne, libellePrixUnitaire, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
@@ -19,6 +19,9 @@ function detailLigne(l: LivraisonAssignee["lignes"][number]): string[] {
   if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
   if (l.sansSauce) details.push("SANS SAUCE");
   if (l.saladeOption) details.push("+ Salade");
+  const supp = libelleSupplementsLigne(l);
+  if (supp.viandes) details.push(`+ VIANDE EN PLUS : ${supp.viandes}`);
+  if (supp.sauces) details.push(`+ SAUCE EN PLUS : ${supp.sauces}`);
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   const boisson = libelleBoissonLigne(l);
   if (boisson) details.push(boisson);

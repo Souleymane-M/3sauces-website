@@ -28,3 +28,25 @@ export function libelleBoissonLigne(l: LigneMinimale): string | null {
 export function libellePrixUnitaire(l: LigneMinimale): string | null {
   return l.quantite > 1 ? `${euros(l.prixUnitaire)} pièce` : null;
 }
+
+/** "Steak haché ×2, Kebab" — regroupe les doublons d'une liste de suppléments. */
+function listeAvecQuantites(noms: string[]): string {
+  const comptes = new Map<string, number>();
+  for (const n of noms) comptes.set(n, (comptes.get(n) ?? 0) + 1);
+  return [...comptes].map(([n, c]) => (c > 1 ? `${n} ×${c}` : n)).join(", ");
+}
+
+/**
+ * Suppléments payants rattachés à la ligne (viande / sauce en plus), à
+ * afficher juste sous le produit — jamais sur une ligne séparée en bas du
+ * ticket (demande du patron, 2026-11-03).
+ */
+export function libelleSupplementsLigne(l: {
+  viandesSupplementaires?: string[];
+  saucesSupplementaires?: string[];
+}): { viandes: string | null; sauces: string | null } {
+  return {
+    viandes: l.viandesSupplementaires?.length ? listeAvecQuantites(l.viandesSupplementaires) : null,
+    sauces: l.saucesSupplementaires?.length ? listeAvecQuantites(l.saucesSupplementaires) : null,
+  };
+}
