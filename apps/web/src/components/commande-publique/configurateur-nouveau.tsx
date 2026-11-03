@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { ProduitConfigurable, ViandePublique, SaucePublique, SaveurPublique } from "@/lib/commande-publique/types";
-import { GROUPE_ACCOMPAGNEMENT_COMBINABLE, GROUPE_ACCOMPAGNEMENT_EXCLUSIF } from "@/lib/commande-publique/accompagnements";
 import {
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
@@ -54,6 +53,9 @@ const ROUGE = "#8B2020";
 const VERT = "#2D5A27";
 const ORANGE = "#C2540C";
 const QUANTITE_MAX_DEFAUT = 20;
+/** Accompagnements compris dans le prix d'un plat du jour ; au-delà, chacun est facturé à son prix. */
+const NB_ACCOMPAGNEMENTS_INCLUS = 2;
+const NB_ACCOMPAGNEMENTS_MAX = 6;
 
 const euros = (montant: number) => `${montant.toFixed(2).replace(".", ",")} €`;
 
@@ -80,6 +82,29 @@ function Pastille({
     >
       {children}
     </button>
+  );
+}
+
+/** Ligne à cocher bien visible : le titre du choix (« Salade », « Boisson »…) se distingue des pastilles de saveurs. */
+function CaseACocher({
+  coche,
+  onChange,
+  couleur,
+  children,
+}: {
+  coche: boolean;
+  onChange: (coche: boolean) => void;
+  couleur: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className="flex cursor-pointer items-center gap-3 rounded-lg border-2 px-3 py-3"
+      style={{ borderColor: coche ? couleur : "#6b7280", backgroundColor: coche ? `${couleur}15` : "#fff" }}
+    >
+      <input type="checkbox" checked={coche} onChange={(e) => onChange(e.target.checked)} className="h-7 w-7 shrink-0" style={{ accentColor: couleur }} />
+      <span className="text-lg font-extrabold text-gray-900">{children}</span>
+    </label>
   );
 }
 
@@ -176,7 +201,10 @@ export function ConfigurateurNouveau({
     (produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0) +
     (saladeOptionCochee ? (produit.saladePrixOption ?? 0) : 0) +
     (demandeSaladeOuBoisson && saladeGardee === true && boissonVoulue && boissonRetenue ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
-  const prixExtras = extraViandes.length * prixViandeExtra + saucesPayantes.length * prixSauceExtra + canettesRapides.length * prixCanette;
+  const prixAccompagnement = (nom: string) => accompagnements.find((a) => a.nom === nom)?.prix ?? 0;
+  const accompagnementsPayants = accompagnementsChoisis.slice(NB_ACCOMPAGNEMENTS_INCLUS);
+  const prixAccompagnementsPayants = accompagnementsPayants.reduce((t, n) => t + prixAccompagnement(n), 0);
+  const prixExtras = prixAccompagnementsPayants + extraViandes.length * prixViandeExtra + saucesPayantes.length * prixSauceExtra + canettesRapides.length * prixCanette;
   const prixTotal = prixUnite * quantite + prixExtras;
 
   function toggleViande(nom: string) {
@@ -201,10 +229,8 @@ export function ConfigurateurNouveau({
   function toggleAccompagnement(nom: string) {
     setAccompagnementsChoisis((precedent) => {
       if (precedent.includes(nom)) return precedent.filter((n) => n !== nom);
-      if (GROUPE_ACCOMPAGNEMENT_EXCLUSIF.has(nom)) return [nom];
-      const combinablesActuels = precedent.filter((n) => GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(n));
-      if (combinablesActuels.length >= 2) return precedent;
-      return [...combinablesActuels, nom];
+      if (precedent.length >= NB_ACCOMPAGNEMENTS_MAX) return precedent;
+      return [...precedent, nom];
     });
   }
 
@@ -281,17 +307,17 @@ export function ConfigurateurNouveau({
             }
             couleur={VERT}
           >
+            <CaseACocher
+              coche={sansSauce}
+              couleur={ROUGE}
+              onChange={(c) => {
+                setSansSauce(c);
+                if (c) setSaucesChoisies([]);
+              }}
+            >
+              Sans sauce
+            </CaseACocher>
             <div className="flex flex-wrap gap-2">
-              <Pastille
-                actif={sansSauce}
-                couleur={ROUGE}
-                onClick={() => {
-                  setSansSauce((prec) => !prec);
-                  setSaucesChoisies([]);
-                }}
-              >
-                Sans sauce
-              </Pastille>
               {sauces.map((s) => {
                 const index = saucesChoisies.indexOf(s.nom);
                 const payante = index >= produit.nbSaucesIncluses;
@@ -338,21 +364,29 @@ export function ConfigurateurNouveau({
             aide={`Inclus au choix. Les deux : +${euros(MONTANT_SUPPLEMENT_SALADE_ET_BOISSON)}`}
             couleur={VERT}
           >
-            <div className="flex gap-2">
-              <Pastille actif={saladeGardee === true} couleur={VERT} onClick={() => setSaladeGardee((prec) => (prec === true ? false : true))}>
-                Salade
-              </Pastille>
-              <Pastille actif={boissonVoulue} couleur={ORANGE} onClick={() => setBoissonVoulue((prec) => !prec)}>
-                Boisson
-              </Pastille>
-            </div>
+            <CaseACocher coche={saladeGardee === true} couleur={VERT} onChange={(c) => setSaladeGardee(c)}>
+              Salade
+            </CaseACocher>
+            <CaseACocher
+              coche={boissonVoulue}
+              couleur={ORANGE}
+              onChange={(c) => {
+                setBoissonVoulue(c);
+                if (!c) setBoissonChoisie(null);
+              }}
+            >
+              Boisson
+            </CaseACocher>
             {boissonVoulue && (
-              <div className="flex flex-wrap gap-2">
-                {saveurs.map((s) => (
-                  <Pastille key={s.id} actif={boissonChoisie === s.nom} couleur={ORANGE} onClick={() => setBoissonChoisie(s.nom)}>
-                    {s.nom}
-                  </Pastille>
-                ))}
+              <div className="ml-4 space-y-2 border-l-4 pl-3" style={{ borderColor: ORANGE }}>
+                <p className="text-sm font-extrabold text-gray-900">Choisis ta boisson :</p>
+                <div className="flex flex-wrap gap-2">
+                  {saveurs.map((s) => (
+                    <Pastille key={s.id} actif={boissonChoisie === s.nom} couleur={ORANGE} onClick={() => setBoissonChoisie(s.nom)}>
+                      {s.nom}
+                    </Pastille>
+                  ))}
+                </div>
               </div>
             )}
             {saladeGardee === true && boissonVoulue && (
@@ -364,19 +398,30 @@ export function ConfigurateurNouveau({
         )}
 
         {demandeAccompagnement && (
-          <Etape numero={prochain()} titre="Ton accompagnement" aide="Choisis-en un (jusqu'à 2 si combinables)" couleur={VERT}>
+          <Etape
+            numero={prochain()}
+            titre="Tes accompagnements"
+            aide={`${NB_ACCOMPAGNEMENTS_INCLUS} inclus, au choix · le 3e et les suivants au prix indiqué`}
+            couleur={VERT}
+          >
             <div className="flex flex-wrap gap-2">
               {accompagnements.map((a) => {
-                const choisi = accompagnementsChoisis.includes(a.nom);
-                const combinablesActuels = accompagnementsChoisis.filter((n) => GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(n));
-                const desactive = !choisi && GROUPE_ACCOMPAGNEMENT_COMBINABLE.has(a.nom) && combinablesActuels.length >= 2;
+                const index = accompagnementsChoisis.indexOf(a.nom);
+                const choisi = index !== -1;
+                const payant = index >= NB_ACCOMPAGNEMENTS_INCLUS;
+                const prochainSeraPayant = !choisi && accompagnementsChoisis.length >= NB_ACCOMPAGNEMENTS_INCLUS;
                 return (
-                  <Pastille key={a.id} actif={choisi} couleur={VERT} disabled={desactive} onClick={() => toggleAccompagnement(a.nom)}>
+                  <Pastille key={a.id} actif={choisi} couleur={payant ? ORANGE : VERT} onClick={() => toggleAccompagnement(a.nom)}>
                     {nomSansMultiplicateur(a.nom)}
+                    {payant || prochainSeraPayant ? ` (+${euros(a.prix ?? 0)})` : ""}
                   </Pastille>
                 );
               })}
             </div>
+            <p className="text-sm font-bold text-gray-900">
+              {Math.min(accompagnementsChoisis.length, NB_ACCOMPAGNEMENTS_INCLUS)}/{NB_ACCOMPAGNEMENTS_INCLUS} inclus
+              {accompagnementsPayants.length > 0 ? ` · ${accompagnementsPayants.length} en plus = ${euros(prixAccompagnementsPayants)}` : ""}
+            </p>
           </Etape>
         )}
 

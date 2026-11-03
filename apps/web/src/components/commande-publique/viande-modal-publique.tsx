@@ -25,6 +25,8 @@ export interface ExtrasChoisis {
 export interface AccompagnementPublique {
   id: string;
   nom: string;
+  /** Prix de l'accompagnement (utilisé quand il dépasse les 2 inclus sur la nouvelle page de commande). */
+  prix?: number | null;
 }
 
 interface ViandeModalPubliqueProps {

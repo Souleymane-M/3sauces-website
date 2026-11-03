@@ -26,7 +26,6 @@ import {
 } from "@/lib/commande-publique/types";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
-import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
@@ -299,7 +298,7 @@ export async function POST(request: Request) {
   // elle fait partie de la recette (mécanisme distinct de celui-ci).
   const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
     .from("produits")
-    .select("nom")
+    .select("nom, prix")
     .eq("categorie", "accompagnement")
     .eq("actif", true)
     .neq("nom", "Salade");
@@ -308,6 +307,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur (accompagnements)." }, { status: 500 });
   }
   const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
+  const prixAccompagnement = new Map((accompagnementsActifs ?? []).map((a) => [a.nom, Number(a.prix ?? 0)]));
 
   // Prix des suppléments payants (viande / sauce en plus) rattachés à une ligne de snack —
   // lus en base, jamais envoyés par le client.
@@ -517,12 +517,23 @@ export async function POST(request: Request) {
     // sans choix. Groupes de combinaison (jusqu'à 2 combinables, jamais
     // mélangés avec un exclusif) revérifiés ici, jamais confiance dans la
     // seule validation client.
+    // Règle du site public depuis le 2026-11-03 (demande du patron) : 2 accompagnements
+    // inclus, au choix, sans contrainte de combinaison ; le 3e et les suivants sont
+    // facturés au prix de l'accompagnement (lu en base).
     let accompagnementsInclus: string[] = [];
+    let supplementAccompagnements = 0;
     if (produit.accompagnement_inclus) {
       const brut = Array.isArray(ligneBrute.accompagnementsInclus) ? ligneBrute.accompagnementsInclus : null;
-      if (!brut || !combinaisonAccompagnementsValide(brut)) {
+      if (
+        !brut ||
+        brut.length === 0 ||
+        brut.length > 6 ||
+        brut.some((n) => typeof n !== "string") ||
+        new Set(brut).size !== brut.length
+      ) {
         return NextResponse.json({ error: `Choix d'accompagnement invalide sur ${produit.nom}.` }, { status: 400 });
       }
+      supplementAccompagnements = brut.slice(2).reduce((t, n) => t + (prixAccompagnement.get(n) ?? 0), 0);
       if (brut.some((n) => !nomsAccompagnementsValides.has(n))) {
         return NextResponse.json(
           { error: `Accompagnement non disponible sur ${produit.nom}.` },
@@ -603,7 +614,8 @@ export async function POST(request: Request) {
               ? produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON
               : produit.prix) +
             supplementSalade +
-            supplementsPayants) *
+            supplementsPayants +
+            supplementAccompagnements) *
             100
         ) / 100,
       coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique

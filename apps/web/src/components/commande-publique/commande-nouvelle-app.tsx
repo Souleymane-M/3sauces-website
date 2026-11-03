@@ -355,6 +355,8 @@ export function CommandeNouvelleApp({
       : 0) +
     (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0) +
+    // Accompagnements : 2 inclus au choix, le 3e et les suivants au prix de l'accompagnement.
+    l.accompagnementsInclus.slice(2).reduce((t, nomAcc) => t + (produits.find((p) => p.nom === nomAcc)?.prix ?? 0), 0) +
     l.viandesSupp.length * (produitViandeSupplementaire?.prix ?? 0) +
     l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0);
 
