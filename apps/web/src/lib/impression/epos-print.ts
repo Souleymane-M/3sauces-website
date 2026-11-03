@@ -1,6 +1,6 @@
 import type { CommandePourImpression } from "./types";
 import { libellePayeeTicket } from "@/lib/libelle-paiement";
-import { libelleBoissonLigne, libellePrixUnitaire, libelleSupplementsLigne } from "@/lib/libelle-ligne";
+import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
@@ -218,8 +218,6 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   if (l.accompagnementsInclus?.length)
     details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
-  const prixPiece = libellePrixUnitaire(l);
-  if (prixPiece) details.push(prixPiece);
   return details;
 }
 

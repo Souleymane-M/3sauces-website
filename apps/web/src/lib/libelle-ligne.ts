@@ -24,11 +24,6 @@ export function libelleBoissonLigne(l: LigneMinimale): string | null {
     : `Boisson incluse : ${l.boissonIncluse}`;
 }
 
-/** "9,50 € pièce" dès qu'il y a plusieurs exemplaires, sinon rien (le prix de la ligne suffit). */
-export function libellePrixUnitaire(l: LigneMinimale): string | null {
-  return l.quantite > 1 ? `${euros(l.prixUnitaire)} pièce` : null;
-}
-
 /** "Steak haché ×2, Kebab" — regroupe les doublons d'une liste de suppléments. */
 function listeAvecQuantites(noms: string[]): string {
   const comptes = new Map<string, number>();

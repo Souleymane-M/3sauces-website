@@ -1,7 +1,7 @@
 "use client";
 
 import { libellePayee } from "@/lib/libelle-paiement";
-import { libelleBoissonLigne, libellePrixUnitaire, libelleSupplementsLigne } from "@/lib/libelle-ligne";
+import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
@@ -384,7 +384,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                               {detail}
                             </div>
                           ))}
-                          {libellePrixUnitaire(l) && <div className="text-sm font-semibold text-gray-700">{libellePrixUnitaire(l)}</div>}
                         </li>
                       ))}
                     </ul>
