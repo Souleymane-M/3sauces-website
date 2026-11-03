@@ -38,7 +38,7 @@ import { SaveurModalPublique } from "./saveur-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
-import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { SEUIL_MINIMUM_PLAT } from "@/lib/plats";
@@ -1276,6 +1276,11 @@ export function CommandeNouvelleApp({
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
                 <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
               </div>
+              <p className="mt-2 text-sm font-extrabold text-gray-900">
+                {texteProgressionCommande(
+                  calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                )}
+              </p>
             </div>
           )}
 
