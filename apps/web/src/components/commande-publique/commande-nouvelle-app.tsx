@@ -379,6 +379,10 @@ export function CommandeNouvelleApp({
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
+  // Même règle que le serveur : la remise de lancement ne se cumule pas avec des tampons.
+  const remiseLancement =
+    nbTamponsEffectif === 0 && parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT ? MONTANT_REMISE_LANCEMENT : 0;
+  const montantAPayer = Math.max(0, totalApresTampons - remiseLancement);
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
   const pourcentageProchaineBoisson = Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100);
@@ -1187,6 +1191,9 @@ export function CommandeNouvelleApp({
           </div>
           </div>
           <div className="mx-auto max-w-lg space-y-4 p-4">
+            <button type="button" onClick={changerMode} className="text-base font-bold text-gray-900 underline">
+              ← Changer de mode ({enGroupe ? "plusieurs personnes" : "juste moi"})
+            </button>
             {contenuOnglet()}
             <FooterLegal />
           </div>
@@ -1297,7 +1304,11 @@ export function CommandeNouvelleApp({
               <span className="text-lg font-bold">Total</span>
               <span className="text-2xl font-extrabold">{euros(total)}</span>
             </div>
-            {messageTotalApayer && <p className="mt-1 text-sm font-bold text-[#2D5A27]">{messageTotalApayer}</p>}
+            {messageTotalApayer && (
+              <p className="mt-1 text-sm font-bold text-[#2D5A27]">
+                {messageTotalApayer} · Total à payer : {euros(montantAPayer)}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1584,7 +1595,7 @@ export function CommandeNouvelleApp({
             className="w-full rounded-xl py-4 text-lg font-extrabold text-white disabled:opacity-40"
             style={{ backgroundColor: VERT }}
           >
-            {envoiEnCours ? "Envoi…" : `Commander · ${euros(totalApresTampons)}`}
+            {envoiEnCours ? "Envoi…" : `Commander · ${euros(montantAPayer)}`}
           </button>
           <FooterLegal />
         </div>
