@@ -25,6 +25,7 @@ import {
   creneauxPourDate,
   filtrerCreneauxLivraison,
   heureDebutLivraison,
+  DELAI_MINIMUM_LIVRAISON_MINUTES,
   prochainesDatesOuvertes,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
@@ -585,8 +586,11 @@ export function CommandeNouvelleApp({
   /** « Dès que possible » : premier créneau de la première date ouverte. */
   function choisirAuPlusTot() {
     const premiereDate = datesOuvertes[0] ?? aujourdHui;
+    const tous = creneauxPourDate(premiereDate, parametres.heureDebut, parametres.heureFin);
+    // Livraison : jamais avant le délai minimum (préparation + trajet), calculé automatiquement.
+    const possibles = canal === "livraison" ? filtrerCreneauxLivraison(tous, premiereDate) : tous;
     setDateCommande(premiereDate);
-    setCreneauHeure(creneauxPourDate(premiereDate, parametres.heureDebut, parametres.heureFin)[0] ?? "");
+    setCreneauHeure(possibles[0] ?? "");
     if (premiereDate !== aujourdHui) setModePaiement("stripe");
     setQuand("asap");
   }
@@ -1463,6 +1467,17 @@ export function CommandeNouvelleApp({
               />
             </div>
             {quand === null && <p className="text-sm font-bold" style={{ color: ROUGE }}>Choisis « Dès que possible » ou une heure.</p>}
+            {canal === "livraison" && heureDebutLivraison(dateCommande) && creneauxValides.length > 0 && (
+              <p className="text-sm font-bold text-gray-900">
+                Livraison : compte {DELAI_MINIMUM_LIVRAISON_MINUTES} min après ta commande. Premier créneau possible :{" "}
+                {heureDebutLivraison(dateCommande)!.replace(":", "h")}.
+              </p>
+            )}
+            {canal === "livraison" && creneauxValides.length === 0 && (
+              <p className="text-sm font-bold" style={{ color: ROUGE }}>
+                Plus de créneau de livraison disponible à cette date : choisis un autre jour, ou le retrait.
+              </p>
+            )}
           </section>
 
           {/* 3. Coordonnées */}
