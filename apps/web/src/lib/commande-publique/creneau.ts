@@ -8,6 +8,24 @@ const DECALAGE_MAYOTTE_HEURES = 3;
 /** Fenêtre de réservation à l'avance : 14 jours calendaires glissants — une constante, pas un réglage /patron. */
 export const FENETRE_RESERVATION_JOURS = 14;
 
+/**
+ * Décision exceptionnelle du patron (2026-11-04) : ce jour-là, les livraisons ne partent qu'à
+ * partir de 11h30. Règle limitée à une date précise, jamais permanente — elle s'éteint d'elle-même
+ * le lendemain. Le retrait sur place / à emporter n'est pas concerné.
+ */
+const LIVRAISON_DEBUT_EXCEPTIONNEL = { date: "2026-11-04", heure: "11:30" };
+
+/** Heure "HH:MM" avant laquelle aucune livraison n'est possible pour cette date, ou null s'il n'y a pas de restriction. */
+export function heureDebutLivraison(date: string): string | null {
+  return date === LIVRAISON_DEBUT_EXCEPTIONNEL.date ? LIVRAISON_DEBUT_EXCEPTIONNEL.heure : null;
+}
+
+/** Retire les créneaux trop tôt pour une livraison (liste inchangée s'il n'y a pas de restriction). */
+export function filtrerCreneauxLivraison(creneaux: string[], date: string): string[] {
+  const minimum = heureDebutLivraison(date);
+  return minimum ? creneaux.filter((c) => c >= minimum) : creneaux;
+}
+
 const RE_CRENEAU = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** Valide le format "HH:MM" d'un créneau saisi par le client. */
