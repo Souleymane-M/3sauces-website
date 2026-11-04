@@ -10,10 +10,10 @@ export const FENETRE_RESERVATION_JOURS = 14;
 
 /**
  * Décision exceptionnelle du patron (2026-11-04) : ce jour-là, les livraisons ne partent qu'à
- * partir de 11h30. Règle limitée à une date précise, jamais permanente — elle s'éteint d'elle-même
+ * partir de 12h20. Règle limitée à une date précise, jamais permanente — elle s'éteint d'elle-même
  * le lendemain. Le retrait sur place / à emporter n'est pas concerné.
  */
-const LIVRAISON_DEBUT_EXCEPTIONNEL = { date: "2026-11-04", heure: "11:30" };
+const LIVRAISON_DEBUT_EXCEPTIONNEL = { date: "2026-11-04", heure: "12:20" };
 
 /** Heure "HH:MM" avant laquelle aucune livraison n'est possible pour cette date, ou null s'il n'y a pas de restriction. */
 export function heureDebutLivraison(date: string): string | null {
