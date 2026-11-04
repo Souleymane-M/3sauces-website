@@ -13,11 +13,13 @@ export const FENETRE_RESERVATION_JOURS = 14;
  * partir de 12h20. Règle limitée à une date précise, jamais permanente — elle s'éteint d'elle-même
  * le lendemain. Le retrait sur place / à emporter n'est pas concerné.
  */
-const LIVRAISON_DEBUT_EXCEPTIONNEL = { date: "2026-11-04", heure: "12:20" };
+// Désactivée (retour à la normale demandé par le patron le 2026-11-04) : pour la réutiliser un autre jour,
+// remplacer `null` par { date: "AAAA-MM-JJ", heure: "HH:MM" }.
+const LIVRAISON_DEBUT_EXCEPTIONNEL: { date: string; heure: string } | null = null;
 
 /** Heure "HH:MM" avant laquelle aucune livraison n'est possible pour cette date, ou null s'il n'y a pas de restriction. */
 export function heureDebutLivraison(date: string): string | null {
-  return date === LIVRAISON_DEBUT_EXCEPTIONNEL.date ? LIVRAISON_DEBUT_EXCEPTIONNEL.heure : null;
+  return LIVRAISON_DEBUT_EXCEPTIONNEL && date === LIVRAISON_DEBUT_EXCEPTIONNEL.date ? LIVRAISON_DEBUT_EXCEPTIONNEL.heure : null;
 }
 
 /** Retire les créneaux trop tôt pour une livraison (liste inchangée s'il n'y a pas de restriction). */
