@@ -18,6 +18,8 @@ import {
 import {
   prochainCreneauValide,
   creneauxPourDate,
+  filtrerCreneauxLivraison,
+  heureDebutLivraison,
   prochainesDatesOuvertes,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
@@ -458,12 +460,14 @@ export function CaisseApp({
   // livraison. Voir `infosClientIncompletes` plus bas pour les champs
   // réellement obligatoires (moins stricts qu'au site public).
   const creneauxValides = useMemo(() => {
-    const base = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
+    const toutes = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
+    // Livraison : pas de créneau avant l'heure exceptionnelle du jour (cf. creneau.ts).
+    const base = canal === "livraison" ? filtrerCreneauxLivraison(toutes, dateCommande) : toutes;
     // Le créneau d'origine reste toujours proposé (jamais de "créneau passé" imposé en modification).
     return creneauOrigine && dateCommande === dateOrigine && !base.includes(creneauOrigine)
       ? [creneauOrigine, ...base]
       : base;
-  }, [dateCommande, parametres.heureDebut, parametres.heureFin, creneauOrigine, dateOrigine]);
+  }, [dateCommande, parametres.heureDebut, parametres.heureFin, creneauOrigine, dateOrigine, canal]);
   const [creneauHeure, setCreneauHeure] = useState(
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
@@ -498,7 +502,8 @@ export function CaisseApp({
 
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
-    const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    const toutesCreneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    const creneaux = canal === "livraison" ? filtrerCreneauxLivraison(toutesCreneaux, nouvelleDate) : toutesCreneaux;
     if (nouvelleDate === dateOrigine && creneauOrigine) creneaux.unshift(creneauOrigine);
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
   }
@@ -2201,7 +2206,15 @@ export function CaisseApp({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCanal("livraison")}
+                  onClick={() => {
+                    setCanal("livraison");
+                    const debutLivraison = heureDebutLivraison(dateCommande);
+                    if (debutLivraison && creneauHeure < debutLivraison) {
+                      setCreneauHeure(
+                        filtrerCreneauxLivraison(creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin), dateCommande)[0] ?? ""
+                      );
+                    }
+                  }}
                   disabled={!livraisonPossible || livraisonBloqueeParPaiement}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${
                     canal === "livraison" ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
