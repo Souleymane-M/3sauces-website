@@ -25,6 +25,7 @@ import {
   creneauxPourDate,
   filtrerCreneauxLivraison,
   heureDebutLivraison,
+  DELAI_MINIMUM_LIVRAISON_MINUTES,
   prochainesDatesOuvertes,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
@@ -1598,9 +1599,14 @@ export function CommandePubliqueApp({
                     Livraison
                   </button>
                 </div>
+                {canal === "livraison" && creneauxValides.length === 0 && (
+                  <p className="mt-2 text-sm font-bold text-[#8B2020]">
+                    Plus de créneau de livraison disponible à cette date : choisis un autre jour, ou le retrait.
+                  </p>
+                )}
                 {canal === "livraison" && heureDebutLivraison(dateCommande) && (
                   <p className="mt-2 text-sm font-bold text-[#8B2020]">
-                    Aujourd&apos;hui, les livraisons commencent à {heureDebutLivraison(dateCommande)!.replace(":", "h")}.
+                    Livraison : il faut compter {DELAI_MINIMUM_LIVRAISON_MINUTES} min après la commande. Premier créneau possible : {heureDebutLivraison(dateCommande)!.replace(":", "h")}.
                   </p>
                 )}
                 {!canal && (
