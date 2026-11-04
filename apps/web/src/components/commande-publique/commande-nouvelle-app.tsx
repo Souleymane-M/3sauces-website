@@ -23,6 +23,8 @@ import {
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
+  filtrerCreneauxLivraison,
+  heureDebutLivraison,
   prochainesDatesOuvertes,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
@@ -260,8 +262,11 @@ export function CommandeNouvelleApp({
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
   const creneauxValides = useMemo(
-    () => creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
-    [dateCommande, parametres.heureDebut, parametres.heureFin]
+    () => {
+      const tous = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
+      return canal === "livraison" ? filtrerCreneauxLivraison(tous, dateCommande) : tous;
+    },
+    [dateCommande, parametres.heureDebut, parametres.heureFin, canal]
   );
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
   // Le client choisit lui-même : « dès que possible » ou une heure précise — jamais présélectionné.
@@ -398,7 +403,8 @@ export function CommandeNouvelleApp({
 
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
-    const creneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    const tousCreneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
+    const creneaux = canal === "livraison" ? filtrerCreneauxLivraison(tousCreneaux, nouvelleDate) : tousCreneaux;
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
     if (nouvelleDate !== aujourdHui) setModePaiement("stripe");
   }
@@ -1362,7 +1368,13 @@ export function CommandeNouvelleApp({
                 <button
                   key={valeur}
                   type="button"
-                  onClick={() => setCanal(valeur)}
+                  onClick={() => {
+                    setCanal(valeur);
+                    const debutLivraison = valeur === "livraison" ? heureDebutLivraison(dateCommande) : null;
+                    if (debutLivraison && creneauHeure < debutLivraison) {
+                      setCreneauHeure(filtrerCreneauxLivraison(creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin), dateCommande)[0] ?? "");
+                    }
+                  }}
                   disabled={valeur === "livraison" && !livraisonPossible}
                   className={`rounded-lg border-2 py-3 text-sm font-extrabold disabled:opacity-30 ${
                     canal === valeur ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
