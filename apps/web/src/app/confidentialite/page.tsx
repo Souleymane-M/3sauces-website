@@ -26,6 +26,22 @@ export default function ConfidentialitePage() {
       </section>
 
       <section className="space-y-1">
+        <h2 className="font-semibold text-gray-900">Inscription aux informations et aux offres</h2>
+        <p>
+          Si vous laissez votre adresse email sur notre site pour être prévenu de la réouverture, nous
+          conservons cette adresse, la date de votre inscription et le texte que vous avez accepté. Elle
+          sert uniquement à vous prévenir de la réouverture ; si vous cochez la case correspondante
+          (facultative, jamais pré-cochée), elle sert aussi à vous envoyer les offres et actualités de
+          3 Sauces. Base légale : votre consentement.
+        </p>
+        <p>
+          Vous pouvez vous désinscrire à tout moment grâce au lien présent dans chaque email, ou en nous
+          contactant. Votre adresse est conservée jusqu&apos;à votre désinscription et au plus trois ans
+          après notre dernier contact avec vous.
+        </p>
+      </section>
+
+      <section className="space-y-1">
         <h2 className="font-semibold text-gray-900">Mesure d&apos;audience anonyme</h2>
         <p>
           Pour améliorer le site, nous comptons de façon anonyme les visites et les étapes de la
