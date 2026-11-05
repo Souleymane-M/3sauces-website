@@ -497,6 +497,33 @@ export interface Database {
         Relationships: [];
       };
 
+      inscriptions_information: {
+        Row: {
+          id: string;
+          email: string;
+          accepte_offres: boolean;
+          consentement_le: string;
+          texte_consentement: string;
+          source: string;
+          jeton_desinscription: string;
+          desinscrit_le: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          accepte_offres?: boolean;
+          consentement_le?: string;
+          texte_consentement: string;
+          source?: string;
+          jeton_desinscription?: string;
+          desinscrit_le?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["inscriptions_information"]["Insert"]>;
+        Relationships: [];
+      };
+
       visiteurs_site: {
         Row: { visiteur: string; etape: string; premiere_vue: string; derniere_activite: string };
         Insert: { visiteur: string; etape: string; premiere_vue?: string; derniere_activite?: string };
