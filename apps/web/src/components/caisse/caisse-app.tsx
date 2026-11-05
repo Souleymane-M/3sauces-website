@@ -19,8 +19,6 @@ import {
   prochainCreneauValide,
   heureActuelleMayotteMinutes,
   creneauxPourDate,
-  filtrerCreneauxLivraison,
-  heureDebutLivraison,
   prochainesDatesOuvertes,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
@@ -466,13 +464,12 @@ export function CaisseApp({
   // réellement obligatoires (moins stricts qu'au site public).
   const creneauxValides = useMemo(() => {
     const toutes = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
-    // Livraison : pas de créneau avant l'heure exceptionnelle du jour (cf. creneau.ts).
-    const base = canal === "livraison" ? filtrerCreneauxLivraison(toutes, dateCommande) : toutes;
+    const base = toutes;
     // Le créneau d'origine reste toujours proposé (jamais de "créneau passé" imposé en modification).
     return creneauOrigine && dateCommande === dateOrigine && !base.includes(creneauOrigine)
       ? [creneauOrigine, ...base]
       : base;
-  }, [dateCommande, parametres.heureDebut, parametres.heureFin, creneauOrigine, dateOrigine, canal]);
+  }, [dateCommande, parametres.heureDebut, parametres.heureFin, creneauOrigine, dateOrigine]);
   const [creneauHeure, setCreneauHeure] = useState(
     () => commandeExistante?.creneauHeure || prochainCreneauValide(creneauxValides)
   );
@@ -508,7 +505,7 @@ export function CaisseApp({
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
     const toutesCreneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
-    const creneaux = canal === "livraison" ? filtrerCreneauxLivraison(toutesCreneaux, nouvelleDate) : toutesCreneaux;
+    const creneaux = [...toutesCreneaux];
     if (nouvelleDate === dateOrigine && creneauOrigine) creneaux.unshift(creneauOrigine);
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
   }
@@ -2261,12 +2258,6 @@ export function CaisseApp({
                   type="button"
                   onClick={() => {
                     setCanal("livraison");
-                    const debutLivraison = heureDebutLivraison(dateCommande);
-                    if (debutLivraison && creneauHeure < debutLivraison) {
-                      setCreneauHeure(
-                        filtrerCreneauxLivraison(creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin), dateCommande)[0] ?? ""
-                      );
-                    }
                   }}
                   disabled={!livraisonPossible || livraisonBloqueeParPaiement}
                   className={`rounded border py-2 text-xs font-bold uppercase disabled:opacity-40 ${

@@ -13,8 +13,6 @@ import {
 import {
   construireHeureSouhaiteeUtc,
   creneauDansPlage,
-  heureDebutLivraison,
-  DELAI_MINIMUM_LIVRAISON_MINUTES,
   dateIsoValide,
   dateMayotteIso,
   heureActuelleMayotteMinutes,
@@ -616,17 +614,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Restriction exceptionnelle d'un jour donné (cf. creneau.ts) : pas de livraison avant l'heure fixée.
-  if (body.canal === "livraison") {
-    const debutLivraison = heureDebutLivraison(dateCommande, 10);
-    if (debutLivraison && creneauHeure < debutLivraison) {
-      return NextResponse.json(
-        { error: `Pour livrer à temps, il faut compter ${DELAI_MINIMUM_LIVRAISON_MINUTES} min après la commande : choisis un créneau à partir de ${debutLivraison.replace(":", "h")}.` },
-        { status: 400 }
-      );
-    }
-  }
-
   const heureSouhaitee = construireHeureSouhaiteeUtc(creneauHeure, dateCommande);
   if (!heureSouhaitee) {
     return NextResponse.json({ error: "Créneau horaire invalide." }, { status: 400 });
@@ -1073,17 +1060,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Canal invalide." }, { status: 400 });
   }
   const canal = canalDemande as (typeof CANAUX_CAISSE)[number];
-  // Même restriction qu'à la création, sauf si le créneau déjà enregistré n'a pas changé (modifier une
-  // commande existante n'est jamais bloqué pour ça).
-  if (canal === "livraison" && !creneauInchange) {
-    const debutLivraison = heureDebutLivraison(dateCommande, 10);
-    if (debutLivraison && creneauHeure < debutLivraison) {
-      return NextResponse.json(
-        { error: `Pour livrer à temps, il faut compter ${DELAI_MINIMUM_LIVRAISON_MINUTES} min après la commande : choisis un créneau à partir de ${debutLivraison.replace(":", "h")}.` },
-        { status: 400 }
-      );
-    }
-  }
   if (canal === "livraison" && !prenom) {
     return NextResponse.json({ error: "Le prénom est requis pour une livraison." }, { status: 400 });
   }
