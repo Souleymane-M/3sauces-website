@@ -5,6 +5,7 @@ import { PinPad } from "@/components/auth/pin-pad";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { ActiviteAppareil } from "@/components/auth/activite-appareil";
 import { CaisseApp } from "@/components/caisse/caisse-app";
+import { CompteurCreneaux } from "@/components/caisse/compteur-creneaux";
 import { RappelFondsCaisse } from "@/components/caisse/rappel-fonds-caisse";
 import {
   listerProduitsActifs,
@@ -109,6 +110,9 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
         Prise de commande. Le stock/approvisionnement arrive avec le Module 3.
       </p>
       <RappelFondsCaisse />
+      <div className="mb-4">
+        <CompteurCreneaux />
+      </div>
       <CaisseApp
         produits={produits}
         viandes={viandes}

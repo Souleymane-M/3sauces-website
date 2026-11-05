@@ -40,6 +40,7 @@ import {
 import { chargerStatistiquesJour } from "@/lib/patron/statistiques";
 import { listerClientsAdmin } from "@/lib/patron/clients";
 import { listerHistoriqueTiroir } from "@/lib/caisse/tiroir";
+import { CompteurCreneaux } from "@/components/caisse/compteur-creneaux";
 import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 import { InscriptionsApp } from "@/components/patron/inscriptions-app";
@@ -149,7 +150,12 @@ export default async function PatronPage() {
           {
             id: "en_direct",
             label: "En direct",
-            contenu: <EnDirectApp />,
+            contenu: (
+              <div className="space-y-4">
+                <CompteurCreneaux />
+                <EnDirectApp />
+              </div>
+            ),
           },
           {
             id: "caisse",

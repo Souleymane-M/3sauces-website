@@ -1453,7 +1453,7 @@ export function CommandeNouvelleApp({
                     </optgroup>
                   </select>
                 </div>
-                {lieu && (
+                {lieu && !lieu.sansPrecision && (
                   <div>
                     <label className="text-sm font-semibold text-gray-900">
                       {lieu.village ? "Précise l'endroit (mairie, CCAS, rue…)" : "Précision (bâtiment, salle…) — facultatif"}
