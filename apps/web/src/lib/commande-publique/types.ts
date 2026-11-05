@@ -140,6 +140,9 @@ export interface CreerCommandePubliquePayload {
   // Livraison uniquement :
   adresse?: string;
   zone?: string;
+  /** Nouveau site : lieu de livraison (cf. lieux-livraison.ts) + précision (mairie, CCAS, rue…). */
+  lieuId?: string;
+  precision?: string;
   // Créneau souhaité (heure de passage ou de livraison), "HH:MM".
   creneauHeure: string;
   /** Date de retrait/livraison souhaitée, "YYYY-MM-DD" (heure de Mayotte). Peut être un jour futur (commande à l'avance). */
