@@ -42,6 +42,8 @@ import { listerClientsAdmin } from "@/lib/patron/clients";
 import { listerHistoriqueTiroir } from "@/lib/caisse/tiroir";
 import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
+import { InscriptionsApp } from "@/components/patron/inscriptions-app";
+import { listerInscriptions } from "@/lib/patron/inscriptions";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,7 @@ export default async function PatronPage() {
     livraisonActive,
     terminauxSumup,
     historiqueTiroir,
+    inscriptions,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -107,6 +110,8 @@ export default async function PatronPage() {
     listerTerminauxSumupAdmin(),
     // Ne jamais casser tout /patron si la table du tiroir n'existe pas encore.
     listerHistoriqueTiroir().catch(() => []),
+    // Ne jamais casser tout /patron si la table des inscriptions n'existe pas encore.
+    listerInscriptions().catch(() => []),
   ]);
 
   return (
@@ -186,6 +191,11 @@ export default async function PatronPage() {
                 />
               </>
             ),
+          },
+          {
+            id: "emails",
+            label: "Emails",
+            contenu: <InscriptionsApp inscriptionsInitiales={inscriptions} />,
           },
           {
             id: "site",
