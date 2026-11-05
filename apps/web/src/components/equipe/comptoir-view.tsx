@@ -56,9 +56,21 @@ interface Catalogue {
 
 type Vue = "liste" | "nouvelle_commande" | "modifier_commande" | "encaissements" | "fin_service" | "tiroir";
 
+const MOTIF_AUTRE = "Autre (préciser)";
+/** Motifs proposés pour annuler une commande pas encore prise en charge — texte enregistré tel quel dans l'historique. */
+const MOTIFS_ANNULATION_EN_ATTENTE = [
+  "Client a changé d'avis",
+  "Client injoignable / absent",
+  "Paiement en ligne non finalisé",
+  "Doublon ou erreur de saisie",
+  "Produit en rupture",
+  "Livraison impossible (pas de livreur / créneau trop proche)",
+  MOTIF_AUTRE,
+];
+
 /**
  * Vue COMPTOIR : montants et coordonnées client visibles (nécessaires
- * pour encaisser/remettre), "Remise", "Annuler" (en attente, sans motif)
+ * pour encaisser/remettre), "Remise", "Annuler" (en attente, avec motif obligatoire)
  * et "Annuler (avec motif)" pour une commande déjà en préparation/prête —
  * un client peut rappeler juste au moment où sa commande part en
  * préparation (cas réel, 2026-10-19) : même mécanique que "Fin de
@@ -73,6 +85,10 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [annulationEnAttente, setAnnulationEnAttente] = useState<string | null>(null);
+  // Annulation d'une commande « en attente » : le motif est choisi AVANT la confirmation par PIN (demande du patron, 2026-11-05).
+  const [annulationMotifPour, setAnnulationMotifPour] = useState<string | null>(null);
+  const [motifAnnulation, setMotifAnnulation] = useState("");
+  const [motifAnnulationAutre, setMotifAnnulationAutre] = useState("");
   const [relacherEnAttente, setRelacherEnAttente] = useState<string | null>(null);
   const [annulationAvecMotifPour, setAnnulationAvecMotifPour] = useState<string | null>(null);
   const [motifChoisi, setMotifChoisi] = useState("");
@@ -183,14 +199,14 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
     }
   }
 
-  async function appliquer(commandeId: string, action: "remise" | "annuler" | "relacher_livreur") {
+  async function appliquer(commandeId: string, action: "remise" | "annuler" | "relacher_livreur", motif?: string) {
     setEnCours(commandeId);
     setErreur(null);
     try {
       const res = await fetch("/api/equipe/comptoir/action", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, action, profilId }),
+        body: JSON.stringify({ commandeId, action, profilId, motif }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -498,7 +514,11 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                 {c.statut === "en_attente" ? (
                   <button
                     type="button"
-                    onClick={() => setAnnulationEnAttente(c.id)}
+                    onClick={() => {
+                      setAnnulationMotifPour(c.id);
+                      setMotifAnnulation("");
+                      setMotifAnnulationAutre("");
+                    }}
                     disabled={enCours === c.id}
                     className="rounded border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 disabled:opacity-50"
                   >
@@ -630,6 +650,45 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
                 </div>
               )}
 
+              {annulationMotifPour === c.id && (
+                <div className="mt-2 space-y-2 rounded border border-red-200 bg-red-50 p-2">
+                  <p className="text-sm font-semibold text-gray-900">Pourquoi annuler cette commande ? (obligatoire)</p>
+                  <select
+                    value={motifAnnulation}
+                    onChange={(e) => setMotifAnnulation(e.target.value)}
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  >
+                    <option value="">Choisir un motif…</option>
+                    {MOTIFS_ANNULATION_EN_ATTENTE.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  {motifAnnulation === MOTIF_AUTRE && (
+                    <input
+                      value={motifAnnulationAutre}
+                      onChange={(e) => setMotifAnnulationAutre(e.target.value)}
+                      placeholder="Précise le motif"
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                    />
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setAnnulationEnAttente(c.id)}
+                      disabled={!motifAnnulation || (motifAnnulation === MOTIF_AUTRE && motifAnnulationAutre.trim().length < 3)}
+                      className="rounded bg-black px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      Confirmer l&apos;annulation
+                    </button>
+                    <button type="button" onClick={() => setAnnulationMotifPour(null)} className="text-sm text-gray-700 underline">
+                      Ne pas annuler
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {annulationAvecMotifPour === c.id && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-red-200 bg-red-50 p-2">
                   <select
@@ -673,8 +732,10 @@ export function ComptoirView({ profilId, nom, seuilAlerteMin }: { profilId: stri
           onAnnule={() => setAnnulationEnAttente(null)}
           onConfirme={() => {
             const id = annulationEnAttente;
+            const motif = motifAnnulation === MOTIF_AUTRE ? `Autre : ${motifAnnulationAutre.trim()}` : motifAnnulation;
             setAnnulationEnAttente(null);
-            appliquer(id, "annuler");
+            setAnnulationMotifPour(null);
+            appliquer(id, "annuler", motif);
           }}
         />
       )}

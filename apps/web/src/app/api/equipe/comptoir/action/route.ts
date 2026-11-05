@@ -41,6 +41,10 @@ export async function PATCH(request: Request) {
     } else if (action === "changer_canal") {
       await changerCanalCommande({ commandeId, canal: body?.canal ?? "", adresse: body?.adresse, zone: body?.zone });
     } else if (action === "annuler") {
+      // Motif obligatoire à toute annulation faite depuis le comptoir (demande du patron, 2026-11-05).
+      if (typeof motif !== "string" || motif.trim().length < 3) {
+        return NextResponse.json({ error: "Le motif de l'annulation est obligatoire." }, { status: 400 });
+      }
       await annulerCommande({ commandeId, profilId, motif });
     } else {
       await relacherLivraison(commandeId, profilId, "comptoir");
