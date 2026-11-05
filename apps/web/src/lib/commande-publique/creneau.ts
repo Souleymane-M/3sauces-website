@@ -19,11 +19,10 @@ const LIVRAISON_DEBUT_EXCEPTIONNEL: { date: string; heure: string } | null = nul
 
 /**
  * Délai minimum entre le moment où la commande est passée et l'heure de livraison demandée
- * (préparation + départ + trajet) — demande du patron, 2026-11-04. Mesuré sur les livraisons réelles :
- * une commande pressée met en médiane 42 min (jusqu'à 61 min une fois sur quatre) entre la commande
- * et la remise, d'où 45 min. UNE seule valeur à changer ici.
+ * (préparation + départ + trajet) — demande du patron, 2026-11-04 : 30 min (les mesures passées ne sont pas
+ * encore assez fiables pour imposer plus). UNE seule valeur à changer ici.
  */
-export const DELAI_MINIMUM_LIVRAISON_MINUTES = 45;
+export const DELAI_MINIMUM_LIVRAISON_MINUTES = 30;
 
 const versHeureMinute = (minutes: number): string =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;

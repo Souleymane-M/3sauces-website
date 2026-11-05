@@ -9,6 +9,8 @@ import {
   listerParfums2lPublics,
 } from "@/lib/commande-publique/produits";
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
+import { dateMayotteIso } from "@/lib/commande-publique/creneau";
+import { messageFermeture } from "@/lib/commande-publique/fermeture";
 
 export const dynamic = "force-dynamic";
 
@@ -53,14 +55,13 @@ export default async function CommanderPage() {
   );
 
   if (!parametres.siteOuvert) {
+    const fermeture = messageFermeture(dateMayotteIso());
     return (
       <main className="min-h-screen bg-[#F5F0E8]">
         {enTete}
         <div className="mx-auto max-w-lg space-y-2 p-8 text-center">
-          <h2 className="text-xl font-bold text-gray-900">Fermé pour le moment</h2>
-          <p className="text-sm text-gray-600">
-            On ne prend pas de commande en ce moment — repasse un peu plus tard !
-          </p>
+          <h2 className="text-2xl font-extrabold text-gray-900">{fermeture.titre}</h2>
+          <p className="text-base leading-relaxed text-gray-800">{fermeture.texte}</p>
         </div>
       </main>
     );
