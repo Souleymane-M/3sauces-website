@@ -69,3 +69,20 @@ export function composerAdresseLivraison(lieu: LieuLivraison, precision: string)
   if (lieu.village && !p) return null;
   return p ? `${lieu.nom} — ${p}` : lieu.nom;
 }
+
+/**
+ * « entre 11h00 et 11h30 » pour une commande livrée à l'Université (adresse composée par le nouveau site) dont
+ * l'heure enregistrée est le début d'une fourchette ; null pour toute autre commande (affichage inchangé).
+ */
+export function fourchetteLivraison(adresse: string | null | undefined, heureSouhaiteeIso: string | null | undefined): string | null {
+  const fac = LIEUX_PRINCIPAUX[0];
+  if (!adresse || !heureSouhaiteeIso || !adresse.startsWith(fac.nom)) return null;
+  const parties = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Mayotte",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(heureSouhaiteeIso));
+  const creneau = parties;
+  return fac.creneaux!.includes(creneau) ? libelleCreneauLieu(fac, creneau) : null;
+}

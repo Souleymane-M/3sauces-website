@@ -1,5 +1,6 @@
 "use client";
 
+import { fourchetteLivraison } from "@/lib/commande-publique/lieux-livraison";
 import { libellePayee } from "@/lib/libelle-paiement";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
@@ -92,8 +93,13 @@ function sauvegarderWhatsappOuverts(ids: Set<string>): void {
 
 // Toujours la date ET l'heure, jamais l'heure seule — sinon impossible de
 // distinguer une livraison de la veille restée bloquée d'une du jour même.
-function formaterHeure(iso: string | null): string {
+function formaterHeure(iso: string | null, adresse?: string | null): string {
   if (!iso) return "—";
+  const fourchette = fourchetteLivraison(adresse, iso);
+  if (fourchette) {
+    const jour = new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", day: "2-digit", month: "2-digit" }).format(new Date(iso));
+    return `${jour} ${fourchette}`;
+  }
   return new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
     day: "2-digit",
@@ -276,7 +282,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
             <div key={livraison.id} className="rounded-xl border-2 border-dashed border-gray-300 p-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-bold text-gray-900">Commande #{livraison.numero}</span>
-                <span className="text-lg text-gray-700">{formaterHeure(livraison.heureSouhaitee)}</span>
+                <span className="text-lg text-gray-700">{formaterHeure(livraison.heureSouhaitee, livraison.adresse)}</span>
               </div>
               <p className="mt-1 text-lg text-gray-900">{livraison.nom}</p>
               <p className="text-base text-gray-700">{livraison.adresse}</p>
@@ -336,7 +342,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
             )}
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-bold text-gray-900">Commande #{livraison.numero}</span>
-              <span className="text-xl text-gray-900">{formaterHeure(livraison.heureSouhaitee)}</span>
+              <span className="text-xl text-gray-900">{formaterHeure(livraison.heureSouhaitee, livraison.adresse)}</span>
             </div>
             <p className="mt-1 text-lg text-gray-900">{livraison.nom}</p>
             <p className="text-lg text-gray-700">{livraison.adresse}</p>

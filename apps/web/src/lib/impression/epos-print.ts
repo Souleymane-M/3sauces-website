@@ -1,4 +1,5 @@
 import type { CommandePourImpression } from "./types";
+import { fourchetteLivraison } from "@/lib/commande-publique/lieux-livraison";
 import { libellePayeeTicket } from "@/lib/libelle-paiement";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
@@ -186,8 +187,15 @@ function estAujourdhuiMayotte(iso: string): boolean {
  * une commande à l'avance — sans ça, un ticket imprimé plusieurs jours avant
  * la date de retrait ne montrerait qu'une heure, sans dire de quel jour.
  */
-function libelleHeureSouhaitee(iso: string): string {
-  if (estAujourdhuiMayotte(iso)) return formaterHeure(iso);
+function libelleHeureSouhaitee(iso: string, adresse?: string | null): string {
+  const fourchette = fourchetteLivraison(adresse, iso);
+  if (estAujourdhuiMayotte(iso)) return fourchette ?? formaterHeure(iso);
+  if (fourchette) {
+    const jour = new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", weekday: "short", day: "2-digit", month: "2-digit" }).format(
+      new Date(iso)
+    );
+    return `${jour} ${fourchette}`;
+  }
   const jourHeure = new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
     weekday: "short",
@@ -351,7 +359,7 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
   b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
     b.brut(`<feed line="1"/>`);
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "left", gras: true, taille: 2 });
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 2 });
   }
   if (commande.adresse) {
     b.brut(`<feed line="1"/>`);
@@ -591,7 +599,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   }
   b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: true, taille: 1 });
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "center", gras: true, taille: 1 });
   }
   if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
