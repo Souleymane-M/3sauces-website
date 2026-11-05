@@ -61,6 +61,10 @@ export async function PATCH(request: Request) {
 
   try {
     if (body.statut === "annulee") {
+      // Motif obligatoire à toute annulation faite depuis un écran de l'équipe (demande du patron, 2026-11-05).
+      if (typeof body.motif !== "string" || body.motif.trim().length < 3) {
+        return NextResponse.json({ error: "Le motif de l'annulation est obligatoire." }, { status: 400 });
+      }
       await annulerCommande({ commandeId: body.commandeId, profilId: body.profilId, motif: body.motif });
     } else {
       await changerStatutCommande({

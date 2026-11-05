@@ -154,8 +154,12 @@ export function CommandesHistoriqueApp({
 
   /** Uniquement pour une commande encore "en_attente" — vérifié aussi côté serveur. */
   function demanderAnnulation(commandeId: string) {
-    const motif = window.prompt("Pourquoi annuler cette commande ? (optionnel)");
+    const motif = window.prompt("Pourquoi annuler cette commande ? (obligatoire)");
     if (motif === null) return;
+    if (motif.trim().length < 3) {
+      window.alert("Le motif de l'annulation est obligatoire.");
+      return;
+    }
     appliquerChangement(commandeId, "annulee", undefined, motif);
   }
 
