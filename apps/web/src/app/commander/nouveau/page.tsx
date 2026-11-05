@@ -11,6 +11,7 @@ import {
 import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
 import { dateMayotteIso } from "@/lib/commande-publique/creneau";
 import { messageFermeture } from "@/lib/commande-publique/fermeture";
+import { InscriptionInformation } from "@/components/commande-publique/inscription-information";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,9 @@ export default async function CommanderNouveauPage() {
         <div className="mx-auto max-w-lg space-y-2 p-8 text-center">
           <h2 className="text-2xl font-extrabold text-gray-900">{fermeture.titre}</h2>
           <p className="text-base leading-relaxed text-gray-800">{fermeture.texte}</p>
+        </div>
+        <div className="mx-auto max-w-lg px-4 pb-10">
+          <InscriptionInformation />
         </div>
       </main>
     );
