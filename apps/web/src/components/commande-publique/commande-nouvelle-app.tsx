@@ -1592,7 +1592,7 @@ export function CommandeNouvelleApp({
               placeholder="0639123456"
               className="w-full rounded-lg border border-gray-400 bg-white p-3 text-base text-gray-900"
             />
-            <p className="text-sm font-medium text-gray-800">Tes tampons sont comptés avec ce numéro.</p>
+            <p className="text-sm font-medium text-gray-800">Tes tampons de fidélité sont comptés avec ce numéro.</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-sm font-semibold text-gray-900">Prénom</label>
@@ -1620,9 +1620,11 @@ export function CommandeNouvelleApp({
                 placeholder={emailDejaConnu ? "Laisse vide pour garder ton email déjà enregistré" : "toi@exemple.com"}
                 className="mt-1 w-full rounded-lg border border-gray-400 bg-white p-3 text-base text-gray-900"
               />
-              {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tu peux laisser vide.</p>}
+              {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes tampons, ou laisse vide.</p>}
             </div>
             <CarteFidelite
+              telephoneExterne={telephone}
+              emailExterne={email}
               montantPanier={total}
               nbTampons={nbTamponsEffectif}
               onChangeNbTampons={setNbTampons}

@@ -15,6 +15,12 @@ interface SoldeTampons {
 type Etape = "saisie" | "verifie" | "nouveau_client" | "email_manquant";
 
 interface CarteFideliteProps {
+  /**
+   * Nouveau site : le numéro et l'email sont ceux déjà saisis plus bas dans le formulaire — la carte ne redemande rien
+   * et se déclenche toute seule. Absents : la carte garde ses propres champs (ancien site).
+   */
+  telephoneExterne?: string;
+  emailExterne?: string;
   montantPanier: number;
   nbTampons: number;
   onChangeNbTampons: (valeur: number) => void;
@@ -43,6 +49,8 @@ interface CarteFideliteProps {
  * les tampons immédiatement.
  */
 export function CarteFidelite({
+  telephoneExterne,
+  emailExterne,
   montantPanier,
   nbTampons,
   onChangeNbTampons,
@@ -50,8 +58,11 @@ export function CarteFidelite({
   onPrefillIdentite,
 }: CarteFideliteProps) {
   const [etape, setEtape] = useState<Etape>("saisie");
-  const [telephoneSaisi, setTelephoneSaisi] = useState("");
-  const [emailSaisi, setEmailSaisi] = useState("");
+  const [telephoneInterne, setTelephoneSaisi] = useState("");
+  const [emailInterne, setEmailSaisi] = useState("");
+  const champsExternes = telephoneExterne !== undefined && emailExterne !== undefined;
+  const telephoneSaisi = champsExternes ? telephoneExterne : telephoneInterne;
+  const emailSaisi = champsExternes ? emailExterne : emailInterne;
   const [solde, setSolde] = useState<SoldeTampons | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [enCoursLiaison, setEnCoursLiaison] = useState(false);
@@ -166,25 +177,41 @@ export function CarteFidelite({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
-      <p className="text-sm font-semibold text-gray-900">
-        Déjà client·e chez 3 Sauces ? Ton numéro et ton email remplissent tes infos automatiquement.
-      </p>
-      <div className="mt-2 space-y-2">
-        <input
-          value={telephoneSaisi}
-          onChange={(e) => setTelephoneSaisi(e.target.value)}
-          placeholder="0639123456"
-          className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
-        />
-        <input
-          value={emailSaisi}
-          onChange={(e) => setEmailSaisi(e.target.value)}
-          type="email"
-          placeholder="ton@email.com"
-          className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
-        />
-        {enCours && <p className="text-xs text-gray-700">Vérification…</p>}
-      </div>
+      {champsExternes ? (
+        <>
+          <p className="text-sm font-semibold text-gray-900">Déjà client·e chez 3 Sauces ?</p>
+          {etape === "saisie" && !enCours && (
+            <p className="mt-1 text-sm text-gray-800">
+              {normaliserTelephone(telephoneSaisi) && !normaliserEmail(emailSaisi)
+                ? "Tape aussi ton email plus haut : ton nom, ton adresse et tes tampons de fidélité s'afficheront tout seuls."
+                : "Ton numéro et ton email, tapés plus haut, remplissent tes infos et affichent tes tampons de fidélité."}
+            </p>
+          )}
+          {enCours && <p className="mt-1 text-xs text-gray-700">Vérification…</p>}
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-gray-900">
+            Déjà client·e chez 3 Sauces ? Ton numéro et ton email remplissent tes infos automatiquement.
+          </p>
+          <div className="mt-2 space-y-2">
+            <input
+              value={telephoneInterne}
+              onChange={(e) => setTelephoneSaisi(e.target.value)}
+              placeholder="0639123456"
+              className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+            />
+            <input
+              value={emailInterne}
+              onChange={(e) => setEmailSaisi(e.target.value)}
+              type="email"
+              placeholder="ton@email.com"
+              className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+            />
+            {enCours && <p className="text-xs text-gray-700">Vérification…</p>}
+          </div>
+        </>
+      )}
 
       {etape === "nouveau_client" && (
         <p className="mt-2 text-xs text-gray-700">
