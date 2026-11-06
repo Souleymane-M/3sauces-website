@@ -217,6 +217,7 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
   const supp = libelleSupplementsLigne(l);
   if (supp.viandes) details.push(`+ Viande en plus : ${supp.viandes}`);
   if (supp.sauces) details.push(`+ Sauce en plus : ${supp.sauces}`);
+  if (supp.oignons) details.push("+ Oignons frits");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   const boisson = libelleBoissonLigne(l);
   if (boisson) details.push(boisson);
@@ -250,6 +251,7 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   const supp = libelleSupplementsLigne(l);
   if (supp.viandes) attributs.push({ label: "Viande en plus", valeur: supp.viandes });
   if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces });
+  if (supp.oignons) attributs.push({ label: "Supplément", valeur: "Oignons frits" });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
   if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
   if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
@@ -273,6 +275,7 @@ function cleLigne(l: LigneCommande): string {
     l.saladeOption ?? false,
     [...(l.viandesSupplementaires ?? [])].sort(),
     [...(l.saucesSupplementaires ?? [])].sort(),
+    l.oignonsFrits ?? false,
     [...(l.saveurs ?? [])].sort(),
     l.boissonIncluse ?? null,
     l.sansBoisson ?? false,

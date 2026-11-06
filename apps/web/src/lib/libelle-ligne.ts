@@ -39,9 +39,11 @@ function listeAvecQuantites(noms: string[]): string {
 export function libelleSupplementsLigne(l: {
   viandesSupplementaires?: string[];
   saucesSupplementaires?: string[];
-}): { viandes: string | null; sauces: string | null } {
+  oignonsFrits?: boolean;
+}): { viandes: string | null; sauces: string | null; oignons: boolean } {
   return {
     viandes: l.viandesSupplementaires?.length ? listeAvecQuantites(l.viandesSupplementaires) : null,
     sauces: l.saucesSupplementaires?.length ? listeAvecQuantites(l.saucesSupplementaires) : null,
+    oignons: l.oignonsFrits === true,
   };
 }

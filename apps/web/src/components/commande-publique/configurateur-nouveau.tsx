@@ -5,6 +5,7 @@ import type { ProduitConfigurable, ViandePublique, SaucePublique, SaveurPublique
 import {
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
+  MONTANT_OIGNONS_FRITS,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -41,7 +42,7 @@ interface ConfigurateurNouveauProps {
     viandes: string[];
     sauces: string[];
     sansSauce: boolean;
-    extraViandes: string[];
+    oignonsFrits: boolean;
     boisson: string | null;
     saladeGardee: boolean | null;
     saladeOption: boolean;
@@ -56,6 +57,8 @@ const QUANTITE_MAX_DEFAUT = 20;
 /** Accompagnements compris dans le prix d'un plat du jour ; au-delà, chacun est facturé à son prix. */
 const NB_ACCOMPAGNEMENTS_INCLUS = 2;
 const NB_ACCOMPAGNEMENTS_MAX = 6;
+/** Viandes ou sauces au total (incluses + en plus) sur un même plat. */
+const NB_SUPPLEMENTS_MAX = 20;
 
 const euros = (montant: number) => `${montant.toFixed(2).replace(".", ",")} €`;
 
@@ -152,7 +155,7 @@ export function ConfigurateurNouveau({
   // Ordre de sélection conservé : les N premières sont incluses, les suivantes payantes.
   const [saucesChoisies, setSaucesChoisies] = useState<string[]>(initial?.sauces ?? []);
   const [sansSauce, setSansSauce] = useState(initial?.sansSauce ?? false);
-  const [extraViandes, setExtraViandes] = useState<string[]>(initial?.extraViandes ?? []);
+  const [oignonsFrits, setOignonsFrits] = useState(initial?.oignonsFrits ?? false);
   const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
   const [boissonChoisie, setBoissonChoisie] = useState<string | null>(initial?.boisson ?? null);
   const [saladeGardee, setSaladeGardee] = useState<boolean | null>(initial?.saladeGardee ?? null);
@@ -178,16 +181,29 @@ export function ConfigurateurNouveau({
   const proposeCanetteRapide =
     !produit.canetteIncluse && !produit.saladeOuBoisson && !!canetteRapideProduit && canetteRapideSaveurs.length > 0;
   const demandeSauce = produit.nbSaucesIncluses > 0 && sauces.length > 0;
-  const sauceExtraPossible = !!produitSauceSupplementaire;
+  // Viandes / sauces en plus et oignons frits : snacks uniquement (le serveur refuse le reste).
+  const sauceExtraPossible = !!produitSauceSupplementaire && produit.autoriseExtras;
+  const viandeExtraPossible = !!produitViandeSupplementaire && produit.autoriseExtras;
   const prixSauceExtra = produitSauceSupplementaire?.prix ?? 0;
   const prixViandeExtra = produitViandeSupplementaire?.prix ?? 0;
   const prixCanette = canetteRapideProduit?.prix ?? 0;
 
   const saucesIncluses = saucesChoisies.slice(0, produit.nbSaucesIncluses);
   const saucesPayantes = saucesChoisies.slice(produit.nbSaucesIncluses);
+  // Viandes : les N premières sont incluses, les suivantes payantes (même logique que les sauces).
+  const viandesIncluses = viandesChoisies.slice(0, produit.nbViandesMax);
+  const viandesPayantes = viandesChoisies.slice(produit.nbViandesMax);
+  /** Nombre d'unités payantes par nom (ex. une sauce choisie 3 fois dont 1 payante). */
+  const payantsParNom = (choisies: string[], nbIncluses: number) => {
+    const m = new Map<string, number>();
+    choisies.slice(nbIncluses).forEach((n) => m.set(n, (m.get(n) ?? 0) + 1));
+    return m;
+  };
+  const viandesPayantesParNom = payantsParNom(viandesChoisies, produit.nbViandesMax);
+  const saucesPayantesParNom = payantsParNom(saucesChoisies, produit.nbSaucesIncluses);
 
   const toutSelectionne =
-    (!demandeViande || viandesChoisies.length === produit.nbViandesMax) &&
+    (!demandeViande || viandesChoisies.length >= produit.nbViandesMax) &&
     (!demandeSauce || sansSauce || saucesChoisies.length >= 1) &&
     (!demandeChoixBoisson || sansBoisson || boissonChoisie !== null) &&
     (!produit.saladeIncluse || saladeGardee !== null) &&
@@ -204,11 +220,16 @@ export function ConfigurateurNouveau({
   const prixAccompagnement = (nom: string) => accompagnements.find((a) => a.nom === nom)?.prix ?? 0;
   const accompagnementsPayants = accompagnementsChoisis.slice(NB_ACCOMPAGNEMENTS_INCLUS);
   const prixAccompagnementsPayants = accompagnementsPayants.reduce((t, n) => t + prixAccompagnement(n), 0);
-  const prixExtras = prixAccompagnementsPayants + extraViandes.length * prixViandeExtra + saucesPayantes.length * prixSauceExtra + canettesRapides.length * prixCanette;
+  const prixExtras = prixAccompagnementsPayants + viandesPayantes.length * prixViandeExtra + saucesPayantes.length * prixSauceExtra + canettesRapides.length * prixCanette + (oignonsFrits ? MONTANT_OIGNONS_FRITS : 0);
   const prixTotal = prixUnite * quantite + prixExtras;
 
-  function toggleViande(nom: string) {
-    setViandesChoisies((prec) => (prec.length >= produit.nbViandesMax ? prec : [...prec, nom]));
+  function ajouterViande(nom: string) {
+    setViandesChoisies((prec) => {
+      if (prec.length >= NB_SUPPLEMENTS_MAX) return prec;
+      // Au-delà des viandes incluses, il faut pouvoir les facturer.
+      if (prec.length >= produit.nbViandesMax && !viandeExtraPossible) return prec;
+      return [...prec, nom];
+    });
   }
   function retirerViande(nom: string) {
     setViandesChoisies((prec) => {
@@ -217,13 +238,20 @@ export function ConfigurateurNouveau({
       return prec.filter((_, idx) => idx !== i);
     });
   }
-  function toggleSauce(nom: string) {
+  function ajouterSauce(nom: string) {
     setSansSauce(false);
     setSaucesChoisies((prec) => {
-      if (prec.includes(nom)) return prec.filter((n) => n !== nom);
-      // Au-delà des sauces incluses, il faut pouvoir les facturer.
+      if (prec.length >= NB_SUPPLEMENTS_MAX) return prec;
+      // Une même sauce peut être choisie plusieurs fois ; au-delà des sauces incluses, il faut pouvoir les facturer.
       if (prec.length >= produit.nbSaucesIncluses && !sauceExtraPossible) return prec;
       return [...prec, nom];
+    });
+  }
+  function retirerSauce(nom: string) {
+    setSaucesChoisies((prec) => {
+      const i = prec.lastIndexOf(nom);
+      if (i === -1) return prec;
+      return prec.filter((_, idx) => idx !== i);
     });
   }
   function toggleAccompagnement(nom: string) {
@@ -263,35 +291,47 @@ export function ConfigurateurNouveau({
         {demandeViande && (
           <Etape
             numero={prochain()}
-            titre={`Tes ${produit.nbViandesMax} viande${produit.nbViandesMax > 1 ? "s" : ""}`}
-            aide={`Choisis-en ${produit.nbViandesMax} (${viandesChoisies.length}/${produit.nbViandesMax})`}
+            titre={`Tes viandes (${produit.nbViandesMax} incluse${produit.nbViandesMax > 1 ? "s" : ""})`}
+            aide={
+              viandeExtraPossible
+                ? `Choisis-en ${produit.nbViandesMax} · une viande en plus : +${euros(prixViandeExtra)} chacune`
+                : `Choisis-en ${produit.nbViandesMax} (${viandesChoisies.length}/${produit.nbViandesMax})`
+            }
             couleur={ROUGE}
           >
             <div className="flex flex-wrap gap-2">
               {viandes.map((v) => {
                 const count = viandesChoisies.filter((c) => c === v.nom).length;
+                const payantes = viandesPayantesParNom.get(v.nom) ?? 0;
                 return (
                   <Pastille
                     key={v.id}
                     actif={count > 0}
-                    couleur={ROUGE}
-                    disabled={count === 0 && viandesChoisies.length >= produit.nbViandesMax}
-                    onClick={() => toggleViande(v.nom)}
+                    couleur={payantes > 0 ? ORANGE : ROUGE}
+                    disabled={viandesChoisies.length >= produit.nbViandesMax && !viandeExtraPossible}
+                    onClick={() => ajouterViande(v.nom)}
                   >
                     {v.nom}
                     {count > 1 ? ` ×${count}` : ""}
+                    {payantes > 0 ? ` (+${euros(payantes * prixViandeExtra)})` : ""}
                   </Pastille>
                 );
               })}
             </div>
             {viandesChoisies.length > 0 && (
-              <div className="flex flex-wrap gap-3 text-sm font-bold text-gray-900">
-                {[...new Set(viandesChoisies)].map((nom) => (
-                  <button key={nom} type="button" onClick={() => retirerViande(nom)} className="underline">
-                    Retirer {nom}
-                  </button>
-                ))}
-              </div>
+              <>
+                <p className="text-sm font-bold text-gray-900">
+                  {viandesIncluses.length}/{produit.nbViandesMax} incluses
+                  {viandesPayantes.length > 0 ? ` · ${viandesPayantes.length} en plus = ${euros(viandesPayantes.length * prixViandeExtra)}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-3 text-sm font-bold text-gray-900">
+                  {[...new Set(viandesChoisies)].map((nom) => (
+                    <button key={nom} type="button" onClick={() => retirerViande(nom)} className="underline">
+                      Retirer {nom}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </Etape>
         )}
@@ -302,7 +342,7 @@ export function ConfigurateurNouveau({
             titre="Tes sauces"
             aide={
               sauceExtraPossible
-                ? `${produit.nbSaucesIncluses} incluses, +${euros(prixSauceExtra)} ensuite`
+                ? `${produit.nbSaucesIncluses} incluses, +${euros(prixSauceExtra)} ensuite · tu peux reprendre la même sauce`
                 : `Jusqu'à ${produit.nbSaucesIncluses} sauces incluses`
             }
             couleur={VERT}
@@ -318,28 +358,38 @@ export function ConfigurateurNouveau({
               Sans sauce
             </CaseACocher>
             <div className="flex flex-wrap gap-2">
-              {sauces.map((s) => {
-                const index = saucesChoisies.indexOf(s.nom);
-                const payante = index >= produit.nbSaucesIncluses;
+              {sauces.map((sc) => {
+                const count = saucesChoisies.filter((c) => c === sc.nom).length;
+                const payantes = saucesPayantesParNom.get(sc.nom) ?? 0;
                 return (
                   <Pastille
-                    key={s.id}
-                    actif={index !== -1}
-                    couleur={payante ? ORANGE : VERT}
-                    disabled={index === -1 && saucesChoisies.length >= produit.nbSaucesIncluses && !sauceExtraPossible}
-                    onClick={() => toggleSauce(s.nom)}
+                    key={sc.id}
+                    actif={count > 0}
+                    couleur={payantes > 0 ? ORANGE : VERT}
+                    disabled={saucesChoisies.length >= produit.nbSaucesIncluses && !sauceExtraPossible}
+                    onClick={() => ajouterSauce(sc.nom)}
                   >
-                    {s.nom}
-                    {payante ? ` (+${euros(prixSauceExtra)})` : ""}
+                    {sc.nom}
+                    {count > 1 ? ` ×${count}` : ""}
+                    {payantes > 0 ? ` (+${euros(payantes * prixSauceExtra)})` : ""}
                   </Pastille>
                 );
               })}
             </div>
-            {saucesIncluses.length > 0 && (
-              <p className="text-sm font-bold text-gray-900">
-                {saucesIncluses.length}/{produit.nbSaucesIncluses} incluses
-                {saucesPayantes.length > 0 ? ` · ${saucesPayantes.length} en plus = ${euros(saucesPayantes.length * prixSauceExtra)}` : ""}
-              </p>
+            {saucesChoisies.length > 0 && (
+              <>
+                <p className="text-sm font-bold text-gray-900">
+                  {saucesIncluses.length}/{produit.nbSaucesIncluses} incluses
+                  {saucesPayantes.length > 0 ? ` · ${saucesPayantes.length} en plus = ${euros(saucesPayantes.length * prixSauceExtra)}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-3 text-sm font-bold text-gray-900">
+                  {[...new Set(saucesChoisies)].map((nom) => (
+                    <button key={nom} type="button" onClick={() => retirerSauce(nom)} className="underline">
+                      Retirer {nom}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </Etape>
         )}
@@ -447,9 +497,7 @@ export function ConfigurateurNouveau({
           </Etape>
         )}
 
-        {(produit.saladePrixOption !== null ||
-          (produit.autoriseExtras && produitViandeSupplementaire) ||
-          proposeCanetteRapide) && (
+        {(produit.saladePrixOption !== null || produit.autoriseExtras || proposeCanetteRapide) && (
           <Etape numero={prochain()} titre="Options" couleur={ORANGE}>
             {produit.saladePrixOption !== null && (
               <label className="flex items-center justify-between gap-3 rounded-lg border border-gray-300 px-3 py-3">
@@ -468,51 +516,16 @@ export function ConfigurateurNouveau({
               </label>
             )}
 
-            {produit.autoriseExtras && produitViandeSupplementaire && (
-              <div className="space-y-2 rounded-lg border border-gray-300 p-3">
-                <p className="text-base font-bold text-gray-900">
-                  Viande supplémentaire{" "}
-                  <span className="font-extrabold" style={{ color: ROUGE }}>
-                    +{euros(prixViandeExtra)}
+            {produit.autoriseExtras && (
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-gray-300 px-3 py-3">
+                <span className="text-base font-bold text-gray-900">Oignons frits</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-base font-extrabold" style={{ color: ROUGE }}>
+                    +{euros(MONTANT_OIGNONS_FRITS)}
                   </span>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {viandes.map((v) => {
-                    const count = extraViandes.filter((c) => c === v.nom).length;
-                    return (
-                      <Pastille
-                        key={v.id}
-                        actif={count > 0}
-                        couleur={ROUGE}
-                        onClick={() => setExtraViandes((prec) => (prec.length >= 20 ? prec : [...prec, v.nom]))}
-                      >
-                        {v.nom}
-                        {count > 0 ? ` ×${count}` : ""}
-                      </Pastille>
-                    );
-                  })}
-                </div>
-                {extraViandes.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-gray-900">
-                    {[...new Set(extraViandes)].map((nom) => (
-                      <button
-                        key={nom}
-                        type="button"
-                        onClick={() =>
-                          setExtraViandes((prec) => {
-                            const i = prec.lastIndexOf(nom);
-                            return prec.filter((_, idx) => idx !== i);
-                          })
-                        }
-                        className="underline"
-                      >
-                        Retirer {nom}
-                      </button>
-                    ))}
-                    <span style={{ color: ROUGE }}>= {euros(extraViandes.length * prixViandeExtra)}</span>
-                  </div>
-                )}
-              </div>
+                  <input type="checkbox" checked={oignonsFrits} onChange={(e) => setOignonsFrits(e.target.checked)} className="h-6 w-6" />
+                </span>
+              </label>
             )}
 
             {proposeCanetteRapide && (
@@ -590,9 +603,9 @@ export function ConfigurateurNouveau({
             disabled={!toutSelectionne}
             onClick={() =>
               onValider(
-                produit.viandeImposee ? [produit.viandeImposee] : viandesChoisies,
+                produit.viandeImposee ? [produit.viandeImposee] : viandesIncluses,
                 saucesIncluses,
-                { viandesSupplementaires: extraViandes, saucesSupplementaires: saucesPayantes },
+                { viandesSupplementaires: viandesPayantes, saucesSupplementaires: saucesPayantes, oignonsFrits },
                 boissonRetenue,
                 produit.saladeIncluse ? saladeGardee : demandeSaladeOuBoisson ? saladeGardee === true : null,
                 saladeOptionCochee,

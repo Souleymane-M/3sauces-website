@@ -24,6 +24,7 @@ import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
+  MONTANT_OIGNONS_FRITS,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
@@ -607,7 +608,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "La sauce supplémentaire n'est pas disponible." }, { status: 400 });
       }
     }
+    const oignonsFrits = ligneBrute.oignonsFrits === true;
+    if (oignonsFrits && produit.categorie !== "snacking") {
+      return NextResponse.json({ error: `Oignons frits non proposés sur ${produit.nom}.` }, { status: 400 });
+    }
     const supplementsPayants =
+      (oignonsFrits ? MONTANT_OIGNONS_FRITS : 0) +
       viandesSupplementaires.length * Number(prixViandeSupplementaire ?? 0) +
       saucesSupplementaires.length * Number(prixSauceSupplementaire ?? 0);
 
@@ -639,6 +645,7 @@ export async function POST(request: Request) {
       saladeOption,
       viandesSupplementaires,
       saucesSupplementaires,
+      oignonsFrits,
       saveurs,
       boissonIncluse,
       sansBoisson,

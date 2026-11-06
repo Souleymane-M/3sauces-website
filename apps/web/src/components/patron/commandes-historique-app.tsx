@@ -44,6 +44,7 @@ function detailLigne(l: CommandeHistorique["lignes"][number]): string[] {
   const supp = libelleSupplementsLigne(l);
   if (supp.viandes) details.push(`+ VIANDE EN PLUS : ${supp.viandes}`);
   if (supp.sauces) details.push(`+ SAUCE EN PLUS : ${supp.sauces}`);
+  if (supp.oignons) details.push("+ OIGNONS FRITS");
   if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
   if (l.boissonIncluse) details.push(`Boisson incluse : ${l.boissonIncluse}`);
   if (l.sansBoisson) details.push("Sans boisson");

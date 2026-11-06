@@ -20,6 +20,8 @@ export interface ExtrasChoisis {
   viandesSupplementaires: string[];
   /** Une entrée par unité de sauce supplémentaire choisie (doublons autorisés, illimité). */
   saucesSupplementaires: string[];
+  /** Oignons frits en supplément (nouveau site uniquement). */
+  oignonsFrits?: boolean;
 }
 
 export interface AccompagnementPublique {

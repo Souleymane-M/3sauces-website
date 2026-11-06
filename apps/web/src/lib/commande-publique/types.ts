@@ -79,6 +79,8 @@ export const NOM_PRODUIT_SALADE_SUPPLEMENTAIRE = "Salade supplémentaire";
 export const MONTANT_REDUCTION_SANS_BOISSON = 1.5;
 /** Supplément quand le client prend la salade ET la boisson d'un plat "salade ou boisson" (ex: Poisson grillé 13 € → 15 €). */
 export const MONTANT_SUPPLEMENT_SALADE_ET_BOISSON = 2;
+/** Supplément « Oignons frits » (snacks), par plat — prix fixe, jamais envoyé par le client. */
+export const MONTANT_OIGNONS_FRITS = 1;
 /** Seule formule à canette incluse jamais éligible à "Sans boisson" — décision explicite du patron. */
 export const NOM_PRODUIT_MENU_ETUDIANT = "Menu Étudiant";
 
@@ -116,6 +118,8 @@ export interface LigneCommandePubliquePayload {
   viandesSupplementaires?: string[];
   /** Sauces en supplément payant (une entrée par unité), intégrées à la ligne (snacks uniquement). */
   saucesSupplementaires?: string[];
+  /** Oignons frits en supplément (snacks) — prix fixe `MONTANT_OIGNONS_FRITS`. */
+  oignonsFrits?: boolean;
   /** Choix explicite "garder la salade" (true/false) sur un produit à salade incluse obligatoire, null si sans objet. */
   saladeIncluse: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet — jusqu'à 2 si combinables, exactement 1 si exclusif. */

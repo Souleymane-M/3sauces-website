@@ -30,6 +30,8 @@ export interface LigneCommande {
   viandesSupplementaires?: string[];
   /** Sauces en supplément payant (une entrée par unité), intégrées à la ligne du produit — leur prix est déjà dans `prixUnitaire`. */
   saucesSupplementaires?: string[];
+  /** Oignons frits en supplément (snacks) — leur prix est déjà dans `prixUnitaire`. */
+  oignonsFrits?: boolean;
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;

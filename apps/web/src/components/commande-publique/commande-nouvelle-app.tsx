@@ -20,6 +20,7 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
+  MONTANT_OIGNONS_FRITS,
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
@@ -63,6 +64,7 @@ interface LignePanierPublique {
   /** Viandes / sauces en supplément payant, intégrées à la ligne (jamais des produits à part). */
   viandesSupp: string[];
   saucesSupp: string[];
+  oignonsFrits: boolean;
   /** Index du plat (0 en commande simple) — jamais déduit du contenu, toujours choisi par le client. */
   plat: number;
 }
@@ -201,6 +203,7 @@ export function CommandeNouvelleApp({
                 plat: l.plat ?? 0,
                 viandesSupp: l.viandesSupp ?? [],
                 saucesSupp: l.saucesSupp ?? [],
+                oignonsFrits: l.oignonsFrits ?? false,
               }))
             );
           if (etat.mode === "simple" || etat.mode === "groupee") setMode(etat.mode);
@@ -366,7 +369,8 @@ export function CommandeNouvelleApp({
     // Accompagnements : 2 inclus au choix, le 3e et les suivants au prix de l'accompagnement.
     l.accompagnementsInclus.slice(2).reduce((t, nomAcc) => t + (produits.find((p) => p.nom === nomAcc)?.prix ?? 0), 0) +
     l.viandesSupp.length * (produitViandeSupplementaire?.prix ?? 0) +
-    l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0);
+    l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0) +
+    (l.oignonsFrits ? MONTANT_OIGNONS_FRITS : 0);
 
   const total = panier.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
@@ -434,7 +438,8 @@ export function CommandeNouvelleApp({
     saladeOption: boolean = false,
     viandesSupp: string[] = [],
     saucesSupp: string[] = [],
-    platForce?: number
+    platForce?: number,
+    oignonsFrits: boolean = false
   ) {
     declencherPulse();
     const platCible = platForce ?? platCourant;
@@ -452,6 +457,7 @@ export function CommandeNouvelleApp({
       l.saladeIncluse === saladeIncluse &&
       memeTri(l.viandesSupp, viandesSupp) &&
       memeTri(l.saucesSupp, saucesSupp) &&
+      l.oignonsFrits === oignonsFrits &&
       memeTri(l.accompagnementsInclus, accompagnementsInclus);
 
     const stockRestantAvantAjout = produit.stockJour !== null ? plafonnerQuantite(produit, null, produit.stockJour) : null;
@@ -489,6 +495,7 @@ export function CommandeNouvelleApp({
           accompagnementsInclus,
           viandesSupp,
           saucesSupp,
+          oignonsFrits,
           plat: platCible,
         },
       ];
@@ -723,6 +730,7 @@ export function CommandeNouvelleApp({
         accompagnementsInclus: l.accompagnementsInclus,
         viandesSupplementaires: l.viandesSupp,
         saucesSupplementaires: l.saucesSupp,
+        oignonsFrits: l.oignonsFrits || undefined,
         platIndex: enGroupe ? l.plat : null,
         pourQui: enGroupe ? nomsPlats[l.plat]?.trim() || null : null,
       }));
@@ -1083,6 +1091,7 @@ export function CommandeNouvelleApp({
               + Sauce en plus : {l.saucesSupp.join(", ")} (+{euros(l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0))})
             </p>
           )}
+          {l.oignonsFrits && <p className="font-semibold">+ Oignons frits (+{euros(MONTANT_OIGNONS_FRITS)})</p>}
           {l.accompagnementsInclus.length > 0 && (
             <p>Accompagnement : {l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}</p>
           )}
@@ -1796,10 +1805,10 @@ export function CommandeNouvelleApp({
             ligneEnModification
               ? {
                   quantite: ligneEnModification.quantite,
-                  viandes: ligneEnModification.viandes,
+                  viandes: [...ligneEnModification.viandes, ...ligneEnModification.viandesSupp],
                   sauces: [...ligneEnModification.sauces, ...ligneEnModification.saucesSupp],
                   sansSauce: ligneEnModification.sansSauce,
-                  extraViandes: ligneEnModification.viandesSupp,
+                  oignonsFrits: ligneEnModification.oignonsFrits,
                   boisson: ligneEnModification.boissonIncluse,
                   saladeGardee: ligneEnModification.saladeIncluse,
                   saladeOption: ligneEnModification.saladeOption,
@@ -1826,7 +1835,8 @@ export function CommandeNouvelleApp({
           ) => {
             // Les suppléments (viande / sauce en plus) font partie du tacos lui-même. Avec plusieurs
             // exemplaires, ils vont sur UN seul : jamais répétés sur chaque exemplaire par erreur.
-            const aDesSupplements = extras.viandesSupplementaires.length > 0 || extras.saucesSupplementaires.length > 0;
+            const aDesSupplements =
+              extras.viandesSupplementaires.length > 0 || extras.saucesSupplementaires.length > 0 || extras.oignonsFrits === true;
             if (ligneEnModification) {
               // Modification : la ligne est remplacée à sa place (même plat), jamais supprimée puis recréée.
               const ancienne = ligneEnModification;
@@ -1846,6 +1856,7 @@ export function CommandeNouvelleApp({
                         accompagnementsInclus,
                         viandesSupp: extras.viandesSupplementaires,
                         saucesSupp: extras.saucesSupplementaires,
+                        oignonsFrits: extras.oignonsFrits === true,
                         quantite: Math.max(1, plafonnerQuantite(x.produit, x.id, quantitePrincipale)),
                       }
                     : x
@@ -1906,7 +1917,9 @@ export function CommandeNouvelleApp({
               sansSauce,
               saladeOption,
               extras.viandesSupplementaires,
-              extras.saucesSupplementaires
+              extras.saucesSupplementaires,
+              undefined,
+              extras.oignonsFrits === true
             );
             if (produitCanetteRapide) {
               for (const saveur of canettesRapidesChoisies) {
