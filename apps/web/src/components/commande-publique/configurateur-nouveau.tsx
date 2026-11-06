@@ -6,6 +6,7 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   MONTANT_OIGNONS_FRITS,
+  supplementBoissonFormule,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -21,6 +22,8 @@ interface ConfigurateurNouveauProps {
   produitSauceSupplementaire: ProduitConfigurable | null;
   canetteRapideProduit?: ProduitConfigurable | null;
   canetteRapideSaveurs?: SaveurPublique[];
+  /** Boissons 50 cl proposables à la place de la canette dans une formule snack (prix de la carte, − 0,50 € en formule). */
+  boissons50cl?: { nom: string; prix: number }[];
   onValider: (
     viandes: string[],
     sauces: string[],
@@ -145,6 +148,7 @@ export function ConfigurateurNouveau({
   produitSauceSupplementaire,
   canetteRapideProduit,
   canetteRapideSaveurs = [],
+  boissons50cl = [],
   onValider,
   onAnnuler,
   quantiteMax = QUANTITE_MAX_DEFAUT,
@@ -167,6 +171,8 @@ export function ConfigurateurNouveau({
   const proposeSansBoisson = produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT;
   const demandeChoixBoisson = produit.canetteIncluse && (proposeSansBoisson || saveurs.length > 1);
   const demandeSaladeOuBoisson = produit.saladeOuBoisson;
+  // Boissons 50 cl au choix à la place de la canette : formules snack seulement (le Menu Étudiant garde sa canette).
+  const propose50cl = proposeSansBoisson && produit.categorie === "snacking" && boissons50cl.length > 0;
   const sansBoisson = proposeSansBoisson && boissonChoisie === null;
   const boissonRetenue = demandeSaladeOuBoisson
     ? boissonVoulue
@@ -214,7 +220,7 @@ export function ConfigurateurNouveau({
   const prixBase = produit.prix ?? 0;
   const prixUnite =
     prixBase +
-    (produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson ? MONTANT_REDUCTION_SANS_BOISSON : 0) +
+    (produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson ? supplementBoissonFormule(boissonChoisie, boissons50cl) : 0) +
     (saladeOptionCochee ? (produit.saladePrixOption ?? 0) : 0) +
     (demandeSaladeOuBoisson && saladeGardee === true && boissonVoulue && boissonRetenue ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const prixAccompagnement = (nom: string) => accompagnements.find((a) => a.nom === nom)?.prix ?? 0;
@@ -478,10 +484,20 @@ export function ConfigurateurNouveau({
         {demandeChoixBoisson && (
           <Etape
             numero={prochain()}
-            titre={proposeSansBoisson ? "Une canette avec ?" : "Ta canette incluse"}
-            aide={proposeSansBoisson ? `+${euros(MONTANT_REDUCTION_SANS_BOISSON)} — touche à nouveau pour l'enlever` : undefined}
+            titre={proposeSansBoisson ? (propose50cl ? "Une boisson avec ?" : "Une canette avec ?") : "Ta canette incluse"}
+            aide={proposeSansBoisson ? "Touche à nouveau pour l'enlever" : undefined}
             couleur={ORANGE}
           >
+            {propose50cl && (
+              <p className="text-sm font-extrabold text-gray-900">
+                Canette 33 cl <span style={{ color: ROUGE }}>+{euros(MONTANT_REDUCTION_SANS_BOISSON)}</span>
+              </p>
+            )}
+            {!propose50cl && proposeSansBoisson && (
+              <p className="text-sm font-extrabold" style={{ color: ROUGE }}>
+                +{euros(MONTANT_REDUCTION_SANS_BOISSON)}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {saveurs.map((s) => (
                 <Pastille
@@ -494,6 +510,29 @@ export function ConfigurateurNouveau({
                 </Pastille>
               ))}
             </div>
+            {propose50cl && (
+              <>
+                <p className="pt-1 text-sm font-extrabold text-gray-900">
+                  Boisson 50 cl{" "}
+                  <span style={{ color: ROUGE }}>+{euros(supplementBoissonFormule(boissons50cl[0].nom, boissons50cl))}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {boissons50cl.map((b) => (
+                    <Pastille
+                      key={b.nom}
+                      actif={boissonChoisie === b.nom}
+                      couleur={ORANGE}
+                      onClick={() => setBoissonChoisie((prec) => (prec === b.nom ? null : b.nom))}
+                    >
+                      {b.nom}
+                      {supplementBoissonFormule(b.nom, boissons50cl) !== supplementBoissonFormule(boissons50cl[0].nom, boissons50cl)
+                        ? ` (+${euros(supplementBoissonFormule(b.nom, boissons50cl))})`
+                        : ""}
+                    </Pastille>
+                  ))}
+                </div>
+              </>
+            )}
           </Etape>
         )}
 

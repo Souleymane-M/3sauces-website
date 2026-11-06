@@ -21,6 +21,7 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   MONTANT_OIGNONS_FRITS,
+  supplementBoissonFormule,
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
@@ -358,11 +359,17 @@ export function CommandeNouvelleApp({
     [produits]
   );
 
+  // Boissons 50 cl proposables dans une formule snack (prix de la carte − 0,50 €).
+  const boissons50cl = useMemo(
+    () => produits.filter((p) => p.familleBoisson === "boisson_50cl" && p.prix !== null).map((p) => ({ nom: p.nom, prix: p.prix })),
+    [produits]
+  );
+
   // ---- Calculs de prix (identiques à l'ancien site) -------------------------
   const prixLigne = (l: LignePanierPublique) =>
     l.produit.prix +
     (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
-      ? MONTANT_REDUCTION_SANS_BOISSON
+      ? supplementBoissonFormule(l.boissonIncluse, boissons50cl)
       : 0) +
     (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0) +
@@ -1101,7 +1108,7 @@ export function CommandeNouvelleApp({
               Boisson incluse : {l.boissonIncluse}
               {l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && l.produit.canetteIncluse && (
                 <button type="button" onClick={() => retirerBoisson(l.id)} className="ml-2 font-semibold text-orange-700 underline">
-                  Retirer (−{euros(MONTANT_REDUCTION_SANS_BOISSON)})
+                  Retirer (−{euros(supplementBoissonFormule(l.boissonIncluse, boissons50cl))})
                 </button>
               )}
             </p>
@@ -1227,7 +1234,10 @@ export function CommandeNouvelleApp({
                 <button
                   key={o.cle}
                   type="button"
-                  onClick={() => setOnglet(o.cle)}
+                  onClick={() => {
+                    setOnglet(o.cle);
+                    setAutresBoissonsOuvert(false);
+                  }}
                   className={`shrink-0 whitespace-nowrap rounded-full border-2 px-4 py-2 text-sm font-extrabold ${
                     ongletActif === o.cle ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
                   }`}
@@ -1796,6 +1806,7 @@ export function CommandeNouvelleApp({
           produitSauceSupplementaire={produitSauceSupplementaire}
           canetteRapideProduit={produitEnSelection.categorie === "plat_du_jour" ? produitCanetteRapide : null}
           canetteRapideSaveurs={saveurs}
+          boissons50cl={boissons50cl}
           quantiteMax={
             produitEnSelection.stockJour !== null
               ? plafonnerQuantite(produitEnSelection, ligneEnModification?.id ?? null, produitEnSelection.stockJour)

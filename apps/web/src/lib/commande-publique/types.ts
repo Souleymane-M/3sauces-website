@@ -81,6 +81,14 @@ export const MONTANT_REDUCTION_SANS_BOISSON = 1.5;
 export const MONTANT_SUPPLEMENT_SALADE_ET_BOISSON = 2;
 /** Supplément « Oignons frits » (snacks), par plat — prix fixe, jamais envoyé par le client. */
 export const MONTANT_OIGNONS_FRITS = 1;
+/** Une boisson 50 cl choisie dans une formule snack coûte son prix de la carte moins ce montant (ex. 2,50 € → 2,00 €). */
+export const REMISE_BOISSON_50CL_EN_FORMULE = 0.5;
+
+/** Supplément de la boisson incluse dans une formule : 1,50 € la canette, prix 50 cl − 0,50 € pour une 50 cl. */
+export function supplementBoissonFormule(boissonIncluse: string | null, boissons50cl: { nom: string; prix: number }[]): number {
+  const b = boissons50cl.find((x) => x.nom === boissonIncluse);
+  return b ? Math.round((b.prix - REMISE_BOISSON_50CL_EN_FORMULE) * 100) / 100 : MONTANT_REDUCTION_SANS_BOISSON;
+}
 /** Seule formule à canette incluse jamais éligible à "Sans boisson" — décision explicite du patron. */
 export const NOM_PRODUIT_MENU_ETUDIANT = "Menu Étudiant";
 

@@ -23,8 +23,8 @@ import type {
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-  MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_OIGNONS_FRITS,
+  supplementBoissonFormule,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
@@ -296,6 +296,18 @@ export async function POST(request: Request) {
   }
   const nomsSaveursValides = new Set((saveursActives ?? []).map((s) => s.nom));
 
+  // Boissons 50 cl proposables dans une formule snack (prix de la carte − 0,50 €), lues en base.
+  const { data: boissons50clActives, error: erreurBoissons50cl } = await supabase
+    .from("produits")
+    .select("nom, prix")
+    .eq("categorie", "boisson")
+    .eq("famille_boisson", "boisson_50cl")
+    .eq("actif", true);
+  if (erreurBoissons50cl) {
+    return NextResponse.json({ error: "Erreur serveur (boissons 50 cl)." }, { status: 500 });
+  }
+  const boissons50cl = (boissons50clActives ?? []).map((b) => ({ nom: b.nom, prix: Number(b.prix ?? 0) }));
+
   // Parfums Boisson 2L : référentiel indépendant de `saveurs` (canettes),
   // uniquement pour ce produit (cf. NOM_PRODUIT_BOISSON_OFFERTE).
   const { data: parfums2lActifs, error: erreurParfums2l } = await supabase
@@ -475,7 +487,11 @@ export async function POST(request: Request) {
       if (!produit.canette_incluse && !produit.salade_ou_boisson) {
         return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
       }
-      if (!nomsSaveursValides.has(boissonIncluse)) {
+      const est50cl = boissons50cl.some((b) => b.nom === boissonIncluse);
+      if (est50cl && (produit.categorie !== "snacking" || produit.nom === NOM_PRODUIT_MENU_ETUDIANT || produit.salade_ou_boisson)) {
+        return NextResponse.json({ error: `Boisson 50 cl non proposée sur ${produit.nom}.` }, { status: 400 });
+      }
+      if (!est50cl && !nomsSaveursValides.has(boissonIncluse)) {
         return NextResponse.json(
           { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
           { status: 400 }
@@ -629,7 +645,7 @@ export async function POST(request: Request) {
       prixUnitaire:
         Math.round(
           ((produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
-            ? produit.prix + MONTANT_REDUCTION_SANS_BOISSON
+            ? produit.prix + supplementBoissonFormule(boissonIncluse, boissons50cl)
             : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
               ? produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON
               : produit.prix) +
