@@ -25,6 +25,7 @@ import { ViandeModalPublique } from "@/components/commande-publique/viande-modal
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
+import { LIEUX_PRINCIPAUX, TOUS_LES_LIEUX, VILLAGES, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
 import { DatePicker } from "@/components/commande-publique/date-picker";
 import type { CommandePourImpression } from "@/lib/impression/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
@@ -929,7 +930,7 @@ export function CaisseApp({
   // panier brut — même correctif que /api/commande et /api/caisse/commandes,
   // cf. commande #509, 2026-10-21.
   const minimumAtteint = totalApresRemises >= parametres.minimumCommande;
-  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim());
+  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim() || /—\s*$/.test(adresse.trim()));
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -2236,7 +2237,35 @@ export function CaisseApp({
             {canal === "livraison" && (
               <div className="space-y-3 border-t border-gray-200 pt-3">
                 <div>
-                  <label className="text-xs text-gray-700">Adresse</label>
+                  <label className="text-xs text-gray-700">Lieu</label>
+                  <select
+                    value={TOUS_LES_LIEUX.find((l) => adresse.trim().startsWith(l.nom))?.id ?? ""}
+                    onChange={(e) => {
+                      const choisi = trouverLieu(e.target.value);
+                      // Le lieu remplit l'adresse (modifiable ensuite) ; un village attend sa précision (mairie, CCAS, rue…).
+                      setAdresse(choisi ? (choisi.village ? `${choisi.nom} — ` : choisi.nom) : "");
+                    }}
+                    className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                  >
+                    <option value="">Autre adresse (saisie libre)</option>
+                    <optgroup label="Lieux principaux">
+                      {LIEUX_PRINCIPAUX.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.nom}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Villages">
+                      {VILLAGES.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.nom}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-700">Adresse / précision</label>
                   <input
                     value={adresse}
                     onChange={(e) => setAdresse(e.target.value)}
