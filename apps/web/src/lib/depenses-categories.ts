@@ -7,9 +7,9 @@ export const CATEGORIES_DEPENSE = [
   { valeur: "gaz_eau_electricite", libelle: "Gaz, eau, électricité" },
   { valeur: "loyer", libelle: "Loyer" },
   { valeur: "salaires", libelle: "Salaires" },
-  { valeur: "carburant_transport", libelle: "Carburant, scooter, livraison" },
+  { valeur: "carburant_transport", libelle: "Carburant, location de véhicule, livraison" },
   { valeur: "materiel", libelle: "Matériel, équipement" },
-  { valeur: "assurance_banque_comptable", libelle: "Assurance, banque, comptable" },
+  { valeur: "assurance_banque_comptable", libelle: "Assurance, banque, comptable, abonnements (téléphone, internet)" },
   { valeur: "publicite", libelle: "Publicité, communication" },
   { valeur: "autre", libelle: "Autre" },
 ] as const;
