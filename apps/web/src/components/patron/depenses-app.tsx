@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import {
   CATEGORIES_DEPENSE,
   MODES_PAIEMENT_DEPENSE,
+  OBJECTIF_MARGE_BRUTE,
   libelleCategorie,
   type LigneDepense,
 } from "@/lib/depenses-categories";
@@ -269,6 +270,23 @@ export function DepensesApp({
                 <p className="text-xs text-gray-600">achats = {Math.round((resume.totalAchats / resume.ventes) * 100)} % des ventes</p>
               )}
             </div>
+          </div>
+        )}
+        {resume && resume.ventes > 0 && (
+          <div className="mt-2 rounded border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-600">
+              Marge brute (ventes − produits, emballages, gaz/eau/électricité, salaires, livraison)
+            </p>
+            {(() => {
+              const marge = Math.round(((resume.ventes - resume.totalCoutsDirects) / resume.ventes) * 100);
+              const ok = marge >= OBJECTIF_MARGE_BRUTE;
+              return (
+                <p className={`text-xl font-extrabold ${ok ? "text-[#2D5A27]" : "text-[#8B2020]"}`}>
+                  {marge} % <span className="text-xs font-semibold text-gray-600">(objectif {OBJECTIF_MARGE_BRUTE} %) — coûts directs {euros(resume.totalCoutsDirects)}</span>
+                </p>
+              );
+            })()}
+            <p className="text-xs text-gray-600">Fiable seulement quand toutes les factures du mois sont saisies.</p>
           </div>
         )}
         {resume && resume.parCategorie.length > 0 && (

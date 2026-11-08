@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { construireHeureSouhaiteeUtc, dateMayotteIso } from "@/lib/commande-publique/creneau";
-import { CATEGORIES_ACHATS, type LigneDepense } from "@/lib/depenses-categories";
+import { CATEGORIES_ACHATS, CATEGORIES_COUTS_DIRECTS, type LigneDepense } from "@/lib/depenses-categories";
 
 export interface DepenseAdmin {
   id: string;
@@ -21,6 +21,7 @@ export interface ResumeMois {
   nbCommandes: number;
   totalDepenses: number;
   totalAchats: number;
+  totalCoutsDirects: number;
   parCategorie: { categorie: string; montant: number }[];
 }
 
@@ -104,6 +105,7 @@ export async function chargerDonneesDepenses(mois: string = moisCourantMayotte()
       nbCommandes,
       totalDepenses: arrondi(depenses.reduce((t, d) => t + d.montant, 0)),
       totalAchats: arrondi(depenses.filter((d) => (CATEGORIES_ACHATS as string[]).includes(d.categorie)).reduce((t, d) => t + d.montant, 0)),
+      totalCoutsDirects: arrondi(depenses.filter((d) => (CATEGORIES_COUTS_DIRECTS as string[]).includes(d.categorie)).reduce((t, d) => t + d.montant, 0)),
       parCategorie,
     },
   };

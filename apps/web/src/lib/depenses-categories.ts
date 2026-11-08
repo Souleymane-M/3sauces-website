@@ -29,6 +29,17 @@ export type ModePaiementDepense = (typeof MODES_PAIEMENT_DEPENSE)[number]["valeu
 /** Achats de matières et produits vendus (le « coût de revient »), par opposition aux charges de fonctionnement. */
 export const CATEGORIES_ACHATS: CategorieDepense[] = ["viande", "boissons", "legumes_epicerie", "emballages"];
 
+/** Coûts directs de production et de vente : tout ce qui entre dans la marge brute (matières, emballages, gaz, salaires, livraison). */
+export const CATEGORIES_COUTS_DIRECTS: CategorieDepense[] = [
+  ...CATEGORIES_ACHATS,
+  "gaz_eau_electricite",
+  "salaires",
+  "carburant_transport",
+];
+
+/** Objectif de marge brute fixé par le patron. */
+export const OBJECTIF_MARGE_BRUTE = 60;
+
 export interface LigneDepense {
   designation: string;
   quantite: number | null;
