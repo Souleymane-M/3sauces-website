@@ -524,6 +524,39 @@ export interface Database {
         Relationships: [];
       };
 
+      depenses: {
+        Row: {
+          id: string;
+          date_depense: string;
+          fournisseur: string | null;
+          description: string | null;
+          categorie: string;
+          montant: number;
+          mode_paiement: string | null;
+          lignes: unknown;
+          facture_chemin: string | null;
+          facture_type: string | null;
+          saisi_par: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date_depense: string;
+          fournisseur?: string | null;
+          description?: string | null;
+          categorie: string;
+          montant: number;
+          mode_paiement?: string | null;
+          lignes?: unknown;
+          facture_chemin?: string | null;
+          facture_type?: string | null;
+          saisi_par?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["depenses"]["Insert"]>;
+        Relationships: [];
+      };
+
       visiteurs_site: {
         Row: { visiteur: string; etape: string; premiere_vue: string; derniere_activite: string };
         Insert: { visiteur: string; etape: string; premiere_vue?: string; derniere_activite?: string };
