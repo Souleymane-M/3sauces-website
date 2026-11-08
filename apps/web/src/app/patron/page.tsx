@@ -45,6 +45,9 @@ import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 import { InscriptionsApp } from "@/components/patron/inscriptions-app";
 import { listerInscriptions } from "@/lib/patron/inscriptions";
+import { DepensesApp } from "@/components/patron/depenses-app";
+import { chargerDonneesDepenses, moisCourantMayotte } from "@/lib/patron/depenses";
+import { dateMayotteIso } from "@/lib/commande-publique/creneau";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +90,7 @@ export default async function PatronPage() {
     terminauxSumup,
     historiqueTiroir,
     inscriptions,
+    depensesInitiales,
   ] = await Promise.all([
     listerProduitsAdmin(),
     listerOptionsAdmin("viandes"),
@@ -113,6 +117,8 @@ export default async function PatronPage() {
     listerHistoriqueTiroir().catch(() => []),
     // Ne jamais casser tout /patron si la table des inscriptions n'existe pas encore.
     listerInscriptions().catch(() => []),
+    // Idem pour la table des dépenses : l'onglet affiche un message plutôt que de casser la page.
+    chargerDonneesDepenses().then((d) => ({ donnees: d, erreur: null as string | null })).catch(() => ({ donnees: null, erreur: "La table des dépenses n'est pas encore créée (SQL à coller dans Supabase)." as string | null })),
   ]);
 
   return (
@@ -196,6 +202,18 @@ export default async function PatronPage() {
                   produitsBoissons={produits.filter((p) => p.categorie === "boisson")}
                 />
               </>
+            ),
+          },
+          {
+            id: "depenses",
+            label: "Dépenses",
+            contenu: (
+              <DepensesApp
+                initial={depensesInitiales.donnees}
+                moisInitial={moisCourantMayotte()}
+                aujourdHui={dateMayotteIso()}
+                erreurInitiale={depensesInitiales.erreur}
+              />
             ),
           },
           {

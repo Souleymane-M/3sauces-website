@@ -11,6 +11,7 @@
   "dependencies": {
     "@3sauces/supabase": "workspace:*",
     "@3sauces/ui": "workspace:*",
+    "@anthropic-ai/sdk": "^1.6.0",
     "@supabase/supabase-js": "^2.112.4",
     "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
