@@ -17,34 +17,20 @@ export const FENETRE_RESERVATION_JOURS = 14;
 // remplacer `null` par { date: "AAAA-MM-JJ", heure: "HH:MM" }.
 const LIVRAISON_DEBUT_EXCEPTIONNEL: { date: string; heure: string } | null = null;
 
-/**
- * Délai minimum entre le moment où la commande est passée et l'heure de livraison demandée
- * (préparation + départ + trajet) — demande du patron, 2026-11-04 : 30 min (les mesures passées ne sont pas
- * encore assez fiables pour imposer plus). UNE seule valeur à changer ici.
- */
-export const DELAI_MINIMUM_LIVRAISON_MINUTES = 30;
-
 const versHeureMinute = (minutes: number): string =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
 /**
  * Heure "HH:MM" avant laquelle aucune livraison n'est possible pour cette date, ou null s'il n'y a pas de
- * restriction : pour aujourd'hui, maintenant + délai minimum (arrondi aux 10 min supérieures) ; plus, le cas
- * échéant, une heure exceptionnelle fixée à la main. `toleranceMinutes` sert au serveur : un client qui a
- * choisi son créneau un peu plus tôt ne doit jamais être refusé pour quelques minutes d'écart.
+ * restriction. Plus de délai minimum automatique (retour au système d'avant, demande du patron le 2026-11-09) :
+ * seule reste l'heure exceptionnelle fixée à la main ci-dessus.
  */
-export function heureDebutLivraison(date: string, toleranceMinutes = 0): string | null {
-  let minimum: number | null = null;
+export function heureDebutLivraison(date: string): string | null {
   if (LIVRAISON_DEBUT_EXCEPTIONNEL && date === LIVRAISON_DEBUT_EXCEPTIONNEL.date) {
     const [h, m] = LIVRAISON_DEBUT_EXCEPTIONNEL.heure.split(":").map(Number);
-    minimum = h * 60 + m;
+    return versHeureMinute(h * 60 + m);
   }
-  if (date === dateMayotteIso()) {
-    const disponible =
-      Math.ceil((heureActuelleMayotteMinutes() + DELAI_MINIMUM_LIVRAISON_MINUTES - toleranceMinutes) / 10) * 10;
-    minimum = Math.max(minimum ?? 0, disponible);
-  }
-  return minimum === null ? null : versHeureMinute(minimum);
+  return null;
 }
 
 /** Retire les créneaux trop tôt pour une livraison (liste inchangée s'il n'y a pas de restriction). */

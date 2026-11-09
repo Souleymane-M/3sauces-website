@@ -36,13 +36,15 @@ function echapperXml(texte: string): string {
     .replace(/'/g, "&apos;");
 }
 
-type StyleLigne = { align?: "left" | "center" | "right"; gras?: boolean; taille?: 1 | 2 | 3 };
+type StyleLigne = { align?: "left" | "center" | "right"; gras?: boolean; taille?: 1 | 2 | 3; surligne?: boolean };
 
 function styleTexte(opts: StyleLigne = {}): string {
   const attrs: string[] = [];
   if (opts.align) attrs.push(`align="${opts.align}"`);
   if (opts.gras !== undefined) attrs.push(`em="${opts.gras}"`);
   if (opts.taille !== undefined) attrs.push(`width="${opts.taille}" height="${opts.taille}"`);
+  // Texte blanc sur fond noir (surligné) : toujours renvoyé explicitement, sinon l'inversion resterait active sur les lignes suivantes.
+  if (opts.gras !== undefined || opts.taille !== undefined) attrs.push(`reverse="${opts.surligne === true}"`);
   return attrs.length > 0 ? `<text ${attrs.join(" ")}/>` : "";
 }
 
@@ -190,49 +192,42 @@ function estAujourdhuiMayotte(iso: string): boolean {
 function libelleHeureSouhaitee(iso: string, adresse?: string | null): string {
   const fourchette = fourchetteLivraison(adresse, iso);
   if (estAujourdhuiMayotte(iso)) return fourchette ?? formaterHeure(iso);
-  if (fourchette) {
-    const jour = new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", weekday: "short", day: "2-digit", month: "2-digit" }).format(
-      new Date(iso)
-    );
-    return `${jour} ${fourchette}`;
-  }
-  const jourHeure = new Intl.DateTimeFormat("fr-FR", {
+  const jour = new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
-    weekday: "short",
+    weekday: "long",
     day: "2-digit",
     month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(new Date(iso));
-  return jourHeure;
+  return `POUR LE ${jour.toUpperCase()} ${fourchette ? fourchette : `A ${formaterHeure(iso)}`}`;
 }
 
 /** Description d'une ligne de panier : "2x Tacos 2 viandes" puis le détail en dessous. */
-function detailLigne(l: CommandePourImpression["lignes"][number]): string[] {
-  const details: string[] = [];
-  if (l.viandes.length > 0) details.push(l.viandes.join(", "));
-  if (l.sauces && l.sauces.length > 0) details.push(`Sauces : ${l.sauces.join(", ")}`);
-  if (l.sansSauce) details.push("SANS SAUCE");
-  if (l.saladeOption) details.push("+ Salade");
+function detailLigne(l: CommandePourImpression["lignes"][number]): { texte: string; surligne?: boolean }[] {
+  const details: { texte: string; surligne?: boolean }[] = [];
+  if (l.viandes.length > 0) details.push({ texte: l.viandes.join(", ") });
+  if (l.sauces && l.sauces.length > 0) details.push({ texte: `Sauces : ${l.sauces.join(", ")}` });
+  if (l.sansSauce) details.push({ texte: "SANS SAUCE" });
+  if (l.saladeOption) details.push({ texte: "+ Salade" });
   const supp = libelleSupplementsLigne(l);
-  if (supp.viandes) details.push(`+ Viande en plus : ${supp.viandes}`);
-  if (supp.sauces) details.push(`+ Sauce en plus : ${supp.sauces}`);
-  if (supp.oignons) details.push("+ Oignons frits");
-  if (l.saveurs && l.saveurs.length > 0) details.push(l.saveurs.join(", "));
+  if (supp.viandes) details.push({ texte: `+ Viande en plus : ${supp.viandes}` });
+  if (supp.sauces) details.push({ texte: `+ Sauce en plus : ${supp.sauces}` });
+  if (supp.oignons) details.push({ texte: "+ Oignons frits" });
+  if (l.saveurs && l.saveurs.length > 0) details.push({ texte: l.saveurs.join(", ") });
   const boisson = libelleBoissonLigne(l);
-  if (boisson) details.push(boisson);
-  if (l.sansBoisson) details.push("SANS BOISSON — ne pas donner de canette");
-  if (l.saladeIncluse === true) details.push("Avec salade");
-  if (l.saladeIncluse === false) details.push("SANS SALADE");
+  if (boisson) details.push({ texte: `BOISSON : ${boisson}`, surligne: true });
+  if (l.sansBoisson) details.push({ texte: "SANS BOISSON — ne pas donner de canette", surligne: true });
+  if (l.saladeIncluse === true) details.push({ texte: "Avec salade" });
+  if (l.saladeIncluse === false) details.push({ texte: "SANS SALADE" });
   if (l.accompagnementsInclus?.length)
-    details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
-  if (l.pourQui) details.push(`Pour ${l.pourQui}`);
+    details.push({ texte: `Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}` });
+  if (l.pourQui) details.push({ texte: `Pour ${l.pourQui}` });
   return details;
 }
 
 interface AttributCuisine {
   label: string;
   valeur: string;
+  surligne?: boolean;
 }
 
 /**
@@ -253,7 +248,7 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces });
   if (supp.oignons) attributs.push({ label: "Supplément", valeur: "Oignons frits" });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
-  if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse });
+  if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse, surligne: true });
   if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
   if (l.saladeIncluse === false) attributs.push({ label: "Salade", valeur: "SANS SALADE" });
   if (l.accompagnementsInclus?.length)
@@ -312,11 +307,15 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
-      for (const { label, valeur } of attributsCuisine(l)) {
+      for (const { label, valeur, surligne } of attributsCuisine(l)) {
+        if (surligne) {
+          b.ligne(` ${label.toUpperCase()} : ${valeur.toUpperCase()} `, { gras: true, taille: 1, surligne: true }, "  ");
+          continue;
+        }
         b.ligne(label, { gras: false, taille: 1 }, "  ");
         b.ligne(valeur.toUpperCase(), { gras: true, taille: 1 }, "  ");
       }
-      if (l.sansBoisson) b.ligne("SANS BOISSON — ne pas donner de canette", { gras: true, taille: 1 }, "  ");
+      if (l.sansBoisson) b.ligne(" SANS BOISSON — ne pas donner de canette ", { gras: true, taille: 1, surligne: true }, "  ");
       if (l.pourQui) b.ligne(`Pour ${l.pourQui}`, { gras: true, taille: 1 }, "  ");
     }
   });
@@ -518,7 +517,7 @@ function construireContenuTicketClient(
         taille: 1,
       });
       for (const detail of detailLigne(l)) {
-        b.ligne(detail, { gras: false, taille: 1 }, "  ");
+        b.ligne(detail.surligne ? ` ${detail.texte.toUpperCase()} ` : detail.texte, { gras: detail.surligne === true, taille: 1, surligne: detail.surligne }, "  ");
       }
     }
   });
@@ -602,7 +601,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   }
   b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "center", gras: true, taille: 1 });
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "center", gras: true, taille: estAujourdhuiMayotte(commande.heureSouhaitee) ? 1 : 2 });
   }
   if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });

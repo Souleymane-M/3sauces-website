@@ -116,6 +116,13 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   const [declarationsOuvertes, setDeclarationsOuvertes] = useState<Record<string, DeclarationEnCours>>({});
   const [enCours, setEnCours] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  // "Impossible à livrer" directement depuis la liste (sans re-scanner le QR code) : commande dont le formulaire
+  // est ouvert + motif choisi/saisi.
+  const [echecOuvertId, setEchecOuvertId] = useState<string | null>(null);
+  const [motifEchec, setMotifEchec] = useState("");
+  // La commande reste "en livraison" côté serveur (le responsable décide de la suite) : on mémorise juste ici
+  // qu'elle a été signalée pour ne pas laisser croire que rien ne s'est passé.
+  const [echecsSignales, setEchecsSignales] = useState<Set<string>>(new Set());
   // Mémorise lesquelles ont déjà été tapotées (on sait seulement que le
   // lien a été ouvert, jamais que le message a vraiment été envoyé — texte
   // volontairement "ouvert", jamais "envoyé", pour rester honnête sur ce
@@ -167,6 +174,30 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       clearInterval(minuteur);
     };
   }, [enCours, declarationsOuvertes]);
+
+  async function signalerEchec(livraison: LivraisonAssignee) {
+    setErreur(null);
+    setEnCours(livraison.id);
+    try {
+      const reponse = await fetch("/api/livreur/signaler-echec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: livraison.id, motif: motifEchec }),
+      });
+      if (!reponse.ok) {
+        const data = await reponse.json().catch(() => ({}));
+        setErreur(data.error ?? "Échec du signalement.");
+        return;
+      }
+      setEchecsSignales((prec) => new Set(prec).add(livraison.id));
+      setEchecOuvertId(null);
+      setMotifEchec("");
+    } catch {
+      setErreur("Erreur réseau, réessaie.");
+    } finally {
+      setEnCours(null);
+    }
+  }
 
   function ouvrirDeclaration(commandeId: string) {
     setErreur(null);
@@ -432,6 +463,66 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               >
                 Livré
               </button>
+            )}
+
+            {!declaration && echecsSignales.has(livraison.id) && (
+              <p className="mt-2 rounded bg-red-50 p-3 text-center text-base font-bold text-red-700">
+                ⚠️ Signalé au responsable : livraison impossible
+              </p>
+            )}
+
+            {!declaration && !echecsSignales.has(livraison.id) && echecOuvertId !== livraison.id && (
+              <button
+                onClick={() => {
+                  setErreur(null);
+                  setMotifEchec("");
+                  setEchecOuvertId(livraison.id);
+                }}
+                className="mt-2 w-full rounded border-2 border-red-600 py-3 text-lg font-bold text-red-600"
+              >
+                ❌ Impossible à livrer
+              </button>
+            )}
+
+            {!declaration && echecOuvertId === livraison.id && (
+              <div className="mt-2 space-y-2 rounded-lg border border-red-600 bg-red-50 p-3">
+                <p className="text-sm font-semibold text-red-700">Pourquoi ?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Client absent", "Adresse introuvable", "Client refuse", "Ne répond pas"].map((motif) => (
+                    <button
+                      key={motif}
+                      onClick={() => setMotifEchec(motif)}
+                      className={`rounded border py-2 text-sm font-bold ${
+                        motifEchec === motif ? "border-red-600 bg-red-600 text-white" : "border-gray-300 bg-white text-gray-700"
+                      }`}
+                    >
+                      {motif}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={motifEchec}
+                  onChange={(e) => setMotifEchec(e.target.value)}
+                  placeholder="Autre motif"
+                  className="w-full rounded border border-gray-300 p-3 text-sm text-gray-900"
+                />
+                <p className="text-xs text-gray-600">Un responsable sera alerté tout de suite par email.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEchecOuvertId(null)}
+                    className="flex-1 rounded border border-gray-300 bg-white py-2 text-sm font-semibold text-gray-700"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={() => signalerEchec(livraison)}
+                    disabled={enCours === livraison.id || motifEchec.trim() === ""}
+                    className="flex-1 rounded bg-red-600 py-2 text-sm font-bold text-white disabled:opacity-40"
+                  >
+                    {enCours === livraison.id ? "…" : "Signaler"}
+                  </button>
+                </div>
+              </div>
             )}
 
             {declaration && declaration.mode === "simple" && (
