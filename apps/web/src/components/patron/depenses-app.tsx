@@ -72,6 +72,42 @@ async function reduirePhoto(fichier: File): Promise<File> {
   }
 }
 
+const CATEGORIES_CHARGES_FIXES = ["loyer", "salaires", "assurance_banque_comptable", "carburant_transport"];
+
+function moisPrecedent(mois: string): string {
+  const [a, m] = mois.split("-").map(Number);
+  return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`;
+}
+
+interface PrixAchat {
+  designation: string;
+  fournisseur: string | null;
+  date: string;
+  prixUnitaire: number;
+  unite: string | null;
+  nbAchats: number;
+}
+
+/** Dernier prix d'achat relevé par article (ligne de facture), pour calculer plus tard le coût de chaque plat. */
+function prixAchatsReleves(depenses: DepenseAdmin[]): PrixAchat[] {
+  const parArticle = new Map<string, PrixAchat>();
+  for (const d of depenses) {
+    for (const l of d.lignes) {
+      const prix = l.prixUnitaire ?? (l.quantite ? l.montant / l.quantite : null);
+      if (prix === null || !Number.isFinite(prix)) continue;
+      const cle = l.designation.trim().toLowerCase();
+      const existant = parArticle.get(cle);
+      if (!existant) {
+        parArticle.set(cle, { designation: l.designation.trim(), fournisseur: d.fournisseur, date: d.dateDepense, prixUnitaire: prix, unite: l.unite, nbAchats: 1 });
+      } else {
+        existant.nbAchats += 1;
+        if (d.dateDepense > existant.date) Object.assign(existant, { fournisseur: d.fournisseur, date: d.dateDepense, prixUnitaire: prix, unite: l.unite });
+      }
+    }
+  }
+  return [...parArticle.values()].sort((a, b) => a.designation.localeCompare(b.designation, "fr"));
+}
+
 export function DepensesApp({
   initial,
   moisInitial,
@@ -103,6 +139,44 @@ export function DepensesApp({
       setErreur(null);
     } catch {
       setErreur("Chargement impossible.");
+    }
+  }
+
+  async function reprendreChargesFixes() {
+    const precedent = moisPrecedent(mois);
+    setErreur(null);
+    setEnregistrement(true);
+    try {
+      const reponse = await fetch(`/api/patron/depenses?mois=${precedent}`, { cache: "no-store" });
+      const data = (await reponse.json()) as DonneesDepenses & { error?: string };
+      if (!reponse.ok) throw new Error(data.error);
+      const aReprendre = data.depenses.filter((d) => CATEGORIES_CHARGES_FIXES.includes(d.categorie));
+      if (aReprendre.length === 0) {
+        setErreur("Aucune charge fixe (loyer, salaires, assurance/abonnements, location de véhicule) le mois dernier.");
+        return;
+      }
+      for (const d of aReprendre) {
+        const envoi = await fetch("/api/patron/depenses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dateDepense: `${mois}-01`,
+            fournisseur: d.fournisseur,
+            description: d.description,
+            categorie: d.categorie,
+            montant: d.montant,
+            modePaiement: d.modePaiement,
+            lignes: [],
+            factureChemin: null,
+          }),
+        });
+        if (!envoi.ok) throw new Error("envoi");
+      }
+      await charger(mois);
+    } catch {
+      setErreur("Reprise impossible, réessaie.");
+    } finally {
+      setEnregistrement(false);
     }
   }
 
@@ -434,6 +508,40 @@ export function DepensesApp({
               Annuler
             </button>
           </div>
+        </section>
+      )}
+
+      {donnees && !donnees.depenses.some((d) => CATEGORIES_CHARGES_FIXES.includes(d.categorie)) && (
+        <section className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-sm text-gray-700">Aucune charge fixe saisie ce mois (loyer, salaires, assurance/abonnements, véhicule).</p>
+          <button
+            type="button"
+            onClick={reprendreChargesFixes}
+            disabled={enregistrement}
+            className="mt-2 rounded border border-gray-400 px-3 py-2 text-sm font-semibold text-black disabled:opacity-40"
+          >
+            Reprendre celles du mois dernier
+          </button>
+          <p className="mt-1 text-xs text-gray-500">Elles sont recopiées au 1er du mois : tu corriges ensuite les montants qui changent.</p>
+        </section>
+      )}
+
+      {donnees && prixAchatsReleves(donnees.depenses).length > 0 && (
+        <section className="rounded-lg border border-gray-200 bg-white p-4">
+          <h2 className="text-lg font-bold text-black">Prix d&apos;achat relevés</h2>
+          <p className="text-xs text-gray-600">Dernier prix payé par article, lu sur les factures : la base pour calculer ce que coûte chaque plat.</p>
+          <ul className="mt-2 divide-y divide-gray-100">
+            {prixAchatsReleves(donnees.depenses).map((p) => (
+              <li key={p.designation} className="flex flex-wrap justify-between gap-2 py-1.5 text-sm text-black">
+                <span className="font-semibold">{p.designation}</span>
+                <span className="text-gray-600">
+                  {euros(p.prixUnitaire)}
+                  {p.unite ? ` / ${p.unite}` : ""} · {p.fournisseur ?? "?"} · {libelleDate(p.date)}
+                  {p.nbAchats > 1 ? ` · ${p.nbAchats} achats` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
