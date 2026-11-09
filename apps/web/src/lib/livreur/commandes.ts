@@ -156,6 +156,8 @@ interface DeclarationLivraison {
   commandeId: string;
   livreurId: string;
   paiements: PaiementDeclare[];
+  /** Remarque libre facultative (oubli de sauce, boisson, couverts...). */
+  commentaire?: string;
 }
 
 /**
@@ -179,7 +181,7 @@ interface DeclarationLivraison {
  * réglé — bug réel constaté le 2026-10-21 (commande #455), qui aurait pu
  * faire livrer gratuitement une commande jamais payée.
  */
-export async function declarerLivraison({ commandeId, livreurId, paiements }: DeclarationLivraison): Promise<void> {
+export async function declarerLivraison({ commandeId, livreurId, paiements, commentaire }: DeclarationLivraison): Promise<void> {
   for (const p of paiements) {
     if (!Number.isFinite(p.montant) || p.montant <= 0) {
       throw new Error("Montant de paiement invalide.");
@@ -207,6 +209,11 @@ export async function declarerLivraison({ commandeId, livreurId, paiements }: De
     .maybeSingle();
   if (!livraison || livraison.livreur_id !== livreurId) {
     throw new Error("Cette livraison n'est pas assignée à ce livreur.");
+  }
+
+  const commentaireNettoye = commentaire?.trim().slice(0, 500);
+  if (commentaireNettoye) {
+    await supabase.from("commandes").update({ commentaire_livreur: commentaireNettoye }).eq("id", commandeId);
   }
 
   if (commande.mode_paiement === "stripe" && commande.paiement_statut === "paye") {

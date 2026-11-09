@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; paiements?: { mode?: string; montant?: number; payeur?: string }[] }
+    | { commandeId?: string; paiements?: { mode?: string; montant?: number; payeur?: string }[]; commentaire?: string }
     | null;
 
   if (!body?.commandeId || typeof body.commandeId !== "string") {
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await declarerLivraison({ commandeId: body.commandeId, livreurId: session.profilId, paiements });
+    await declarerLivraison({ commandeId: body.commandeId, livreurId: session.profilId, paiements, commentaire: typeof body.commentaire === "string" ? body.commentaire : undefined });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";
