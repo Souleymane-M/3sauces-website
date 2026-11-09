@@ -488,7 +488,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               <div className="mt-2 space-y-2 rounded-lg border border-red-600 bg-red-50 p-3">
                 <p className="text-sm font-semibold text-red-700">Pourquoi ?</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {["Client absent", "Adresse introuvable", "Client refuse", "Ne répond pas"].map((motif) => (
+                  {["Client absent", "Adresse introuvable", "Client refuse", "Ne répond pas", "Problème de paiement"].map((motif) => (
                     <button
                       key={motif}
                       onClick={() => setMotifEchec(motif)}
