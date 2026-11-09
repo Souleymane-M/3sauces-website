@@ -272,6 +272,7 @@ export function CommandesHistoriqueApp({
 
                 <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-xs text-gray-400">
                   {c.motifAnnulation && <p className="text-red-500">Motif d&apos;annulation : {c.motifAnnulation}</p>}
+                  {c.commentaireLivreur && <p className="text-orange-500">💬 Remarque du livreur : {c.commentaireLivreur}</p>}
                   {c.evenements.length === 0 && <p>Aucun évènement enregistré.</p>}
                   {c.evenements.map((e, i) => (
                     <p key={i}>

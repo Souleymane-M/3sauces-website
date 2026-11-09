@@ -1,5 +1,6 @@
 "use client";
 
+import { FormulaireImpossibleLivrer } from "./formulaire-impossible-livrer";
 import { libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { libellePayeeCourt } from "@/lib/libelle-paiement";
 import { useState } from "react";
@@ -66,7 +67,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   const [montantEspeces, setMontantEspeces] = useState("");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   const [echecOuvert, setEchecOuvert] = useState(false);
-  const [motifEchec, setMotifEchec] = useState("");
+  const [commentaire, setCommentaire] = useState("");
   const [relacherOuvert, setRelacherOuvert] = useState(false);
 
   async function prendre() {
@@ -99,7 +100,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
       const reponse = await fetch("/api/livreur/declarer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, paiements }),
+        body: JSON.stringify({ commandeId, paiements, commentaire }),
       });
       const data = await reponse.json();
       if (!reponse.ok) {
@@ -114,14 +115,14 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
     }
   }
 
-  async function signalerEchec(commandeId: string) {
+  async function signalerEchec(commandeId: string, motif: string) {
     setEnCours(true);
     setErreur(null);
     try {
       const reponse = await fetch("/api/livreur/signaler-echec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, motif: motifEchec }),
+        body: JSON.stringify({ commandeId, motif }),
       });
       const data = await reponse.json();
       if (!reponse.ok) {
@@ -263,6 +264,17 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
         </>
       )}
 
+      {etat.type === "a_livrer" && (
+        <textarea
+          value={commentaire}
+          onChange={(e) => setCommentaire(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder="Remarque (facultatif) : sauce, boisson, couverts oubliés…"
+          className="w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
+        />
+      )}
+
       {etat.type === "a_livrer" && livraison.dejaPayee && (
         <button
           type="button"
@@ -294,7 +306,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
           {choix === "especes" && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500">Combien le client t&apos;a-t-il donné ?</p>
+              <p className="text-xs text-gray-500">Combien le client t&apos;a-t-il donné ? (facultatif, pour calculer la monnaie)</p>
               <input
                 value={montantEspeces}
                 onChange={(e) => setMontantEspeces(e.target.value)}
@@ -419,35 +431,11 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
       )}
 
       {etat.type === "a_livrer" && echecOuvert && (
-        <div className="space-y-2 rounded-lg border border-red-600 bg-red-50 p-3">
-          <p className="text-sm font-semibold text-red-700">
-            Pourquoi ? (client absent, adresse introuvable, refusée...)
-          </p>
-          <input
-            value={motifEchec}
-            onChange={(e) => setMotifEchec(e.target.value)}
-            placeholder="Motif"
-            className="w-full rounded border border-gray-300 p-3 text-sm text-gray-900"
-          />
-          <p className="text-xs text-gray-600">Un responsable sera alerté tout de suite par email.</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setEchecOuvert(false)}
-              className="flex-1 rounded border border-gray-300 py-2 text-sm font-semibold text-gray-700"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={() => signalerEchec(commandeId)}
-              disabled={enCours}
-              className="flex-1 rounded bg-red-600 py-2 text-sm font-bold text-white disabled:opacity-40"
-            >
-              {enCours ? "…" : "Signaler"}
-            </button>
-          </div>
-        </div>
+        <FormulaireImpossibleLivrer
+          enCours={enCours}
+          onAnnuler={() => setEchecOuvert(false)}
+          onEnvoyer={(motif) => signalerEchec(commandeId, motif)}
+        />
       )}
     </div>
   );

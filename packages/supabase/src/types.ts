@@ -325,6 +325,7 @@ export interface Database {
           ticket_remis_le: string | null;
           palier_groupe: string | null;
           motif_annulation: string | null;
+          commentaire_livreur: string | null;
           statut_change_le: string | null;
           imprimer_ticket_client: boolean;
         };
@@ -357,6 +358,7 @@ export interface Database {
           ticket_remis_le?: string | null;
           palier_groupe?: string | null;
           motif_annulation?: string | null;
+          commentaire_livreur?: string | null;
           statut_change_le?: string | null;
           imprimer_ticket_client?: boolean;
         };

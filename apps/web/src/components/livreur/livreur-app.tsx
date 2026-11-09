@@ -2,6 +2,7 @@
 
 import { fourchetteLivraison } from "@/lib/commande-publique/lieux-livraison";
 import { libellePayee } from "@/lib/libelle-paiement";
+import { FormulaireImpossibleLivrer } from "./formulaire-impossible-livrer";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
@@ -119,7 +120,8 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // "Impossible à livrer" directement depuis la liste (sans re-scanner le QR code) : commande dont le formulaire
   // est ouvert + motif choisi/saisi.
   const [echecOuvertId, setEchecOuvertId] = useState<string | null>(null);
-  const [motifEchec, setMotifEchec] = useState("");
+  // Remarque libre facultative par livraison (envoyée avec la déclaration de livraison).
+  const [commentaires, setCommentaires] = useState<Record<string, string>>({});
   // La commande reste "en livraison" côté serveur (le responsable décide de la suite) : on mémorise juste ici
   // qu'elle a été signalée pour ne pas laisser croire que rien ne s'est passé.
   const [echecsSignales, setEchecsSignales] = useState<Set<string>>(new Set());
@@ -175,14 +177,14 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
     };
   }, [enCours, declarationsOuvertes]);
 
-  async function signalerEchec(livraison: LivraisonAssignee) {
+  async function signalerEchec(livraison: LivraisonAssignee, motif: string) {
     setErreur(null);
     setEnCours(livraison.id);
     try {
       const reponse = await fetch("/api/livreur/signaler-echec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId: livraison.id, motif: motifEchec }),
+        body: JSON.stringify({ commandeId: livraison.id, motif }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
@@ -191,7 +193,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       }
       setEchecsSignales((prec) => new Set(prec).add(livraison.id));
       setEchecOuvertId(null);
-      setMotifEchec("");
     } catch {
       setErreur("Erreur réseau, réessaie.");
     } finally {
@@ -223,7 +224,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       const reponse = await fetch("/api/livreur/declarer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId: livraison.id, paiements }),
+        body: JSON.stringify({ commandeId: livraison.id, paiements, commentaire: commentaires[livraison.id] }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
@@ -446,6 +447,15 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               </>
             )}
 
+            <textarea
+              value={commentaires[livraison.id] ?? ""}
+              onChange={(e) => setCommentaires((prec) => ({ ...prec, [livraison.id]: e.target.value }))}
+              rows={2}
+              maxLength={500}
+              placeholder="Remarque (facultatif) : sauce, boisson, couverts oubliés…"
+              className="mt-3 w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
+            />
+
             {!declaration && livraison.dejaPayee && (
               <button
                 onClick={() => envoyer(livraison, [])}
@@ -475,7 +485,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               <button
                 onClick={() => {
                   setErreur(null);
-                  setMotifEchec("");
                   setEchecOuvertId(livraison.id);
                 }}
                 className="mt-2 w-full rounded border-2 border-red-600 py-3 text-lg font-bold text-red-600"
@@ -485,43 +494,12 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
             )}
 
             {!declaration && echecOuvertId === livraison.id && (
-              <div className="mt-2 space-y-2 rounded-lg border border-red-600 bg-red-50 p-3">
-                <p className="text-sm font-semibold text-red-700">Pourquoi ?</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {["Client absent", "Adresse introuvable", "Client refuse", "Ne répond pas", "Problème de paiement"].map((motif) => (
-                    <button
-                      key={motif}
-                      onClick={() => setMotifEchec(motif)}
-                      className={`rounded border py-2 text-sm font-bold ${
-                        motifEchec === motif ? "border-red-600 bg-red-600 text-white" : "border-gray-300 bg-white text-gray-700"
-                      }`}
-                    >
-                      {motif}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  value={motifEchec}
-                  onChange={(e) => setMotifEchec(e.target.value)}
-                  placeholder="Autre motif"
-                  className="w-full rounded border border-gray-300 p-3 text-sm text-gray-900"
+              <div className="mt-2">
+                <FormulaireImpossibleLivrer
+                  enCours={enCours === livraison.id}
+                  onAnnuler={() => setEchecOuvertId(null)}
+                  onEnvoyer={(motif) => signalerEchec(livraison, motif)}
                 />
-                <p className="text-xs text-gray-600">Un responsable sera alerté tout de suite par email.</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setEchecOuvertId(null)}
-                    className="flex-1 rounded border border-gray-300 bg-white py-2 text-sm font-semibold text-gray-700"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={() => signalerEchec(livraison)}
-                    disabled={enCours === livraison.id || motifEchec.trim() === ""}
-                    className="flex-1 rounded bg-red-600 py-2 text-sm font-bold text-white disabled:opacity-40"
-                  >
-                    {enCours === livraison.id ? "…" : "Signaler"}
-                  </button>
-                </div>
               </div>
             )}
 
@@ -545,7 +523,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
 
                 {declaration.choixSimple === "especes" && (
                   <div>
-                    <label className="text-sm text-gray-500">Montant reçu</label>
+                    <label className="text-sm text-gray-500">Montant reçu (facultatif, pour calculer la monnaie)</label>
                     <input
                       value={declaration.montantRecu}
                       onChange={(e) => modifierDeclaration(livraison.id, { montantRecu: e.target.value })}
@@ -603,8 +581,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                     disabled={
                       enCours === livraison.id ||
                       !declaration.choixSimple ||
-                      (declaration.choixSimple === "especes" &&
-                        !(Number(declaration.montantRecu.replace(",", ".")) >= livraison.montant)) ||
                       (declaration.choixSimple === "mixte" &&
                         !(Number(declaration.montantEspecesMixte.replace(",", ".")) >= 0))
                     }

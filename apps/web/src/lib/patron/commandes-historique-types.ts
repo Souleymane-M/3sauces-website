@@ -35,6 +35,8 @@ export interface CommandeHistorique {
   dejaPayee: boolean;
   /** Renseigné uniquement si la commande a été annulée. */
   motifAnnulation: string | null;
+  /** Remarque libre du livreur (oubli de sauce, boisson, couverts...), pour la formation du personnel. */
+  commentaireLivreur: string | null;
 }
 
 export interface TempsPreparationEmploye {
