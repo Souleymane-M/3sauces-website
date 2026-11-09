@@ -25,7 +25,6 @@ import {
   creneauxPourDate,
   filtrerCreneauxLivraison,
   heureDebutLivraison,
-  DELAI_MINIMUM_LIVRAISON_MINUTES,
   prochainesDatesOuvertes,
   dateMayotteIso,
   heureActuelleMayotteMinutes,
@@ -1656,7 +1655,7 @@ export function CommandePubliqueApp({
                 )}
                 {canal === "livraison" && heureDebutLivraison(dateCommande) && (
                   <p className="mt-2 text-sm font-bold text-[#8B2020]">
-                    Livraison : il faut compter {DELAI_MINIMUM_LIVRAISON_MINUTES} min après la commande. Premier créneau possible : {heureDebutLivraison(dateCommande)!.replace(":", "h")}.
+                    Livraison possible à partir de {heureDebutLivraison(dateCommande)!.replace(":", "h")}.
                   </p>
                 )}
                 {!canal && (

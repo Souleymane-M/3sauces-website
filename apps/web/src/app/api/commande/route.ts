@@ -10,7 +10,6 @@ import {
   dateMayotteIso,
   heureActuelleMayotteMinutes,
   heureDebutLivraison,
-  DELAI_MINIMUM_LIVRAISON_MINUTES,
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
 import { limiterDebit } from "@/lib/auth/rate-limit";
@@ -227,10 +226,10 @@ export async function POST(request: Request) {
 
   // Restriction exceptionnelle d'un jour donné (cf. creneau.ts) : pas de livraison avant l'heure fixée.
   if (body.canal === "livraison") {
-    const debutLivraison = heureDebutLivraison(dateCommande, 10);
+    const debutLivraison = heureDebutLivraison(dateCommande);
     if (debutLivraison && creneauHeure < debutLivraison) {
       return NextResponse.json(
-        { error: `Pour livrer à temps, il faut compter ${DELAI_MINIMUM_LIVRAISON_MINUTES} min après la commande : choisis un créneau à partir de ${debutLivraison.replace(":", "h")}.` },
+        { error: `Pas de livraison avant ${debutLivraison.replace(":", "h")}.` },
         { status: 400 }
       );
     }
