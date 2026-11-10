@@ -25,7 +25,7 @@ import { ViandeModalPublique } from "@/components/commande-publique/viande-modal
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
-import { LIEUX_PRINCIPAUX, TOUS_LES_LIEUX, VILLAGES, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
+import { LIEUX_PRINCIPAUX, TOUS_LES_LIEUX, VILLAGES, libelleCreneauLieu, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
 import { DatePicker } from "@/components/commande-publique/date-picker";
 import type { CommandePourImpression } from "@/lib/impression/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
@@ -2244,6 +2244,8 @@ export function CaisseApp({
                       const choisi = trouverLieu(e.target.value);
                       // Le lieu remplit l'adresse (modifiable ensuite) ; un village attend sa précision (mairie, CCAS, rue…).
                       setAdresse(choisi ? (choisi.village ? `${choisi.nom} — ` : choisi.nom) : "");
+                      // Lieu à créneaux fixes : on retombe sur son premier créneau si l'heure actuelle n'en fait pas partie.
+                      if (choisi?.creneaux && !choisi.creneaux.includes(creneauHeure)) setCreneauHeure(choisi.creneaux[0]);
                     }}
                     className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
                   >
@@ -2283,12 +2285,39 @@ export function CaisseApp({
               label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
             />
 
-            <CreneauPicker
-              creneauxValides={creneauxValides}
-              valeur={creneauHeure}
-              onChange={setCreneauHeure}
-              label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
-            />
+            {(() => {
+              const lieuCaisse = canal === "livraison" ? TOUS_LES_LIEUX.find((l) => adresse.trim().startsWith(l.nom)) : undefined;
+              if (!lieuCaisse?.creneaux) {
+                return (
+                  <CreneauPicker
+                    creneauxValides={creneauxValides}
+                    valeur={creneauHeure}
+                    onChange={setCreneauHeure}
+                    label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
+                  />
+                );
+              }
+              // Même créneaux que sur le site pour ce lieu (la caissière garde la main : aucun n'est grisé).
+              return (
+                <div>
+                  <p className="text-xs text-gray-700">Créneau de livraison — {lieuCaisse.nom}</p>
+                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {lieuCaisse.creneaux.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCreneauHeure(c)}
+                        className={`rounded border-2 px-3 py-3 text-base font-bold ${
+                          creneauHeure === c ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-900"
+                        }`}
+                      >
+                        {libelleCreneauLieu(lieuCaisse, c)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {canal !== null && canal !== "livraison" && (
               <div>

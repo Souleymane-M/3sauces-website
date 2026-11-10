@@ -279,6 +279,8 @@ export function CommandePubliqueApp({
   // Lieu de livraison choisi dans la liste (créneaux fixes pour la fac, le lycée et la Technopole) ; `adresse` ne
   // sert plus que de précision (bâtiment, mairie, rue…).
   const [lieuId, setLieuId] = useState("");
+  // « Dès que possible » (premier créneau libre) ou une heure choisie à la main : l'un des deux est obligatoire.
+  const [quand, setQuand] = useState<"asap" | "heure" | null>(null);
   const lieu = trouverLieu(lieuId);
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
   const creneauxValides = useMemo(
@@ -502,7 +504,23 @@ export function CommandePubliqueApp({
       dateCommande,
       nouveauLieu
     );
-    setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
+    setCreneauHeure(creneaux.includes(creneauHeure) && quand !== "asap" ? creneauHeure : (creneaux[0] ?? ""));
+  }
+
+  /** « Dès que possible » : premier créneau libre de la première date ouverte qui en a encore un. */
+  function choisirAuPlusTot() {
+    let date = datesOuvertes[0] ?? aujourdHui;
+    let possibles: string[] = [];
+    for (const d of datesOuvertes.length > 0 ? datesOuvertes : [aujourdHui]) {
+      const tous = creneauxPourDate(d, parametres.heureDebut, parametres.heureFin);
+      possibles = canal === "livraison" ? creneauxLivraisonPossibles(tous, d, lieu) : tous;
+      date = d;
+      if (possibles.length > 0) break;
+    }
+    setDateCommande(date);
+    setCreneauHeure(possibles[0] ?? "");
+    if (date !== aujourdHui) setModePaiement("stripe");
+    setQuand("asap");
   }
 
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
@@ -983,6 +1001,10 @@ export function CommandePubliqueApp({
     const telephoneComplet = normaliserTelephone(telephone);
     if (!telephoneComplet) {
       setErreur("Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456).");
+      return;
+    }
+    if (quand === null) {
+      setErreur("Choisis « Dès que possible » ou une heure.");
       return;
     }
     if (canal === "livraison") {
@@ -1729,11 +1751,41 @@ export function CommandePubliqueApp({
                 </>
               )}
 
+              <label
+                className={`flex cursor-pointer items-center gap-3 rounded border-2 px-3 py-3 ${
+                  quand === "asap" ? "border-[#8B2020] bg-[#8B2020]/10" : "border-gray-300 bg-white"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={quand === "asap"}
+                  onChange={(e) => (e.target.checked ? choisirAuPlusTot() : setQuand(null))}
+                  className="h-6 w-6 shrink-0 accent-[#8B2020]"
+                />
+                <span className="text-base font-bold text-gray-900">
+                  Dès que possible
+                  <span className="block text-sm font-semibold text-gray-700">
+                    {commandeAvance
+                      ? `Le ${new Date(`${dateCommande}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}`
+                      : "Aujourd'hui"}
+                    {creneauHeure
+                      ? canal === "livraison" && lieu?.creneaux
+                        ? ` ${libelleCreneauLieu(lieu, creneauHeure)}`
+                        : ` à partir de ${creneauHeure}`
+                      : ""}
+                  </span>
+                </span>
+              </label>
+              <p className="text-sm font-bold text-gray-900">Ou choisis une heure :</p>
+
               <DatePicker
                 dates={datesOuvertes}
                 aujourdHui={aujourdHui}
                 valeur={dateCommande}
-                onChange={changerDate}
+                onChange={(d) => {
+                  setQuand("heure");
+                  changerDate(d);
+                }}
                 label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
               />
 
@@ -1748,7 +1800,10 @@ export function CommandePubliqueApp({
                           key={c}
                           type="button"
                           disabled={!dispo}
-                          onClick={() => setCreneauHeure(c)}
+                          onClick={() => {
+                            setQuand("heure");
+                            setCreneauHeure(c);
+                          }}
                           className={`rounded border-2 px-3 py-3 text-base font-bold disabled:opacity-30 ${
                             creneauHeure === c && dispo ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-900"
                           }`}
@@ -1763,7 +1818,10 @@ export function CommandePubliqueApp({
                 <CreneauPicker
                   creneauxValides={creneauxValides}
                   valeur={creneauHeure}
-                  onChange={setCreneauHeure}
+                  onChange={(c) => {
+                    setQuand("heure");
+                    setCreneauHeure(c);
+                  }}
                   label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
                 />
               )}
