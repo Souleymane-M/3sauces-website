@@ -24,6 +24,7 @@ import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_OIGNONS_FRITS,
   supplementBoissonFormule,
+  NOM_EAU_FORMULE_PLAT,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
@@ -490,7 +491,8 @@ export async function POST(request: Request) {
       if (est50cl && (produit.categorie !== "snacking" || produit.nom === NOM_PRODUIT_MENU_ETUDIANT || produit.salade_ou_boisson)) {
         return NextResponse.json({ error: `Boisson 50 cl non proposée sur ${produit.nom}.` }, { status: 400 });
       }
-      if (!est50cl && !nomsSaveursValides.has(boissonIncluse)) {
+      const eauAutorisee = boissonIncluse === NOM_EAU_FORMULE_PLAT && produit.categorie === "plat_du_jour" && produit.canette_incluse;
+      if (!est50cl && !eauAutorisee && !nomsSaveursValides.has(boissonIncluse)) {
         return NextResponse.json(
           { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
           { status: 400 }

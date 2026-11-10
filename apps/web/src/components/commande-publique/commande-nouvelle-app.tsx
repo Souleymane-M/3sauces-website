@@ -22,6 +22,7 @@ import {
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   MONTANT_OIGNONS_FRITS,
   supplementBoissonFormule,
+  saveursFormule,
 } from "@/lib/commande-publique/types";
 import {
   creneauxPourDate,
@@ -1789,7 +1790,7 @@ export function CommandeNouvelleApp({
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}
-          saveurs={saveurs}
+          saveurs={saveursFormule(produitEnSelection, saveurs)}
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
