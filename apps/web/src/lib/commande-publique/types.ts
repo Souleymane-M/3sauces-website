@@ -66,6 +66,16 @@ export interface SaveurPublique {
   nom: string;
 }
 
+/** Petite bouteille d'eau proposée, au choix de la canette, dans la formule d'un plat du jour à boisson incluse (ex : Pilaou au poisson). */
+export const NOM_EAU_FORMULE_PLAT = "Eau 50cl";
+
+/** Boissons au choix de la formule d'un produit : les canettes, plus la petite eau pour un plat du jour à boisson incluse. */
+export function saveursFormule(produit: { categorie: string; canetteIncluse: boolean }, saveurs: SaveurPublique[]): SaveurPublique[] {
+  return produit.canetteIncluse && produit.categorie === "plat_du_jour"
+    ? [...saveurs, { id: "eau-formule", nom: NOM_EAU_FORMULE_PLAT }]
+    : saveurs;
+}
+
 /**
  * Produits "supplément" utilisés à l'intérieur du configurateur
  * Tacos/Barquette/Bowl (viande et sauce en plus, avec supplément de prix),

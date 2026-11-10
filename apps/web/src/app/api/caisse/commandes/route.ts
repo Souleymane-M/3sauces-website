@@ -7,6 +7,7 @@ import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifi
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
+  NOM_EAU_FORMULE_PLAT,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
@@ -279,7 +280,8 @@ async function validerLignesCommande(
       if (!produit.canette_incluse && !produit.salade_ou_boisson) {
         throw new ErreurValidation(`Pas de canette incluse sur ${produit.nom}.`);
       }
-      if (!nomsSaveursValides.has(boissonIncluse)) {
+      const eauAutorisee = boissonIncluse === NOM_EAU_FORMULE_PLAT && produit.categorie === "plat_du_jour" && produit.canette_incluse;
+      if (!eauAutorisee && !nomsSaveursValides.has(boissonIncluse)) {
         throw new ErreurValidation(`Saveur de canette invalide sur la ligne ${produit.nom}.`);
       }
     }

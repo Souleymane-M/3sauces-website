@@ -32,7 +32,7 @@ export const LIEUX_PRINCIPAUX: LieuLivraison[] = [
     sansPrecision: true,
   },
   { id: "lycee", nom: "Lycée de Dembéni", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false, sansPrecision: true },
-  { id: "technopole", nom: "Technopole", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false },
+  { id: "technopole", nom: "Technopole", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false, sansPrecision: true },
 ];
 
 export const VILLAGES: LieuLivraison[] = ["Dembéni", "Iloni", "Tsararano", "Hajangoua", "Ongojou"].map((nom) => ({

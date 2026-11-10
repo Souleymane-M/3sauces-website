@@ -22,6 +22,7 @@ import type {
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   MONTANT_REDUCTION_SANS_BOISSON,
+  NOM_EAU_FORMULE_PLAT,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
@@ -457,7 +458,8 @@ export async function POST(request: Request) {
       if (!produit.canette_incluse && !produit.salade_ou_boisson) {
         return NextResponse.json({ error: `Pas de canette incluse sur ${produit.nom}.` }, { status: 400 });
       }
-      if (!nomsSaveursValides.has(boissonIncluse)) {
+      const eauAutorisee = boissonIncluse === NOM_EAU_FORMULE_PLAT && produit.categorie === "plat_du_jour" && produit.canette_incluse;
+      if (!eauAutorisee && !nomsSaveursValides.has(boissonIncluse)) {
         return NextResponse.json(
           { error: `Saveur de canette invalide sur la ligne ${produit.nom}.` },
           { status: 400 }

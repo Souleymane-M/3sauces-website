@@ -13,6 +13,7 @@ import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
+  saveursFormule,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
@@ -1055,7 +1056,8 @@ export function CaisseApp({
       produit.nbSaucesIncluses > 0 ||
       produit.autoriseExtras ||
       produit.nbSaveursMax > 0 ||
-      produit.accompagnementInclus;
+      produit.accompagnementInclus ||
+      (produit.canetteIncluse && produit.categorie === "plat_du_jour");
 
     if (besoinConfigurateur) {
       setProduitEnSelection(produit);
@@ -2637,7 +2639,7 @@ export function CaisseApp({
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}
-          saveurs={saveurs}
+          saveurs={saveursFormule(produitEnSelection, saveurs)}
           accompagnements={accompagnements}
           produitViandeSupplementaire={produitViandeSupplementaire}
           produitSauceSupplementaire={produitSauceSupplementaire}
