@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!body?.commandeId || typeof body.commandeId !== "string") {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
-  if (body.action !== "remettre" && body.action !== "annuler") {
+  if (body.action !== "remettre" && body.action !== "annuler" && body.action !== "classer") {
     return NextResponse.json({ error: "Action invalide." }, { status: 400 });
   }
   if (!body.profilId || typeof body.profilId !== "string") {

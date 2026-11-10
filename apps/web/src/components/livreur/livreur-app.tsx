@@ -46,27 +46,17 @@ interface LivreurAppProps {
 /** Sondage régulier de /api/livreur/commandes — même esprit que l'alerte sonore côté caisse, pour que la liste "en attente" se tienne à jour sans rafraîchissement manuel. */
 const INTERVALLE_SONDAGE_MS = 8_000;
 
-interface PaiementGroupe {
-  mode: ModePaiement;
-  montant: string;
-  payeur: string;
-}
-
 interface DeclarationEnCours {
-  mode: "simple" | "groupe";
   choixSimple: "especes" | "cb" | "mixte" | null;
   montantRecu: string;
   montantEspecesMixte: string;
-  paiementsGroupes: PaiementGroupe[];
 }
 
 function declarationVide(): DeclarationEnCours {
   return {
-    mode: "simple",
     choixSimple: null,
     montantRecu: "",
     montantEspecesMixte: "",
-    paiementsGroupes: [{ mode: "especes", montant: "", payeur: "" }],
   };
 }
 
@@ -276,19 +266,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
     }
   }
 
-  function soumettreGroupe(livraison: LivraisonAssignee, declaration: DeclarationEnCours) {
-    const paiements: { mode: ModePaiement; montant: number; payeur?: string }[] = [];
-    for (const p of declaration.paiementsGroupes) {
-      const montant = Number(p.montant.replace(",", "."));
-      if (!Number.isFinite(montant) || montant <= 0) {
-        setErreur("Chaque paiement doit avoir un montant valide.");
-        return;
-      }
-      paiements.push({ mode: p.mode, montant, payeur: p.payeur.trim() || undefined });
-    }
-    envoyer(livraison, paiements);
-  }
-
   return (
     <div className="mt-4 space-y-4">
       {erreur && <p className="text-lg text-red-600">{erreur}</p>}
@@ -360,13 +337,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
 
       {(onglet === "livraison" ? livraisonsFiltrees : []).map((livraison) => {
         const declaration = declarationsOuvertes[livraison.id];
-        const totalGroupeDeclare = declaration
-          ? Math.round(
-              declaration.paiementsGroupes.reduce((total, p) => total + (Number(p.montant.replace(",", ".")) || 0), 0) * 100
-            ) / 100
-          : 0;
-        const totalGroupeCorrespond = declaration && totalGroupeDeclare === Math.round(livraison.montant * 100) / 100;
-
         const prioritaire = livraison.palierGroupe !== null;
         // Remise éventuelle (lancement et/ou récompense fidélité) : déduite
         // de l'écart entre la somme des lignes et le montant réellement dû —
@@ -515,7 +485,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               </div>
             )}
 
-            {declaration && declaration.mode === "simple" && (
+            {declaration && (
               <div className="mt-4 space-y-3 border-t border-gray-200 pt-3">
                 <div className="grid grid-cols-3 gap-2">
                   {(["especes", "cb", "mixte"] as const).map((choix) => (
@@ -574,16 +544,9 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                   </div>
                 )}
 
-                <button
-                  onClick={() => modifierDeclaration(livraison.id, { mode: "groupe" })}
-                  className="text-sm text-gray-500 underline"
-                >
-                  Commande groupée (plusieurs payeurs)
-                </button>
-
                 {partielOuvertId !== livraison.id ? (
                   <button onClick={() => setPartielOuvertId(livraison.id)} className="block text-sm text-orange-700 underline">
-                    Paiement partiel (un client n&apos;a pas payé)
+                    Paiement partiel
                   </button>
                 ) : (
                   <FormulairePaiementPartiel
@@ -617,96 +580,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               </div>
             )}
 
-            {declaration && declaration.mode === "groupe" && (
-              <div className="mt-4 space-y-3 border-t border-gray-200 pt-3">
-                <button
-                  onClick={() => modifierDeclaration(livraison.id, { mode: "simple" })}
-                  className="text-sm text-gray-500 underline"
-                >
-                  ← Revenir à un seul payeur
-                </button>
-
-                {declaration.paiementsGroupes.map((paiement, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <select
-                      value={paiement.mode}
-                      onChange={(e) => {
-                        const paiements = [...declaration.paiementsGroupes];
-                        paiements[index] = { ...paiement, mode: e.target.value as ModePaiement };
-                        modifierDeclaration(livraison.id, { paiementsGroupes: paiements });
-                      }}
-                      className="rounded border border-gray-300 p-2 text-sm text-gray-900"
-                    >
-                      <option value="especes">Espèces</option>
-                      <option value="cb">Carte</option>
-                    </select>
-                    <input
-                      value={paiement.montant}
-                      onChange={(e) => {
-                        const paiements = [...declaration.paiementsGroupes];
-                        paiements[index] = { ...paiement, montant: e.target.value };
-                        modifierDeclaration(livraison.id, { paiementsGroupes: paiements });
-                      }}
-                      inputMode="decimal"
-                      placeholder="Montant"
-                      className="w-24 rounded border border-gray-300 p-2 text-sm text-gray-900"
-                    />
-                    <input
-                      value={paiement.payeur}
-                      onChange={(e) => {
-                        const paiements = [...declaration.paiementsGroupes];
-                        paiements[index] = { ...paiement, payeur: e.target.value };
-                        modifierDeclaration(livraison.id, { paiementsGroupes: paiements });
-                      }}
-                      placeholder="Qui (optionnel)"
-                      className="flex-1 rounded border border-gray-300 p-2 text-sm text-gray-900"
-                    />
-                    {declaration.paiementsGroupes.length > 1 && (
-                      <button
-                        onClick={() => {
-                          const paiements = declaration.paiementsGroupes.filter((_, i) => i !== index);
-                          modifierDeclaration(livraison.id, { paiementsGroupes: paiements });
-                        }}
-                        className="text-gray-400"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                <button
-                  onClick={() =>
-                    modifierDeclaration(livraison.id, {
-                      paiementsGroupes: [...declaration.paiementsGroupes, { mode: "especes", montant: "", payeur: "" }],
-                    })
-                  }
-                  className="text-sm text-[#8B2020] underline"
-                >
-                  + Ajouter un paiement
-                </button>
-
-                <p className={`text-lg font-semibold ${totalGroupeCorrespond ? "text-gray-900" : "text-orange-600"}`}>
-                  Total déclaré : {totalGroupeDeclare.toFixed(2)} € / {livraison.montant.toFixed(2)} € attendus
-                </p>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => fermerDeclaration(livraison.id)}
-                    className="flex-1 rounded border border-gray-300 py-3 text-lg font-semibold text-gray-700"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={() => soumettreGroupe(livraison, declaration)}
-                    disabled={enCours === livraison.id || !totalGroupeCorrespond}
-                    className="flex-1 rounded bg-[#8B2020] py-3 text-lg font-bold text-white disabled:opacity-40"
-                  >
-                    Confirmer
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         );
       })}

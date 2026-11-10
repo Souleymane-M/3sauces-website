@@ -421,7 +421,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
  */
 interface CarteLivraisonEnCoursProps {
   livraison: LivraisonEnCours;
-  resoudreLivraison: (commandeId: string, action: "remettre" | "annuler") => void;
+  resoudreLivraison: (commandeId: string, action: "remettre" | "annuler" | "classer") => void;
 }
 
 function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonEnCoursProps) {
@@ -449,7 +449,20 @@ function CarteLivraisonEnCours({ livraison, resoudreLivraison }: CarteLivraisonE
     <div
       className={`rounded-xl border-2 p-4 ${livraison.alerteSignalee ? "border-orange-500" : ancienne ? "border-red-600" : "border-gray-200"}`}
     >
-      {livraison.alerteSignalee && (
+      {livraison.alerteSignalee && livraison.paiementPartiel && (
+        <div className="mb-2 rounded bg-orange-100 p-3">
+          <p className="text-lg font-bold text-orange-800">⚠️ Paiement partiel — une partie de la commande est revenue</p>
+          {livraison.alerteNote && <p className="mt-1 text-base text-orange-800">{livraison.alerteNote}</p>}
+          <button
+            type="button"
+            onClick={() => resoudreLivraison(livraison.id, "classer")}
+            className="mt-3 w-full rounded bg-[#2D5A27] py-2 text-sm font-semibold text-white"
+          >
+            ✓ Pris en compte
+          </button>
+        </div>
+      )}
+      {livraison.alerteSignalee && !livraison.paiementPartiel && (
         <div className="mb-2 rounded bg-orange-100 p-3">
           <p className="text-lg font-bold text-orange-800">🚨 Impossible de livrer</p>
           {livraison.alerteNote && <p className="mt-1 text-base text-orange-800">{livraison.alerteNote}</p>}
@@ -725,7 +738,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     demanderChangement(commandeId, "annulee", undefined, motif);
   }
 
-  async function appliquerResolutionLivraison(commandeId: string, action: "remettre" | "annuler", profilId: string) {
+  async function appliquerResolutionLivraison(commandeId: string, action: "remettre" | "annuler" | "classer", profilId: string) {
     setErreur(null);
     const reponse = await fetch("/api/cuisine/livraison-echec", {
       method: "POST",
@@ -740,7 +753,7 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     await rafraichir();
   }
 
-  function resoudreLivraison(commandeId: string, action: "remettre" | "annuler") {
+  function resoudreLivraison(commandeId: string, action: "remettre" | "annuler" | "classer") {
     if (action === "annuler" && !window.confirm("Confirmer l'annulation de cette commande ?")) return;
     const executer = (identite: EmployeActif) => {
       appliquerResolutionLivraison(commandeId, action, identite.profilId);

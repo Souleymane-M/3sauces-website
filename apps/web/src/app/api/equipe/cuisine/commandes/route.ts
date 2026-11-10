@@ -51,6 +51,7 @@ export async function GET() {
       alerteSignalee: l.alerteSignalee,
       alerteNote: l.alerteNote,
       alerteSignaleeLe: l.alerteSignaleeLe,
+      paiementPartiel: l.paiementPartiel,
     }));
     return NextResponse.json({ commandes: projeter(commandes), aVenir: projeter(aVenir), enLivraison: enLivraisonProjetee });
   } catch (e) {

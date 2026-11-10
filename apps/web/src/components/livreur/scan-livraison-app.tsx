@@ -308,7 +308,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
 
           {!partielOuvert ? (
             <button type="button" onClick={() => setPartielOuvert(true)} className="text-sm text-orange-700 underline">
-              Paiement partiel (un client n&apos;a pas payé)
+              Paiement partiel
             </button>
           ) : (
             <FormulairePaiementPartiel

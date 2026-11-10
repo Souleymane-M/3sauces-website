@@ -80,6 +80,8 @@ export interface LivraisonEnCours {
   alerteSignalee: boolean;
   alerteNote: string | null;
   alerteSignaleeLe: string | null;
+  /** Livrée mais payée en partie seulement : reste à traiter (plat non récupéré), jusqu'à ce que le comptoir le classe. */
+  paiementPartiel: boolean;
   /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
   origineCaisse: boolean;
 }

@@ -129,10 +129,11 @@ export async function listerLivraisonsEnCours(): Promise<LivraisonEnCours[]> {
   const { data: commandes, error } = await supabase
     .from("commandes")
     .select(
-      "id, numero, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, alerte_signalee, alerte_note, alerte_signalee_le, commande_par"
+      "id, numero, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, alerte_signalee, alerte_note, alerte_signalee_le, commande_par"
     )
     .eq("canal", "livraison")
-    .eq("statut", "pris_par_livreur")
+    // En cours de livraison, ou livrée mais avec un paiement partiel encore à traiter (alerte non classée).
+    .or("statut.eq.pris_par_livreur,and(statut.eq.livre,alerte_signalee.eq.true,alerte_note.like.Paiement partiel*)")
     .lt("heure_souhaitee", fin.toISOString())
     .order("heure_souhaitee", { ascending: true, nullsFirst: false });
 
@@ -172,6 +173,7 @@ export async function listerLivraisonsEnCours(): Promise<LivraisonEnCours[]> {
       alerteSignalee: c.alerte_signalee,
       alerteNote: c.alerte_note,
       alerteSignaleeLe: c.alerte_signalee_le,
+      paiementPartiel: c.statut === "livre",
       origineCaisse: c.commande_par !== null,
     };
   });
@@ -600,7 +602,7 @@ export async function cloturerCommandeFinService({
 export async function resoudreLivraisonSignalee(
   commandeId: string,
   profilId: string,
-  action: "remettre" | "annuler",
+  action: "remettre" | "annuler" | "classer",
   motif?: string
 ): Promise<void> {
   const supabase = createServiceSupabaseClient();
@@ -618,11 +620,20 @@ export async function resoudreLivraisonSignalee(
 
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
-    .select("id, statut, contenu, alerte_signalee")
+    .select("id, statut, contenu, alerte_signalee, alerte_note")
     .eq("id", commandeId)
     .maybeSingle();
   if (erreurCommande || !commande) {
     throw new Error("Commande introuvable.");
+  }
+  // Paiement partiel déjà livré : le comptoir prend connaissance, l'alerte est classée (la note reste sur la commande).
+  if (action === "classer") {
+    if (commande.statut !== "livre" || !commande.alerte_signalee || !commande.alerte_note?.startsWith("Paiement partiel")) {
+      throw new Error("Cette commande n'a pas de paiement partiel à classer.");
+    }
+    const { error: erreurClasse } = await supabase.from("commandes").update({ alerte_signalee: false }).eq("id", commandeId);
+    if (erreurClasse) throw new Error(`Impossible de classer l'alerte : ${erreurClasse.message}`);
+    return;
   }
   if (commande.statut !== "pris_par_livreur" || !commande.alerte_signalee) {
     throw new Error("Cette commande n'est pas signalée comme non livrée.");
