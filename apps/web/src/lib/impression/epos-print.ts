@@ -214,7 +214,7 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): { texte: stri
   if (supp.oignons) details.push({ texte: "+ Oignons frits" });
   if (l.saveurs && l.saveurs.length > 0) details.push({ texte: l.saveurs.join(", ") });
   const boisson = libelleBoissonLigne(l);
-  if (boisson) details.push({ texte: `BOISSON : ${boisson}`, surligne: true });
+  if (boisson) details.push({ texte: boisson, surligne: true });
   if (l.sansBoisson) details.push({ texte: "SANS BOISSON — ne pas donner de canette", surligne: true });
   if (l.saladeIncluse === true) details.push({ texte: "Avec salade" });
   if (l.saladeIncluse === false) details.push({ texte: "SANS SALADE" });
@@ -306,8 +306,19 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
     if (index > 0) b.brut(`<feed line="1"/>`);
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
-      b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`, { gras: true, taille: 2 });
+      // Toute boisson (canette, eau, 2L, 50 cl…) est surlignée, qu'elle soit vendue seule ou incluse dans une formule.
+      const estBoisson = l.categorie === "boisson";
+      b.ligne(
+        estBoisson
+          ? ` ${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()} `
+          : `${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`,
+        { gras: true, taille: 2, surligne: estBoisson }
+      );
       for (const { label, valeur, surligne } of attributsCuisine(l)) {
+        if (estBoisson) {
+          b.ligne(` ${valeur.toUpperCase()} `, { gras: true, taille: 1, surligne: true }, "  ");
+          continue;
+        }
         if (surligne) {
           b.ligne(` ${label.toUpperCase()} : ${valeur.toUpperCase()} `, { gras: true, taille: 1, surligne: true }, "  ");
           continue;
@@ -512,12 +523,12 @@ function construireContenuTicketClient(
     b.ligne(groupe.titre, { gras: true, taille: 1 });
     for (const l of groupe.lignes) {
       const prixLigne = l.quantite * l.prixUnitaire;
-      b.ligne(`${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)} - ${prixLigne.toFixed(2)} €`, {
-        gras: true,
-        taille: 1,
-      });
+      const estBoisson = l.categorie === "boisson";
+      const texteLigne = `${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)} - ${prixLigne.toFixed(2)} €`;
+      b.ligne(estBoisson ? ` ${texteLigne.toUpperCase()} ` : texteLigne, { gras: true, taille: 1, surligne: estBoisson });
       for (const detail of detailLigne(l)) {
-        b.ligne(detail.surligne ? ` ${detail.texte.toUpperCase()} ` : detail.texte, { gras: detail.surligne === true, taille: 1, surligne: detail.surligne }, "  ");
+        const surligne = detail.surligne === true || estBoisson;
+        b.ligne(surligne ? ` ${detail.texte.toUpperCase()} ` : detail.texte, { gras: surligne, taille: 1, surligne }, "  ");
       }
     }
   });
