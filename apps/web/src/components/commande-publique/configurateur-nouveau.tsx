@@ -7,6 +7,7 @@ import {
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   MONTANT_OIGNONS_FRITS,
   supplementBoissonFormule,
+  ajustementBoissonFormule,
   NOM_PRODUIT_MENU_ETUDIANT,
 } from "@/lib/commande-publique/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -220,7 +221,7 @@ export function ConfigurateurNouveau({
   const prixBase = produit.prix ?? 0;
   const prixUnite =
     prixBase +
-    (produit.canetteIncluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson ? supplementBoissonFormule(boissonChoisie, boissons50cl) : 0) +
+    ajustementBoissonFormule(produit, sansBoisson, boissonChoisie, boissons50cl) +
     (saladeOptionCochee ? (produit.saladePrixOption ?? 0) : 0) +
     (demandeSaladeOuBoisson && saladeGardee === true && boissonVoulue && boissonRetenue ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const prixAccompagnement = (nom: string) => accompagnements.find((a) => a.nom === nom)?.prix ?? 0;
@@ -484,8 +485,22 @@ export function ConfigurateurNouveau({
         {demandeChoixBoisson && (
           <Etape
             numero={prochain()}
-            titre={proposeSansBoisson ? (propose50cl ? "Une boisson avec ?" : "Une canette avec ?") : "Ta canette incluse"}
-            aide={proposeSansBoisson ? "Touche à nouveau pour l'enlever" : undefined}
+            titre={
+              produit.categorie === "plat_du_jour"
+                ? "Ta boisson, incluse dans le prix"
+                : proposeSansBoisson
+                  ? propose50cl
+                    ? "Une boisson avec ?"
+                    : "Une canette avec ?"
+                  : "Ta canette incluse"
+            }
+            aide={
+              produit.categorie === "plat_du_jour"
+                ? `Touche à nouveau pour l'enlever (−${euros(MONTANT_REDUCTION_SANS_BOISSON)})`
+                : proposeSansBoisson
+                  ? "Touche à nouveau pour l'enlever"
+                  : undefined
+            }
             couleur={ORANGE}
           >
             {propose50cl && (
@@ -493,7 +508,7 @@ export function ConfigurateurNouveau({
                 Canette 33 cl <span style={{ color: ROUGE }}>+{euros(MONTANT_REDUCTION_SANS_BOISSON)}</span>
               </p>
             )}
-            {!propose50cl && proposeSansBoisson && (
+            {!propose50cl && proposeSansBoisson && produit.categorie !== "plat_du_jour" && (
               <p className="text-sm font-extrabold" style={{ color: ROUGE }}>
                 +{euros(MONTANT_REDUCTION_SANS_BOISSON)}
               </p>

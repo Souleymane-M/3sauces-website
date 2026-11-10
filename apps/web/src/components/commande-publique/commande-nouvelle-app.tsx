@@ -22,6 +22,7 @@ import {
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   MONTANT_OIGNONS_FRITS,
   supplementBoissonFormule,
+  ajustementBoissonFormule,
   saveursFormule,
 } from "@/lib/commande-publique/types";
 import {
@@ -367,9 +368,7 @@ export function CommandeNouvelleApp({
   // ---- Calculs de prix (identiques à l'ancien site) -------------------------
   const prixLigne = (l: LignePanierPublique) =>
     l.produit.prix +
-    (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
-      ? supplementBoissonFormule(l.boissonIncluse, boissons50cl)
-      : 0) +
+    ajustementBoissonFormule(l.produit, l.sansBoisson === true, l.boissonIncluse, boissons50cl) +
     (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0) +
     // Accompagnements : 2 inclus au choix, le 3e et les suivants au prix de l'accompagnement.

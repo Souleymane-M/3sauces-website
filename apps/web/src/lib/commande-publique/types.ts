@@ -69,6 +69,22 @@ export interface SaveurPublique {
 /** Petite bouteille d'eau proposée, au choix de la canette, dans la formule d'un plat du jour à boisson incluse (ex : Pilaou au poisson). */
 export const NOM_EAU_FORMULE_PLAT = "Eau 50cl";
 
+/**
+ * Boisson de formule dont le prix est celui de la carte AVEC la boisson (plat du jour à boisson incluse, ex : Pilaou au poisson 13 €) :
+ * aucun supplément quand le client en prend une, 1,50 € de moins s'il la refuse. Ailleurs (Tacos, Barquette, Bowl) le prix de la carte
+ * est celui SANS boisson, +1,50 € si elle est ajoutée ; le Menu Étudiant n'a jamais de supplément ni de réduction.
+ */
+export function ajustementBoissonFormule(
+  produit: { categorie: string; canetteIncluse: boolean; nom: string },
+  sansBoisson: boolean,
+  boissonIncluse: string | null = null,
+  boissons50cl: { nom: string; prix: number }[] = []
+): number {
+  if (!produit.canetteIncluse || produit.nom === NOM_PRODUIT_MENU_ETUDIANT) return 0;
+  if (produit.categorie === "plat_du_jour") return sansBoisson ? -MONTANT_REDUCTION_SANS_BOISSON : 0;
+  return sansBoisson ? 0 : supplementBoissonFormule(boissonIncluse, boissons50cl);
+}
+
 /** Boissons au choix de la formule d'un produit : les canettes, plus la petite eau pour un plat du jour à boisson incluse. */
 export function saveursFormule(produit: { categorie: string; canetteIncluse: boolean }, saveurs: SaveurPublique[]): SaveurPublique[] {
   return produit.canetteIncluse && produit.categorie === "plat_du_jour"

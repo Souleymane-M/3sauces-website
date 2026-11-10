@@ -14,6 +14,7 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
   saveursFormule,
+  ajustementBoissonFormule,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
 import {
@@ -859,9 +860,7 @@ export function CaisseApp({
   // dans ViandeModalPublique.
   const prixLigne = (l: LignePanier) =>
     (l.produit.prix ?? l.prixSaisi ?? 0) +
-    (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
-      ? MONTANT_REDUCTION_SANS_BOISSON
-      : 0) +
+    ajustementBoissonFormule(l.produit, l.sansBoisson === true) +
     (l.saladeOption === true ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
