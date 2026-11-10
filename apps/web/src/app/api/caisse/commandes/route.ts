@@ -6,7 +6,7 @@ import { normaliserEmail } from "@/lib/email";
 import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-  MONTANT_REDUCTION_SANS_BOISSON,
+  ajustementBoissonFormule,
   NOM_EAU_FORMULE_PLAT,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
@@ -316,8 +316,9 @@ async function validerLignesCommande(
     // (Tacos/Barquette/Bowl) — elle se rajoute en option, jamais l'inverse.
     // Le Menu Étudiant fait exception : sa boisson est incluse
     // obligatoirement dans son prix de base, jamais de supplément.
-    if (produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson) {
-      prixUnitaire = Math.round((prixUnitaire + MONTANT_REDUCTION_SANS_BOISSON) * 100) / 100;
+    if (produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT) {
+      const ajustement = ajustementBoissonFormule({ categorie: produit.categorie, canetteIncluse: true, nom: produit.nom }, sansBoisson);
+      prixUnitaire = Math.round((prixUnitaire + ajustement) * 100) / 100;
     }
 
     // Salade en supplément payant (Tacos/Bowl) : intégrée à la ligne du produit.

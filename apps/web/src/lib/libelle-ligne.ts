@@ -6,6 +6,7 @@ interface LigneMinimale {
   prixUnitaire: number;
   boissonIncluse?: string | null;
   canetteIncluse?: boolean;
+  categorie?: string;
 }
 
 const euros = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
@@ -18,7 +19,7 @@ const euros = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
  */
 export function libelleBoissonLigne(l: LigneMinimale): string | null {
   if (!l.boissonIncluse) return null;
-  const payante = l.canetteIncluse === true && l.nom !== NOM_PRODUIT_MENU_ETUDIANT;
+  const payante = l.canetteIncluse === true && l.nom !== NOM_PRODUIT_MENU_ETUDIANT && l.categorie !== "plat_du_jour";
   return payante
     ? `Boisson : ${l.boissonIncluse} (+${euros(MONTANT_REDUCTION_SANS_BOISSON)})`
     : `Boisson incluse : ${l.boissonIncluse}`;

@@ -20,6 +20,7 @@ import {
   NOM_PRODUIT_MENU_ETUDIANT,
   MONTANT_REDUCTION_SANS_BOISSON,
   saveursFormule,
+  ajustementBoissonFormule,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
 import { LIEUX_PRINCIPAUX, VILLAGES, creneauxLivraisonPossibles, libelleCreneauLieu, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
@@ -480,9 +481,7 @@ export function CommandePubliqueApp({
   // exactement comme `proposeSansBoisson` dans ViandeModalPublique.
   const prixLigne = (l: LignePanierPublique) =>
     l.produit.prix +
-    (l.produit.canetteIncluse && l.produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !l.sansBoisson
-      ? MONTANT_REDUCTION_SANS_BOISSON
-      : 0) +
+    ajustementBoissonFormule(l.produit, l.sansBoisson === true) +
     (l.saladeOption ? (l.produit.saladePrixOption ?? 0) : 0) +
     (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
   const totalPlat = (plat: PlatGroupe) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);

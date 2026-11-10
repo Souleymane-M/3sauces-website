@@ -21,7 +21,7 @@ import type {
 } from "@/lib/commande-publique/types";
 import {
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
-  MONTANT_REDUCTION_SANS_BOISSON,
+  ajustementBoissonFormule,
   NOM_EAU_FORMULE_PLAT,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
   NOM_PRODUIT_MENU_ETUDIANT,
@@ -568,8 +568,8 @@ export async function POST(request: Request) {
       // obligatoirement dans son prix de base, jamais de supplément.
       prixUnitaire:
         Math.round(
-          ((produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT && !sansBoisson
-            ? produit.prix + MONTANT_REDUCTION_SANS_BOISSON
+          ((produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT
+            ? produit.prix + ajustementBoissonFormule({ categorie: produit.categorie, canetteIncluse: true, nom: produit.nom }, sansBoisson)
             : produit.salade_ou_boisson && saladeIncluse === true && boissonIncluse !== null
               ? produit.prix + MONTANT_SUPPLEMENT_SALADE_ET_BOISSON
               : produit.prix) +
