@@ -37,6 +37,7 @@ interface LivraisonEnCoursRestreinte {
   alerteSignalee: boolean;
   alerteNote: string | null;
   alerteSignaleeLe: string | null;
+  paiementPartiel?: boolean;
 }
 
 function jourMayotte(iso: string): string {
@@ -255,7 +256,7 @@ export function CuisineView({ profilId, seuilAlerteMin }: { profilId: string; se
               >
                 {l.alerteSignalee && (
                   <div className="mb-2 rounded bg-orange-100 p-2 text-sm font-semibold text-orange-800">
-                    🚨 Livreur signale un problème — préviens le comptoir
+                    {l.paiementPartiel ? "⚠️ Paiement partiel — préviens le comptoir" : "🚨 Livreur signale un problème — préviens le comptoir"}
                     {l.alerteSignaleeLe && ` (${formaterHeure(l.alerteSignaleeLe)})`}
                   </div>
                 )}
