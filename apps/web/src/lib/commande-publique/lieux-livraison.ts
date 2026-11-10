@@ -19,27 +19,25 @@ export interface LieuLivraison {
   sansPrecision?: boolean;
 }
 
-/** Créneaux d'une heure proposés au lycée, à la Technopole et dans les villages (« entre 11h et 12h », « entre 12h et 13h »). */
-const CRENEAUX_HEURE = ["11:00", "12:00"];
 
 export const LIEUX_PRINCIPAUX: LieuLivraison[] = [
   {
     id: "universite",
     nom: "Université de Mayotte",
-    creneaux: ["10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00"],
-    fourchetteMinutes: 30,
+    creneaux: null,
+    fourchetteMinutes: null,
     village: false,
     sansPrecision: true,
   },
-  { id: "lycee", nom: "Lycée de Dembéni", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false, sansPrecision: true },
-  { id: "technopole", nom: "Technopole", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false, sansPrecision: true },
+  { id: "lycee", nom: "Lycée de Dembéni", creneaux: null, fourchetteMinutes: null, village: false, sansPrecision: true },
+  { id: "technopole", nom: "Technopole", creneaux: null, fourchetteMinutes: null, village: false, sansPrecision: true },
 ];
 
 export const VILLAGES: LieuLivraison[] = ["Dembéni", "Iloni", "Tsararano", "Hajangoua", "Ongojou"].map((nom) => ({
   id: `village-${nom.toLowerCase()}`,
   nom,
-  creneaux: CRENEAUX_HEURE,
-  fourchetteMinutes: 60,
+  creneaux: null,
+  fourchetteMinutes: null,
   village: true,
 }));
 
