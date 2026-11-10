@@ -1776,20 +1776,6 @@ export function CommandePubliqueApp({
                       />
                     </div>
                   )}
-                  <div>
-                    <label className="text-xs text-gray-700">Zone</label>
-                    <select
-                      value={zone}
-                      onChange={(e) => setZone(e.target.value)}
-                      className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
-                    >
-                      {parametres.zonesActives.map((z) => (
-                        <option key={z} value={z}>
-                          {z}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                 </>
               )}
 
