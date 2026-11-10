@@ -90,14 +90,14 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
     }
   }
 
-  async function declarer(commandeId: string, paiements: { mode: ModePaiement; montant: number }[], motifPartiel?: string) {
+  async function declarer(commandeId: string, paiements: { mode: ModePaiement; montant: number }[], motifPartiel?: string, platsNonRecuperes?: string[]) {
     setEnCours(true);
     setErreur(null);
     try {
       const reponse = await fetch("/api/livreur/declarer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, paiements, commentaire, partiel: motifPartiel !== undefined ? true : undefined, motifPartiel }),
+        body: JSON.stringify({ commandeId, paiements, commentaire, partiel: motifPartiel !== undefined ? true : undefined, motifPartiel, platsNonRecuperes }),
       });
       const data = await reponse.json();
       if (!reponse.ok) {
@@ -308,9 +308,10 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
           ) : (
             <FormulairePaiementPartiel
               montantDu={montantDu}
+              lignes={livraison.lignes}
               enCours={enCours}
               onAnnuler={() => setPartielOuvert(false)}
-              onValider={(paiements, motif) => declarer(commandeId, paiements, motif)}
+              onValider={(paiements, motif, plats) => declarer(commandeId, paiements, motif, plats)}
             />
           )}
 

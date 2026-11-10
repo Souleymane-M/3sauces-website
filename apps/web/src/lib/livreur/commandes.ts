@@ -159,7 +159,7 @@ interface DeclarationLivraison {
   /** Remarque libre facultative (oubli de sauce, boisson, couverts...). */
   commentaire?: string;
   /** Paiement partiel : un client est parti sans payer, seul ce qui a été reçu est encaissé (motif facultatif). */
-  partiel?: { motif: string; nomLivreur: string };
+  partiel?: { motif: string; nomLivreur: string; plats: string[] };
 }
 
 /**
@@ -273,7 +273,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
         ? {
             montant: totalDeclare,
             alerte_signalee: true,
-            alerte_note: `Paiement partiel : ${totalDeclare.toFixed(2)} € reçus sur ${totalAttendu.toFixed(2)} € (reste ${(totalAttendu - totalDeclare).toFixed(2)} € non payé).${partiel.motif ? ` ${partiel.motif}` : ""}`,
+            alerte_note: `Paiement partiel : ${totalDeclare.toFixed(2)} € reçus sur ${totalAttendu.toFixed(2)} € (reste ${(totalAttendu - totalDeclare).toFixed(2)} € non payé).${partiel.plats.length > 0 ? ` Non récupéré : ${partiel.plats.join(", ")}.` : ""} ${partiel.motif}`,
             alerte_signalee_par: livreurId,
             alerte_signalee_le: new Date().toISOString(),
           }
@@ -286,7 +286,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
   await notifierPaiementConfirme(commandeId);
-  if (partiel) await notifierPaiementPartiel(commandeId, totalDeclare, totalAttendu, partiel.motif.trim(), partiel.nomLivreur);
+  if (partiel) await notifierPaiementPartiel(commandeId, totalDeclare, totalAttendu, partiel.motif.trim(), partiel.nomLivreur, partiel.plats);
 }
 
 /**
