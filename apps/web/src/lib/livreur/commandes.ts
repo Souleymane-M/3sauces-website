@@ -3,7 +3,7 @@ import { modeGlobalDepuisPaiements } from "@/lib/libelle-paiement";
 import type { RoleMetier, StatutCommande } from "@3sauces/supabase";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { changerStatutCommande } from "@/lib/cuisine/commandes";
-import { notifierPaiementConfirme, notifierLivraisonNonEffectuee } from "@/lib/notifications/paiement";
+import { notifierPaiementConfirme, notifierLivraisonNonEffectuee, notifierPaiementPartiel } from "@/lib/notifications/paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/creneau";
@@ -159,7 +159,7 @@ interface DeclarationLivraison {
   /** Remarque libre facultative (oubli de sauce, boisson, couverts...). */
   commentaire?: string;
   /** Paiement partiel : un client est parti sans payer, seul ce qui a été reçu est encaissé (motif facultatif). */
-  partiel?: { motif: string };
+  partiel?: { motif: string; nomLivreur: string };
 }
 
 /**
@@ -230,6 +230,9 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
   const totalDeclare = Math.round(paiements.reduce((total, p) => total + p.montant, 0) * 100) / 100;
   const totalAttendu = Math.round(commande.montant * 100) / 100;
   if (partiel) {
+    if (!partiel.motif.trim()) {
+      throw new Error("Indique le motif du paiement partiel.");
+    }
     if (!(totalDeclare > 0 && totalDeclare < totalAttendu)) {
       throw new Error("Un paiement partiel doit être inférieur au montant dû.");
     }
@@ -283,6 +286,7 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
 
   await changerStatutCommande({ commandeId, statut: "livre", profilId: livreurId, roleMetier: "livreur" });
   await notifierPaiementConfirme(commandeId);
+  if (partiel) await notifierPaiementPartiel(commandeId, totalDeclare, totalAttendu, partiel.motif.trim(), partiel.nomLivreur);
 }
 
 /**

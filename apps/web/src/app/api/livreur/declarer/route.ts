@@ -40,7 +40,10 @@ export async function POST(request: Request) {
 
   try {
     await declarerLivraison({ commandeId: body.commandeId, livreurId: session.profilId, paiements, commentaire: typeof body.commentaire === "string" ? body.commentaire : undefined,
-      partiel: body.partiel === true ? { motif: typeof body.motifPartiel === "string" ? body.motifPartiel.trim().slice(0, 200) : "" } : undefined,
+      partiel:
+        body.partiel === true
+          ? { motif: typeof body.motifPartiel === "string" ? body.motifPartiel.trim().slice(0, 200) : "", nomLivreur: session.nom }
+          : undefined,
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
