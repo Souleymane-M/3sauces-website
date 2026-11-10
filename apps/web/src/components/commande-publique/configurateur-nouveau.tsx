@@ -487,7 +487,7 @@ export function ConfigurateurNouveau({
             numero={prochain()}
             titre={
               produit.categorie === "plat_du_jour"
-                ? "Ta boisson, incluse dans le prix"
+                ? "Boisson"
                 : proposeSansBoisson
                   ? propose50cl
                     ? "Une boisson avec ?"
@@ -496,7 +496,7 @@ export function ConfigurateurNouveau({
             }
             aide={
               produit.categorie === "plat_du_jour"
-                ? `Touche à nouveau pour l'enlever (−${euros(MONTANT_REDUCTION_SANS_BOISSON)})`
+                ? undefined
                 : proposeSansBoisson
                   ? "Touche à nouveau pour l'enlever"
                   : undefined
