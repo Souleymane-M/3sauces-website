@@ -19,6 +19,9 @@ export interface LieuLivraison {
   sansPrecision?: boolean;
 }
 
+/** Créneaux d'une heure proposés au lycée, à la Technopole et dans les villages (« entre 11h et 12h », « entre 12h et 13h »). */
+const CRENEAUX_HEURE = ["11:00", "12:00"];
+
 export const LIEUX_PRINCIPAUX: LieuLivraison[] = [
   {
     id: "universite",
@@ -28,15 +31,15 @@ export const LIEUX_PRINCIPAUX: LieuLivraison[] = [
     village: false,
     sansPrecision: true,
   },
-  { id: "lycee", nom: "Lycée de Dembéni", creneaux: ["10:30", "11:20", "12:20"], fourchetteMinutes: null, village: false, sansPrecision: true },
-  { id: "technopole", nom: "Technopole", creneaux: ["12:00", "12:30"], fourchetteMinutes: null, village: false },
+  { id: "lycee", nom: "Lycée de Dembéni", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false, sansPrecision: true },
+  { id: "technopole", nom: "Technopole", creneaux: CRENEAUX_HEURE, fourchetteMinutes: 60, village: false },
 ];
 
 export const VILLAGES: LieuLivraison[] = ["Dembéni", "Iloni", "Tsararano", "Hajangoua", "Ongojou"].map((nom) => ({
   id: `village-${nom.toLowerCase()}`,
   nom,
-  creneaux: null,
-  fourchetteMinutes: null,
+  creneaux: CRENEAUX_HEURE,
+  fourchetteMinutes: 60,
   village: true,
 }));
 
@@ -46,16 +49,18 @@ export function trouverLieu(id: string | null | undefined): LieuLivraison | null
   return TOUS_LES_LIEUX.find((l) => l.id === id) ?? null;
 }
 
-function versHeureMinute(minutes: number): string {
-  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}h${String(minutes % 60).padStart(2, "0")}`;
+function versHeureMinute(minutes: number, sansMinutesNulles = false): string {
+  const h = String(Math.floor(minutes / 60)).padStart(2, "0");
+  return sansMinutesNulles && minutes % 60 === 0 ? `${h}h` : `${h}h${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** « entre 11h00 et 11h30 » pour une fourchette, « 11h20 » sinon. */
+/** « entre 11h00 et 11h30 » ou « entre 11h et 12h » (minutes à zéro omises) pour une fourchette, « 11h20 » sinon. */
 export function libelleCreneauLieu(lieu: LieuLivraison | null, creneau: string): string {
   if (!creneau) return "";
   const [h, m] = creneau.split(":").map(Number);
   if (lieu?.fourchetteMinutes) {
-    return `entre ${versHeureMinute(h * 60 + m)} et ${versHeureMinute(h * 60 + m + lieu.fourchetteMinutes)}`;
+    const entiere = lieu.fourchetteMinutes % 60 === 0;
+    return `entre ${versHeureMinute(h * 60 + m, entiere)} et ${versHeureMinute(h * 60 + m + lieu.fourchetteMinutes, entiere)}`;
   }
   return versHeureMinute(h * 60 + m);
 }
@@ -73,21 +78,17 @@ export function composerAdresseLivraison(lieu: LieuLivraison, precision: string)
   return p ? `${lieu.nom} — ${p}` : lieu.nom;
 }
 
-/**
- * « entre 11h00 et 11h30 » pour une commande livrée à l'Université (adresse composée par le nouveau site) dont
- * l'heure enregistrée est le début d'une fourchette ; null pour toute autre commande (affichage inchangé).
- */
+/** « entre 11h00 et 11h30 » / « entre 11h et 12h » pour une commande livrée dans un lieu à fourchette dont l'heure enregistrée est le début d'un créneau ; null sinon (affichage inchangé). */
 export function fourchetteLivraison(adresse: string | null | undefined, heureSouhaiteeIso: string | null | undefined): string | null {
-  const fac = LIEUX_PRINCIPAUX[0];
-  if (lieuPrincipalDeAdresse(adresse) !== fac || !heureSouhaiteeIso) return null;
-  const parties = new Intl.DateTimeFormat("fr-FR", {
+  const lieu = lieuPrincipalDeAdresse(adresse);
+  if (!lieu?.creneaux || !lieu.fourchetteMinutes || !heureSouhaiteeIso) return null;
+  const creneau = new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Indian/Mayotte",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
   }).format(new Date(heureSouhaiteeIso));
-  const creneau = parties;
-  return fac.creneaux!.includes(creneau) ? libelleCreneauLieu(fac, creneau) : null;
+  return lieu.creneaux.includes(creneau) ? libelleCreneauLieu(lieu, creneau) : null;
 }
 
 /** Lieu principal reconnu dans une adresse (nouveau format « Université de Mayotte… » ou saisie libre « univ », « lycée »…). */
@@ -96,5 +97,6 @@ export function lieuPrincipalDeAdresse(adresse: string | null | undefined): Lieu
   if (/univ|\bfac\b/.test(a)) return LIEUX_PRINCIPAUX[0];
   if (/lyc/.test(a)) return LIEUX_PRINCIPAUX[1];
   if (/techno/.test(a)) return LIEUX_PRINCIPAUX[2];
-  return null;
+  // Villages : uniquement l'adresse composée « Village — précision » (jamais un simple mot dans une saisie libre).
+  return VILLAGES.find((v) => adresse && (adresse.trim() === v.nom || adresse.trim().startsWith(`${v.nom} — `))) ?? null;
 }
