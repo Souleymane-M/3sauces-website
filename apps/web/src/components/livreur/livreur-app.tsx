@@ -212,7 +212,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   async function envoyer(
     livraison: LivraisonAssignee,
     paiements: { mode: ModePaiement; montant: number; payeur?: string }[],
-    partiel?: { motif: string }
+    partiel?: { motif: string; plats: string[] }
   ) {
     setErreur(null);
     setEnCours(livraison.id);
@@ -226,6 +226,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
           commentaire: commentaires[livraison.id],
           partiel: partiel ? true : undefined,
           motifPartiel: partiel?.motif,
+          platsNonRecuperes: partiel?.plats,
         }),
       });
       if (!reponse.ok) {
@@ -551,9 +552,10 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                 ) : (
                   <FormulairePaiementPartiel
                     montantDu={livraison.montant}
+                    lignes={livraison.lignes}
                     enCours={enCours === livraison.id}
                     onAnnuler={() => setPartielOuvertId(null)}
-                    onValider={(paiements, motif) => envoyer(livraison, paiements, { motif })}
+                    onValider={(paiements, motif, plats) => envoyer(livraison, paiements, { motif, plats })}
                   />
                 )}
 

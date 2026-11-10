@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; paiements?: { mode?: string; montant?: number; payeur?: string }[]; commentaire?: string; partiel?: boolean; motifPartiel?: string }
+    | { commandeId?: string; paiements?: { mode?: string; montant?: number; payeur?: string }[]; commentaire?: string; partiel?: boolean; motifPartiel?: string; platsNonRecuperes?: string[] }
     | null;
 
   if (!body?.commandeId || typeof body.commandeId !== "string") {
@@ -42,7 +42,11 @@ export async function POST(request: Request) {
     await declarerLivraison({ commandeId: body.commandeId, livreurId: session.profilId, paiements, commentaire: typeof body.commentaire === "string" ? body.commentaire : undefined,
       partiel:
         body.partiel === true
-          ? { motif: typeof body.motifPartiel === "string" ? body.motifPartiel.trim().slice(0, 200) : "", nomLivreur: session.nom }
+          ? { motif: typeof body.motifPartiel === "string" ? body.motifPartiel.trim().slice(0, 200) : "", nomLivreur: session.nom,
+              plats: Array.isArray(body.platsNonRecuperes)
+                ? body.platsNonRecuperes.filter((p): p is string => typeof p === "string").map((p) => p.slice(0, 100)).slice(0, 20)
+                : [],
+            }
           : undefined,
     });
     return NextResponse.json({ ok: true });

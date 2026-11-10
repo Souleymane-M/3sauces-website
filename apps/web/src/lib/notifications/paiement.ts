@@ -402,7 +402,8 @@ export async function notifierPaiementPartiel(
   recu: number,
   attendu: number,
   motif: string,
-  nomLivreur: string
+  nomLivreur: string,
+  plats: string[] = []
 ): Promise<void> {
   const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
   if (!emailRestaurant) return;
@@ -423,6 +424,7 @@ export async function notifierPaiementPartiel(
     `<p><strong>${nomLivreur}</strong> a livré la commande #${commande.numero} avec un paiement partiel.</p>` +
       `<p>Reçu : <strong>${recu.toFixed(2)} €</strong> sur ${attendu.toFixed(2)} € — reste <strong>${(attendu - recu).toFixed(2)} €</strong> non payé.</p>` +
       `<p>Motif : ${motif}</p>` +
+      (plats.length > 0 ? `<p>Non récupéré : <strong>${plats.join(", ")}</strong></p>` : "") +
       `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
       `<p>Adresse : ${commande.adresse_livraison ?? "—"}</p>` +
       `<p>${resume}</p>`
