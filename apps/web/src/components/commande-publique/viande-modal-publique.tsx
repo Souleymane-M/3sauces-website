@@ -478,7 +478,7 @@ export function ViandeModalPublique({
           <div className="mt-5">
             <p className="text-sm font-bold text-[#C2540C]">
               {proposeSansBoisson && produit.categorie === "plat_du_jour"
-                ? `Ta boisson, incluse dans le prix (touche-la à nouveau pour l'enlever : -${MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} €)`
+                ? "Boisson"
                 : proposeSansBoisson
                 ? `+ Une boisson avec ? (${MONTANT_REDUCTION_SANS_BOISSON.toFixed(2)} € / unité)`
                 : "Choisis ta canette incluse"}
