@@ -12,6 +12,7 @@ import {
   heureDebutLivraison,
   prochainesDatesOuvertes,
 } from "@/lib/commande-publique/creneau";
+import { composerAdresseLivraison, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import type {
   CanalPublic,
@@ -668,7 +669,23 @@ export async function POST(request: Request) {
   let zone: string | null = null;
 
   if (body.canal === "livraison") {
-    adresse = (body.adresse ?? "").trim();
+    if (body.lieuId) {
+      // Lieu choisi dans la liste : adresse composée côté serveur, créneaux fixes imposés.
+      const lieu = trouverLieu(body.lieuId);
+      if (!lieu) {
+        return NextResponse.json({ error: "Lieu de livraison invalide." }, { status: 400 });
+      }
+      if (lieu.creneaux && !lieu.creneaux.includes(creneauHeure)) {
+        return NextResponse.json({ error: `Pour ${lieu.nom}, choisis un des créneaux proposés.` }, { status: 400 });
+      }
+      const composee = composerAdresseLivraison(lieu, typeof body.precision === "string" ? body.precision.slice(0, 200) : "");
+      if (!composee) {
+        return NextResponse.json({ error: "Précise l'endroit de livraison (mairie, CCAS, rue…)." }, { status: 400 });
+      }
+      adresse = composee;
+    } else {
+      adresse = (body.adresse ?? "").trim();
+    }
     zone = (body.zone ?? "").trim();
 
     if (!adresse) {
