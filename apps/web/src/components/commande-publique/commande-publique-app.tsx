@@ -21,9 +21,9 @@ import {
   MONTANT_REDUCTION_SANS_BOISSON,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
 } from "@/lib/commande-publique/types";
+import { LIEUX_PRINCIPAUX, VILLAGES, creneauxLivraisonPossibles, libelleCreneauLieu, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
 import {
   creneauxPourDate,
-  filtrerCreneauxLivraison,
   heureDebutLivraison,
   prochainesDatesOuvertes,
   dateMayotteIso,
@@ -276,13 +276,17 @@ export function CommandePubliqueApp({
 
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
+  // Lieu de livraison choisi dans la liste (créneaux fixes pour la fac, le lycée et la Technopole) ; `adresse` ne
+  // sert plus que de précision (bâtiment, mairie, rue…).
+  const [lieuId, setLieuId] = useState("");
+  const lieu = trouverLieu(lieuId);
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
   const creneauxValides = useMemo(
     () => {
       const tous = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
-      return canal === "livraison" ? filtrerCreneauxLivraison(tous, dateCommande) : tous;
+      return canal === "livraison" ? creneauxLivraisonPossibles(tous, dateCommande, lieu) : tous;
     },
-    [dateCommande, parametres.heureDebut, parametres.heureFin, canal]
+    [dateCommande, parametres.heureDebut, parametres.heureFin, canal, lieu]
   );
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
   const commandeAvance = dateCommande !== aujourdHui;
@@ -483,9 +487,22 @@ export function CommandePubliqueApp({
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
     const tousCreneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
-    const creneaux = canal === "livraison" ? filtrerCreneauxLivraison(tousCreneaux, nouvelleDate) : tousCreneaux;
+    const creneaux = canal === "livraison" ? creneauxLivraisonPossibles(tousCreneaux, nouvelleDate, lieu) : tousCreneaux;
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
     if (nouvelleDate !== aujourdHui) setModePaiement("stripe");
+  }
+
+  /** Changer de lieu change les créneaux : on garde l'heure choisie si le nouveau lieu la propose encore, sinon le premier créneau. */
+  function changerLieu(nouveauId: string) {
+    setLieuId(nouveauId);
+    setAdresse("");
+    const nouveauLieu = trouverLieu(nouveauId);
+    const creneaux = creneauxLivraisonPossibles(
+      creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
+      dateCommande,
+      nouveauLieu
+    );
+    setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
   }
 
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
@@ -973,8 +990,16 @@ export function CommandePubliqueApp({
         setErreur("La livraison n'est pas disponible pour le moment — choisis sur place ou à emporter.");
         return;
       }
-      if (!adresse.trim()) {
-        setErreur("Indique ton adresse de livraison.");
+      if (!lieu) {
+        setErreur("Choisis le lieu de livraison.");
+        return;
+      }
+      if (lieu.village && !adresse.trim()) {
+        setErreur("Précise l'endroit de livraison (mairie, CCAS, rue…).");
+        return;
+      }
+      if (lieu.creneaux && !creneauxValides.includes(creneauHeure)) {
+        setErreur("Choisis un des créneaux proposés pour ce lieu.");
         return;
       }
       if (!minimumAtteint) {
@@ -1043,7 +1068,8 @@ export function CommandePubliqueApp({
           modePaiement: modePaiementEffectif,
           creneauHeure,
           date: dateCommande,
-          adresse: canal === "livraison" ? adresse.trim() : undefined,
+          lieuId: canal === "livraison" ? lieuId : undefined,
+          precision: canal === "livraison" ? adresse.trim() : undefined,
           zone: canal === "livraison" ? zone : undefined,
           consentementCgv: accepteCgv,
           lignes,
@@ -1223,7 +1249,6 @@ export function CommandePubliqueApp({
                 if (infos.nom) setNom((precedent) => precedent.trim() || infos.nom!);
                 if (infos.prenom) setPrenom((precedent) => precedent.trim() || infos.prenom!);
                 if (canal === "livraison") {
-                  if (infos.adresse) setAdresse((precedent) => precedent.trim() || infos.adresse!);
                   if (infos.zone) setZone((precedent) => precedent.trim() || infos.zone!);
                 }
               }}
@@ -1587,7 +1612,7 @@ export function CommandePubliqueApp({
                       setCanal("livraison");
                       const debutLivraison = heureDebutLivraison(dateCommande);
                       if (debutLivraison && creneauHeure < debutLivraison) {
-                        setCreneauHeure(filtrerCreneauxLivraison(creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin), dateCommande)[0] ?? "");
+                        setCreneauHeure(creneauxLivraisonPossibles(creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin), dateCommande, lieu)[0] ?? "");
                       }
                     }}
                     disabled={!livraisonPossible}
@@ -1666,13 +1691,41 @@ export function CommandePubliqueApp({
               {canal === "livraison" && (
                 <>
                   <div>
-                    <label className="text-xs text-gray-700">Adresse</label>
-                    <input
-                      value={adresse}
-                      onChange={(e) => setAdresse(e.target.value)}
+                    <label className="text-xs text-gray-700">Lieu de livraison</label>
+                    <select
+                      value={lieuId}
+                      onChange={(e) => changerLieu(e.target.value)}
                       className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
-                    />
+                    >
+                      <option value="">Choisis le lieu…</option>
+                      <optgroup label="Lieux principaux">
+                        {LIEUX_PRINCIPAUX.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.nom}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Villages">
+                        {VILLAGES.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.nom}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
                   </div>
+                  {lieu && !lieu.sansPrecision && (
+                    <div>
+                      <label className="text-xs text-gray-700">
+                        {lieu.village ? "Précise l'endroit (mairie, CCAS, rue…)" : "Précision (bâtiment, salle…) — facultatif"}
+                      </label>
+                      <input
+                        value={adresse}
+                        onChange={(e) => setAdresse(e.target.value)}
+                        className="mt-1 w-full rounded border border-gray-300 bg-white p-3 text-base text-gray-900"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="text-xs text-gray-700">Zone</label>
                     <select
@@ -1698,12 +1751,36 @@ export function CommandePubliqueApp({
                 label={canal === "livraison" ? "Date de livraison souhaitée" : "Date de retrait souhaitée"}
               />
 
-              <CreneauPicker
-                creneauxValides={creneauxValides}
-                valeur={creneauHeure}
-                onChange={setCreneauHeure}
-                label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
-              />
+              {canal === "livraison" && lieu?.creneaux ? (
+                <div>
+                  <p className="text-xs text-gray-700">Créneau de livraison — {lieu.nom}</p>
+                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {lieu.creneaux.map((c) => {
+                      const dispo = creneauxValides.includes(c);
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          disabled={!dispo}
+                          onClick={() => setCreneauHeure(c)}
+                          className={`rounded border-2 px-3 py-3 text-base font-bold disabled:opacity-30 ${
+                            creneauHeure === c && dispo ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-900"
+                          }`}
+                        >
+                          {libelleCreneauLieu(lieu, c)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <CreneauPicker
+                  creneauxValides={creneauxValides}
+                  valeur={creneauHeure}
+                  onChange={setCreneauHeure}
+                  label={canal === "livraison" ? "Créneau de livraison souhaité" : "Heure de passage souhaitée"}
+                />
+              )}
 
               <div>
                 <label className="text-xs text-gray-700">
