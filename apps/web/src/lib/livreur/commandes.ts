@@ -158,6 +158,8 @@ interface DeclarationLivraison {
   paiements: PaiementDeclare[];
   /** Remarque libre facultative (oubli de sauce, boisson, couverts...). */
   commentaire?: string;
+  /** Paiement partiel : un client est parti sans payer, seul ce qui a été reçu est encaissé (motif facultatif). */
+  partiel?: { motif: string };
 }
 
 /**
@@ -181,7 +183,7 @@ interface DeclarationLivraison {
  * réglé — bug réel constaté le 2026-10-21 (commande #455), qui aurait pu
  * faire livrer gratuitement une commande jamais payée.
  */
-export async function declarerLivraison({ commandeId, livreurId, paiements, commentaire }: DeclarationLivraison): Promise<void> {
+export async function declarerLivraison({ commandeId, livreurId, paiements, commentaire, partiel }: DeclarationLivraison): Promise<void> {
   for (const p of paiements) {
     if (!Number.isFinite(p.montant) || p.montant <= 0) {
       throw new Error("Montant de paiement invalide.");
@@ -227,7 +229,11 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
 
   const totalDeclare = Math.round(paiements.reduce((total, p) => total + p.montant, 0) * 100) / 100;
   const totalAttendu = Math.round(commande.montant * 100) / 100;
-  if (totalDeclare !== totalAttendu) {
+  if (partiel) {
+    if (!(totalDeclare > 0 && totalDeclare < totalAttendu)) {
+      throw new Error("Un paiement partiel doit être inférieur au montant dû.");
+    }
+  } else if (totalDeclare !== totalAttendu) {
     throw new Error(`Le total déclaré (${totalDeclare.toFixed(2)} €) ne correspond pas au montant dû (${totalAttendu.toFixed(2)} €).`);
   }
 
@@ -256,7 +262,20 @@ export async function declarerLivraison({ commandeId, livreurId, paiements, comm
   const modeReel = modeGlobalDepuisPaiements(paiements.map((p) => p.mode));
   const { error: erreurStatutPaiement } = await supabase
     .from("commandes")
-    .update({ paiement_statut: "paye", ...(modeReel ? { mode_paiement: modeReel } : {}) })
+    .update({
+      paiement_statut: "paye",
+      ...(modeReel ? { mode_paiement: modeReel } : {}),
+      // Paiement partiel : la commande vaut ce qui a réellement été encaissé ; l'écart reste tracé dans l'alerte.
+      ...(partiel
+        ? {
+            montant: totalDeclare,
+            alerte_signalee: true,
+            alerte_note: `Paiement partiel : ${totalDeclare.toFixed(2)} € reçus sur ${totalAttendu.toFixed(2)} € (reste ${(totalAttendu - totalDeclare).toFixed(2)} € non payé).${partiel.motif ? ` ${partiel.motif}` : ""}`,
+            alerte_signalee_par: livreurId,
+            alerte_signalee_le: new Date().toISOString(),
+          }
+        : {}),
+    })
     .eq("id", commandeId);
   if (erreurStatutPaiement) {
     throw new Error(`Impossible d'enregistrer le paiement : ${erreurStatutPaiement.message}`);

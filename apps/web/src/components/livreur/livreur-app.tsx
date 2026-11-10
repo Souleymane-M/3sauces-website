@@ -2,6 +2,7 @@
 
 import { libellePayee } from "@/lib/libelle-paiement";
 import { FormulaireImpossibleLivrer } from "./formulaire-impossible-livrer";
+import { FormulairePaiementPartiel } from "./formulaire-paiement-partiel";
 import { libelleBoissonLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
@@ -110,6 +111,7 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // "Impossible à livrer" directement depuis la liste (sans re-scanner le QR code) : commande dont le formulaire
   // est ouvert + motif choisi/saisi.
   const [echecOuvertId, setEchecOuvertId] = useState<string | null>(null);
+  const [partielOuvertId, setPartielOuvertId] = useState<string | null>(null);
   // Remarque libre facultative par livraison (envoyée avec la déclaration de livraison).
   const [commentaires, setCommentaires] = useState<Record<string, string>>({});
   // La commande reste "en livraison" côté serveur (le responsable décide de la suite) : on mémorise juste ici
@@ -207,14 +209,24 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
     setDeclarationsOuvertes((prec) => ({ ...prec, [commandeId]: { ...prec[commandeId], ...changement } }));
   }
 
-  async function envoyer(livraison: LivraisonAssignee, paiements: { mode: ModePaiement; montant: number; payeur?: string }[]) {
+  async function envoyer(
+    livraison: LivraisonAssignee,
+    paiements: { mode: ModePaiement; montant: number; payeur?: string }[],
+    partiel?: { motif: string }
+  ) {
     setErreur(null);
     setEnCours(livraison.id);
     try {
       const reponse = await fetch("/api/livreur/declarer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId: livraison.id, paiements, commentaire: commentaires[livraison.id] }),
+        body: JSON.stringify({
+          commandeId: livraison.id,
+          paiements,
+          commentaire: commentaires[livraison.id],
+          partiel: partiel ? true : undefined,
+          motifPartiel: partiel?.motif,
+        }),
       });
       if (!reponse.ok) {
         const data = await reponse.json().catch(() => ({}));
@@ -558,6 +570,19 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
                 >
                   Commande groupée (plusieurs payeurs)
                 </button>
+
+                {partielOuvertId !== livraison.id ? (
+                  <button onClick={() => setPartielOuvertId(livraison.id)} className="block text-sm text-orange-700 underline">
+                    Paiement partiel (un client n&apos;a pas payé)
+                  </button>
+                ) : (
+                  <FormulairePaiementPartiel
+                    montantDu={livraison.montant}
+                    enCours={enCours === livraison.id}
+                    onAnnuler={() => setPartielOuvertId(null)}
+                    onValider={(paiements, motif) => envoyer(livraison, paiements, { motif })}
+                  />
+                )}
 
                 <div className="flex gap-2">
                   <button

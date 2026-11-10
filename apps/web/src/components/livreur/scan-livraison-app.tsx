@@ -1,6 +1,7 @@
 "use client";
 
 import { FormulaireImpossibleLivrer } from "./formulaire-impossible-livrer";
+import { FormulairePaiementPartiel } from "./formulaire-paiement-partiel";
 import { libellePayeeCourt } from "@/lib/libelle-paiement";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -62,6 +63,7 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
   const [montantEspeces, setMontantEspeces] = useState("");
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   const [echecOuvert, setEchecOuvert] = useState(false);
+  const [partielOuvert, setPartielOuvert] = useState(false);
   const [commentaire, setCommentaire] = useState("");
   const [relacherOuvert, setRelacherOuvert] = useState(false);
 
@@ -88,14 +90,14 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
     }
   }
 
-  async function declarer(commandeId: string, paiements: { mode: ModePaiement; montant: number }[]) {
+  async function declarer(commandeId: string, paiements: { mode: ModePaiement; montant: number }[], motifPartiel?: string) {
     setEnCours(true);
     setErreur(null);
     try {
       const reponse = await fetch("/api/livreur/declarer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandeId, paiements, commentaire }),
+        body: JSON.stringify({ commandeId, paiements, commentaire, partiel: motifPartiel !== undefined ? true : undefined, motifPartiel }),
       });
       const data = await reponse.json();
       if (!reponse.ok) {
@@ -298,6 +300,19 @@ export function ScanLivraisonApp({ qrCode, etatInitial }: ScanLivraisonAppProps)
               </button>
             ))}
           </div>
+
+          {!partielOuvert ? (
+            <button type="button" onClick={() => setPartielOuvert(true)} className="text-sm text-orange-700 underline">
+              Paiement partiel (un client n&apos;a pas payé)
+            </button>
+          ) : (
+            <FormulairePaiementPartiel
+              montantDu={montantDu}
+              enCours={enCours}
+              onAnnuler={() => setPartielOuvert(false)}
+              onValider={(paiements, motif) => declarer(commandeId, paiements, motif)}
+            />
+          )}
 
           {choix === "especes" && (
             <div className="space-y-2">
