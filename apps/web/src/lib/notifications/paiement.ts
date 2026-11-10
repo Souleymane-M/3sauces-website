@@ -396,6 +396,42 @@ export async function notifierCommandeModifiee(commandeId: string): Promise<void
  * suite pour décider de la suite en interne. Aucun email client ici —
  * seulement le restaurant.
  */
+/** Alerte au restaurant : livraison payée en partie seulement (un client est parti sans payer). Seul le restaurant est prévenu. */
+export async function notifierPaiementPartiel(
+  commandeId: string,
+  recu: number,
+  attendu: number,
+  motif: string,
+  nomLivreur: string
+): Promise<void> {
+  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
+  if (!emailRestaurant) return;
+
+  const supabase = createServiceSupabaseClient();
+  const { data: commande } = await supabase
+    .from("commandes")
+    .select("numero, contenu, nom_livraison, adresse_livraison, client_telephone")
+    .eq("id", commandeId)
+    .maybeSingle();
+  if (!commande) return;
+
+  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
+  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
+  const resultat = await envoyerEmail(
+    emailRestaurant,
+    `⚠️ Paiement partiel — commande #${commande.numero}`,
+    `<p><strong>${nomLivreur}</strong> a livré la commande #${commande.numero} avec un paiement partiel.</p>` +
+      `<p>Reçu : <strong>${recu.toFixed(2)} €</strong> sur ${attendu.toFixed(2)} € — reste <strong>${(attendu - recu).toFixed(2)} €</strong> non payé.</p>` +
+      `<p>Motif : ${motif}</p>` +
+      `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
+      `<p>Adresse : ${commande.adresse_livraison ?? "—"}</p>` +
+      `<p>${resume}</p>`
+  );
+  if (!resultat.ok) {
+    console.error("[notifications/paiement] échec envoi alerte paiement partiel :", resultat.erreur);
+  }
+}
+
 export async function notifierLivraisonNonEffectuee(commandeId: string, motif: string, nomLivreur: string): Promise<void> {
   const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
   if (!emailRestaurant) return;

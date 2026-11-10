@@ -17,7 +17,7 @@ export function FormulairePaiementPartiel({ montantDu, enCours, onAnnuler, onVal
   const [motif, setMotif] = useState("");
 
   const recu = Number(montant.replace(",", "."));
-  const valide = Number.isFinite(recu) && recu > 0 && recu < montantDu;
+  const valide = Number.isFinite(recu) && recu > 0 && recu < montantDu && motif.trim() !== "";
 
   return (
     <div className="space-y-2 rounded-lg border border-orange-500 bg-orange-50 p-3">
@@ -43,11 +43,11 @@ export function FormulairePaiementPartiel({ montantDu, enCours, onAnnuler, onVal
         placeholder="Montant reçu"
         className="w-full rounded border border-gray-300 bg-white p-3 text-lg text-gray-900"
       />
-      {valide && <p className="text-sm font-semibold text-orange-800">Reste non payé : {(montantDu - recu).toFixed(2)} €</p>}
+      {Number.isFinite(recu) && recu > 0 && recu < montantDu && <p className="text-sm font-semibold text-orange-800">Reste non payé : {(montantDu - recu).toFixed(2)} €</p>}
       <input
         value={motif}
         onChange={(e) => setMotif(e.target.value)}
-        placeholder="Motif (facultatif) : cliente partie…"
+        placeholder="Motif (obligatoire) : cliente partie…"
         className="w-full rounded border border-gray-300 bg-white p-3 text-sm text-gray-900"
       />
       <div className="flex gap-2">
