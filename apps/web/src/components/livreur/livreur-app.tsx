@@ -5,7 +5,6 @@ import { libellePayee } from "@/lib/libelle-paiement";
 import { FormulaireImpossibleLivrer } from "./formulaire-impossible-livrer";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { FormulairePaiementPartiel } from "./formulaire-paiement-partiel";
-import { libelleBoissonLigne } from "@/lib/libelle-ligne";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
