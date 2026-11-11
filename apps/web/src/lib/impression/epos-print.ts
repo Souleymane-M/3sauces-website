@@ -602,6 +602,18 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
     b.ligne("★ PRIORITAIRE ★", { align: "center", gras: true, taille: 2 });
   }
 
+  // Heure (et lieu pour une livraison) tout en haut et en gros, pour tous les canaux : la cuisine range les tickets
+  // papier par heure, puis par lieu (demande du patron, 2026-11-11).
+  if (commande.heureSouhaitee) {
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), {
+      align: "center",
+      gras: true,
+      taille: estAujourdhuiMayotte(commande.heureSouhaitee) ? 3 : 2,
+    });
+  }
+  if (commande.canal === "livraison" && commande.adresse) {
+    b.ligne(commande.adresse, { align: "center", gras: true, taille: 2 });
+  }
   b.ligne(`${formaterNumeroTicket(commande.numero)} - ${libelleCanal(commande.canal).toUpperCase()}`, {
     align: "center",
     gras: true,
@@ -617,14 +629,6 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
     b.ligne("PAIEMENT EN LIGNE NON CONFIRME", { align: "center", gras: true, taille: 1 });
   }
   b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
-  if (commande.heureSouhaitee) {
-    // Livraison : heure et lieu en gros, pour que la cuisine regroupe les commandes par lieu et par heure.
-    const gros = commande.canal === "livraison" || !estAujourdhuiMayotte(commande.heureSouhaitee);
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "center", gras: true, taille: gros ? 2 : 1 });
-  }
-  if (commande.canal === "livraison" && commande.adresse) {
-    b.ligne(commande.adresse, { align: "center", gras: true, taille: 2 });
-  }
   if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
   }
