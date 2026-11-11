@@ -599,7 +599,12 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   }
   b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: true, taille: estAujourdhuiMayotte(commande.heureSouhaitee) ? 1 : 2 });
+    // Livraison : heure et lieu en gros, pour que la cuisine regroupe les commandes par lieu et par heure.
+    const gros = commande.canal === "livraison" || !estAujourdhuiMayotte(commande.heureSouhaitee);
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee), { align: "center", gras: true, taille: gros ? 2 : 1 });
+  }
+  if (commande.canal === "livraison" && commande.adresse) {
+    b.ligne(commande.adresse, { align: "center", gras: true, taille: 2 });
   }
   if (commande.clientTelephone) {
     b.ligne(`Tél : ${formaterTelephoneAffichage(commande.clientTelephone)}`, { align: "center", gras: true, taille: 1 });
