@@ -214,7 +214,9 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): { texte: stri
   if (supp.oignons) details.push({ texte: "+ Oignons frits" });
   if (l.saveurs && l.saveurs.length > 0) details.push({ texte: l.saveurs.join(", ") });
   const boisson = libelleBoissonLigne(l);
-  if (boisson) details.push({ texte: boisson, surligne: true });
+  // Plusieurs exemplaires du même produit (ex : 2x Menu Étudiant) : une boisson par exemplaire, écrite avec son nombre
+  // pour que la préparation les mette toutes dans le sac.
+  if (boisson) details.push({ texte: l.quantite > 1 ? `${l.quantite}x ${boisson}` : boisson, surligne: true });
   if (l.sansBoisson) details.push({ texte: "SANS BOISSON — ne pas donner de canette", surligne: true });
   if (l.saladeIncluse === true) details.push({ texte: "Avec salade" });
   if (l.saladeIncluse === false) details.push({ texte: "SANS SALADE" });
@@ -248,11 +250,15 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces });
   if (supp.oignons) attributs.push({ label: "Supplément", valeur: "Oignons frits" });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
-  if (l.boissonIncluse) attributs.push({ label: "Boisson", valeur: l.boissonIncluse, surligne: true });
+  if (l.boissonIncluse)
+    attributs.push({ label: "Boisson", valeur: `${l.quantite > 1 ? `${l.quantite}x ` : ""}${l.boissonIncluse}`, surligne: true });
   if (l.saladeIncluse === true) attributs.push({ label: "Salade", valeur: "Oui" });
   if (l.saladeIncluse === false) attributs.push({ label: "Salade", valeur: "SANS SALADE" });
   if (l.accompagnementsInclus?.length)
-    attributs.push({ label: "Accompagnement", valeur: l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ") });
+    attributs.push({
+      label: "Accompagnement",
+      valeur: `${l.quantite > 1 ? `${l.quantite}x ` : ""}${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`,
+    });
   return attributs;
 }
 
