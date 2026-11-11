@@ -969,9 +969,6 @@ export function CommandeNouvelleApp({
             const q = quantiteProduit(produit.id);
             return (
               <div key={produit.id} className="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm">
-                <div className="flex h-28 items-center justify-center bg-[#E8DFD0] text-sm font-bold text-gray-700">
-                  Photo à venir
-                </div>
                 <div className="space-y-1 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-lg font-extrabold leading-tight text-gray-900">{produit.nom}</p>
