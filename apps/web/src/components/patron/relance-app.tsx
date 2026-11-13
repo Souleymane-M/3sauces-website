@@ -24,7 +24,7 @@ const MODELES: Record<Mode, { sujet: string; message: string }> = {
     sujet: "Tu as des récompenses chez 3 Sauces",
     message:
       "Bonjour {prenom},\n\n{fidelite}\n\nSur 3sauces.fr, saisis ton numéro et ton e-mail en haut du panier : ta récompense apparaît et tu choisis si tu l'utilises (à partir de 10 € de commande).\n\nMerci de ta fidélité !",
-  },  },
+  },
 };
 
 /**
