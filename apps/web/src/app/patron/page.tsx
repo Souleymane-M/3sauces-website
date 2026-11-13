@@ -44,6 +44,7 @@ import { CompteurCreneaux } from "@/components/caisse/compteur-creneaux";
 import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 import { InscriptionsApp } from "@/components/patron/inscriptions-app";
+import { RelanceApp } from "@/components/patron/relance-app";
 import { listerInscriptions } from "@/lib/patron/inscriptions";
 import { DepensesApp } from "@/components/patron/depenses-app";
 import { chargerDonneesDepenses, moisCourantMayotte } from "@/lib/patron/depenses";
@@ -219,7 +220,12 @@ export default async function PatronPage() {
           {
             id: "emails",
             label: "Emails",
-            contenu: <InscriptionsApp inscriptionsInitiales={inscriptions} />,
+            contenu: (
+              <>
+                <RelanceApp />
+                <InscriptionsApp inscriptionsInitiales={inscriptions} />
+              </>
+            ),
           },
           {
             id: "site",

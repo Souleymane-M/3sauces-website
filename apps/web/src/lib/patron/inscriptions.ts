@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
+import { SOURCE_RELANCE } from "@/lib/patron/relance";
 
 export interface InscriptionAdmin {
   id: string;
@@ -17,6 +18,7 @@ export async function listerInscriptions(): Promise<InscriptionAdmin[]> {
   const { data, error } = await supabase
     .from("inscriptions_information")
     .select("id, email, accepte_offres, consentement_le, desinscrit_le")
+    .neq("source", SOURCE_RELANCE)
     .order("consentement_le", { ascending: false });
   if (error) throw new Error(`Impossible de charger les inscriptions : ${error.message}`);
   return (data ?? []).map((r) => ({
@@ -40,6 +42,7 @@ export async function listerDestinataires(cible: CibleEnvoi): Promise<{ id: stri
     .from("inscriptions_information")
     .select("id, email, jeton_desinscription")
     .is("desinscrit_le", null)
+    .neq("source", SOURCE_RELANCE)
     .order("created_at", { ascending: true })
     .order("id", { ascending: true });
   if (cible === "offres") requete = requete.eq("accepte_offres", true);
