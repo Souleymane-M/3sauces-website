@@ -667,55 +667,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Offre du jour : une canette offerte par tranche de 10 € d'achats (site uniquement, cf. offre-canette.ts).
-  const nbCanettesOffertes = nombreCanettesOffertes(montant, dateMayotteIso());
-  if (nbCanettesOffertes > 0) {
-    const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
-    const saveursValidees = saveursBrutes.filter(
-      (s: unknown): s is string => typeof s === "string" && nomsSaveursValides.has(s)
-    );
-    if (saveursValidees.length !== nbCanettesOffertes) {
-      return NextResponse.json(
-        {
-          error:
-            nbCanettesOffertes > 1
-              ? `Choisis un parfum pour chacune de tes ${nbCanettesOffertes} canettes offertes.`
-              : "Choisis un parfum disponible pour ta canette offerte.",
-        },
-        { status: 400 }
-      );
-    }
-    const { data: produitsCanette, error: erreurCanette } = await supabase
-      .from("produits")
-      .select("id, nom")
-      .eq("categorie", "boisson")
-      .eq("actif", true)
-      .gt("nb_saveurs_max", 0)
-      .neq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
-      .order("prix", { ascending: true })
-      .limit(1);
-    if (erreurCanette) {
-      return NextResponse.json({ error: "Erreur serveur (canette offerte)." }, { status: 500 });
-    }
-    const canette = produitsCanette?.[0];
-    if (canette) {
-      for (const saveur of saveursValidees) {
-        lignes.push({
-          produitId: canette.id,
-          nom: `${canette.nom} (offerte — offre du jour)`,
-          categorie: "boisson",
-          quantite: 1,
-          prixUnitaire: 0,
-          coutMatiereUnitaire: null,
-          viandes: [],
-          saveurs: [saveur],
-          canetteIncluse: false,
-          platIndex: null,
-        });
-      }
-    }
-  }
-
   // --- Règles spécifiques à la livraison ---
   let adresse: string | null = null;
   let zone: string | null = null;
@@ -818,6 +769,55 @@ export async function POST(request: Request) {
     // une seule remise à la fois : la récompense fidélité prime toujours
     // si le client l'utilise sur cette commande (branche ci-dessus).
     montantFinal = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
+  }
+
+  // Offre du jour : une canette offerte par tranche de 10 € d'achats sur le montant réellement payé (après points de fidélité / remise), pour les commandes servies le jour de l'offre — site uniquement, cf. offre-canette.ts.
+  const nbCanettesOffertes = nombreCanettesOffertes(montantFinal, dateCommande);
+  if (nbCanettesOffertes > 0) {
+    const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsSaveursValides.has(s)
+    );
+    if (saveursValidees.length !== nbCanettesOffertes) {
+      return NextResponse.json(
+        {
+          error:
+            nbCanettesOffertes > 1
+              ? `Choisis un parfum pour chacune de tes ${nbCanettesOffertes} canettes offertes.`
+              : "Choisis un parfum disponible pour ta canette offerte.",
+        },
+        { status: 400 }
+      );
+    }
+    const { data: produitsCanette, error: erreurCanette } = await supabase
+      .from("produits")
+      .select("id, nom")
+      .eq("categorie", "boisson")
+      .eq("actif", true)
+      .gt("nb_saveurs_max", 0)
+      .neq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .order("prix", { ascending: true })
+      .limit(1);
+    if (erreurCanette) {
+      return NextResponse.json({ error: "Erreur serveur (canette offerte)." }, { status: 500 });
+    }
+    const canette = produitsCanette?.[0];
+    if (canette) {
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: canette.id,
+          nom: `${canette.nom} (offerte — offre du jour)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null,
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
+    }
   }
 
   // Minimum de commande pour la livraison : vérifié sur le montant RÉEL à

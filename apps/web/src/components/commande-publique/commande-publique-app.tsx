@@ -516,7 +516,14 @@ export function CommandePubliqueApp({
       : 0;
 
   // Offre du jour : 1 canette offerte par tranche de 10 € d'achats (jour concerné → offre-canette.ts).
-  const nbCanettesOffertes = nombreCanettesOffertes(total, aujourdHui);
+  // Sur le montant réellement payé (après points de fidélité ou remise de lancement), jamais de cumul d'offres.
+  const totalAPayerCanette =
+    nbTamponsEffectif > 0
+      ? Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE)
+      : parametres.remiseLancementActive && total >= SEUIL_REMISE_LANCEMENT
+        ? total - MONTANT_REMISE_LANCEMENT
+        : total;
+  const nbCanettesOffertes = nombreCanettesOffertes(totalAPayerCanette, dateCommande);
   const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
@@ -1288,7 +1295,7 @@ export function CommandePubliqueApp({
       </div>
       {offreCanetteActive(aujourdHui) && (
         <div className="bg-[#8B2020] px-4 py-2 text-center text-sm font-bold text-white">
-          🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € d&apos;achats
+          🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
         </div>
       )}
       <div className="mx-auto max-w-lg space-y-6 p-4">
