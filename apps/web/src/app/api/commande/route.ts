@@ -31,6 +31,7 @@ import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxPa
 import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
+import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import {
   NOM_PRODUIT_BOISSON_OFFERTE,
@@ -657,6 +658,55 @@ export async function POST(request: Request) {
           quantite: 1,
           prixUnitaire: 0,
           coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
+    }
+  }
+
+  // Offre du jour : une canette offerte par tranche de 10 € d'achats (site uniquement, cf. offre-canette.ts).
+  const nbCanettesOffertes = nombreCanettesOffertes(montant, dateMayotteIso());
+  if (nbCanettesOffertes > 0) {
+    const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsSaveursValides.has(s)
+    );
+    if (saveursValidees.length !== nbCanettesOffertes) {
+      return NextResponse.json(
+        {
+          error:
+            nbCanettesOffertes > 1
+              ? `Choisis un parfum pour chacune de tes ${nbCanettesOffertes} canettes offertes.`
+              : "Choisis un parfum disponible pour ta canette offerte.",
+        },
+        { status: 400 }
+      );
+    }
+    const { data: produitsCanette, error: erreurCanette } = await supabase
+      .from("produits")
+      .select("id, nom")
+      .eq("categorie", "boisson")
+      .eq("actif", true)
+      .gt("nb_saveurs_max", 0)
+      .neq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .order("prix", { ascending: true })
+      .limit(1);
+    if (erreurCanette) {
+      return NextResponse.json({ error: "Erreur serveur (canette offerte)." }, { status: 500 });
+    }
+    const canette = produitsCanette?.[0];
+    if (canette) {
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: canette.id,
+          nom: `${canette.nom} (offerte — offre du jour)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null,
           viandes: [],
           saveurs: [saveur],
           canetteIncluse: false,

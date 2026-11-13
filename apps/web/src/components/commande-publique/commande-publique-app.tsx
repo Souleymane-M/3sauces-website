@@ -48,6 +48,7 @@ import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
+import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
@@ -242,6 +243,7 @@ export function CommandePubliqueApp({
   // 2026-10-14, plus un seul flacon fixe) — index = position parmi les
   // boissons offertes, jamais lié à un article du panier en particulier.
   const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
+  const [canetteOfferteSaveurs, setCanetteOfferteSaveurs] = useState<string[]>([]);
 
   // Restauration du panier après un rechargement accidentel de l'onglet : on
   // ne persiste qu'après cette première lecture (`pretPourPersistance`),
@@ -512,6 +514,10 @@ export function CommandePubliqueApp({
     palierGroupeReel === "GROUPE_4"
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
+
+  // Offre du jour : 1 canette offerte par tranche de 10 € d'achats (jour concerné → offre-canette.ts).
+  const nbCanettesOffertes = nombreCanettesOffertes(total, aujourdHui);
+  const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -1010,6 +1016,10 @@ export function CommandePubliqueApp({
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
+    if (canettesOffertesAChoisir > 0) {
+      setErreur(`Choisis le parfum de ta canette offerte${nbCanettesOffertes > 1 ? "s" : ""} avant de valider.`);
+      return;
+    }
     if (modeCommande === "groupee") {
       const platsValides = plats.filter((p) => p.lignes.length > 0);
       const indexPlatSousLeSeuil = platsValides.findIndex((p) => totalPlat(p) < SEUIL_MINIMUM_PLAT);
@@ -1149,6 +1159,7 @@ export function CommandePubliqueApp({
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs:
             palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
         }),
       });
       const data = await reponse.json();
@@ -1177,7 +1188,7 @@ export function CommandePubliqueApp({
         } catch {
           // Non bloquant : au pire le panier soumis réapparaît si le client revient en arrière.
         }
-        window.location.href = dataPaiement.url;
+        window.location.assign(dataPaiement.url);
         return;
       }
 
@@ -1275,6 +1286,11 @@ export function CommandePubliqueApp({
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
         10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
       </div>
+      {offreCanetteActive(aujourdHui) && (
+        <div className="bg-[#8B2020] px-4 py-2 text-center text-sm font-bold text-white">
+          🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € d&apos;achats
+        </div>
+      )}
       <div className="mx-auto max-w-lg space-y-6 p-4">
         {modeCommande === null ? (
           <div className="space-y-4">
@@ -1748,6 +1764,47 @@ export function CommandePubliqueApp({
                             }
                             className={`rounded-full border px-3 py-1.5 text-sm ${
                               boissonOfferteSaveurs[index] === s.nom
+                                ? "border-[#8B2020] bg-[#8B2020] text-white"
+                                : "border-gray-300 text-gray-700"
+                            }`}
+                          >
+                            {s.nom}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {nbCanettesOffertes > 0 && (
+                <div
+                  id="canette-offerte"
+                  className={`rounded-lg border-2 p-3 ${
+                    canettesOffertesAChoisir > 0 ? "border-red-600 bg-red-50" : "border-[#2D5A27] bg-green-50"
+                  }`}
+                >
+                  <p className="text-sm font-bold text-gray-900">
+                    {canettesOffertesAChoisir > 0 ? "👉 " : "✅ "}🎁 Offre du jour : choisis le parfum de ta canette offerte
+                    {nbCanettesOffertes > 1 ? `s (${nbCanettesOffertes})` : ""}
+                  </p>
+                  {Array.from({ length: nbCanettesOffertes }, (_, index) => (
+                    <div key={index} className="mt-2">
+                      {nbCanettesOffertes > 1 && (
+                        <p className="text-xs font-semibold text-gray-700">Canette offerte n°{index + 1}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {saveurs.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() =>
+                              setCanetteOfferteSaveurs((prev) =>
+                                Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? s.nom : prev[i]))
+                              )
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                              canetteOfferteSaveurs[index] === s.nom
                                 ? "border-[#8B2020] bg-[#8B2020] text-white"
                                 : "border-gray-300 text-gray-700"
                             }`}
