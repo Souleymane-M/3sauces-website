@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Mode = "relance" | "recompense";
+type Mode = "relance" | "recompense" | "points";
 
 interface ClientListe {
   telephone: string;
@@ -15,6 +15,11 @@ interface ClientListe {
 }
 
 const MODELES: Record<Mode, { sujet: string; message: string }> = {
+  points: {
+    sujet: "Tes points de fidélité chez 3 Sauces",
+    message:
+      "Bonjour {prenom},\n\n{fidelite}\n\nChaque tranche de 10 € dépensés = 1 point de fidélité, et 10 points = 10 € offerts. Sur 3sauces.fr, saisis ton numéro et ton e-mail en haut du panier pour les utiliser quand tu veux.\n\nÀ très vite !",
+  },
   relance: {
     sujet: "Ça fait un moment chez 3 Sauces !",
     message:
@@ -33,10 +38,10 @@ const MODELES: Record<Mode, { sujet: string; message: string }> = {
  * sont remplacés pour chaque client (tampons manquants, ou récompense disponible avec sa date limite).
  */
 export function RelanceApp() {
-  const [mode, setMode] = useState<Mode>("relance");
+  const [mode, setMode] = useState<Mode>("points");
   const [jours, setJours] = useState(14);
-  const [sujet, setSujet] = useState(MODELES.relance.sujet);
-  const [message, setMessage] = useState(MODELES.relance.message);
+  const [sujet, setSujet] = useState(MODELES.points.sujet);
+  const [message, setMessage] = useState(MODELES.points.message);
   const [clients, setClients] = useState<ClientListe[] | null>(null);
   const [adresseTest, setAdresseTest] = useState("");
   const [etat, setEtat] = useState<string | null>(null);
@@ -129,6 +134,10 @@ export function RelanceApp() {
 
       <div className="space-y-1">
         <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <input type="radio" checked={mode === "points"} onChange={() => changerMode("points")} />
+          Clients qui ont au moins 1 point de fidélité (rappel du lundi)
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
           <input type="radio" checked={mode === "relance"} onChange={() => changerMode("relance")} />
           Clients qui ne commandent plus depuis
           <input
@@ -209,7 +218,7 @@ export function RelanceApp() {
           className="w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
         />
         <p className="text-xs text-gray-700">
-          {"{prenom}"} = prénom du client · {"{fidelite}"} = sa situation (récompense disponible, ou tampons qui lui manquent). Un lien « Me
+          {"{prenom}"} = prénom du client · {"{fidelite}"} = sa situation (récompense disponible, ou points qui lui manquent). Un lien « Me
           désinscrire » est ajouté automatiquement à chaque email.
         </p>
         <div className="flex flex-wrap items-center gap-2">

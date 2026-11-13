@@ -2,8 +2,8 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
 
-/** « relance » : clients sans commande depuis X jours ; « recompense » : clients qui ont au moins une récompense disponible. */
-export type ModeRelance = "relance" | "recompense";
+/** « relance » : sans commande depuis X jours ; « recompense » : au moins une récompense disponible ; « points » : au moins 1 point de fidélité (ou une récompense). */
+export type ModeRelance = "relance" | "recompense" | "points";
 
 export const SOURCE_RELANCE = "relance_client";
 const TEXTE_CONSENTEMENT_RELANCE =
@@ -92,8 +92,11 @@ export async function listerClientsRelance(mode: ModeRelance, jours: number): Pr
     const expirations = (recompensesParClient.get(c.telephone) ?? []).sort();
     const joursDepuis = stats ? Math.floor((maintenant - new Date(stats.derniere).getTime()) / 86_400_000) : null;
 
+    const tamponsClient = Math.floor((c.montant_cumule ?? 0) / MONTANT_RECOMPENSE);
     if (mode === "recompense") {
       if (expirations.length === 0) continue;
+    } else if (mode === "points") {
+      if (expirations.length === 0 && tamponsClient < 1) continue;
     } else if (joursDepuis === null || joursDepuis < jours) {
       continue;
     }
@@ -122,6 +125,8 @@ const dateFr = (iso: string) =>
  * Jamais de décision à sa place : on lui dit seulement ce qu'il a, il l'utilise quand il veut.
  */
 export function phraseFidelite(c: Pick<ClientRelance, "recompenses" | "prochaineExpiration" | "tampons">): string {
+  const manque = Math.max(1, NB_TAMPONS_RECOMPENSE - (c.tampons % NB_TAMPONS_RECOMPENSE));
+  const prochaine = `Encore ${manque} point${manque > 1 ? "s" : ""} de fidélité pour avoir ${MONTANT_RECOMPENSE} € de récompense en plus.`;
   if (c.recompenses > 0) {
     const montant = c.recompenses * MONTANT_RECOMPENSE;
     const pluriel = c.recompenses > 1;
@@ -130,10 +135,10 @@ export function phraseFidelite(c: Pick<ClientRelance, "recompenses" | "prochaine
         ? ` Les premiers expirent le ${dateFr(c.prochaineExpiration)}.`
         : ` Valable jusqu'au ${dateFr(c.prochaineExpiration)}.`
       : "";
-    return `🎁 Tu as ${montant} € de récompense disponible${pluriel ? "s" : ""}, à utiliser quand tu veux sur ta prochaine commande (sur 3sauces.fr, par téléphone ou au comptoir).${fin}`;
+    return `🎁 Tu as ${montant} € de récompense disponible${pluriel ? "s" : ""}, à utiliser quand tu veux sur ta prochaine commande (sur 3sauces.fr, par téléphone ou au comptoir).${fin} ${prochaine}`;
   }
-  const manque = Math.max(1, NB_TAMPONS_RECOMPENSE - (c.tampons % NB_TAMPONS_RECOMPENSE));
-  return `🎁 Il te manque ${manque} tampon${manque > 1 ? "s" : ""} pour obtenir ${MONTANT_RECOMPENSE} € offerts (10 € dépensés = 1 tampon).`;
+  const points = c.tampons;
+  return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité. Encore ${manque} point${manque > 1 ? "s" : ""} pour avoir ${MONTANT_RECOMPENSE} € de récompense.`;
 }
 
 export function personnaliserMessage(modele: string, c: ClientRelance): string {

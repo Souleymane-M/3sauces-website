@@ -45,7 +45,7 @@ export default function ConfidentialitePage() {
         <h2 className="font-semibold text-gray-900">Emails de fidélité et de relance aux clients</h2>
         <p>
           Si vous avez déjà commandé chez 3 Sauces et que vous nous avez donné votre adresse email, nous
-          pouvons vous écrire pour vous informer de vos tampons et récompenses de fidélité, ou pour vous
+          pouvons vous écrire pour vous informer de vos points et récompenses de fidélité, ou pour vous
           proposer de commander à nouveau (produits similaires à ceux déjà commandés). Base légale : notre
           intérêt légitime à fidéliser nos clients. Vous pouvez vous y opposer à tout moment grâce au lien
           « Me désinscrire » présent dans chaque email : plus aucun email de ce type ne vous sera envoyé.

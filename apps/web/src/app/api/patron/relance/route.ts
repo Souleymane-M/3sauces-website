@@ -12,7 +12,7 @@ const MESSAGE_MAX = 3000;
 const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function lireMode(valeur: unknown): ModeRelance | null {
-  return valeur === "relance" || valeur === "recompense" ? valeur : null;
+  return valeur === "relance" || valeur === "recompense" || valeur === "points" ? valeur : null;
 }
 
 function lireJours(valeur: unknown): number {

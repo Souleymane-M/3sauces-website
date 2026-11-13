@@ -48,7 +48,7 @@ import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
-import { MONTANT_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -1273,7 +1273,7 @@ export function CommandePubliqueApp({
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
-        10 € = 1 tampon · 10 tampons = 10 € offerts
+        10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
       </div>
       <div className="mx-auto max-w-lg space-y-6 p-4">
         {modeCommande === null ? (
@@ -1591,7 +1591,7 @@ export function CommandePubliqueApp({
                 Total : {total.toFixed(2)} €
                 {nbTamponsEffectif > 0 ? (
                   <div className="mt-1 text-sm font-semibold text-[#2D5A27]">
-                    {nbTamponsEffectif} tampon{nbTamponsEffectif > 1 ? "s" : ""} fidélité : −
+                    {nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −
                     {(nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} € · Total à payer :{" "}
                     {Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE).toFixed(2)} €
                   </div>

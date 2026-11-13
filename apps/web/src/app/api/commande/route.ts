@@ -728,7 +728,7 @@ export async function POST(request: Request) {
     const fideliteEmail = typeof body.fideliteEmail === "string" ? normaliserEmail(body.fideliteEmail) : null;
     if (!fideliteTelephone || !fideliteEmail || fideliteTelephone !== telephone) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }
       );
     }
@@ -744,7 +744,7 @@ export async function POST(request: Request) {
     }
     if (!client?.email || client.email.toLowerCase() !== fideliteEmail) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }
       );
     }
@@ -753,7 +753,7 @@ export async function POST(request: Request) {
     const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montant / MONTANT_RECOMPENSE));
     if (nbTamponsDemandes > maxUtilisable) {
       return NextResponse.json(
-        { error: "Tu n'as pas assez de tampons disponibles pour ce montant." },
+        { error: "Tu n'as pas assez de points de fidélité disponibles pour ce montant." },
         { status: 409 }
       );
     }
@@ -780,7 +780,7 @@ export async function POST(request: Request) {
   if (body.canal === "livraison" && montantFinal < parametres.minimum_commande) {
     return NextResponse.json(
       {
-        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels tampons). Choisis le retrait sur place en dessous de ce montant.`,
+        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels points de fidélité). Choisis le retrait sur place en dessous de ce montant.`,
       },
       { status: 400 }
     );
@@ -884,7 +884,7 @@ export async function POST(request: Request) {
         });
       }
       return NextResponse.json(
-        { error: "Tes tampons fidélité viennent d'être utilisés ailleurs — recharge la page et réessaie." },
+        { error: "Tes points de fidélité viennent d'être utilisés ailleurs — recharge la page et réessaie." },
         { status: 409 }
       );
     }

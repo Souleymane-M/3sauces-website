@@ -74,7 +74,7 @@ export async function chargerCommandePourModification(
     return {
       commande: null,
       erreur:
-        "Cette commande a utilisé des tampons fidélité et ne peut pas être modifiée ici — annule-la et recrée-la.",
+        "Cette commande a utilisé des points de fidélité et ne peut pas être modifiée ici — annule-la et recrée-la.",
     };
   }
   if (!data.mode_paiement) {

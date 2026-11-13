@@ -197,7 +197,7 @@ export function CarteFidelite({
         <div className="mt-2 rounded border border-[#8B2020]/30 bg-white p-2">
           <p className="text-xs text-gray-700">
             On connaît ce numéro, mais aucun email n&apos;y est encore associé — nécessaire pour voir et utiliser tes
-            tampons.
+            points de fidélité.
           </p>
           <button
             type="button"

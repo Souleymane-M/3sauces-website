@@ -384,13 +384,13 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
 function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
   separateur(b);
   b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 1 });
-  b.ligne("10€ dépensés = 1 tampon", { align: "center", gras: false, taille: 1 });
-  b.ligne("10 tampons = 10€ offerts", { align: "center", gras: false, taille: 1 });
+  b.ligne("10€ dépensés = 1 point de fidélité", { align: "center", gras: false, taille: 1 });
+  b.ligne("10 points = 10€ offerts", { align: "center", gras: false, taille: 1 });
 
   if (commande.clientTelephone && commande.tamponsAffiches !== null) {
     if (commande.tamponsUtilises > 0) {
       const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
-      b.ligne(`✅ ${remise.toFixed(2)} € de tampons utilisés sur cette commande`, {
+      b.ligne(`✅ ${remise.toFixed(2)} € de points de fidélité utilisés sur cette commande`, {
         align: "center",
         gras: true,
         taille: 1,
@@ -400,13 +400,13 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
     // (cf. `compterTamponsDisponibles`, `reserver_tampons_fidelite`) — ne
     // jamais soustraire une seconde fois ici, ce serait compter la remise
     // deux fois.
-    const tampon = commande.tamponsAffiches > 1 ? "tampons" : "tampon";
+    const tampon = commande.tamponsAffiches > 1 ? "points" : "point";
     b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon}`, { align: "center", gras: true, taille: 2 });
     if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
   } else {
-    b.ligne("Suivez vos tampons sur 3sauces.fr/fidelite", { align: "center", gras: false, taille: 1 });
+    b.ligne("Suivez vos points sur 3sauces.fr/fidelite", { align: "center", gras: false, taille: 1 });
   }
 }
 
@@ -434,7 +434,7 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
       return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser 🙂`;
     }
     const reste = NB_TAMPONS_RECOMPENSE - commande.tamponsAffiches;
-    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} tampon${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts 🙂`;
+    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts 🙂`;
   }
 
   if (!commande.origineCaisse) return null;
@@ -535,7 +535,7 @@ function construireContenuTicketClient(
     const montantBrut = commande.lignes.reduce((s, l) => s + l.prixUnitaire * l.quantite, 0);
     const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
     b.ligne(`SOUS-TOTAL : ${montantBrut.toFixed(2)} €`, { gras: false, taille: 1 });
-    b.ligne(`Tampons fidélité utilisés : -${remise.toFixed(2)} €`, { gras: true, taille: 1 });
+    b.ligne(`Points de fidélité utilisés : -${remise.toFixed(2)} €`, { gras: true, taille: 1 });
   }
   b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
   b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.dejaPayee, taille: 1 });
