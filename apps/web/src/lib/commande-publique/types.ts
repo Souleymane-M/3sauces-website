@@ -178,4 +178,6 @@ export interface CreerCommandePubliquePayload {
   boissonOfferteSaveurs?: string[];
   /** Un parfum par canette offerte (offre du jour, une par tranche de 10 €) — longueur revérifiée côté serveur. */
   canetteOfferteSaveurs?: string[];
+  /** Étiquette de campagne (lien ?src=) mémorisée à l'arrivée sur le site — nettoyée côté serveur. */
+  sourceCampagne?: string;
 }

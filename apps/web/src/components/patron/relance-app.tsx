@@ -14,6 +14,8 @@ interface ClientListe {
   phrase: string;
 }
 
+const CAMPAGNE_PAR_DEFAUT: Record<Mode, string> = { points: "lundi-points", relance: "relance", recompense: "recompense" };
+
 const MODELES: Record<Mode, { sujet: string; message: string }> = {
   points: {
     sujet: "Tes points de fidélité chez 3 Sauces",
@@ -43,6 +45,9 @@ export function RelanceApp() {
   const [sujet, setSujet] = useState(MODELES.points.sujet);
   const [message, setMessage] = useState(MODELES.points.message);
   const [clients, setClients] = useState<ClientListe[] | null>(null);
+  const [campagne, setCampagne] = useState(CAMPAGNE_PAR_DEFAUT.points);
+  const [resultats, setResultats] = useState<{ source: string; commandes: number; ca: number }[] | null>(null);
+  const [erreurResultats, setErreurResultats] = useState<string | null>(null);
   const [adresseTest, setAdresseTest] = useState("");
   const [etat, setEtat] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -52,6 +57,7 @@ export function RelanceApp() {
     setMode(m);
     setSujet(MODELES[m].sujet);
     setMessage(MODELES[m].message);
+    setCampagne(CAMPAGNE_PAR_DEFAUT[m]);
     setClients(null);
     setEtat(null);
     setErreur(null);
@@ -73,11 +79,25 @@ export function RelanceApp() {
     }
   }
 
+  async function chargerResultats() {
+    setErreurResultats(null);
+    try {
+      const reponse = await fetch("/api/patron/relance?stats=1");
+      const data = await reponse.json().catch(() => ({}));
+      if (!reponse.ok) throw new Error(data.error ?? "Chargement impossible.");
+      setResultats(data.sources);
+    } catch (e) {
+      setErreurResultats(e instanceof Error ? e.message : "Chargement impossible.");
+    }
+  }
+
+  const etiquette = campagne.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 34);
+
   async function appeler(corps: Record<string, unknown>) {
     const reponse = await fetch("/api/patron/relance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, jours, sujet, message, ...corps }),
+      body: JSON.stringify({ mode, jours, sujet, message, campagne, ...corps }),
     });
     const data = await reponse.json().catch(() => ({}));
     if (!reponse.ok) throw new Error(data.error ?? "Envoi impossible.");
@@ -217,6 +237,23 @@ export function RelanceApp() {
           maxLength={3000}
           className="w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
         />
+        <div className="space-y-1 text-xs text-gray-700">
+          <label className="block font-semibold text-gray-900">Étiquette de la campagne (sert à savoir d&apos;où viennent les commandes)</label>
+          <input
+            value={campagne}
+            onChange={(e) => setCampagne(e.target.value)}
+            maxLength={34}
+            className="w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
+          />
+          {etiquette && (
+            <>
+              <p>Lien du bouton de l&apos;e-mail : https://3sauces.fr/?src=email-{etiquette}</p>
+              <p>
+                Lien à coller dans WhatsApp : <span className="font-semibold">https://3sauces.fr/?src=whatsapp-{etiquette}</span>
+              </p>
+            </>
+          )}
+        </div>
         <p className="text-xs text-gray-700">
           {"{prenom}"} = prénom du client · {"{fidelite}"} = sa situation (récompense disponible, ou points qui lui manquent). Un lien « Me
           désinscrire » est ajouté automatiquement à chaque email.
@@ -247,6 +284,37 @@ export function RelanceApp() {
         </div>
         {etat && <p className="text-sm font-semibold text-[#2D5A27]">{etat}</p>}
         {erreur && <p className="text-sm font-bold text-red-700">{erreur}</p>}
+      </div>
+      <div className="space-y-2 rounded-lg border border-gray-300 p-3">
+        <div className="flex items-center gap-3">
+          <h3 className="font-bold text-gray-900">Résultats des campagnes (60 derniers jours)</h3>
+          <button type="button" onClick={chargerResultats} className="rounded border border-gray-400 px-3 py-1 text-sm font-bold text-gray-900">
+            Voir
+          </button>
+        </div>
+        {erreurResultats && <p className="text-sm font-bold text-red-700">{erreurResultats}</p>}
+        {resultats && (resultats.length === 0 ? (
+          <p className="text-sm text-gray-700">Aucune commande avec étiquette pour l&apos;instant.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase text-gray-700">
+              <tr>
+                <th className="p-1">Étiquette</th>
+                <th className="p-1">Commandes</th>
+                <th className="p-1">Recette</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resultats.map((r) => (
+                <tr key={r.source} className="border-t border-gray-100 text-gray-900">
+                  <td className="p-1">{r.source}</td>
+                  <td className="p-1">{r.commandes}</td>
+                  <td className="p-1">{r.ca.toFixed(2)} €</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ))}
       </div>
     </section>
   );

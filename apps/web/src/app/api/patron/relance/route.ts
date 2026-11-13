@@ -4,6 +4,8 @@ import { jetonDesinscription, listerClientsRelance, personnaliserMessage, phrase
 import { envoyerEmail } from "@/lib/notifications/email";
 import { construireEmailClientHtml } from "@/lib/notifications/template";
 import { normaliserEmail } from "@/lib/email";
+import { normaliserSourceCampagne } from "@/lib/campagne";
+import { createServiceSupabaseClient } from "@3sauces/supabase";
 
 const TAILLE_LOT = 20;
 const SUJET_MAX = 150;
@@ -20,12 +22,13 @@ function lireJours(valeur: unknown): number {
   return Number.isInteger(n) && n >= 1 && n <= 365 ? n : 14;
 }
 
-function construireHtml(message: string, jeton: string): string {
+function construireHtml(message: string, jeton: string, campagne: string | null): string {
   const corps = echapper(message).replace(/\n/g, "<br>");
   const lien = `https://3sauces.fr/desinscription?jeton=${jeton}`;
   return construireEmailClientHtml(
     `<p>${corps}</p><p style="margin-top:24px;font-size:12px;color:#777777;">Vous recevez cet email car vous avez déjà commandé chez 3 Sauces et disposez d'un compte fidélité.<br><a href="${lien}" style="color:#8B2020;">Me désinscrire</a></p>`,
-    "Commander"
+    "Commander",
+    campagne ? `https://3sauces.fr/?src=email-${campagne}` : undefined
   );
 }
 
@@ -34,6 +37,28 @@ export async function GET(request: Request) {
   const session = await requireRole(["patron"]);
   if (!session) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   const url = new URL(request.url);
+  if (url.searchParams.get("stats") === "1") {
+    const supabase = createServiceSupabaseClient();
+    const depuis = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const { data, error } = await supabase
+      .from("commandes")
+      .select("source_campagne, montant")
+      .not("source_campagne", "is", null)
+      .neq("statut", "annulee")
+      .gte("created_at", depuis);
+    if (error) {
+      return NextResponse.json({ error: "Suivi indisponible : la migration « source_campagne » n'est pas encore passée dans Supabase." }, { status: 500 });
+    }
+    const parSource = new Map<string, { commandes: number; ca: number }>();
+    for (const c of data ?? []) {
+      const s = c.source_campagne ?? "";
+      const x = parSource.get(s) ?? { commandes: 0, ca: 0 };
+      x.commandes += 1;
+      x.ca += Number(c.montant);
+      parSource.set(s, x);
+    }
+    return NextResponse.json({ sources: [...parSource].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.commandes - a.commandes) });
+  }
   const mode = lireMode(url.searchParams.get("mode"));
   if (!mode) return NextResponse.json({ error: "Mode invalide." }, { status: 400 });
   try {
@@ -61,6 +86,7 @@ export async function POST(request: Request) {
     message?: unknown;
     test?: unknown;
     debut?: unknown;
+    campagne?: unknown;
   } | null;
   const mode = lireMode(body?.mode);
   const sujet = typeof body?.sujet === "string" ? body.sujet.trim() : "";
@@ -68,6 +94,8 @@ export async function POST(request: Request) {
   if (!mode || !sujet || !message || sujet.length > SUJET_MAX || message.length > MESSAGE_MAX) {
     return NextResponse.json({ error: "Choisis le mode, un sujet et un message (limites de longueur respectées)." }, { status: 400 });
   }
+
+  const campagne = normaliserSourceCampagne(body?.campagne);
 
   if (typeof body?.test === "string" && body.test.trim()) {
     const adresse = normaliserEmail(body.test);
@@ -83,7 +111,7 @@ export async function POST(request: Request) {
       prochaineExpiration: mode === "recompense" ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null,
       tampons: 6,
     });
-    const r = await envoyerEmail(adresse, `[TEST] ${sujet}`, construireHtml(exemple, "00000000-0000-0000-0000-000000000000"));
+    const r = await envoyerEmail(adresse, `[TEST] ${sujet}`, construireHtml(exemple, "00000000-0000-0000-0000-000000000000", campagne));
     return r.ok ? NextResponse.json({ ok: true, test: true }) : NextResponse.json({ error: r.erreur ?? "Envoi impossible." }, { status: 502 });
   }
 
@@ -102,7 +130,7 @@ export async function POST(request: Request) {
     try {
       const jeton = await jetonDesinscription(c.email);
       if (!jeton) continue;
-      const r = await envoyerEmail(c.email, sujet, construireHtml(personnaliserMessage(message, c), jeton));
+      const r = await envoyerEmail(c.email, sujet, construireHtml(personnaliserMessage(message, c), jeton, campagne));
       if (r.ok) envoyes++;
       else echecs.push(c.email);
     } catch {

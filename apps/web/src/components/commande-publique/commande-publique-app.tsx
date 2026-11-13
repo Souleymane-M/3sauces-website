@@ -49,6 +49,7 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
+import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
@@ -117,6 +118,19 @@ const SECTIONS_AJOUT_DIRECT = new Set(["grillade", "accompagnement", "boisson"])
  * nouvelle visite le lendemain ou dans un autre onglet.
  */
 const CLE_PANIER_PUBLIC = "3sauces_commande_panier";
+
+/** Étiquette de campagne mémorisée à l'arrivée sur le site (valable 7 jours) ; undefined si aucune ou stockage indisponible. */
+function lireSourceCampagne(): string | undefined {
+  try {
+    const brut = localStorage.getItem(CLE_SOURCE_CAMPAGNE);
+    if (!brut) return undefined;
+    const { source, le } = JSON.parse(brut) as { source?: unknown; le?: unknown };
+    if (typeof le !== "number" || Date.now() - le > DUREE_SOURCE_CAMPAGNE_MS) return undefined;
+    return normaliserSourceCampagne(source) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function platVide(numero: number): PlatGroupe {
   return { id: `plat-${numero}-${Date.now()}-${Math.random()}`, pourQui: "", lignes: [] };
@@ -1167,6 +1181,7 @@ export function CommandePubliqueApp({
           boissonOfferteSaveurs:
             palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
+          sourceCampagne: lireSourceCampagne(),
         }),
       });
       const data = await reponse.json();

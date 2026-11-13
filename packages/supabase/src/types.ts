@@ -326,6 +326,8 @@ export interface Database {
           palier_groupe: string | null;
           motif_annulation: string | null;
           commentaire_livreur: string | null;
+          /** Étiquette de campagne (lien ?src=) — voir migration 20261113100000. */
+          source_campagne: string | null;
           statut_change_le: string | null;
           imprimer_ticket_client: boolean;
         };
@@ -359,6 +361,7 @@ export interface Database {
           palier_groupe?: string | null;
           motif_annulation?: string | null;
           commentaire_livreur?: string | null;
+          source_campagne?: string | null;
           statut_change_le?: string | null;
           imprimer_ticket_client?: boolean;
         };

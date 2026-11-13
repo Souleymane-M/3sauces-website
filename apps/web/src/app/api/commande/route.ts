@@ -32,6 +32,7 @@ import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accomp
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
+import { normaliserSourceCampagne } from "@/lib/campagne";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import {
   NOM_PRODUIT_BOISSON_OFFERTE,
@@ -908,6 +909,14 @@ export async function POST(request: Request) {
   if (erreurCommande || !commande) {
     console.error("[/api/commande] échec insertion commande :", erreurCommande?.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
+  }
+
+  // Origine de la commande (lien ?src= d'une campagne) : enregistrée à part, après coup, pour qu'un souci sur cette
+  // colonne (ex: migration pas encore passée) ne fasse jamais échouer une commande.
+  const sourceCampagne = normaliserSourceCampagne(body.sourceCampagne);
+  if (sourceCampagne) {
+    const { error: erreurSource } = await supabase.from("commandes").update({ source_campagne: sourceCampagne }).eq("id", commande.id);
+    if (erreurSource) console.error("[/api/commande] source de campagne non enregistrée :", erreurSource.message);
   }
 
   // Verrouille les tampons demandés au profit de CETTE commande, pour
