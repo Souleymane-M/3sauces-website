@@ -46,11 +46,14 @@ async function construireBlocFidelite(
   if (tamponsUtilises > 0) {
     lignes.push(`Tu as utilisé ${formaterEuros(tamponsUtilises * MONTANT_RECOMPENSE)} de récompense sur cette commande, merci de ta fidélité !`);
   }
-  lignes.push(
-    gagnes > 0
-      ? `🎁 Tu viens de gagner ${pts(gagnes)} de fidélité : tu en as maintenant ${total}.`
-      : `🎁 Tu as ${pts(total)} de fidélité.`
-  );
+  const resteProchainPoint = MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE);
+  if (gagnes > 0) {
+    lignes.push(`🎁 Tu viens de gagner ${pts(gagnes)} de fidélité : tu en as maintenant ${total}.`);
+  } else if (total > 0) {
+    lignes.push(`🎁 Tu as ${pts(total)} de fidélité. Plus que ${formaterEuros(resteProchainPoint)} pour le prochain.`);
+  } else {
+    lignes.push(`🎁 Plus que ${formaterEuros(resteProchainPoint)} pour gagner ton premier point de fidélité.`);
+  }
   lignes.push(
     solde.nombre > 0
       ? `🎉 Tu as ${formaterEuros(solde.nombre * MONTANT_RECOMPENSE)} de récompense disponible, à utiliser quand tu veux sur ta prochaine commande.`
