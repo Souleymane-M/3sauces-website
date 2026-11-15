@@ -1,9 +1,10 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
+import { construireEmailClientHtml } from "@/lib/notifications/template";
 
 /** « relance » : sans commande depuis X jours ; « recompense » : au moins une récompense disponible ; « points » : au moins 1 point de fidélité (ou une récompense). */
-export type ModeRelance = "relance" | "recompense" | "points";
+export type ModeRelance = "relance" | "recompense" | "points" | "tous";
 
 export const SOURCE_RELANCE = "relance_client";
 const TEXTE_CONSENTEMENT_RELANCE =
@@ -95,6 +96,8 @@ export async function listerClientsRelance(mode: ModeRelance, jours: number): Pr
     const tamponsClient = Math.floor((c.montant_cumule ?? 0) / MONTANT_RECOMPENSE);
     if (mode === "recompense") {
       if (expirations.length === 0) continue;
+    } else if (mode === "tous") {
+      if (joursDepuis === null) continue;
     } else if (mode === "points") {
       if (expirations.length === 0 && tamponsClient < 1) continue;
     } else if (joursDepuis === null || joursDepuis < jours) {
@@ -179,4 +182,17 @@ export async function jetonDesinscription(email: string): Promise<string | null>
     .single();
   if (error) throw new Error(error.message);
   return data.jeton_desinscription;
+}
+
+const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Corps HTML d'un e-mail de campagne : message, pied de page avec lien de désinscription, bouton étiqueté `?src=email-…`. */
+export function construireHtmlCampagne(message: string, jeton: string, campagne: string | null): string {
+  const corps = echapper(message).replace(/\n/g, "<br>");
+  const lien = `https://3sauces.fr/desinscription?jeton=${jeton}`;
+  return construireEmailClientHtml(
+    `<p>${corps}</p><p style="margin-top:24px;font-size:12px;color:#777777;">Vous recevez cet email car vous avez déjà commandé chez 3 Sauces et disposez d'un compte fidélité.<br><a href="${lien}" style="color:#8B2020;">Me désinscrire</a></p>`,
+    "Commander",
+    campagne ? `https://3sauces.fr/?src=email-${campagne}` : undefined
+  );
 }

@@ -45,6 +45,7 @@ import { EnDirectApp } from "@/components/patron/en-direct-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 import { InscriptionsApp } from "@/components/patron/inscriptions-app";
 import { RelanceApp } from "@/components/patron/relance-app";
+import { CampagnesAutoApp } from "@/components/patron/campagnes-auto-app";
 import { listerInscriptions } from "@/lib/patron/inscriptions";
 import { DepensesApp } from "@/components/patron/depenses-app";
 import { chargerDonneesDepenses, moisCourantMayotte } from "@/lib/patron/depenses";
@@ -222,6 +223,7 @@ export default async function PatronPage() {
             label: "Emails",
             contenu: (
               <>
+                <CampagnesAutoApp />
                 <RelanceApp />
                 <InscriptionsApp inscriptionsInitiales={inscriptions} />
               </>

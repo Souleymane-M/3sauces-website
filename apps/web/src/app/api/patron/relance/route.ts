@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { jetonDesinscription, listerClientsRelance, personnaliserMessage, phraseFidelite, type ModeRelance } from "@/lib/patron/relance";
+import { construireHtmlCampagne, jetonDesinscription, listerClientsRelance, personnaliserMessage, phraseFidelite, type ModeRelance } from "@/lib/patron/relance";
 import { envoyerEmail } from "@/lib/notifications/email";
-import { construireEmailClientHtml } from "@/lib/notifications/template";
 import { normaliserEmail } from "@/lib/email";
 import { normaliserSourceCampagne } from "@/lib/campagne";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
@@ -11,25 +10,13 @@ const TAILLE_LOT = 20;
 const SUJET_MAX = 150;
 const MESSAGE_MAX = 3000;
 
-const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 function lireMode(valeur: unknown): ModeRelance | null {
-  return valeur === "relance" || valeur === "recompense" || valeur === "points" ? valeur : null;
+  return valeur === "relance" || valeur === "recompense" || valeur === "points" || valeur === "tous" ? valeur : null;
 }
 
 function lireJours(valeur: unknown): number {
   const n = Number(valeur);
   return Number.isInteger(n) && n >= 1 && n <= 365 ? n : 14;
-}
-
-function construireHtml(message: string, jeton: string, campagne: string | null): string {
-  const corps = echapper(message).replace(/\n/g, "<br>");
-  const lien = `https://3sauces.fr/desinscription?jeton=${jeton}`;
-  return construireEmailClientHtml(
-    `<p>${corps}</p><p style="margin-top:24px;font-size:12px;color:#777777;">Vous recevez cet email car vous avez déjà commandé chez 3 Sauces et disposez d'un compte fidélité.<br><a href="${lien}" style="color:#8B2020;">Me désinscrire</a></p>`,
-    "Commander",
-    campagne ? `https://3sauces.fr/?src=email-${campagne}` : undefined
-  );
 }
 
 /** Liste des clients concernés (aperçu avant envoi). */
@@ -111,7 +98,7 @@ export async function POST(request: Request) {
       prochaineExpiration: mode === "recompense" ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null,
       tampons: 6,
     });
-    const r = await envoyerEmail(adresse, `[TEST] ${sujet}`, construireHtml(exemple, "00000000-0000-0000-0000-000000000000", campagne));
+    const r = await envoyerEmail(adresse, `[TEST] ${sujet}`, construireHtmlCampagne(exemple, "00000000-0000-0000-0000-000000000000", campagne));
     return r.ok ? NextResponse.json({ ok: true, test: true }) : NextResponse.json({ error: r.erreur ?? "Envoi impossible." }, { status: 502 });
   }
 
@@ -130,7 +117,7 @@ export async function POST(request: Request) {
     try {
       const jeton = await jetonDesinscription(c.email);
       if (!jeton) continue;
-      const r = await envoyerEmail(c.email, sujet, construireHtml(personnaliserMessage(message, c), jeton, campagne));
+      const r = await envoyerEmail(c.email, sujet, construireHtmlCampagne(personnaliserMessage(message, c), jeton, campagne));
       if (r.ok) envoyes++;
       else echecs.push(c.email);
     } catch {

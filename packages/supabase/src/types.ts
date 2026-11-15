@@ -529,6 +529,44 @@ export interface Database {
         Relationships: [];
       };
 
+      campagnes_auto: {
+        Row: {
+          jour_semaine: number;
+          actif: boolean;
+          mode: "points" | "recompense" | "relance" | "tous";
+          jours_inactivite: number;
+          sujet: string;
+          message: string;
+          etiquette: string;
+          dernier_envoi_le: string | null;
+          dernier_nb_envoyes: number | null;
+          dernier_nb_echecs: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          jour_semaine: number;
+          actif?: boolean;
+          mode?: "points" | "recompense" | "relance" | "tous";
+          jours_inactivite?: number;
+          sujet?: string;
+          message?: string;
+          etiquette?: string;
+          dernier_envoi_le?: string | null;
+          dernier_nb_envoyes?: number | null;
+          dernier_nb_echecs?: number | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["campagnes_auto"]["Insert"]>;
+        Relationships: [];
+      };
+
+      campagnes_auto_envois: {
+        Row: { jour: string; email: string; envoye_le: string };
+        Insert: { jour: string; email: string; envoye_le?: string };
+        Update: Partial<Database["public"]["Tables"]["campagnes_auto_envois"]["Insert"]>;
+        Relationships: [];
+      };
+
       depenses: {
         Row: {
           id: string;
