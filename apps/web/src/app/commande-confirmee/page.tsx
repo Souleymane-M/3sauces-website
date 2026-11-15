@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { dateMayotteIso } from "@/lib/commande-publique/creneau";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
-import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, formaterEuros, progressionTampons } from "@/lib/fidelite/regles";
 
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
@@ -77,13 +77,17 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
           lignes.push(
             gagnes > 0
               ? `🎁 Tu viens de gagner ${pluriel(gagnes, "point")} de fidélité. Tu en as maintenant ${totalPoints}.`
-              : `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité.`
+              : totalPoints > 0
+                ? `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité. Plus que ${formaterEuros(MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE))} pour le prochain.`
+                : `🎁 Plus que ${formaterEuros(MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE))} pour gagner ton premier point de fidélité.`
           );
         } else {
           lignes.push(
             gagnes > 0
               ? `🎁 Cette commande te rapporte ${pluriel(gagnes, "point")} de fidélité, ajouté${gagnes > 1 ? "s" : ""} dès qu'elle est payée. Tu en as ${totalPoints} aujourd'hui.`
-              : `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité.`
+              : totalPoints > 0
+                ? `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité. Plus que ${formaterEuros(MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE))} pour le prochain.`
+                : `🎁 Plus que ${formaterEuros(MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE))} pour gagner ton premier point de fidélité.`
           );
         }
         lignes.push(
