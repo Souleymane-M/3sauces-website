@@ -141,10 +141,22 @@ export function phraseFidelite(c: Pick<ClientRelance, "recompenses" | "prochaine
   return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité. Encore ${manque} point${manque > 1 ? "s" : ""} pour avoir ${MONTANT_RECOMPENSE} € de récompense.`;
 }
 
+/** Fin de phrase du mail du lundi : « tu as 4 points de fidélité, il t'en manque 6 pour 10 € offerts ». */
+export function phrasePointsLundi(c: Pick<ClientRelance, "recompenses" | "prochaineExpiration" | "tampons">): string {
+  const manque = Math.max(1, NB_TAMPONS_RECOMPENSE - (c.tampons % NB_TAMPONS_RECOMPENSE));
+  const pts = (n: number) => `${n} point${n > 1 ? "s" : ""}`;
+  if (c.recompenses > 0) {
+    const fin = c.prochaineExpiration ? ` (valable jusqu'au ${dateFr(c.prochaineExpiration)})` : "";
+    return `tu as ${c.recompenses * MONTANT_RECOMPENSE} € de récompense disponible${c.recompenses > 1 ? "s" : ""}${fin}, et il t'en manque ${pts(manque)} pour ${MONTANT_RECOMPENSE} € de plus`;
+  }
+  return `tu as ${pts(c.tampons)} de fidélité, il t'en manque ${manque} pour ${MONTANT_RECOMPENSE} € offerts`;
+}
+
 export function personnaliserMessage(modele: string, c: ClientRelance): string {
   return modele
     .replaceAll("{prenom}", c.prenom?.trim() || "")
     .replaceAll("{fidelite}", phraseFidelite(c))
+    .replaceAll("{pointsfidelite}", phrasePointsLundi(c))
     .replace(/^ +,/gm, ",")
     .replace(/Bonjour ,/g, "Bonjour,");
 }
