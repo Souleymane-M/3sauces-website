@@ -18,7 +18,7 @@ interface CarteFideliteProps {
   montantPanier: number;
   nbTampons: number;
   onChangeNbTampons: (valeur: number) => void;
-  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number) => void;
+  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number, montantCumule?: number) => void;
   /** Pré-remplit un champ du formulaire plus bas — jamais d'écrasement si le client a déjà saisi quelque chose lui-même. */
   onPrefillIdentite: (infos: {
     telephone: string;
@@ -72,7 +72,7 @@ export function CarteFidelite({
       email: string
     ) => {
       setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
-      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
+      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles, data.montantCumule);
       onPrefillIdentite({
         telephone,
         email,
@@ -165,9 +165,10 @@ export function CarteFidelite({
   const nbTamponsEffectif = Math.min(nbTampons, maxUtilisable);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
-      <p className="text-sm font-semibold text-gray-900">
-        Déjà client·e chez 3 Sauces ? Ton numéro et ton email remplissent tes infos automatiquement.
+    <div className="rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-4">
+      <p className="text-sm font-bold text-gray-900">
+        🎁 Déjà client·e ? Saisis ton numéro et ton email : tu retrouves tes points de fidélité et tes récompenses, et tes infos se
+        remplissent toutes seules.
       </p>
       <div className="mt-2 space-y-2">
         <input

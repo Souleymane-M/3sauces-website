@@ -2,6 +2,10 @@ import Link from "next/link";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { dateMayotteIso } from "@/lib/commande-publique/creneau";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons } from "@/lib/fidelite/regles";
+
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
 /** Heure seule si le retrait est aujourd'hui, "le lundi 22 septembre à 12h30" sinon (commande à l'avance). */
 function formaterHeureSouhaitee(iso: string): string {
@@ -39,11 +43,12 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
   // d'arrivée entre les deux n'est jamais garanti.
   let paiementConfirme: boolean | null = null;
   let libelleHeure: string | null = heure ?? null;
+  let messagesPoints: string[] = [];
   if (commande) {
     const supabase = createServiceSupabaseClient();
     const { data } = await supabase
       .from("commandes")
-      .select("paiement_statut, heure_souhaitee")
+      .select("paiement_statut, heure_souhaitee, montant, client_telephone")
       .eq("id", commande)
       .maybeSingle();
     if (paiement === "stripe") {
@@ -51,6 +56,43 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
     }
     if (data?.heure_souhaitee) {
       libelleHeure = formaterHeureSouhaitee(data.heure_souhaitee);
+    }
+
+    // Points de fidélité : gagnés (si le paiement est déjà passé) ou à venir (dès qu'il est payé), et solde actuel.
+    if (data?.client_telephone) {
+      const [{ data: client }, solde] = await Promise.all([
+        supabase.from("clients").select("montant_cumule").eq("telephone", data.client_telephone).maybeSingle(),
+        compterTamponsDisponibles(supabase, data.client_telephone),
+      ]);
+      if (client) {
+        const net = Number(data.montant);
+        const cumul = client.montant_cumule ?? 0;
+        const payee = data.paiement_statut === "paye";
+        const avant = payee ? (((cumul - net) % 100) + 100) % 100 : cumul;
+        const gagnes = calculerProgressionCommande(net, avant, solde.nombre, 0).tamponsGagnes;
+        const totalPoints = progressionTampons(cumul, solde.nombre);
+        const manque = NB_TAMPONS_RECOMPENSE - (Math.floor(cumul / MONTANT_RECOMPENSE) % NB_TAMPONS_RECOMPENSE);
+        const lignes: string[] = [];
+        if (payee) {
+          lignes.push(
+            gagnes > 0
+              ? `🎁 Tu viens de gagner ${pluriel(gagnes, "point")} de fidélité. Tu en as maintenant ${totalPoints}.`
+              : `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité.`
+          );
+        } else {
+          lignes.push(
+            gagnes > 0
+              ? `🎁 Cette commande te rapporte ${pluriel(gagnes, "point")} de fidélité, ajouté${gagnes > 1 ? "s" : ""} dès qu'elle est payée. Tu en as ${totalPoints} aujourd'hui.`
+              : `🎁 Tu as ${pluriel(totalPoints, "point")} de fidélité.`
+          );
+        }
+        lignes.push(
+          solde.nombre > 0
+            ? `🎉 Tu as ${solde.nombre * MONTANT_RECOMPENSE} € de récompense disponible : utilise-la sur ta prochaine commande.`
+            : `Encore ${pluriel(manque, "point")} pour avoir ${MONTANT_RECOMPENSE} € de récompense.`
+        );
+        messagesPoints = lignes;
+      }
     }
   }
 
@@ -66,14 +108,23 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
       {paiementConfirme === true && <p className="text-sm text-gray-700">Paiement en ligne reçu, commande confirmée.</p>}
       {paiementConfirme === false && (
         <p className="text-sm text-gray-700">
-          Paiement en cours de confirmation — cette étape prend en général quelques secondes, tu recevras la
-          confirmation par SMS.
+          Paiement en cours de confirmation — cela prend en général quelques secondes. Recharge cette page pour voir
+          la confirmation.
         </p>
       )}
       {paiementConfirme === null && (
         <p className="text-sm text-gray-700">
           Paiement en espèces ou par carte, à la {estLivraison ? "livraison" : "prise en main"}.
         </p>
+      )}
+      {messagesPoints.length > 0 && (
+        <div className="max-w-sm space-y-1 rounded-lg border border-green-700 bg-green-50 p-3 text-sm text-gray-900">
+          {messagesPoints.map((m) => (
+            <p key={m} className="font-semibold">
+              {m}
+            </p>
+          ))}
+        </div>
       )}
       <Link href="/commander" className="mt-4 rounded bg-white px-4 py-2 text-sm font-semibold text-black">
         Nouvelle commande

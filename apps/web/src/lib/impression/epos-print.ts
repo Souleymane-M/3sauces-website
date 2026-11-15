@@ -405,8 +405,6 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
     if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
-  } else {
-    b.ligne("Suivez vos points sur 3sauces.fr/fidelite", { align: "center", gras: false, taille: 1 });
   }
 }
 

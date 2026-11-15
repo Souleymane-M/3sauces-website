@@ -1,11 +1,9 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
-import type { Canal } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { MONTANT_RECOMPENSE, formaterEuros, messageSoldeFidelite } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
-import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { envoyerEmail } from "./email";
 import { construireEmailClientHtml } from "./template";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -45,40 +43,6 @@ async function construireBlocFidelite(
 }
 
 /**
- * Bloc commande groupée — incite à essayer la prochaine fois si ce n'était
- * pas le cas, confirme l'avantage obtenu si le palier a été atteint, ne dit
- * rien si la commande était groupée mais sous le seuil (jamais souligner un
- * bonus manqué juste après le paiement). L'incitation "prochaine fois"
- * dépend du canal : "livraison prioritaire" n'a de sens que pour une
- * livraison — pour quelqu'un venu sur place/à emporter, l'argument qui
- * compte est d'éviter la queue en commandant depuis le site à l'avance.
- */
-function construireBlocGroupe(nbPlats: number, palierGroupe: PalierGroupe, canal: Canal): string | null {
-  if (nbPlats === 0) {
-    if (canal === "livraison") {
-      return (
-        `<p>La prochaine fois, commande en groupe avant 11h :<br>` +
-        `Dès 3 plats et 30€ → livraison prioritaire.<br>` +
-        `Dès 4 plats et 40€ → priorité + une boisson 2L offerte.</p>`
-      );
-    }
-    return (
-      `<p>La prochaine fois, commande directement sur 3sauces.fr avant de venir — tu évites la queue.<br>` +
-      `Et si vous êtes plusieurs, commandez en groupe pour une préparation prioritaire :<br>` +
-      `Dès 3 plats et 30€ → commande prioritaire.<br>` +
-      `Dès 4 plats et 40€ → commande prioritaire + une boisson 2L offerte.</p>`
-    );
-  }
-  if (palierGroupe === "GROUPE_4") {
-    return `<p>Livraison prioritaire + boisson 2L offerte activées pour cette commande.</p>`;
-  }
-  if (palierGroupe === "GROUPE_3") {
-    return `<p>Livraison prioritaire activée pour cette commande.</p>`;
-  }
-  return null;
-}
-
-/**
  * Confirme la bonne réception d'une commande du site public payée en
  * personne (espèces/CB au comptoir ou à la livraison) — jamais pour
  * Stripe, où la confirmation n'a de sens qu'une fois le paiement réellement
@@ -113,7 +77,6 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
   const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
   const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
   const montantAffiche = commande.montant.toFixed(2);
-  const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
   const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
 
   const envois: Promise<{ ok: boolean; erreur?: string }>[] = [];
@@ -132,8 +95,7 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
           `Commande reçue — commande #${commande.numero}`,
           construireEmailClientHtml(
             `<p>Merci, ta commande #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
-              `<p>${resume}</p>` +
-              (blocGroupe ?? ""),
+              `<p>${resume}</p>`,
             "Retourner sur le site"
           ),
           emailRestaurant ?? undefined
@@ -209,8 +171,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
 
   if (clientEmail && commande.client_telephone) {
     const blocFidelite = await construireBlocFidelite(supabase, commande.client_telephone, commande.tampons_utilises);
-    const blocGroupe = construireBlocGroupe(commande.nb_plats, commande.palier_groupe as PalierGroupe, commande.canal);
-
+  
     // Un paiement en ligne (Stripe) est bien une confirmation pour le
     // client — il ne sait pas encore que ça a abouti. Payé en personne
     // (comptoir ou au livreur), il le sait déjà en recevant cet email :
@@ -225,7 +186,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
       envoyerEmail(
         clientEmail,
         sujet,
-        construireEmailClientHtml(intro + `<p>${resume}</p>` + blocFidelite.html + (blocGroupe ?? ""), blocFidelite.texteBouton),
+        construireEmailClientHtml(intro + `<p>${resume}</p>` + blocFidelite.html, blocFidelite.texteBouton),
         emailRestaurant ?? undefined
       )
     );

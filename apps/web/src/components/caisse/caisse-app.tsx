@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageErreur } from "@/components/message-erreur";
 import { FAMILLES_BOISSON } from "@/lib/boissons";
 import { suspendreVerrou } from "@/lib/verrou-appareil";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1920,7 +1921,7 @@ export function CaisseApp({
                   </span>
                   {platActif.pourQui ? ` (${platActif.pourQui})` : ""}
                 </p>
-                {erreurPlat && <p className="mt-2 text-sm text-red-600">{erreurPlat}</p>}
+                <div className="mt-2"><MessageErreur message={erreurPlat} /></div>
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
@@ -2183,7 +2184,10 @@ export function CaisseApp({
                       </p>
                       {(clientInfo.tamponsDisponibles ?? 0) > 0 && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
-                          <p>Combien de réduction utiliser sur cette commande ?</p>
+                          <p>
+                            🎁 RÉCOMPENSE DISPONIBLE : {(clientInfo.tamponsDisponibles ?? 0) * MONTANT_RECOMPENSE} € — demande au client
+                            s&apos;il veut l&apos;utiliser. Réduction à appliquer :
+                          </p>
                           <div className="mt-1 flex items-center gap-2 font-normal">
                             <button
                               type="button"
@@ -2537,7 +2541,7 @@ export function CaisseApp({
               </button>
             )}
 
-            {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+            <MessageErreur message={erreur} />
 
             {boissonsOffertesAChoisir > 0 && (
               <button

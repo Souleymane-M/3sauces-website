@@ -48,9 +48,10 @@ import { QuantiteModalPublique } from "./quantite-modal-publique";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
+import { MessageErreur } from "@/components/message-erreur";
 import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
-import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT } from "@/lib/commande-publique/remise-lancement";
 import { piecesParPaquet, nomSansMultiplicateur, nomPluriel } from "@/lib/pieces-produit";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -358,7 +359,7 @@ export function CommandePubliqueApp({
   const [creneauHeure, setCreneauHeure] = useState(() => creneauxValides[0] ?? "");
   const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
-  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number } | null>(
+  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number; montantCumule: number } | null>(
     null
   );
   const [nbTampons, setNbTampons] = useState(0);
@@ -1309,7 +1310,7 @@ export function CommandePubliqueApp({
         10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
       </div>
       {offreCanetteActive(aujourdHui) && (
-        <div className="bg-[#8B2020] px-4 py-2 text-center text-sm font-bold text-white">
+        <div className="bg-[#1F3A5F] px-4 py-2 text-center text-sm font-bold text-white">
           🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
         </div>
       )}
@@ -1347,9 +1348,11 @@ export function CommandePubliqueApp({
               montantPanier={total}
               nbTampons={nbTamponsEffectif}
               onChangeNbTampons={setNbTampons}
-              onSoldeVerifie={(verifie, tel, email, tamponsDisponibles) =>
+              onSoldeVerifie={(verifie, tel, email, tamponsDisponibles, montantCumule) =>
                 setFideliteVerifiee(
-                  verifie && tel && email ? { telephone: tel, email, tamponsDisponibles: tamponsDisponibles ?? 0 } : null
+                  verifie && tel && email
+                    ? { telephone: tel, email, tamponsDisponibles: tamponsDisponibles ?? 0, montantCumule: montantCumule ?? 0 }
+                    : null
                 )
               }
               onPrefillIdentite={(infos) => {
@@ -1372,7 +1375,7 @@ export function CommandePubliqueApp({
                   </span>
                   {platActif.pourQui ? ` (${platActif.pourQui})` : ""}
                 </p>
-                {erreurPlat && <p className="mt-2 text-sm text-red-600">{erreurPlat}</p>}
+                <div className="mt-2"><MessageErreur message={erreurPlat} /></div>
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
@@ -1643,11 +1646,34 @@ export function CommandePubliqueApp({
                   )
                 )}
                 {total > 0 && (
-                  <p className="mt-1 text-xs font-semibold text-gray-700">
-                    {texteProgressionCommande(
-                      calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                  <div className="mt-2 space-y-1 rounded border border-[#2D5A27]/40 bg-green-50 p-2 text-sm text-gray-900">
+                    {fideliteVerifiee ? (
+                      <>
+                        <p className="font-semibold">
+                          🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
+                          {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
+                        </p>
+                        {fideliteVerifiee.tamponsDisponibles > 0 && (
+                          <p className="font-bold text-[#2D5A27]">
+                            🎉 Dont {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense déjà acquise
+                            {nbTamponsEffectif > 0 ? " (appliquée ci-dessus)" : " : utilise-la dans le bloc « Combien utiliser » plus haut"}.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="font-semibold">🎁 Saisis ton numéro et ton e-mail plus haut pour voir tes points de fidélité.</p>
                     )}
-                  </p>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {texteProgressionCommande(
+                        calculerProgressionCommande(
+                          total,
+                          fideliteVerifiee?.montantCumule ?? 0,
+                          fideliteVerifiee?.tamponsDisponibles ?? 0,
+                          nbTamponsEffectif
+                        )
+                      )}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -1807,8 +1833,7 @@ export function CommandePubliqueApp({
                   }`}
                 >
                   <p className="text-sm font-bold text-gray-900">
-                    {canettesOffertesAChoisir > 0 ? "👉 " : "✅ "}🎁 Offre du jour : choisis le parfum de ta canette offerte
-                    {nbCanettesOffertes > 1 ? `s (${nbCanettesOffertes})` : ""}
+                    {canettesOffertesAChoisir > 0 ? "👉 " : "✅ "}🎁 Offre du jour : choisis {nbCanettesOffertes > 1 ? `tes ${nbCanettesOffertes} canettes OFFERTES` : "ta canette OFFERTE"}
                   </p>
                   {Array.from({ length: nbCanettesOffertes }, (_, index) => (
                     <div key={index} className="mt-2">
@@ -1999,7 +2024,7 @@ export function CommandePubliqueApp({
                 </span>
               </label>
 
-              {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+              <MessageErreur message={erreur} />
 
               <button
                 onClick={commander}
