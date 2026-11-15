@@ -12,6 +12,9 @@ interface SoldeTampons {
   montantCumule: number;
 }
 
+/** Numéro et e-mail du client, retenus dans son navigateur après une vérification réussie (jamais envoyés ailleurs). */
+const CLE_CLIENT_MEMORISE = "3sauces-client";
+
 type Etape = "saisie" | "verifie" | "nouveau_client" | "email_manquant";
 
 interface CarteFideliteProps {
@@ -24,7 +27,9 @@ interface CarteFideliteProps {
   montantPanier: number;
   nbTampons: number;
   onChangeNbTampons: (valeur: number) => void;
-  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number) => void;
+  /** Nouveau site : efface le numéro et l'e-mail du formulaire quand le client clique « Ce n'est pas moi ». */
+  onOublierIdentite?: () => void;
+  onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number, montantCumule?: number) => void;
   /** Pré-remplit un champ du formulaire plus bas — jamais d'écrasement si le client a déjà saisi quelque chose lui-même. */
   onPrefillIdentite: (infos: {
     telephone: string;
@@ -56,6 +61,7 @@ export function CarteFidelite({
   onChangeNbTampons,
   onSoldeVerifie,
   onPrefillIdentite,
+  onOublierIdentite,
 }: CarteFideliteProps) {
   const [etape, setEtape] = useState<Etape>("saisie");
   const [telephoneInterne, setTelephoneSaisi] = useState("");
@@ -67,6 +73,49 @@ export function CarteFidelite({
   const [enCours, setEnCours] = useState(false);
   const [enCoursLiaison, setEnCoursLiaison] = useState(false);
   const derniereIdentiteVerifiee = useRef<string | null>(null);
+  const [memorise, setMemorise] = useState(false);
+
+  // Retrouve le client déjà reconnu sur cet appareil : la vérification automatique ci-dessous affiche alors ses
+  // points sans qu'il retape rien. Différé en microtâche (même principe que la restauration du panier).
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const brut = localStorage.getItem(CLE_CLIENT_MEMORISE);
+        if (!brut) return;
+        const { telephone, email } = JSON.parse(brut) as { telephone?: unknown; email?: unknown };
+        if (typeof telephone === "string" && typeof email === "string" && normaliserTelephone(telephone) && normaliserEmail(email)) {
+          if (champsExternes) {
+            // Nouveau site : les champs sont ceux du formulaire plus bas, on les pré-remplit par le parent.
+            onPrefillIdentite({ telephone, email, nom: null, prenom: null, adresse: null, zone: null });
+          } else {
+            setTelephoneSaisi(telephone);
+            setEmailSaisi(email);
+          }
+          setMemorise(true);
+        }
+      } catch {
+        // stockage indisponible ou contenu abîmé : le client saisit comme avant
+      }
+    });
+    // Une seule lecture au chargement de la page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function oublierCetAppareil() {
+    try {
+      localStorage.removeItem(CLE_CLIENT_MEMORISE);
+    } catch {
+      // rien à faire
+    }
+    derniereIdentiteVerifiee.current = null;
+    setMemorise(false);
+    setTelephoneSaisi("");
+    setEmailSaisi("");
+    onOublierIdentite?.();
+    setSolde(null);
+    setEtape("saisie");
+    onSoldeVerifie(false);
+  }
 
   const appliquerSucces = useCallback(
     (
@@ -83,7 +132,13 @@ export function CarteFidelite({
       email: string
     ) => {
       setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
-      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles);
+      onSoldeVerifie(true, telephone, email, data.tamponsDisponibles, data.montantCumule);
+      try {
+        localStorage.setItem(CLE_CLIENT_MEMORISE, JSON.stringify({ telephone, email }));
+        setMemorise(true);
+      } catch {
+        // stockage bloqué : on ne retient simplement rien
+      }
       onPrefillIdentite({
         telephone,
         email,
@@ -176,23 +231,31 @@ export function CarteFidelite({
   const nbTamponsEffectif = Math.min(nbTampons, maxUtilisable);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
+    <div className="rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-4">
       {champsExternes ? (
         <>
-          <p className="text-sm font-semibold text-gray-900">Déjà client·e chez 3 Sauces ?</p>
+          <p className="text-sm font-bold text-gray-900">🎁 Déjà client·e ? Retrouve tes points de fidélité et tes récompenses.</p>
           {etape === "saisie" && !enCours && (
             <p className="mt-1 text-sm text-gray-800">
               {normaliserTelephone(telephoneSaisi) && !normaliserEmail(emailSaisi)
-                ? "Tape aussi ton email plus haut : ton nom, ton adresse et tes tampons de fidélité s'afficheront tout seuls."
-                : "Ton numéro et ton email, tapés plus haut, remplissent tes infos et affichent tes tampons de fidélité."}
+                ? "Tape aussi ton email plus haut : ton nom, ton adresse et tes points de fidélité s'afficheront tout seuls."
+                : "Ton numéro et ton email, tapés plus haut, remplissent tes infos et affichent tes points de fidélité et tes récompenses."}
             </p>
           )}
           {enCours && <p className="mt-1 text-xs text-gray-700">Vérification…</p>}
+          {memorise && !enCours && (
+            <p className="mt-1 text-xs text-gray-700">
+              ✓ Reconnu sur cet appareil.{" "}
+              <button type="button" onClick={oublierCetAppareil} className="font-semibold underline">
+                Ce n&apos;est pas moi
+              </button>
+            </p>
+          )}
         </>
       ) : (
         <>
           <p className="text-sm font-semibold text-gray-900">
-            Déjà client·e chez 3 Sauces ? Ton numéro et ton email remplissent tes infos automatiquement.
+            🎁 Déjà client·e ? Saisis ton numéro et ton email : tu retrouves tes points de fidélité et tes récompenses, et tes infos se remplissent toutes seules.
           </p>
           <div className="mt-2 space-y-2">
             <input
@@ -209,6 +272,14 @@ export function CarteFidelite({
               className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
             />
             {enCours && <p className="text-xs text-gray-700">Vérification…</p>}
+            {memorise && !enCours && (
+              <p className="text-xs text-gray-700">
+                ✓ Reconnu sur cet appareil.{" "}
+                <button type="button" onClick={oublierCetAppareil} className="font-semibold underline">
+                  Ce n&apos;est pas moi
+                </button>
+              </p>
+            )}
           </div>
         </>
       )}
@@ -224,7 +295,7 @@ export function CarteFidelite({
         <div className="mt-2 rounded border border-[#8B2020]/30 bg-white p-2">
           <p className="text-xs text-gray-700">
             On connaît ce numéro, mais aucun email n&apos;y est encore associé — nécessaire pour voir et utiliser tes
-            tampons.
+            points de fidélité.
           </p>
           <button
             type="button"

@@ -3,7 +3,7 @@ import { codeLivraisonExiste } from "@/lib/fidelite/activation";
 import { VoirTamponsApp } from "@/components/fidelite/voir-tampons-app";
 
 export const metadata: Metadata = {
-  title: "Mes tampons — 3 Sauces",
+  title: "Mes points de fidélité — 3 Sauces",
 };
 
 interface VoirTamponsPageProps {
@@ -18,7 +18,7 @@ export default async function VoirTamponsPage({ searchParams }: VoirTamponsPageP
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white p-8 text-center">
         <p className="text-4xl">🎁</p>
-        <h1 className="text-xl font-bold text-black">Voir mes tampons</h1>
+        <h1 className="text-xl font-bold text-black">Voir mes points de fidélité</h1>
         <p className="text-sm text-gray-600">
           Ce lien n&apos;est valable qu&apos;après une livraison — scanne le QR de ton reçu une fois ta commande
           reçue.

@@ -326,6 +326,8 @@ export interface Database {
           palier_groupe: string | null;
           motif_annulation: string | null;
           commentaire_livreur: string | null;
+          /** Étiquette de campagne (lien ?src=) — voir migration 20261113100000. */
+          source_campagne: string | null;
           statut_change_le: string | null;
           imprimer_ticket_client: boolean;
         };
@@ -359,6 +361,7 @@ export interface Database {
           palier_groupe?: string | null;
           motif_annulation?: string | null;
           commentaire_livreur?: string | null;
+          source_campagne?: string | null;
           statut_change_le?: string | null;
           imprimer_ticket_client?: boolean;
         };
@@ -523,6 +526,44 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["inscriptions_information"]["Insert"]>;
+        Relationships: [];
+      };
+
+      campagnes_auto: {
+        Row: {
+          jour_semaine: number;
+          actif: boolean;
+          mode: "points" | "recompense" | "relance" | "tous";
+          jours_inactivite: number;
+          sujet: string;
+          message: string;
+          etiquette: string;
+          dernier_envoi_le: string | null;
+          dernier_nb_envoyes: number | null;
+          dernier_nb_echecs: number | null;
+          updated_at: string;
+        };
+        Insert: {
+          jour_semaine: number;
+          actif?: boolean;
+          mode?: "points" | "recompense" | "relance" | "tous";
+          jours_inactivite?: number;
+          sujet?: string;
+          message?: string;
+          etiquette?: string;
+          dernier_envoi_le?: string | null;
+          dernier_nb_envoyes?: number | null;
+          dernier_nb_echecs?: number | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["campagnes_auto"]["Insert"]>;
+        Relationships: [];
+      };
+
+      campagnes_auto_envois: {
+        Row: { jour: string; email: string; envoye_le: string };
+        Insert: { jour: string; email: string; envoye_le?: string };
+        Update: Partial<Database["public"]["Tables"]["campagnes_auto_envois"]["Insert"]>;
         Relationships: [];
       };
 

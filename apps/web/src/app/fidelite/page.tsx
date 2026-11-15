@@ -15,8 +15,8 @@ export default function FidelitePage() {
           place, à emporter, en livraison, ou sur 3sauces.fr. Un seul numéro de téléphone suffit, pas de
           carte à garder, pas de compte à créer.
         </p>
-        <p>→ Tous les 10€ cumulés (même en plusieurs commandes), vous gagnez 1 tampon.</p>
-        <p>→ À 10 tampons (100€ cumulés), vous débloquez 10€ offerts sur votre prochaine commande.</p>
+        <p>→ Tous les 10€ cumulés (même en plusieurs commandes), vous gagnez 1 point de fidélité.</p>
+        <p>→ À 10 points de fidélité (100€ cumulés), vous débloquez 10€ offerts sur votre prochaine commande.</p>
         <p>
           C&apos;est tout. Pas de calcul compliqué, pas de date à retenir — votre récompense apparaît toute
           seule sur 3sauces.fr et à la caisse dès qu&apos;elle est prête.
@@ -35,7 +35,7 @@ export default function FidelitePage() {
           plusieurs sur une même commande — jamais obligé de tout dépenser d&apos;un coup.
         </p>
         <p>
-          → Chaque récompense de 10€ (10 tampons) est utilisable en une seule fois sur une commande d&apos;un
+          → Chaque récompense de 10€ (10 points) est utilisable en une seule fois sur une commande d&apos;un
           montant minimum de 10€.
         </p>
         <p>

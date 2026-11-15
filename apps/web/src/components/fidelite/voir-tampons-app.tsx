@@ -112,7 +112,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
       {etape === "email" && (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-[#FFF8F0] p-4 text-left">
           <p className="text-sm font-semibold text-gray-900">
-            Entre ton email pour débloquer l&apos;accès à tes tampons fidélité.
+            Entre ton email pour débloquer l&apos;accès à tes points de fidélité.
           </p>
           <input
             value={email}
@@ -128,7 +128,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
             disabled={enCours || !email.trim()}
             className="w-full rounded bg-[#8B2020] py-2 text-sm font-bold text-white disabled:opacity-40"
           >
-            {enCours ? "…" : "Voir mes tampons"}
+            {enCours ? "…" : "Voir mes points de fidélité"}
           </button>
           <p className="text-xs text-gray-700">Jamais de spam — juste de quoi te prévenir quand une récompense est prête.</p>
         </div>
@@ -138,7 +138,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
         <div className="space-y-2 rounded-lg border border-gray-200 bg-[#FFF8F0] p-4">
           <p className="text-2xl tracking-widest text-[#8B2020]">{rendreTampons(activation.tamponsAffiches)}</p>
           <p className="text-sm font-semibold text-gray-900">
-            {activation.tamponsAffiches} tampon{activation.tamponsAffiches > 1 ? "s" : ""}
+            {activation.tamponsAffiches} point{activation.tamponsAffiches > 1 ? "s" : ""} de fidélité
           </p>
           {activation.recompenseDisponible && (
             <p className="text-sm font-bold text-[#2D5A27]">🎁 Récompense disponible — 10€ offerts !</p>

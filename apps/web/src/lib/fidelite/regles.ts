@@ -49,7 +49,7 @@ export const NB_TAMPONS_RECOMPENSE = SEUIL_TAMPON / MONTANT_RECOMPENSE;
 /** Sous ce montant restant avant la prochaine récompense, l'accroche "vous débloquez 10€ offerts" devient utile ; au-delà, "plus que X€ pour votre prochain tampon" suffit. */
 export const SEUIL_AFFICHAGE_PROGRESSION = 30;
 
-export const MESSAGE_GENERIQUE_FIDELITE = `🎁 ${formaterEuros(MONTANT_RECOMPENSE)} dépensés = 1 tampon. ${NB_TAMPONS_RECOMPENSE} tampons = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
+export const MESSAGE_GENERIQUE_FIDELITE = `🎁 ${formaterEuros(MONTANT_RECOMPENSE)} dépensés = 1 point de fidélité. ${NB_TAMPONS_RECOMPENSE} points = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
 const MESSAGE_RECOMPENSE_DISPONIBLE = `🎉 ${formaterEuros(MONTANT_RECOMPENSE)} offerts à utiliser dès votre prochaine commande !`;
 
 export interface SoldeTampons {
@@ -73,7 +73,7 @@ export function messageSoldeFidelite(reliquat: number, solde: SoldeTampons): str
     return `🎁 Plus que ${formaterEuros(resteRecompense)} et vous débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts !`;
   }
   const resteTampon = MONTANT_RECOMPENSE - (reliquat % MONTANT_RECOMPENSE);
-  return `🎁 Plus que ${formaterEuros(resteTampon)} pour votre prochain tampon.`;
+  return `🎁 Plus que ${formaterEuros(resteTampon)} pour votre prochain point de fidélité.`;
 }
 
 export interface ProgressionCommande {
@@ -125,10 +125,10 @@ export function calculerProgressionCommande(
 export function texteProgressionCommande(p: ProgressionCommande): string {
   if (p.recompenseDisponibleApres) return MESSAGE_RECOMPENSE_DISPONIBLE;
   if (p.tamponsGagnes > 0) {
-    return `🎁 +${p.tamponsGagnes} tampon${p.tamponsGagnes > 1 ? "s" : ""} avec cette commande ! ${NB_TAMPONS_RECOMPENSE} tampons = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
+    return `🎁 +${p.tamponsGagnes} point${p.tamponsGagnes > 1 ? "s" : ""} de fidélité avec cette commande ! ${NB_TAMPONS_RECOMPENSE} points = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
   }
   if (p.resteProchaineRecompense <= SEUIL_AFFICHAGE_PROGRESSION) {
     return `🎁 Plus que ${formaterEuros(p.resteProchaineRecompense)} et vous débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts !`;
   }
-  return `🎁 Plus que ${formaterEuros(p.resteProchainTampon)} pour votre prochain tampon.`;
+  return `🎁 Plus que ${formaterEuros(p.resteProchainTampon)} pour votre prochain point de fidélité.`;
 }

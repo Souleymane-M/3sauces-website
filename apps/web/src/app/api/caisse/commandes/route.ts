@@ -658,7 +658,7 @@ export async function POST(request: Request) {
     const { nombre: tamponsDisponibles } = await compterTamponsDisponibles(supabase, clientTelephone);
     const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montantBrut / MONTANT_RECOMPENSE));
     if (nbTamponsDemandes > maxUtilisable) {
-      return NextResponse.json({ error: "Ce client n'a pas assez de tampons disponibles pour ce montant." }, { status: 400 });
+      return NextResponse.json({ error: "Ce client n'a pas assez de points de fidélité disponibles pour ce montant." }, { status: 400 });
     }
     tamponsUtilises = nbTamponsDemandes;
     montant = Math.round((montantBrut - tamponsUtilises * MONTANT_RECOMPENSE) * 100) / 100;
@@ -670,7 +670,7 @@ export async function POST(request: Request) {
   if (body.canal === "livraison" && montant < parametres.minimum_commande) {
     return NextResponse.json(
       {
-        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels tampons).`,
+        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels points de fidélité).`,
       },
       { status: 400 }
     );
@@ -802,7 +802,7 @@ export async function POST(request: Request) {
         });
       }
       return NextResponse.json(
-        { error: "Les tampons fidélité de ce client viennent d'être utilisés ailleurs — relance la commande." },
+        { error: "Les points de fidélité de ce client viennent d'être utilisés ailleurs — relance la commande." },
         { status: 409 }
       );
     }
@@ -949,7 +949,7 @@ export async function PATCH(request: Request) {
   }
   if (commandeExistante.tampons_utilises > 0) {
     return NextResponse.json(
-      { error: "Cette commande a utilisé des tampons fidélité et ne peut pas être modifiée ici." },
+      { error: "Cette commande a utilisé des points de fidélité et ne peut pas être modifiée ici." },
       { status: 400 }
     );
   }

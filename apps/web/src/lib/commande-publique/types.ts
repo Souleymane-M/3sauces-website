@@ -194,4 +194,8 @@ export interface CreerCommandePubliquePayload {
   nbTampons?: number;
   /** Un parfum par boisson 2L offerte (palier GROUPE_4, une par tranche de 40€) — longueur revérifiée côté serveur. */
   boissonOfferteSaveurs?: string[];
+  /** Un parfum par canette offerte (offre du jour, une par tranche de 10 €) — longueur revérifiée côté serveur. */
+  canetteOfferteSaveurs?: string[];
+  /** Étiquette de campagne (lien ?src=) mémorisée à l'arrivée sur le site — nettoyée côté serveur. */
+  sourceCampagne?: string;
 }

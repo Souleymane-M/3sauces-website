@@ -132,7 +132,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
     <div className="mx-auto max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-bold">Clients fidélité</h2>
       <p className="text-xs text-gray-500">
-        {MONTANT_RECOMPENSE}€ dépensés = 1 tampon. {SEUIL_TAMPON}€ cumulés (10 tampons) débloquent {MONTANT_RECOMPENSE}€
+        {MONTANT_RECOMPENSE}€ dépensés = 1 point de fidélité. {SEUIL_TAMPON}€ cumulés (10 points) débloquent {MONTANT_RECOMPENSE}€
         offerts, valables 3 mois depuis leur obtention. Cumulable sans limite. Calculé automatiquement à chaque paiement
         (comptoir, livraison, site) — rien à saisir ici.
       </p>
@@ -143,7 +143,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
           <p className="text-lg font-bold">{clients.length}</p>
         </div>
         <div>
-          <p className="text-gray-500">Tampons (tous clients)</p>
+          <p className="text-gray-500">Points de fidélité (tous clients)</p>
           <p className="text-lg font-bold">{nbTamponsProgressionTotal}</p>
         </div>
       </div>
@@ -177,7 +177,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                   </div>
                   <div className="text-right">
                     <span className="block font-bold text-gray-900">
-                      {tampons} tampon{tampons > 1 ? "s" : ""}
+                      {tampons} point{tampons > 1 ? "s" : ""}
                     </span>
                     {!ouvert && <span className="text-xs text-[#8B2020] underline">Voir la fiche</span>}
                   </div>
@@ -188,7 +188,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                     <span>
                       {tampons > 0
                         ? "🎁".repeat(Math.min(tampons, 10)) + (tampons > 10 ? ` +${tampons - 10}` : "")
-                        : "Aucun tampon pour l'instant"}
+                        : "Aucun point pour l'instant"}
                     </span>
                     {c.prochaineExpiration && <span>Prochaine expiration : {formaterDate(c.prochaineExpiration)}</span>}
                   </div>
@@ -200,7 +200,7 @@ export function ClientsApp({ clientsInitiaux }: ClientsAppProps) {
                       <span>
                         {tampons > 0
                           ? "🎁".repeat(Math.min(tampons, 10)) + (tampons > 10 ? ` +${tampons - 10}` : "")
-                          : "Aucun tampon pour l'instant"}
+                          : "Aucun point pour l'instant"}
                       </span>
                       {c.prochaineExpiration && <span>Prochaine expiration : {formaterDate(c.prochaineExpiration)}</span>}
                     </div>

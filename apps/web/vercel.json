@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/campagnes", "schedule": "30 5 * * 1,3,5" },
+    { "path": "/api/cron/campagnes", "schedule": "0 6 * * 1,3,5" }
+  ]
+}

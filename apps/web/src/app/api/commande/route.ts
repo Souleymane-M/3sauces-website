@@ -32,6 +32,8 @@ import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
+import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
+import { normaliserSourceCampagne } from "@/lib/campagne";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import {
   NOM_PRODUIT_BOISSON_OFFERTE,
@@ -814,7 +816,7 @@ export async function POST(request: Request) {
     const fideliteEmail = typeof body.fideliteEmail === "string" ? normaliserEmail(body.fideliteEmail) : null;
     if (!fideliteTelephone || !fideliteEmail || fideliteTelephone !== telephone) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }
       );
     }
@@ -830,7 +832,7 @@ export async function POST(request: Request) {
     }
     if (!client?.email || client.email.toLowerCase() !== fideliteEmail) {
       return NextResponse.json(
-        { error: "Revérifie ton solde fidélité pour utiliser tes tampons." },
+        { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }
       );
     }
@@ -839,7 +841,7 @@ export async function POST(request: Request) {
     const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montant / MONTANT_RECOMPENSE));
     if (nbTamponsDemandes > maxUtilisable) {
       return NextResponse.json(
-        { error: "Tu n'as pas assez de tampons disponibles pour ce montant." },
+        { error: "Tu n'as pas assez de points de fidélité disponibles pour ce montant." },
         { status: 409 }
       );
     }
@@ -856,6 +858,55 @@ export async function POST(request: Request) {
     montantFinal = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
   }
 
+  // Offre du jour : une canette offerte par tranche de 10 € d'achats sur le montant réellement payé (après points de fidélité / remise), pour les commandes servies le jour de l'offre — site uniquement, cf. offre-canette.ts.
+  const nbCanettesOffertes = nombreCanettesOffertes(montantFinal, dateCommande);
+  if (nbCanettesOffertes > 0) {
+    const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsSaveursValides.has(s)
+    );
+    if (saveursValidees.length !== nbCanettesOffertes) {
+      return NextResponse.json(
+        {
+          error:
+            nbCanettesOffertes > 1
+              ? `Choisis un parfum pour chacune de tes ${nbCanettesOffertes} canettes offertes.`
+              : "Choisis un parfum disponible pour ta canette offerte.",
+        },
+        { status: 400 }
+      );
+    }
+    const { data: produitsCanette, error: erreurCanette } = await supabase
+      .from("produits")
+      .select("id, nom")
+      .eq("categorie", "boisson")
+      .eq("actif", true)
+      .gt("nb_saveurs_max", 0)
+      .neq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .order("prix", { ascending: true })
+      .limit(1);
+    if (erreurCanette) {
+      return NextResponse.json({ error: "Erreur serveur (canette offerte)." }, { status: 500 });
+    }
+    const canette = produitsCanette?.[0];
+    if (canette) {
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: canette.id,
+          nom: `${canette.nom} (offerte — offre du jour)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null,
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
+    }
+  }
+
   // Minimum de commande pour la livraison : vérifié sur le montant RÉEL à
   // payer (après tampons/remise de lancement), jamais sur le montant brut
   // du panier — sinon un client pourrait utiliser ses tampons pour faire
@@ -866,7 +917,7 @@ export async function POST(request: Request) {
   if (body.canal === "livraison" && montantFinal < parametres.minimum_commande) {
     return NextResponse.json(
       {
-        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels tampons). Choisis le retrait sur place en dessous de ce montant.`,
+        error: `Minimum de commande pour la livraison : ${parametres.minimum_commande.toFixed(2)} € (après utilisation d'éventuels points de fidélité). Choisis le retrait sur place en dessous de ce montant.`,
       },
       { status: 400 }
     );
@@ -946,6 +997,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
 
+  // Origine de la commande (lien ?src= d'une campagne) : enregistrée à part, après coup, pour qu'un souci sur cette
+  // colonne (ex: migration pas encore passée) ne fasse jamais échouer une commande.
+  const sourceCampagne = normaliserSourceCampagne(body.sourceCampagne);
+  if (sourceCampagne) {
+    const { error: erreurSource } = await supabase.from("commandes").update({ source_campagne: sourceCampagne }).eq("id", commande.id);
+    if (erreurSource) console.error("[/api/commande] source de campagne non enregistrée :", erreurSource.message);
+  }
+
   // Verrouille les tampons demandés au profit de CETTE commande, pour
   // qu'ils ne puissent plus être proposés à une autre pendant que celle-ci
   // attend son paiement (cf. migration 20261021090000, commande #509,
@@ -970,7 +1029,7 @@ export async function POST(request: Request) {
         });
       }
       return NextResponse.json(
-        { error: "Tes tampons fidélité viennent d'être utilisés ailleurs — recharge la page et réessaie." },
+        { error: "Tes points de fidélité viennent d'être utilisés ailleurs — recharge la page et réessaie." },
         { status: 409 }
       );
     }
