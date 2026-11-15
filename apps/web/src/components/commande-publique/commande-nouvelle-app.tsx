@@ -43,7 +43,10 @@ import { LIEUX_PRINCIPAUX, VILLAGES, creneauxLivraisonPossibles, libelleCreneauL
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
-import { MONTANT_RECOMPENSE, calculerProgressionCommande, texteProgressionCommande } from "@/lib/fidelite/regles";
+import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
+import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
+import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
+import { MessageErreur } from "@/components/message-erreur";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -93,6 +96,19 @@ const FOND_PAGE = "#F5F0E8";
 const CLE_PANIER = "3sauces_nouvelle_commande_panier";
 /** Identité mémorisée sur l'appareil (jamais envoyée ailleurs que dans la commande). */
 const CLE_IDENTITE = "3sauces_identite_client";
+
+/** Étiquette de campagne mémorisée à l'arrivée sur le site (valable 7 jours) ; undefined si aucune ou stockage indisponible. */
+function lireSourceCampagne(): string | undefined {
+  try {
+    const brut = localStorage.getItem(CLE_SOURCE_CAMPAGNE);
+    if (!brut) return undefined;
+    const { source, le } = JSON.parse(brut) as { source?: unknown; le?: unknown };
+    if (typeof le !== "number" || Date.now() - le > DUREE_SOURCE_CAMPAGNE_MS) return undefined;
+    return normaliserSourceCampagne(source) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const euros = (montant: number) => `${montant.toFixed(2).replace(".", ",")} €`;
 
@@ -184,6 +200,7 @@ export function CommandeNouvelleApp({
   // Aucun canal présélectionné : le client doit cliquer explicitement (cf. ancien site, 2026-10-07).
   const [canal, setCanal] = useState<CanalPublic | null>(null);
   const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
+  const [canetteOfferteSaveurs, setCanetteOfferteSaveurs] = useState<string[]>([]);
 
   const [pretPourPersistance, setPretPourPersistance] = useState(false);
   const [nom, setNom] = useState("");
@@ -280,7 +297,7 @@ export function CommandeNouvelleApp({
   const [quand, setQuand] = useState<"asap" | "heure" | null>(null);
   const commandeAvance = dateCommande !== aujourdHui;
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
-  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number } | null>(
+  const [fideliteVerifiee, setFideliteVerifiee] = useState<{ telephone: string; email: string; tamponsDisponibles: number; montantCumule: number } | null>(
     null
   );
   const [nbTampons, setNbTampons] = useState(0);
@@ -398,6 +415,9 @@ export function CommandeNouvelleApp({
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
   const montantAPayer = totalApresTampons;
+  // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
+  const nbCanettesOffertes = nombreCanettesOffertes(montantAPayer, dateCommande);
+  const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
   // Tampons gagnés en plus si le client ajoute juste ce qu'il manque pour la prochaine boisson offerte.
@@ -644,6 +664,10 @@ export function CommandeNouvelleApp({
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
+    if (canettesOffertesAChoisir > 0) {
+      setErreur(`Choisis le parfum de ta canette offerte${nbCanettesOffertes > 1 ? "s" : ""} avant de valider.`);
+      return;
+    }
     if (enGroupe) {
       const indexPlatsRemplis = nomsPlats.map((_, i) => i).filter((i) => panier.some((l) => l.plat === i));
       if (indexPlatsRemplis.length < 2) {
@@ -763,6 +787,8 @@ export function CommandeNouvelleApp({
           fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
+          sourceCampagne: lireSourceCampagne(),
         }),
       });
       const data = await reponse.json();
@@ -1150,7 +1176,7 @@ export function CommandeNouvelleApp({
   const aDejaUneBoisson = panier.some((l) => l.produit.categorie === "boisson" || l.boissonIncluse);
   const messageTotalApayer =
     nbTamponsEffectif > 0
-      ? `${nbTamponsEffectif} tampon${nbTamponsEffectif > 1 ? "s" : ""} fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
+      ? `${nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
       : null;
 
   const libelleQuand = commandeAvance
@@ -1161,8 +1187,13 @@ export function CommandeNouvelleApp({
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
       {/* Bandeau fidélité : toujours visible */}
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
-        10 € = 1 tampon · 10 tampons = 10 € offerts
+        10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
       </div>
+      {offreCanetteActive(aujourdHui) && (
+        <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: "#1F3A5F" }}>
+          🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
+        </div>
+      )}
 
       {vue === "menu" && mode === null && (
         <div className="mx-auto max-w-lg space-y-4 p-4">
@@ -1326,15 +1357,31 @@ export function CommandeNouvelleApp({
               <p className="text-sm font-extrabold text-gray-900">
                 Plus que {euros(resteAvantProchaineBoisson)} : {palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte
                 {tamponsEnPlusAuProchainPalier > 0
-                  ? ` et ${tamponsEnPlusAuProchainPalier} tampon${tamponsEnPlusAuProchainPalier > 1 ? "s" : ""} en plus`
+                  ? ` et ${tamponsEnPlusAuProchainPalier} point${tamponsEnPlusAuProchainPalier > 1 ? "s" : ""} de fidélité en plus`
                   : ""}
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
                 <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
               </div>
-              <p className="mt-2 text-sm font-extrabold text-gray-900">
+              {fideliteVerifiee ? (
+                <>
+                  <p className="mt-2 text-sm font-extrabold text-gray-900">
+                    🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
+                    {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
+                  </p>
+                  {fideliteVerifiee.tamponsDisponibles > 0 && (
+                    <p className="mt-1 text-sm font-extrabold" style={{ color: VERT }}>
+                      🎉 Dont {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense déjà acquise
+                      {nbTamponsEffectif > 0 ? " (appliquée)" : " : utilise-la dans le bloc fidélité plus bas"}.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-2 text-sm font-extrabold text-gray-900">🎁 Saisis ton numéro et ton e-mail plus bas pour voir tes points de fidélité.</p>
+              )}
+              <p className="mt-1 text-sm font-semibold text-gray-800">
                 {texteProgressionCommande(
-                  calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                  calculerProgressionCommande(total, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
                 )}
               </p>
             </div>
@@ -1576,7 +1623,7 @@ export function CommandeNouvelleApp({
               placeholder="0639123456"
               className="w-full rounded-lg border border-gray-400 bg-white p-3 text-base text-gray-900"
             />
-            <p className="text-sm font-medium text-gray-800">Tes tampons de fidélité sont comptés avec ce numéro.</p>
+            <p className="text-sm font-medium text-gray-800">Tes points de fidélité sont comptés avec ce numéro.</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-sm font-semibold text-gray-900">Prénom</label>
@@ -1604,7 +1651,7 @@ export function CommandeNouvelleApp({
                 placeholder={emailDejaConnu ? "Laisse vide pour garder ton email déjà enregistré" : "toi@exemple.com"}
                 className="mt-1 w-full rounded-lg border border-gray-400 bg-white p-3 text-base text-gray-900"
               />
-              {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes tampons, ou laisse vide.</p>}
+              {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes points de fidélité, ou laisse vide.</p>}
             </div>
             <CarteFidelite
               telephoneExterne={telephone}
@@ -1612,9 +1659,20 @@ export function CommandeNouvelleApp({
               montantPanier={total}
               nbTampons={nbTamponsEffectif}
               onChangeNbTampons={setNbTampons}
-              onSoldeVerifie={(verifie, tel, mail, tamponsDisponibles) =>
-                setFideliteVerifiee(verifie && tel && mail ? { telephone: tel, email: mail, tamponsDisponibles: tamponsDisponibles ?? 0 } : null)
+              onSoldeVerifie={(verifie, tel, mail, tamponsDisponibles, montantCumule) =>
+                setFideliteVerifiee(
+                  verifie && tel && mail ? { telephone: tel, email: mail, tamponsDisponibles: tamponsDisponibles ?? 0, montantCumule: montantCumule ?? 0 } : null
+                )
               }
+              onOublierIdentite={() => {
+                setTelephone("");
+                setEmail("");
+                try {
+                  localStorage.removeItem(CLE_IDENTITE);
+                } catch {
+                  // rien à faire
+                }
+              }}
               onPrefillIdentite={(infos) => {
                 setTelephone((precedent) => precedent.trim() || infos.telephone);
                 setEmail((precedent) => precedent.trim() || infos.email);
@@ -1654,6 +1712,41 @@ export function CommandeNouvelleApp({
                         }`}
                       >
                         {s.nom}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {/* Canette offerte (offre du jour) */}
+          {nbCanettesOffertes > 0 && (
+            <section
+              id="canette-offerte"
+              className={`rounded-xl border-2 p-4 ${canettesOffertesAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
+            >
+              <p className="text-base font-extrabold text-gray-900">
+                🎁 Offre du jour : choisis {nbCanettesOffertes > 1 ? `tes ${nbCanettesOffertes} canettes OFFERTES` : "ta canette OFFERTE"}
+              </p>
+              {Array.from({ length: nbCanettesOffertes }, (_, index) => (
+                <div key={index} className="mt-2">
+                  {nbCanettesOffertes > 1 && <p className="text-sm font-semibold text-gray-900">Canette offerte n°{index + 1}</p>}
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {saveurs.map((sv) => (
+                      <button
+                        key={sv.id}
+                        type="button"
+                        onClick={() =>
+                          setCanetteOfferteSaveurs((prev) =>
+                            Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sv.nom : prev[i]))
+                          )
+                        }
+                        className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
+                          canetteOfferteSaveurs[index] === sv.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                        }`}
+                      >
+                        {sv.nom}
                       </button>
                     ))}
                   </div>
@@ -1708,7 +1801,7 @@ export function CommandeNouvelleApp({
             </span>
           </label>
 
-          {erreur && <p className="rounded-lg bg-red-100 p-3 text-sm font-bold text-red-900">{erreur}</p>}
+          <MessageErreur message={erreur} />
 
           <button
             type="button"
