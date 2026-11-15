@@ -12,6 +12,9 @@ interface SoldeTampons {
   montantCumule: number;
 }
 
+/** Numéro et e-mail du client, retenus dans son navigateur après une vérification réussie (jamais envoyés ailleurs). */
+const CLE_CLIENT_MEMORISE = "3sauces-client";
+
 type Etape = "saisie" | "verifie" | "nouveau_client" | "email_manquant";
 
 interface CarteFideliteProps {
@@ -56,6 +59,41 @@ export function CarteFidelite({
   const [enCours, setEnCours] = useState(false);
   const [enCoursLiaison, setEnCoursLiaison] = useState(false);
   const derniereIdentiteVerifiee = useRef<string | null>(null);
+  const [memorise, setMemorise] = useState(false);
+
+  // Retrouve le client déjà reconnu sur cet appareil : la vérification automatique ci-dessous affiche alors ses
+  // points sans qu'il retape rien. Différé en microtâche (même principe que la restauration du panier).
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const brut = localStorage.getItem(CLE_CLIENT_MEMORISE);
+        if (!brut) return;
+        const { telephone, email } = JSON.parse(brut) as { telephone?: unknown; email?: unknown };
+        if (typeof telephone === "string" && typeof email === "string" && normaliserTelephone(telephone) && normaliserEmail(email)) {
+          setTelephoneSaisi(telephone);
+          setEmailSaisi(email);
+          setMemorise(true);
+        }
+      } catch {
+        // stockage indisponible ou contenu abîmé : le client saisit comme avant
+      }
+    });
+  }, []);
+
+  function oublierCetAppareil() {
+    try {
+      localStorage.removeItem(CLE_CLIENT_MEMORISE);
+    } catch {
+      // rien à faire
+    }
+    derniereIdentiteVerifiee.current = null;
+    setMemorise(false);
+    setTelephoneSaisi("");
+    setEmailSaisi("");
+    setSolde(null);
+    setEtape("saisie");
+    onSoldeVerifie(false);
+  }
 
   const appliquerSucces = useCallback(
     (
@@ -73,6 +111,12 @@ export function CarteFidelite({
     ) => {
       setSolde({ nombre: data.tamponsDisponibles, prochaineExpiration: data.prochaineExpiration, montantCumule: data.montantCumule });
       onSoldeVerifie(true, telephone, email, data.tamponsDisponibles, data.montantCumule);
+      try {
+        localStorage.setItem(CLE_CLIENT_MEMORISE, JSON.stringify({ telephone, email }));
+        setMemorise(true);
+      } catch {
+        // stockage bloqué : on ne retient simplement rien
+      }
       onPrefillIdentite({
         telephone,
         email,
@@ -185,6 +229,14 @@ export function CarteFidelite({
           className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
         />
         {enCours && <p className="text-xs text-gray-700">Vérification…</p>}
+        {memorise && !enCours && (
+          <p className="text-xs text-gray-700">
+            ✓ Reconnu sur cet appareil.{" "}
+            <button type="button" onClick={oublierCetAppareil} className="font-semibold underline">
+              Ce n&apos;est pas moi
+            </button>
+          </p>
+        )}
       </div>
 
       {etape === "nouveau_client" && (

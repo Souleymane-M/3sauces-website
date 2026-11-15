@@ -53,6 +53,17 @@ export default function ConfidentialitePage() {
       </section>
 
       <section className="space-y-1">
+        <h2 className="font-semibold text-gray-900">Retenir votre numéro sur cet appareil</h2>
+        <p>
+          Quand vous consultez vos points de fidélité sur 3sauces.fr, votre numéro de téléphone et votre
+          adresse email sont mémorisés dans le navigateur de votre appareil, pour retrouver vos points à votre
+          prochaine visite sans les retaper. Ils restent sur votre appareil et ne sont envoyés qu&apos;à notre
+          serveur pour afficher vos points. Vous pouvez les effacer à tout moment avec le lien « Ce n&apos;est
+          pas moi » du panier, ou en vidant les données de votre navigateur.
+        </p>
+      </section>
+
+      <section className="space-y-1">
         <h2 className="font-semibold text-gray-900">Mesure d&apos;audience anonyme</h2>
         <p>
           Pour améliorer le site, nous comptons de façon anonyme les visites et les étapes de la
