@@ -87,10 +87,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     // Le bon de cuisine s'imprime toujours ; le ticket client (reçu) est
     // sauté si l'employé a décoché "Imprimer le ticket client" en caisse
     // au moment de l'encaissement (demande explicite du patron).
-    const jobs = [
-      ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, null))] : []),
-      construireJob(construireBonCuisineXmlBrut(commande)),
-    ].join("");
+    // À la remise de la commande (sur place / à emporter), le bon de cuisine est déjà sorti : seul le ticket client part.
+    const jobs = commande.ticketClientSeul
+      ? construireJob(construireTicketClientXmlBrut(commande, null))
+      : [
+          ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, null))] : []),
+          construireJob(construireBonCuisineXmlBrut(commande)),
+        ].join("");
 
     await marquerTicketRemis(commande.id);
 

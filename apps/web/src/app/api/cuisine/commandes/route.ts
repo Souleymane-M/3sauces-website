@@ -46,7 +46,16 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; statut?: string; profilId?: string; livreurId?: string; motif?: string }
+    | {
+        commandeId?: string;
+        statut?: string;
+        profilId?: string;
+        livreurId?: string;
+        motif?: string;
+        paiements?: { mode?: string; montant?: number }[];
+        modePaiementReel?: string;
+        imprimerTicketClient?: boolean;
+      }
     | null;
 
   if (!body?.commandeId || typeof body.commandeId !== "string") {
@@ -72,6 +81,16 @@ export async function PATCH(request: Request) {
         statut: body.statut as StatutEvenement,
         profilId: body.profilId,
         livreurId: body.livreurId,
+        paiementsMixte: Array.isArray(body.paiements)
+          ? body.paiements
+              .filter((p) => (p.mode === "especes" || p.mode === "cb") && typeof p.montant === "number")
+              .map((p) => ({ mode: p.mode as "especes" | "cb", montant: p.montant as number }))
+          : undefined,
+        modePaiementReel:
+          body.modePaiementReel === "especes" || body.modePaiementReel === "cb" || body.modePaiementReel === "mixte"
+            ? body.modePaiementReel
+            : undefined,
+        imprimerTicketClient: body.imprimerTicketClient === true,
       });
     }
     return NextResponse.json({ ok: true });

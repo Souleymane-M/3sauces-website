@@ -330,6 +330,8 @@ export interface Database {
           source_campagne: string | null;
           statut_change_le: string | null;
           imprimer_ticket_client: boolean;
+          /** Vrai = la prochaine impression ne sort que le ticket client (voir migration 20261116090000). */
+          ticket_client_seul: boolean;
         };
         Insert: {
           id?: string;
@@ -364,6 +366,7 @@ export interface Database {
           source_campagne?: string | null;
           statut_change_le?: string | null;
           imprimer_ticket_client?: boolean;
+          ticket_client_seul?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["commandes"]["Insert"]>;
         Relationships: [];

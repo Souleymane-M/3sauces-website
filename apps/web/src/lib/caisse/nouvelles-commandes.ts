@@ -7,7 +7,7 @@ import { calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 
 const SELECT_POUR_IMPRESSION =
-  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, prenom, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises, imprimer_ticket_client";
+  "id, numero, canal, contenu, montant, mode_paiement, paiement_statut, nom_livraison, prenom, adresse_livraison, client_telephone, heure_souhaitee, created_at, nb_plats, commande_par, tampons_utilises, imprimer_ticket_client, ticket_client_seul";
 
 type LigneBrutePourImpression = {
   id: string;
@@ -27,6 +27,7 @@ type LigneBrutePourImpression = {
   commande_par: string | null;
   tampons_utilises: number | null;
   imprimer_ticket_client: boolean;
+  ticket_client_seul: boolean;
 };
 
 /**
@@ -117,6 +118,7 @@ export async function construireCommandesPourImpression(
       origineCaisse: c.commande_par !== null,
       tamponsUtilises: c.tampons_utilises ?? 0,
       imprimerTicketClient: c.imprimer_ticket_client,
+      ticketClientSeul: c.ticket_client_seul,
     };
   });
 }
@@ -193,6 +195,8 @@ export async function listerNouvellesCommandesPubliques(
     // imprimée entre-temps via le circuit différé ne doit jamais repasser
     // par ici.
     .is("ticket_imprime_le", null)
+    // Un ticket client seul (remise de la commande) ne passe que par l'imprimante réseau, jamais par ces circuits.
+    .eq("ticket_client_seul", false)
     .order("created_at", { ascending: true })
     .limit(20);
 
@@ -231,6 +235,7 @@ export async function listerCommandesAImprimerDifferees(heureDebut: string): Pro
     .lt("heure_souhaitee", fin.toISOString())
     .lt("created_at", debut.toISOString())
     .is("ticket_imprime_le", null)
+    .eq("ticket_client_seul", false)
     .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
     .order("heure_souhaitee", { ascending: true });
 
@@ -359,7 +364,11 @@ export async function marquerDernierTicketRemisImprime(): Promise<void> {
   }
   if (!data) return;
 
-  const { error } = await supabase.from("commandes").update({ ticket_imprime_le: new Date().toISOString() }).eq("id", data.id);
+  // `ticket_client_seul` redevient faux : une réimpression ultérieure sortira de nouveau les deux tickets.
+  const { error } = await supabase
+    .from("commandes")
+    .update({ ticket_imprime_le: new Date().toISOString(), ticket_client_seul: false })
+    .eq("id", data.id);
   if (error) {
     throw new Error(`Impossible de marquer le ticket comme imprimé : ${error.message}`);
   }
@@ -398,7 +407,7 @@ export async function demanderReimpressionTicket(commandeId: string): Promise<vo
 
   const { error } = await supabase
     .from("commandes")
-    .update({ ticket_imprime_le: null, ticket_remis_le: null, imprimer_ticket_client: true })
+    .update({ ticket_imprime_le: null, ticket_remis_le: null, imprimer_ticket_client: true, ticket_client_seul: false })
     .eq("id", commandeId);
   if (error) {
     throw new Error(`Impossible de redemander l'impression : ${error.message}`);

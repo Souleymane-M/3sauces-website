@@ -33,6 +33,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
   const [etape, setEtape] = useState<Etape>("telephone");
   const [telephone, setTelephone] = useState("");
   const [email, setEmail] = useState("");
+  const [accepteOffres, setAccepteOffres] = useState(false);
   const [activation, setActivation] = useState<ActivationFidelite | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
       const reponse = await fetch("/api/fidelite/activer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, telephone, email }),
+        body: JSON.stringify({ code, telephone, email, accepteOffres }),
       });
       const data = await reponse.json();
       if (!reponse.ok) {
@@ -121,6 +122,15 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
             placeholder="ton@email.com"
             className="w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
           />
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-gray-900">
+            <input
+              type="checkbox"
+              checked={accepteOffres}
+              onChange={(e) => setAccepteOffres(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[#8B2020]"
+            />
+            <span>Je souhaite aussi recevoir les offres et actualités de 3 Sauces par e-mail (facultatif).</span>
+          </label>
           {erreur && <p className="text-xs font-semibold text-red-600">{erreur}</p>}
           <button
             type="button"
@@ -130,7 +140,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
           >
             {enCours ? "…" : "Voir mes points de fidélité"}
           </button>
-          <p className="text-xs text-gray-700">Jamais de spam — juste de quoi te prévenir quand une récompense est prête.</p>
+          <p className="text-xs text-gray-700">Ton e-mail sert à te prévenir quand une récompense est prête. Tu peux te désinscrire à tout moment.</p>
         </div>
       )}
 
