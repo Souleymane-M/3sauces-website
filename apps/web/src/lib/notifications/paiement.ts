@@ -16,6 +16,22 @@ import { construireEmailClientHtml } from "./template";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@3sauces/supabase";
 
+/** « en espèces », « par carte »… tel que dit au client et au restaurant. */
+function libellePaiement(mode: string | null, canal?: string): string {
+  switch (mode) {
+    case "especes":
+      return canal === "livraison" ? "en espèces à la livraison" : "en espèces";
+    case "cb":
+      return canal === "livraison" ? "par carte à la livraison" : "par carte";
+    case "stripe":
+      return "en ligne par carte";
+    case "mixte":
+      return "en espèces et par carte";
+    default:
+      return "";
+  }
+}
+
 const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /**
@@ -88,7 +104,7 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
   const { data: commande, error } = await supabase
     .from("commandes")
-    .select("numero, montant, contenu, client_telephone, prenom, canal")
+    .select("numero, montant, contenu, client_telephone, prenom, canal, mode_paiement")
     .eq("id", commandeId)
     .maybeSingle();
 
@@ -121,6 +137,9 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
           construireEmailClientHtml(
             `<p>Merci${prenom ? ` ${prenom}` : ""} pour ta commande ! La #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
               `<p>${resume}</p>` +
+              (libellePaiement(commande.mode_paiement, commande.canal)
+                ? `<p>Paiement prévu : <strong>${libellePaiement(commande.mode_paiement, commande.canal)}</strong>.</p>`
+                : "") +
               `<p>Pour être ${commande.canal === "livraison" ? "livré" : "servi"} à l'heure prévue, commande le plus tôt possible : plus tu commandes tôt, plus on est ponctuels.</p>` +
               `<p>À très vite chez 3 Sauces !</p>`,
             "Retourner sur le site"
@@ -142,7 +161,7 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
         emailRestaurant,
         `Nouvelle commande — commande #${commande.numero}`,
         `<p><strong>Nouvelle commande reçue (pas encore payée).</strong></p>` +
-          `<p>Commande #${commande.numero} — ${montantAffiche} €</p>` +
+          `<p>Commande #${commande.numero} — ${montantAffiche} €${libellePaiement(commande.mode_paiement, commande.canal) ? ` — paiement prévu ${libellePaiement(commande.mode_paiement, commande.canal)}` : ""}</p>` +
           `<p>${resume}</p>`
       )
     );
@@ -209,8 +228,8 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
     const payeEnLigne = commande.mode_paiement === "stripe";
     const sujet = "Paiement reçu";
     const intro = payeEnLigne
-      ? `<p>Merci${prenom ? ` ${prenom}` : ""}, ton paiement de <strong>${montantAffiche} €</strong> pour la commande #${commande.numero} est bien reçu. Tout est en ordre, on s'occupe du reste.</p>`
-      : `<p>Merci${prenom ? ` ${prenom}` : ""}, nous avons bien reçu ton paiement de <strong>${montantAffiche} €</strong> pour la commande #${commande.numero}. Bon appétit !</p>`;
+      ? `<p>Merci${prenom ? ` ${prenom}` : ""}, ton paiement de <strong>${montantAffiche} €</strong> pour la commande #${commande.numero} est bien reçu${libellePaiement(commande.mode_paiement) ? ` (${libellePaiement(commande.mode_paiement)})` : ""}. Tout est en ordre, on s'occupe du reste.</p>`
+      : `<p>Merci${prenom ? ` ${prenom}` : ""}, nous avons bien reçu ton paiement de <strong>${montantAffiche} €</strong>${libellePaiement(commande.mode_paiement) ? ` ${libellePaiement(commande.mode_paiement)}` : ""} pour la commande #${commande.numero}. Bon appétit !</p>`;
 
     envois.push(
       envoyerEmail(
@@ -228,7 +247,7 @@ export async function notifierPaiementConfirme(commandeId: string): Promise<void
         emailRestaurant,
         `Paiement reçu — commande #${commande.numero}`,
         `<p><strong>Nouveau paiement confirmé.</strong></p>` +
-          `<p>Commande #${commande.numero} — ${montantAffiche} €</p>` +
+          `<p>Commande #${commande.numero} — ${montantAffiche} €${libellePaiement(commande.mode_paiement) ? ` — payé ${libellePaiement(commande.mode_paiement)}` : ""}</p>` +
           `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
           `<p>${resume}</p>`
       )

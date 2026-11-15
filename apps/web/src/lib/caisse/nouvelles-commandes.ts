@@ -35,10 +35,14 @@ type LigneBrutePourImpression = {
  * `CommandePourImpression` — partagé entre les deux fonctions ci-dessous et
  * la route Server Direct Print (`app/api/print/epson/[token]`).
  */
+/** Délai maximum d'attente de la ligne de livraison (QR du livreur) avant d'imprimer sans elle. */
+const DELAI_ATTENTE_QR_MS = 2 * 60 * 1000;
+
 export async function construireCommandesPourImpression(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
-  commandes: LigneBrutePourImpression[]
+  commandesBrutes: LigneBrutePourImpression[]
 ): Promise<CommandePourImpression[]> {
+  let commandes = commandesBrutes;
   if (commandes.length === 0) return [];
 
   const [qrCodeParCommandeId, messageMoment] = await Promise.all([
@@ -46,6 +50,16 @@ export async function construireCommandesPourImpression(
     chargerMessageDuMoment(),
   ]);
   const messageDuMoment = messageMoment.actif && messageMoment.texte ? messageMoment.texte : null;
+
+  // Une livraison dont la ligne `livraisons` (donc le QR du livreur) n'existe pas encore est gardée pour le prochain
+  // passage de l'imprimante : la commande est enregistrée quelques centièmes de seconde avant sa ligne de livraison,
+  // et un ticket imprimé entre les deux sortait sans QR (commande #1181, 2026-11-13). Au-delà de 2 minutes on imprime
+  // quand même, pour qu'une erreur de création de la livraison ne bloque jamais le ticket.
+  const maintenant = Date.now();
+  commandes = commandes.filter(
+    (c) => c.canal !== "livraison" || qrCodeParCommandeId.has(c.id) || maintenant - new Date(c.created_at).getTime() > DELAI_ATTENTE_QR_MS
+  );
+  if (commandes.length === 0) return [];
 
   const telephones = [...new Set(commandes.map((c) => c.client_telephone).filter((t): t is string => !!t))];
   const soldeParTelephone = new Map<string, { tampons: number; recompenseDisponible: boolean }>();
