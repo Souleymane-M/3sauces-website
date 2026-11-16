@@ -917,7 +917,6 @@ export function CaisseApp({
   // téléphone est obligatoire : le numéro de commande suffit à appeler le
   // client. Demande explicite du patron, 2026-10-22, pour fluidifier la
   // file au comptoir.
-  const infosClientIncompletes = !telephone.trim() || (canal === "livraison" && !prenom.trim());
 
   // Remise de lancement : jamais pour une commande créée ici (toujours
   // `commande_par` non nul dès la création) — ne peut survivre que lors de
@@ -934,7 +933,31 @@ export function CaisseApp({
   // panier brut — même correctif que /api/commande et /api/caisse/commandes,
   // cf. commande #509, 2026-10-21.
   const minimumAtteint = totalApresRemises >= parametres.minimumCommande;
-  const canalLivraisonBloque = canal === "livraison" && (!livraisonPossible || !minimumAtteint || !adresse.trim() || /—\s*$/.test(adresse.trim()));
+  // Pourquoi on ne peut pas valider : toujours dit à la caissière, jamais un bouton muet (retour du patron, 2026-11-16 :
+  // lieu de livraison sans précision, aucun message, commande impossible à valider).
+  const raisonBlocage: string | null =
+    panierActuel.length === 0
+      ? "le panier est vide : ajoute au moins un produit."
+      : canal === "livraison" && !livraisonPossible
+        ? "la livraison n'est pas disponible pour le moment."
+        : canal === "livraison" && !minimumAtteint
+          ? `minimum ${parametres.minimumCommande.toFixed(2)} € pour la livraison : ajoute des articles ou choisis un autre mode.`
+          : canal === "livraison" && !adresse.trim()
+            ? "choisis le lieu de livraison."
+            : canal === "livraison" && /—\s*$/.test(adresse.trim())
+              ? "précise l'endroit de livraison dans le champ « Précision » (mairie, CCAS, rue…)."
+              : !telephone.trim()
+                ? "saisis le numéro de téléphone du client."
+                : canal === "livraison" && !prenom.trim()
+                  ? "saisis le prénom du client (obligatoire pour une livraison)."
+                  : !enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null
+                    ? "choisis si le client veut son ticket (Oui ou Non)."
+                    : enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE
+                      ? "une commande groupée doit contenir au moins 2 plats."
+                      : palierGroupeReel === "GROUPE_4" &&
+                          boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes
+                        ? "choisis le parfum de la boisson 2L offerte."
+                        : null;
 
   /** Revient à l'écran de choix "Commande simple / Commande groupée" — vide le panier en cours (avec confirmation s'il n'est pas vide) puisque les deux modes ne partagent pas la même structure de panier. */
   function retourChoixMode() {
@@ -2518,19 +2541,23 @@ export function CaisseApp({
               </button>
             )}
 
+            {raisonBlocage && panierActuel.length > 0 && (
+              <div role="status" className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+                ⚠️ Pour valider : {raisonBlocage}
+              </div>
+            )}
+
             <button
-              onClick={enModeEdition ? enregistrerModification : encaisser}
-              disabled={
-                panierActuel.length === 0 ||
-                envoiEnCours ||
-                canalLivraisonBloque ||
-                infosClientIncompletes ||
-                (!enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null) ||
-                (enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
-                (palierGroupeReel === "GROUPE_4" &&
-                  boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes)
-              }
-              className="w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40"
+              onClick={() => {
+                // Le bouton n'est plus « mort » : s'il manque quelque chose, on le dit en grand au lieu de ne rien faire.
+                if (raisonBlocage) {
+                  setErreur(`Impossible de valider : ${raisonBlocage}`);
+                  return;
+                }
+                (enModeEdition ? enregistrerModification : encaisser)();
+              }}
+              disabled={envoiEnCours}
+              className={`w-full rounded bg-[#8B2020] py-3 font-semibold text-white disabled:opacity-40 ${raisonBlocage ? "opacity-60" : ""}`}
             >
               {envoiEnCours
                 ? "Envoi…"
