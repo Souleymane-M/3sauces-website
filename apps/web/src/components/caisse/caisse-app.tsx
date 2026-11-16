@@ -432,6 +432,8 @@ export function CaisseApp({
   const [erreurPlat, setErreurPlat] = useState<string | null>(null);
   // Commande groupée : plat choisi pour les ajouts du bloc « Et avec ça ? » (jamais déduit).
   const [platEtAvecCaId, setPlatEtAvecCaId] = useState<string | null>(null);
+  // Onglets de produits (même organisation que le site /commander).
+  const [ongletCaisse, setOngletCaisse] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal; encaisse: boolean } | null>(
     null
   );
@@ -1898,7 +1900,6 @@ export function CaisseApp({
           <div className="lg:col-span-2 space-y-6">
             {(() => {
               const parKey = new Map(sections.map((s) => [s.key, s]));
-              const clesAppariees = new Set(["tacos", "barquettes", "bowls", "grillade", "accompagnement", "boisson"]);
               const tacos = parKey.get("tacos");
               const barquettes = parKey.get("barquettes");
               const bowls = parKey.get("bowls");
@@ -1924,23 +1925,74 @@ export function CaisseApp({
     },
   ].filter((g) => g.produits.length > 0);
 
-              return (
-                <>
-                  {sections.filter((s) => !clesAppariees.has(s.key)).map((section) => afficherSection(section))}
-                  {tacos && afficherSection(tacos)}
-                  {barquettes && afficherSection(barquettes)}
-                  {bowls && afficherSection(bowls)}
-                  {(grillade || accompagnement) && (
+              const onglets: { cle: string; titre: string; contenu: React.ReactNode }[] = [];
+              if (grillade || accompagnement)
+                onglets.push({
+                  cle: "grillades",
+                  titre: "Grillades & acc.",
+                  contenu: (
                     <div className={grillade && accompagnement ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
                       {grillade && afficherSection(grillade)}
                       {accompagnement && afficherSection(accompagnement)}
                     </div>
-                  )}
-                  {boisson && (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {groupesBoisson.map((g) => afficherGroupeAjoutDirect(g.produits, g.cle, g.titre))}
-                      </div>
-                    )}
+                  ),
+                });
+              const menus = parKey.get("menus");
+              if (tacos || menus)
+                onglets.push({
+                  cle: "tacos",
+                  titre: "Tacos",
+                  contenu: (
+                    <div className="space-y-6">
+                      {tacos && afficherSection(tacos)}
+                      {menus && afficherSection(menus)}
+                    </div>
+                  ),
+                });
+              if (barquettes || bowls)
+                onglets.push({
+                  cle: "barquettes",
+                  titre: "Barquettes & Bowls",
+                  contenu: (
+                    <div className="space-y-6">
+                      {barquettes && afficherSection(barquettes)}
+                      {bowls && afficherSection(bowls)}
+                    </div>
+                  ),
+                });
+              const platDuJour = parKey.get("plat_du_jour");
+              if (platDuJour) onglets.push({ cle: "plats", titre: "Plats du jour", contenu: afficherSection(platDuJour) });
+              const petitDej = parKey.get("petit_dejeuner");
+              if (petitDej) onglets.push({ cle: "petit_dej", titre: "Petit déj.", contenu: afficherSection(petitDej) });
+              if (boisson)
+                onglets.push({
+                  cle: "boissons",
+                  titre: "Boissons",
+                  contenu: (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {groupesBoisson.map((g) => afficherGroupeAjoutDirect(g.produits, g.cle, g.titre))}
+                    </div>
+                  ),
+                });
+              const actif = onglets.find((o) => o.cle === ongletCaisse) ?? onglets[0];
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {onglets.map((o) => (
+                      <button
+                        key={o.cle}
+                        type="button"
+                        onClick={() => setOngletCaisse(o.cle)}
+                        className={`rounded-xl border-2 px-3 py-3 text-base font-extrabold ${
+                          actif?.cle === o.cle ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                        }`}
+                      >
+                        {o.titre}
+                      </button>
+                    ))}
+                  </div>
+                  {actif?.contenu}
                 </>
               );
             })()}
