@@ -1,7 +1,7 @@
 "use client";
 
 import { FAMILLES_BOISSON } from "@/lib/boissons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { suivreEvenement, suivrePresence } from "@/lib/suivi/client";
 import type { EtapeVisiteur } from "@/lib/suivi/types";
 import { useRouter } from "next/navigation";
@@ -1208,6 +1208,37 @@ export function CommandeNouvelleApp({
       ? `${nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
       : null;
 
+  // Reconnaissance du client (points de fidélité) : mêmes propriétés pour la carte de l'accueil et celle du formulaire.
+  const proprietesCarteFidelite: ComponentProps<typeof CarteFidelite> = {
+    telephoneExterne: telephone,
+    emailExterne: email,
+    montantPanier: total,
+    nbTampons: nbTamponsEffectif,
+    onChangeNbTampons: setNbTampons,
+    onSoldeVerifie: (verifie, tel, mail, tamponsDisponibles, montantCumule) =>
+      setFideliteVerifiee(
+        verifie && tel && mail ? { telephone: tel, email: mail, tamponsDisponibles: tamponsDisponibles ?? 0, montantCumule: montantCumule ?? 0 } : null
+      ),
+    onOublierIdentite: () => {
+      setTelephone("");
+      setEmail("");
+      try {
+        localStorage.removeItem(CLE_IDENTITE);
+      } catch {
+        // rien à faire
+      }
+    },
+    onPrefillIdentite: (infos) => {
+      setTelephone((precedent) => precedent.trim() || infos.telephone);
+      setEmail((precedent) => precedent.trim() || infos.email);
+      if (infos.nom) setNom((precedent) => precedent.trim() || infos.nom!);
+      if (infos.prenom) setPrenom((precedent) => precedent.trim() || infos.prenom!);
+      if (canal === "livraison") {
+        if (infos.zone) setZone((precedent) => precedent.trim() || infos.zone!);
+      }
+    },
+  };
+
   const libelleQuand = commandeAvance
     ? `Le ${new Date(`${dateCommande}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}`
     : "Aujourd'hui";
@@ -1221,6 +1252,37 @@ export function CommandeNouvelleApp({
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: "#1F3A5F" }}>
           🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
+        </div>
+      )}
+
+      {vue === "menu" && (
+        <div className="mx-auto max-w-lg px-4 pt-3">
+          <div className="space-y-2 rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-3">
+            <p className="text-sm font-extrabold text-gray-900">
+              🎁 Déjà client chez 3 Sauces ? Renseigne ton numéro de téléphone et ton e-mail pour voir tes points de fidélité.
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                id="accueil-telephone"
+                value={telephone}
+                onChange={(e) => setTelephone(e.target.value)}
+                inputMode="tel"
+                placeholder="Téléphone (0639123456)"
+                aria-label="Ton numéro de téléphone"
+                className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
+              />
+              <input
+                id="accueil-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                placeholder="E-mail"
+                aria-label="Ton e-mail"
+                className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
+              />
+            </div>
+            <CarteFidelite {...proprietesCarteFidelite} integre />
+          </div>
         </div>
       )}
 
@@ -1393,10 +1455,12 @@ export function CommandeNouvelleApp({
               </div>
               {fideliteVerifiee ? (
                 <>
-                  <p className="mt-2 text-sm font-extrabold text-gray-900">
-                    🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
-                    {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
-                  </p>
+                  {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 0 && (
+                    <p className="mt-2 text-sm font-extrabold text-gray-900">
+                      🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
+                      {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
+                    </p>
+                  )}
                   {fideliteVerifiee.tamponsDisponibles > 0 && (
                     <p className="mt-1 text-sm font-extrabold" style={{ color: VERT }}>
                       🎉 Dont {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense déjà acquise
@@ -1404,9 +1468,7 @@ export function CommandeNouvelleApp({
                     </p>
                   )}
                 </>
-              ) : (
-                <p className="mt-2 text-sm font-extrabold text-gray-900">🎁 Saisis ton numéro et ton e-mail plus bas pour voir tes points de fidélité.</p>
-              )}
+              ) : null}
               <p className="mt-1 text-sm font-semibold text-gray-800">
                 {texteProgressionCommande(
                   calculerProgressionCommande(total, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
@@ -1722,36 +1784,7 @@ export function CommandeNouvelleApp({
               />
               {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes points de fidélité, ou laisse vide.</p>}
             </div>
-            <CarteFidelite
-              telephoneExterne={telephone}
-              emailExterne={email}
-              montantPanier={total}
-              nbTampons={nbTamponsEffectif}
-              onChangeNbTampons={setNbTampons}
-              onSoldeVerifie={(verifie, tel, mail, tamponsDisponibles, montantCumule) =>
-                setFideliteVerifiee(
-                  verifie && tel && mail ? { telephone: tel, email: mail, tamponsDisponibles: tamponsDisponibles ?? 0, montantCumule: montantCumule ?? 0 } : null
-                )
-              }
-              onOublierIdentite={() => {
-                setTelephone("");
-                setEmail("");
-                try {
-                  localStorage.removeItem(CLE_IDENTITE);
-                } catch {
-                  // rien à faire
-                }
-              }}
-              onPrefillIdentite={(infos) => {
-                setTelephone((precedent) => precedent.trim() || infos.telephone);
-                setEmail((precedent) => precedent.trim() || infos.email);
-                if (infos.nom) setNom((precedent) => precedent.trim() || infos.nom!);
-                if (infos.prenom) setPrenom((precedent) => precedent.trim() || infos.prenom!);
-                if (canal === "livraison") {
-                  if (infos.zone) setZone((precedent) => precedent.trim() || infos.zone!);
-                }
-              }}
-            />
+            <CarteFidelite {...proprietesCarteFidelite} />
           </section>
 
           {/* Boisson offerte */}

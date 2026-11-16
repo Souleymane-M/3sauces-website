@@ -29,6 +29,8 @@ interface CarteFideliteProps {
   onChangeNbTampons: (valeur: number) => void;
   /** Nouveau site : efface le numéro et l'e-mail du formulaire quand le client clique « Ce n'est pas moi ». */
   onOublierIdentite?: () => void;
+  /** Affichée à l'intérieur d'un cadre déjà fourni (accueil du site) : ni cadre ni titre propres. */
+  integre?: boolean;
   onSoldeVerifie: (verifie: boolean, telephone?: string, email?: string, tamponsDisponibles?: number, montantCumule?: number) => void;
   /** Pré-remplit un champ du formulaire plus bas — jamais d'écrasement si le client a déjà saisi quelque chose lui-même. */
   onPrefillIdentite: (infos: {
@@ -62,6 +64,7 @@ export function CarteFidelite({
   onSoldeVerifie,
   onPrefillIdentite,
   onOublierIdentite,
+  integre = false,
 }: CarteFideliteProps) {
   const [etape, setEtape] = useState<Etape>("saisie");
   const [telephoneInterne, setTelephoneSaisi] = useState("");
@@ -231,11 +234,11 @@ export function CarteFidelite({
   const nbTamponsEffectif = Math.min(nbTampons, maxUtilisable);
 
   return (
-    <div className="rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-4">
+    <div className={integre ? "" : "rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-4"}>
       {champsExternes ? (
         <>
-          <p className="text-sm font-bold text-gray-900">🎁 Déjà client·e ? Retrouve tes points de fidélité et tes récompenses.</p>
-          {etape === "saisie" && !enCours && (
+          {!integre && <p className="text-sm font-bold text-gray-900">🎁 Déjà client·e ? Retrouve tes points de fidélité et tes récompenses.</p>}
+          {!integre && etape === "saisie" && !enCours && (
             <p className="mt-1 text-sm text-gray-800">
               {normaliserTelephone(telephoneSaisi) && !normaliserEmail(emailSaisi)
                 ? "Tape aussi ton email plus haut : ton nom, ton adresse et tes points de fidélité s'afficheront tout seuls."
