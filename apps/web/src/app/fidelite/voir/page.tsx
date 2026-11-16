@@ -20,8 +20,7 @@ export default async function VoirTamponsPage({ searchParams }: VoirTamponsPageP
         <p className="text-4xl">🎁</p>
         <h1 className="text-xl font-bold text-black">Voir mes points de fidélité</h1>
         <p className="text-sm text-gray-600">
-          Ce lien n&apos;est valable qu&apos;après une livraison — scanne le QR de ton reçu une fois ta commande
-          reçue.
+          Ce lien n&apos;est valable qu&apos;avec le QR de ton reçu — scanne-le une fois ta commande reçue.
         </p>
       </main>
     );

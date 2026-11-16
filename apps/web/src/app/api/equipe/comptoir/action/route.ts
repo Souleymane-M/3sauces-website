@@ -22,7 +22,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { commandeId?: string; action?: string; profilId?: string; motif?: string; canal?: string; adresse?: string; zone?: string; paiements?: { mode?: string; montant?: number }[] }
+    | { commandeId?: string; action?: string; profilId?: string; motif?: string; canal?: string; adresse?: string; zone?: string; paiements?: { mode?: string; montant?: number }[]; modePaiementReel?: string; imprimerTicketClient?: boolean }
     | null;
 
   const { commandeId, action, profilId, motif } = body ?? {};
@@ -37,7 +37,17 @@ export async function PATCH(request: Request) {
             .filter((p) => (p.mode === "especes" || p.mode === "cb") && typeof p.montant === "number")
             .map((p) => ({ mode: p.mode as "especes" | "cb", montant: p.montant as number }))
         : undefined;
-      await changerStatutCommande({ commandeId, statut: "remis_au_client", profilId, roleMetier: "comptoir", paiementsMixte });
+      const modePaiementReel =
+        body?.modePaiementReel === "especes" || body?.modePaiementReel === "cb" || body?.modePaiementReel === "mixte" ? body.modePaiementReel : undefined;
+      await changerStatutCommande({
+        commandeId,
+        statut: "remis_au_client",
+        profilId,
+        roleMetier: "comptoir",
+        paiementsMixte,
+        modePaiementReel,
+        imprimerTicketClient: body?.imprimerTicketClient === true,
+      });
     } else if (action === "changer_canal") {
       await changerCanalCommande({ commandeId, canal: body?.canal ?? "", adresse: body?.adresse, zone: body?.zone });
     } else if (action === "annuler") {

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
 
-  const body = (await request.json().catch(() => null)) as { code?: string; telephone?: string; email?: string } | null;
+  const body = (await request.json().catch(() => null)) as { code?: string; telephone?: string; email?: string; accepteOffres?: unknown } | null;
   const code = typeof body?.code === "string" ? body.code : null;
   const telephone = typeof body?.telephone === "string" ? body.telephone : null;
   const email = normaliserEmail(body?.email ?? "");
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const activation = await activerEmailParQrLivraison(code, telephone, email);
+    const activation = await activerEmailParQrLivraison(code, telephone, email, body?.accepteOffres === true);
     return NextResponse.json(activation);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";

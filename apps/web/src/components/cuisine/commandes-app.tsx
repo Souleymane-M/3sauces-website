@@ -1,6 +1,7 @@
 "use client";
 
 import { libelleSupplementsLigne } from "@/lib/libelle-ligne";
+import { RemiseCommande, remiseDemandeDesChoix, type ChoixRemise } from "@/components/remise-commande";
 import { libellePayee } from "@/lib/libelle-paiement";
 import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivraisonEnCours } from "@/lib/cuisine/types";
@@ -194,7 +195,7 @@ function lireIdentitePersistee(): { identite: EmployeActif | null; derniereActiv
 
 interface CarteCommandeProps {
   commande: CommandeCuisine;
-  demanderChangement: (commandeId: string, statut: string, livreurId?: string, motif?: string) => void;
+  demanderChangement: (commandeId: string, statut: string, livreurId?: string, motif?: string, remise?: ChoixRemise) => void;
   demanderAnnulation: (commandeId: string) => void;
 }
 
@@ -202,6 +203,8 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
   const [detailOuvert, setDetailOuvert] = useDetailAvecRepliAuto();
   const [reimpressionEnCours, setReimpressionEnCours] = useState(false);
   const [reimpressionFaite, setReimpressionFaite] = useState(false);
+  // Remise d'une commande sur place / à emporter : fenêtre « vrai mode de paiement + ticket client ».
+  const [remiseOuverte, setRemiseOuverte] = useState(false);
 
   async function reimprimer() {
     setReimpressionEnCours(true);
@@ -378,11 +381,28 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
       {statutSuivant && !enAttenteScanLivreur && (
         <div className="mt-4 space-y-2">
           <button
-            onClick={() => demanderChangement(commande.id, statutSuivant)}
+            onClick={() => {
+              if (statutSuivant === "remis_au_client" && remiseDemandeDesChoix(commande)) setRemiseOuverte((v) => !v);
+              else demanderChangement(commande.id, statutSuivant);
+            }}
             className="w-full rounded bg-[#8B2020] py-3 text-lg font-bold text-white disabled:opacity-40"
           >
             {commande.canal !== "livraison" && statutSuivant === "remis_au_client" ? "Client venu" : LIBELLES_STATUT[statutSuivant]}
           </button>
+          {remiseOuverte && statutSuivant === "remis_au_client" && (
+            <RemiseCommande
+              numero={commande.numero}
+              montant={commande.montant}
+              dejaPayee={commande.dejaPayee}
+              ticketClientImprime={commande.ticketClientImprime}
+              enCours={false}
+              onValider={(choix) => {
+                setRemiseOuverte(false);
+                demanderChangement(commande.id, "remis_au_client", undefined, undefined, choix);
+              }}
+              onFermer={() => setRemiseOuverte(false)}
+            />
+          )}
         </div>
       )}
       {STATUTS_MODIFIABLES.includes(commande.statut) && (
@@ -698,13 +718,23 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     statut: string,
     profilId: string,
     livreurId?: string,
-    motif?: string
+    motif?: string,
+    remise?: ChoixRemise
   ) {
     setErreur(null);
     const reponse = await fetch("/api/cuisine/commandes", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commandeId, statut, profilId, livreurId, motif }),
+      body: JSON.stringify({
+        commandeId,
+        statut,
+        profilId,
+        livreurId,
+        motif,
+        paiements: remise?.paiements,
+        modePaiementReel: remise?.modePaiementReel,
+        imprimerTicketClient: remise?.imprimerTicketClient,
+      }),
     });
     if (!reponse.ok) {
       const data = await reponse.json().catch(() => ({}));
@@ -714,9 +744,9 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
     await rafraichir();
   }
 
-  function demanderChangement(commandeId: string, statut: string, livreurId?: string, motif?: string) {
+  function demanderChangement(commandeId: string, statut: string, livreurId?: string, motif?: string, remise?: ChoixRemise) {
     const executer = (identite: EmployeActif) => {
-      appliquerChangement(commandeId, statut, identite.profilId, livreurId, motif);
+      appliquerChangement(commandeId, statut, identite.profilId, livreurId, motif, remise);
     };
 
     if (employeActif) {

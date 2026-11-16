@@ -15,7 +15,7 @@ import {
 } from "./types";
 
 const SELECT_COMMANDES_CUISINE =
-  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe, statut_change_le, commande_par";
+  "id, numero, canal, statut, contenu, montant, nom_livraison, client_telephone, adresse_livraison, heure_souhaitee, created_at, nb_plats, paiement_statut, mode_paiement, ticket_imprime_le, palier_groupe, statut_change_le, commande_par, imprimer_ticket_client";
 
 /** Vrai si la date de retrait (Mayotte) diffère de la date de création — la commande a été passée à l'avance. */
 function estCommandeAvance(heureSouhaitee: string | null, creeLe: string): boolean {
@@ -44,6 +44,7 @@ function versCommandeCuisine(c: {
   paiement_statut: string | null;
   statut_change_le: string | null;
   commande_par: string | null;
+  imprimer_ticket_client: boolean;
 }): CommandeCuisine {
   return {
     id: c.id,
@@ -69,6 +70,7 @@ function versCommandeCuisine(c: {
     // explicite du patron, 2026-10-20 : distinguer l'origine, aussi bien
     // ici qu'à l'impression.
     origineCaisse: c.commande_par !== null,
+    ticketClientImprime: c.imprimer_ticket_client,
   };
 }
 
@@ -254,6 +256,10 @@ interface ChangementStatut {
   roleMetier?: RoleMetier;
   /** Répartition espèces/carte, exigée à la remise d'une commande "mixte" non encore payée. */
   paiementsMixte?: { mode: "especes" | "cb"; montant: number }[];
+  /** Vrai mode de paiement constaté à la remise (sur place / à emporter), exigé si la commande n'est pas déjà payée. */
+  modePaiementReel?: "especes" | "cb" | "mixte";
+  /** Imprimer le ticket client à la remise (sur place / à emporter). */
+  imprimerTicketClient?: boolean;
 }
 
 /**
@@ -280,6 +286,8 @@ export async function changerStatutCommande({
   livreurId,
   roleMetier,
   paiementsMixte,
+  modePaiementReel,
+  imprimerTicketClient,
 }: ChangementStatut): Promise<void> {
   const supabase = createServiceSupabaseClient();
 
@@ -317,7 +325,12 @@ export async function changerStatutCommande({
   // précis (ni Stripe, déjà géré par son webhook, ni la caisse, déjà payée
   // à la création), ce qui empêchait le trigger de fidélité de se déclencher
   // et laissait la commande "non payée" indéfiniment.
-  const misesAJour: { statut: StatutEvenement; paiement_statut?: "paye"; statut_change_le: string } = {
+  const misesAJour: {
+    statut: StatutEvenement;
+    paiement_statut?: "paye";
+    mode_paiement?: "especes" | "cb" | "mixte";
+    statut_change_le: string;
+  } = {
     statut,
     // Minuteur par étape de l'écran cuisine (alerte après 15 min dans le
     // même statut) — remis à zéro à chaque transition, jamais calculé
@@ -326,14 +339,18 @@ export async function changerStatutCommande({
   };
   if (statut === "remis_au_client" && commande.mode_paiement !== "stripe" && commande.paiement_statut !== "paye") {
     misesAJour.paiement_statut = "paye";
+    // Le client a pu annoncer « espèces » en commandant et payer par carte : le mode réellement constaté à la remise
+    // remplace ce qu'il avait déclaré, pour que les totaux espèces / carte du jour soient justes.
+    if (modePaiementReel && commande.canal !== "livraison") misesAJour.mode_paiement = modePaiementReel;
   }
+  const modeEffectif = misesAJour.mode_paiement ?? commande.mode_paiement;
 
   // Commande "mixte" payée à la remise : la répartition espèces/carte est
   // indispensable pour que l'argent apparaisse dans les bons totaux et dans
   // le comptage du tiroir (cas #681, 2026-10-27 : 68 € sans aucune ligne).
   // Vérifiée AVANT de toucher à la commande.
   let lignesMixte: { mode: "especes" | "cb"; montant: number }[] | null = null;
-  if (misesAJour.paiement_statut && commande.mode_paiement === "mixte") {
+  if (misesAJour.paiement_statut && modeEffectif === "mixte") {
     const lignes = paiementsMixte ?? [];
     const valides =
       lignes.length > 0 &&
@@ -363,11 +380,11 @@ export async function changerStatutCommande({
   if (
     misesAJour.paiement_statut &&
     (lignesMaj ?? []).length > 0 &&
-    (commande.mode_paiement === "especes" || commande.mode_paiement === "cb")
+    (modeEffectif === "especes" || modeEffectif === "cb")
   ) {
     const { error: erreurPaiement } = await supabase
       .from("paiements")
-      .insert({ commande_id: commandeId, montant: Number(commande.montant), mode: commande.mode_paiement });
+      .insert({ commande_id: commandeId, montant: Number(commande.montant), mode: modeEffectif });
     if (erreurPaiement) {
       console.error("[cuisine/commandes] échec enregistrement paiement à la remise :", erreurPaiement.message);
     }
@@ -377,6 +394,18 @@ export async function changerStatutCommande({
       .insert(lignesMixte.map((l) => ({ commande_id: commandeId, montant: l.montant, mode: l.mode })));
     if (erreurPaiementMixte) {
       console.error("[cuisine/commandes] échec enregistrement paiement mixte à la remise :", erreurPaiementMixte.message);
+    }
+  }
+
+  // Ticket client à la remise (sur place / à emporter) : on remet la commande dans la file d'impression en ne demandant
+  // à l'imprimante que le ticket client — le bon de cuisine est déjà sorti.
+  if (statut === "remis_au_client" && commande.canal !== "livraison" && imprimerTicketClient === true) {
+    const { error: erreurTicket } = await supabase
+      .from("commandes")
+      .update({ imprimer_ticket_client: true, ticket_client_seul: true, ticket_imprime_le: null, ticket_remis_le: null })
+      .eq("id", commandeId);
+    if (erreurTicket) {
+      console.error("[cuisine/commandes] échec demande du ticket client à la remise :", erreurTicket.message);
     }
   }
 

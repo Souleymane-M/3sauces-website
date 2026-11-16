@@ -497,9 +497,12 @@ export function CaisseApp({
   // déjà les deux cas : une livraison a toujours `encaisserEffectif`
   // faux (jamais payée à la prise de commande, cf. `paiementImmediatPossible`
   // juste au-dessus), inutile de re-tester `canal === "livraison"` à part.
-  const impressionTicketObligatoire = !encaisserEffectif;
+  // Sur place / à emporter encaissé plus tard (réservation téléphonique, commande à l'avance) : seul le bon de cuisine
+  // s'imprime maintenant ; le ticket client sort à la remise, avec le vrai mode de paiement (demande du patron, 2026-11-15).
+  const ticketClientALaRemise = !encaisserEffectif && canal !== null && canal !== "livraison";
+  const impressionTicketObligatoire = !encaisserEffectif && !ticketClientALaRemise;
   const [choixImpressionTicket, setChoixImpressionTicket] = useState<boolean | null>(null);
-  const imprimerTicketClient = impressionTicketObligatoire ? true : choixImpressionTicket;
+  const imprimerTicketClient = ticketClientALaRemise ? false : impressionTicketObligatoire ? true : choixImpressionTicket;
 
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
@@ -2442,7 +2445,12 @@ export function CaisseApp({
 
             {!enModeEdition && (
               <div>
-                {impressionTicketObligatoire ? (
+                {ticketClientALaRemise ? (
+                  <p className="text-sm text-gray-700">
+                    🖨️ Seul le bon de cuisine s&apos;imprime maintenant. Le ticket client sortira à la remise de la commande, avec le vrai
+                    mode de paiement.
+                  </p>
+                ) : impressionTicketObligatoire ? (
                   <p className="text-sm text-gray-700">
                     🖨️ Ticket client imprimé automatiquement pour cette commande (bon de cuisine toujours imprimé).
                   </p>
@@ -2507,7 +2515,7 @@ export function CaisseApp({
                 envoiEnCours ||
                 canalLivraisonBloque ||
                 infosClientIncompletes ||
-                (!enModeEdition && !impressionTicketObligatoire && choixImpressionTicket === null) ||
+                (!enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null) ||
                 (enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE) ||
                 (palierGroupeReel === "GROUPE_4" &&
                   boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes)

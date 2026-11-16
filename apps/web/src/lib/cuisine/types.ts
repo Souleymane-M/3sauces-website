@@ -41,6 +41,8 @@ export interface CommandeCuisine {
   statutChangeLe: string | null;
   /** Vrai = saisie en caisse par un employé, faux = passée par le client sur le site public. */
   origineCaisse: boolean;
+  /** Faux = le ticket client n'est pas encore sorti (commande du site ou du téléphone sur place / à emporter) : à proposer à la remise. */
+  ticketClientImprime: boolean;
 }
 
 /** Statuts journalisables dans `commandes_evenements` — jamais "en_attente" (état initial automatique, pas une action). */

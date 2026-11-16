@@ -466,11 +466,6 @@ function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePour
   if (messageFidelite) {
     if (commande.messageDuMoment) b.brut(`<feed line="1"/>`);
     b.ligne(messageFidelite, { align: "center", gras: true, taille: 1 });
-    if (commande.canal !== "livraison") {
-      b.brut(`<feed line="1"/>`);
-      b.brut(styleTexte({ align: "center" }));
-      b.brut(`<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(URL_SITE)}</symbol>`);
-    }
   }
 }
 
@@ -555,6 +550,17 @@ function construireContenuTicketClient(
   }
 
   imprimerBlocClient(b, commande);
+  if (commande.canal !== "livraison") {
+    // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
+    // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
+    // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.
+    b.brut(`<feed line="1"/>`);
+    b.ligne("Scanne pour voir tes points de fidélité", { align: "center", gras: true, taille: 1 });
+    b.brut(styleTexte({ align: "center" }));
+    b.brut(
+      `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}`)}</symbol>`
+    );
+  }
   if (commande.canal === "livraison" && commande.qrCode) {
     b.brut(`<feed line="1"/>`);
     b.brut(styleTexte({ align: "center" }));

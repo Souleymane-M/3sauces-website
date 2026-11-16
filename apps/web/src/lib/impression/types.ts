@@ -42,4 +42,6 @@ export interface CommandePourImpression {
   tamponsUtilises: number;
   /** Faux = le ticket client (reçu) n'est jamais envoyé à l'impression — choix fait en caisse. Le bon de cuisine n'est jamais concerné. */
   imprimerTicketClient: boolean;
+  /** Le bon de cuisine est déjà sorti : n'imprimer que le ticket client (remise de la commande). */
+  ticketClientSeul: boolean;
 }

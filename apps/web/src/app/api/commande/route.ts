@@ -988,6 +988,9 @@ export async function POST(request: Request) {
       nb_plats: nbPlats,
       palier_groupe: palierGroupe,
       tampons_utilises: tamponsUtilises,
+      // Sur place / à emporter : seul le bon de cuisine s'imprime à la commande ; le ticket client sort à la remise,
+      // une fois le vrai mode de paiement enregistré. Livraison : ticket client avec QR du livreur dès le départ.
+      imprimer_ticket_client: body.canal === "livraison",
     })
     .select("id, numero")
     .single();
