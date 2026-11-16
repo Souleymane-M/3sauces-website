@@ -2257,7 +2257,9 @@ export function CaisseApp({
                     }}
                     className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
                   >
-                    <option value="">Autre adresse (saisie libre)</option>
+                    <option value="" disabled>
+                      Choisis le lieu…
+                    </option>
                     <optgroup label="Lieux principaux">
                       {LIEUX_PRINCIPAUX.map((l) => (
                         <option key={l.id} value={l.id}>
@@ -2274,14 +2276,22 @@ export function CaisseApp({
                     </optgroup>
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-700">Adresse / précision</label>
-                  <input
-                    value={adresse}
-                    onChange={(e) => setAdresse(e.target.value)}
-                    className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
-                  />
-                </div>
+                {/* Précision demandée seulement pour un village (mairie, CCAS, rue…) ; une ancienne adresse libre reste visible et modifiable. */}
+                {(() => {
+                  const lieuChoisi = TOUS_LES_LIEUX.find((l) => adresse.trim().startsWith(l.nom));
+                  if (lieuChoisi && !lieuChoisi.village) return null;
+                  if (!lieuChoisi && adresse.trim() === "") return null;
+                  return (
+                    <div>
+                      <label className="text-xs text-gray-700">{lieuChoisi ? "Précision (mairie, CCAS, rue…)" : "Adresse"}</label>
+                      <input
+                        value={adresse}
+                        onChange={(e) => setAdresse(e.target.value)}
+                        className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
