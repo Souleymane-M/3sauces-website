@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { CommandePubliqueApp } from "@/components/commande-publique/commande-publique-app";
+import { CommandeNouvelleApp } from "@/components/commande-publique/commande-nouvelle-app";
 import {
   listerProduitsPublics,
   listerViandesPubliques,
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CommanderPage() {
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres] = await Promise.all([
+  const [produitsCatalogue, viandes, sauces, saveurs, parfums2l, parametres] = await Promise.all([
     listerProduitsPublics(),
     listerViandesPubliques(),
     listerSaucesPubliques(),
@@ -30,6 +30,9 @@ export default async function CommanderPage() {
     listerParfums2lPublics(),
     chargerParametresLivraisonPublics(),
   ]);
+
+  // Sauces à 0,50 € et viande à 3 € proposées sur tous les snacks de cette version (les produits « supplément » existent déjà).
+  const produits = produitsCatalogue.map((p) => (p.categorie === "snacking" ? { ...p, autoriseExtras: true } : p));
 
   const enTete = (
     <div className="flex flex-col items-center gap-2 bg-[#8B2020] py-4">
@@ -74,7 +77,7 @@ export default async function CommanderPage() {
   return (
     <main className="min-h-screen bg-[#F5F0E8]">
       {enTete}
-      <CommandePubliqueApp
+      <CommandeNouvelleApp
         produits={produits}
         viandes={viandes}
         sauces={sauces}
