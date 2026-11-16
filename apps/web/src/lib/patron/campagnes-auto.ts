@@ -111,7 +111,9 @@ export async function executerCampagneDuJour(): Promise<ResultatExecution> {
   let echecs = 0;
   let restants = 0;
   for (const c of destinataires) {
+    // Une adresse partagée par deux fiches clients ne reçoit le message qu'une fois par jour.
     if (dejaFaits.has(c.email.toLowerCase())) continue;
+    dejaFaits.add(c.email.toLowerCase());
     if (Date.now() - debut > BUDGET_MS) {
       restants++;
       continue;
@@ -131,7 +133,7 @@ export async function executerCampagneDuJour(): Promise<ResultatExecution> {
     }
   }
 
-  const totalJour = dejaFaits.size + envoyes;
+  const totalJour = dejaFaits.size;
   if (restants === 0) {
     await supabase
       .from("campagnes_auto")
