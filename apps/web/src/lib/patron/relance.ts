@@ -20,6 +20,8 @@ export interface ClientRelance {
   recompenses: number;
   prochaineExpiration: string | null;
   tampons: number;
+  /** Euros cumulés pas encore convertis en récompense — sert à dire combien il manque avant le prochain point. */
+  montantCumule: number;
 }
 
 const TAILLE_PAGE = 1000;
@@ -114,6 +116,7 @@ export async function listerClientsRelance(mode: ModeRelance, jours: number): Pr
       recompenses: expirations.length,
       prochaineExpiration: expirations[0] ?? null,
       tampons: Math.floor((c.montant_cumule ?? 0) / MONTANT_RECOMPENSE),
+      montantCumule: c.montant_cumule ?? 0,
     });
   }
 
@@ -145,12 +148,16 @@ export function phraseFidelite(c: Pick<ClientRelance, "recompenses" | "prochaine
 }
 
 /** Fin de phrase du mail du lundi : « tu as 4 points de fidélité, il t'en manque 6 pour 10 € offerts ». */
-export function phrasePointsLundi(c: Pick<ClientRelance, "recompenses" | "prochaineExpiration" | "tampons">): string {
+export function phrasePointsLundi(c: Pick<ClientRelance, "recompenses" | "prochaineExpiration" | "tampons" | "montantCumule">): string {
   const manque = Math.max(1, NB_TAMPONS_RECOMPENSE - (c.tampons % NB_TAMPONS_RECOMPENSE));
   const pts = (n: number) => `${n} point${n > 1 ? "s" : ""}`;
   if (c.recompenses > 0) {
     const fin = c.prochaineExpiration ? ` (valable jusqu'au ${dateFr(c.prochaineExpiration)})` : "";
     return `tu as ${c.recompenses * MONTANT_RECOMPENSE} € de récompense disponible${c.recompenses > 1 ? "s" : ""}${fin}, et il t'en manque ${pts(manque)} pour ${MONTANT_RECOMPENSE} € de plus`;
+  }
+  if (c.tampons === 0) {
+    const reste = MONTANT_RECOMPENSE - (c.montantCumule % MONTANT_RECOMPENSE);
+    return `plus que ${reste.toFixed(2).replace(".", ",")} € pour gagner ton premier point de fidélité`;
   }
   return `tu as ${pts(c.tampons)} de fidélité, il t'en manque ${manque} pour ${MONTANT_RECOMPENSE} € offerts`;
 }

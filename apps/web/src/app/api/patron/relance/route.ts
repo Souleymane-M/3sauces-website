@@ -97,6 +97,7 @@ export async function POST(request: Request) {
       recompenses: mode === "recompense" ? 1 : 0,
       prochaineExpiration: mode === "recompense" ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null,
       tampons: 6,
+      montantCumule: 64,
     });
     const r = await envoyerEmail(adresse, `[TEST] ${sujet}`, construireHtmlCampagne(exemple, "00000000-0000-0000-0000-000000000000", campagne));
     return r.ok ? NextResponse.json({ ok: true, test: true }) : NextResponse.json({ error: r.erreur ?? "Envoi impossible." }, { status: 502 });
