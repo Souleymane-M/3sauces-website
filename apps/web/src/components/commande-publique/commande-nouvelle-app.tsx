@@ -1184,12 +1184,11 @@ export function CommandeNouvelleApp({
   }
 
   const aDejaUneBoisson = panier.some((l) => l.produit.categorie === "boisson" || l.boissonIncluse);
-  // « Et avec ça ? » : accompagnements proposés tant qu'il n'y en a aucun dans le panier (les moins chers d'abord).
-  const aDejaUnAccompagnement = panier.some((l) => l.produit.categorie === "accompagnement" || l.accompagnementsInclus.length > 0);
-  const accompagnementsSuggeres = groupes.accompagnements
-    .filter((p) => p.nbSaveursMax === 0 && p.categorie === "accompagnement")
-    .sort((a, b) => a.prix - b.prix)
-    .slice(0, 4);
+  // « Et avec ça ? » : frites, ailes de poulet et salade (la canette a son propre bloc), chacun tant qu'il n'est pas déjà dans le panier.
+  const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Salade"];
+  const accompagnementsSuggeres = SUGGESTIONS_ET_AVEC_CA.map((debut) =>
+    produits.find((p) => p.nom.startsWith(debut) && p.nbSaveursMax === 0 && p.nbViandesMax === 0)
+  ).filter((p): p is ProduitPublic => !!p && !panier.some((l) => l.produit.id === p.id));
   const messageTotalApayer =
     nbTamponsEffectif > 0
       ? `${nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
@@ -1423,7 +1422,7 @@ export function CommandeNouvelleApp({
             </div>
           )}
 
-          {nbArticles > 0 && !aDejaUnAccompagnement && accompagnementsSuggeres.length > 0 && (
+          {nbArticles > 0 && accompagnementsSuggeres.length > 0 && (
             <div className="rounded-lg border-2 border-dashed border-gray-500 bg-white p-3">
               <p className="text-sm font-extrabold text-gray-900">Et avec ça ? Complète ta commande</p>
               <div className="mt-2 flex flex-wrap gap-2">
