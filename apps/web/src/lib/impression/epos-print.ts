@@ -209,9 +209,9 @@ function detailLigne(l: CommandePourImpression["lignes"][number]): { texte: stri
   if (l.sansSauce) details.push({ texte: "SANS SAUCE" });
   if (l.saladeOption) details.push({ texte: "+ Salade" });
   const supp = libelleSupplementsLigne(l);
-  if (supp.viandes) details.push({ texte: `+ Viande en plus : ${supp.viandes}` });
-  if (supp.sauces) details.push({ texte: `+ Sauce en plus : ${supp.sauces}` });
-  if (supp.oignons) details.push({ texte: "+ Oignons frits" });
+  if (supp.viandes) details.push({ texte: `+ Viande en plus : ${supp.viandes}`, surligne: true });
+  if (supp.sauces) details.push({ texte: `+ Sauce en plus : ${supp.sauces}`, surligne: true });
+  if (supp.oignons) details.push({ texte: "+ Oignons frits", surligne: true });
   if (l.saveurs && l.saveurs.length > 0) details.push({ texte: l.saveurs.join(", ") });
   const boisson = libelleBoissonLigne(l);
   // Plusieurs exemplaires du même produit (ex : 2x Menu Étudiant) : une boisson par exemplaire, écrite avec son nombre
@@ -230,6 +230,8 @@ interface AttributCuisine {
   label: string;
   valeur: string;
   surligne?: boolean;
+  /** Supplément payant (viande / sauce en plus, oignons frits) : imprimé en gros, blanc sur noir, pour ne jamais être oublié en cuisine. */
+  supplement?: boolean;
 }
 
 /**
@@ -246,9 +248,9 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
   if (l.sansSauce) attributs.push({ label: "Sauces", valeur: "SANS SAUCE" });
   if (l.saladeOption) attributs.push({ label: "Salade", valeur: "EN PLUS" });
   const supp = libelleSupplementsLigne(l);
-  if (supp.viandes) attributs.push({ label: "Viande en plus", valeur: supp.viandes });
-  if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces });
-  if (supp.oignons) attributs.push({ label: "Supplément", valeur: "Oignons frits" });
+  if (supp.viandes) attributs.push({ label: "Viande en plus", valeur: supp.viandes, supplement: true });
+  if (supp.sauces) attributs.push({ label: "Sauce en plus", valeur: supp.sauces, supplement: true });
+  if (supp.oignons) attributs.push({ label: "Supplément", valeur: "Oignons frits", supplement: true });
   if (l.saveurs && l.saveurs.length > 0) attributs.push({ label: "Saveur", valeur: l.saveurs.join(", ") });
   if (l.boissonIncluse)
     attributs.push({ label: "Boisson", valeur: `${l.quantite > 1 ? `${l.quantite}x ` : ""}${l.boissonIncluse}`, surligne: true });
@@ -320,7 +322,13 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
           : `${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom).toUpperCase()}`,
         { gras: true, taille: 2, surligne: estBoisson }
       );
-      for (const { label, valeur, surligne } of attributsCuisine(l)) {
+      for (const { label, valeur, surligne, supplement } of attributsCuisine(l)) {
+        if (supplement && !estBoisson) {
+          // Retour du patron, 2026-11-16 (commande #1227) : des viandes en plus n'ont pas été préparées, écrites trop petit.
+          b.ligne(` + ${label.toUpperCase()} `, { gras: true, taille: 2, surligne: true }, "  ");
+          b.ligne(` ${valeur.toUpperCase()} `, { gras: true, taille: 2, surligne: true }, "  ");
+          continue;
+        }
         if (estBoisson) {
           b.ligne(` ${valeur.toUpperCase()} `, { gras: true, taille: 1, surligne: true }, "  ");
           continue;

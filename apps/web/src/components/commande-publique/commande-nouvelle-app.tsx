@@ -1972,13 +1972,20 @@ export function CommandeNouvelleApp({
                   </p>
                 </div>
               ) : (
+                // Plus de clignotement (il rendait le bouton flou) : un bloc net, très contrasté, avec une bordure et un halo fixes.
                 <button
                   type="button"
                   onClick={platSuivant}
-                  className="w-full animate-pulse rounded-xl py-4 text-lg font-extrabold text-white shadow-lg active:scale-[0.99]"
+                  className="flex w-full items-center justify-between rounded-xl border-4 border-white px-5 py-3 text-left text-white shadow-2xl ring-4 ring-[#2D5A27]/40 active:scale-[0.99]"
                   style={{ backgroundColor: VERT }}
                 >
-                  Plat {platActif + 1} terminé → Plat {platActif + 2}
+                  <span>
+                    <span className="block text-xs font-bold uppercase tracking-wide">Plat {platActif + 1} complet ✓</span>
+                    <span className="block text-xl font-extrabold">Passer au plat {platActif + 2}</span>
+                  </span>
+                  <span className="text-4xl font-extrabold leading-none" aria-hidden="true">
+                    →
+                  </span>
                 </button>
               ))}
             {nbArticles > 0 && (
