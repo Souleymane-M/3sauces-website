@@ -120,7 +120,7 @@ export function RemiseCommande({ numero, montant, dejaPayee, ticketClientImprime
           disabled={enCours}
           className="rounded bg-[#2D5A27] px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
         >
-          Valider la remise
+          Valider
         </button>
         <button type="button" onClick={onFermer} className="text-sm text-gray-600 underline">
           Fermer
