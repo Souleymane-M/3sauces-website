@@ -2,8 +2,54 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
+import {
+  MONTANT_RECOMPENSE,
+  NB_TAMPONS_RECOMPENSE,
+  SEUIL_TAMPON,
+  calculerProgressionCommande,
+  formaterEuros,
+  progressionTampons,
+} from "@/lib/fidelite/regles";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { envoyerEmail } from "./email";
 import { construireEmailClientHtml } from "./template";
+
+/**
+ * Points de fidélité de la commande, pour le message « commande reçue » : avant paiement, ce qu'elle va rapporter ;
+ * déjà payée (en ligne), ce qu'elle vient de rapporter et le total. Le montant stocké est net des points utilisés.
+ */
+async function construireBlocPoints(telephone: string, montantNet: number, dejaPayee: boolean): Promise<string> {
+  const supabase = createServiceSupabaseClient();
+  const [solde, { data: clientRow }] = await Promise.all([
+    compterTamponsDisponibles(supabase, telephone),
+    supabase.from("clients").select("montant_cumule").eq("telephone", telephone).maybeSingle(),
+  ]);
+  if (!clientRow) return "";
+  const cumul = clientRow.montant_cumule ?? 0;
+  const avant = dejaPayee ? (((cumul - montantNet) % SEUIL_TAMPON) + SEUIL_TAMPON) % SEUIL_TAMPON : cumul;
+  const progression = calculerProgressionCommande(montantNet, avant, solde.nombre, 0);
+  const total = progressionTampons(cumul, solde.nombre);
+  const pts = (n: number) => `${n} point${n > 1 ? "s" : ""}`;
+  const manque = NB_TAMPONS_RECOMPENSE - (Math.floor(cumul / MONTANT_RECOMPENSE) % NB_TAMPONS_RECOMPENSE);
+  const resteProchainPoint = MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE);
+
+  const lignes: string[] = [];
+  if (progression.tamponsGagnes > 0) {
+    lignes.push(
+      dejaPayee
+        ? `🎁 Cette commande vient de te rapporter ${pts(progression.tamponsGagnes)} de fidélité : tu en as maintenant ${total}.`
+        : `🎁 Cette commande te rapporte ${pts(progression.tamponsGagnes)} de fidélité, ${progression.tamponsGagnes > 1 ? "ajoutés" : "ajouté"} dès qu'elle est payée.`
+    );
+  } else {
+    lignes.push(`🎁 Plus que ${formaterEuros(dejaPayee ? resteProchainPoint : progression.resteProchainTampon)} pour gagner un point de fidélité.`);
+  }
+  lignes.push(
+    solde.nombre > 0
+      ? `🎉 Tu as ${formaterEuros(solde.nombre * MONTANT_RECOMPENSE)} de récompense disponible, à utiliser quand tu veux sur ta prochaine commande.`
+      : `Encore ${pts(manque)} pour avoir ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`
+  );
+  return lignes.map((l) => `<p>${l}</p>`).join("");
+}
 
 /** « en espèces », « par carte »… tel que dit au client et au restaurant. */
 function libellePaiement(mode: string | null, canal?: string): string {
@@ -72,6 +118,7 @@ export async function notifierCommandeRecue(commandeId: string, payeeEnLigne: bo
       .maybeSingle();
 
     if (client?.email) {
+      const blocPoints = await construireBlocPoints(commande.client_telephone, Number(commande.montant), payeeEnLigne).catch(() => "");
       envois.push(
         envoyerEmail(
           client.email,
@@ -84,6 +131,7 @@ export async function notifierCommandeRecue(commandeId: string, payeeEnLigne: bo
                 : libellePaiement(commande.mode_paiement, commande.canal)
                   ? `<p>Paiement prévu : <strong>${libellePaiement(commande.mode_paiement, commande.canal)}</strong>.</p>`
                   : "") +
+              blocPoints +
               `<p>Pour être ${commande.canal === "livraison" ? "livré" : "servi"} à l'heure prévue, commande le plus tôt possible : plus tu commandes tôt, plus on est ponctuels.</p>` +
               `<p>À très vite chez 3 Sauces !</p>`,
             "Retourner sur le site"
