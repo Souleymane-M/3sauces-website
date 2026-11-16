@@ -110,6 +110,9 @@ function lireSourceCampagne(): string | undefined {
   }
 }
 
+/** Au-dessus de ce panier, le message pousse vers la boisson 2 L offerte (40 €) plutôt que vers le prochain point. */
+const SEUIL_VISE_BOISSON_2L = 30;
+
 const euros = (montant: number) => `${montant.toFixed(2).replace(".", ",")} €`;
 
 function Titre({ children, couleur = ROUGE, sousTitre }: { children: string; couleur?: string; sousTitre?: string }) {
@@ -420,11 +423,18 @@ export function CommandeNouvelleApp({
   const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
-  // Tampons gagnés en plus si le client ajoute juste ce qu'il manque pour la prochaine boisson offerte.
-  const tamponsEnPlusAuProchainPalier =
-    calculerProgressionCommande(total + resteAvantProchaineBoisson, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
-      .tamponsGagnes - calculerProgressionCommande(total, 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif).tamponsGagnes;
-  const pourcentageProchaineBoisson = Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100);
+  // Points de fidélité (10 € payés = 1 point), en tenant compte de ce que le client a déjà cumulé s'il est reconnu.
+  const reliquatFidelite = fideliteVerifiee?.montantCumule ?? 0;
+  const pointsGagnesPour = (montant: number) =>
+    Math.floor((reliquatFidelite + montant) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
+  const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE);
+  const pointsProchainPoint = pointsGagnesPour(montantAPayer) + 1;
+  // Tant que le panier est loin des 40 €, on pousse vers le prochain point ; à partir de 30 €, vers la boisson 2 L offerte.
+  const viseBoisson2L = total >= SEUIL_VISE_BOISSON_2L;
+  const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
+  const pourcentageProchaineBoisson = viseBoisson2L
+    ? Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
+    : Math.round((((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE) / MONTANT_RECOMPENSE) * 100);
 
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   function declencherPulse() {
@@ -1174,6 +1184,12 @@ export function CommandeNouvelleApp({
   }
 
   const aDejaUneBoisson = panier.some((l) => l.produit.categorie === "boisson" || l.boissonIncluse);
+  // « Et avec ça ? » : accompagnements proposés tant qu'il n'y en a aucun dans le panier (les moins chers d'abord).
+  const aDejaUnAccompagnement = panier.some((l) => l.produit.categorie === "accompagnement" || l.accompagnementsInclus.length > 0);
+  const accompagnementsSuggeres = groupes.accompagnements
+    .filter((p) => p.nbSaveursMax === 0 && p.categorie === "accompagnement")
+    .sort((a, b) => a.prix - b.prix)
+    .slice(0, 4);
   const messageTotalApayer =
     nbTamponsEffectif > 0
       ? `${nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
@@ -1355,10 +1371,9 @@ export function CommandeNouvelleApp({
                 </p>
               )}
               <p className="text-sm font-extrabold text-gray-900">
-                Plus que {euros(resteAvantProchaineBoisson)} : {palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte
-                {tamponsEnPlusAuProchainPalier > 0
-                  ? ` et ${tamponsEnPlusAuProchainPalier} point${tamponsEnPlusAuProchainPalier > 1 ? "s" : ""} de fidélité en plus`
-                  : ""}
+                {viseBoisson2L
+                  ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
+                  : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande`}
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
                 <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
@@ -1391,6 +1406,7 @@ export function CommandeNouvelleApp({
             <div className="rounded-lg border-2 border-dashed border-gray-500 bg-white p-3">
               <p className="text-sm font-extrabold text-gray-900">
                 Ajoutez une canette + {euros(produitCanetteRapide.prix)}
+                {!viseBoisson2L && produitCanetteRapide.prix >= resteProchainPoint ? " · et gagnez +1 point de fidélité" : ""}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {saveurs.map((s) => (
@@ -1401,6 +1417,25 @@ export function CommandeNouvelleApp({
                     className="rounded-full border-2 border-gray-400 bg-white px-4 py-2 text-sm font-bold text-gray-900 active:scale-95"
                   >
                     {s.nom}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {nbArticles > 0 && !aDejaUnAccompagnement && accompagnementsSuggeres.length > 0 && (
+            <div className="rounded-lg border-2 border-dashed border-gray-500 bg-white p-3">
+              <p className="text-sm font-extrabold text-gray-900">Et avec ça ? Complète ta commande</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {accompagnementsSuggeres.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => ajouterAuPanier(p, [], [], [])}
+                    className="rounded-full border-2 border-gray-400 bg-white px-4 py-2 text-sm font-bold text-gray-900 active:scale-95"
+                  >
+                    {p.nom} + {euros(p.prix)}
+                    {!viseBoisson2L && p.prix >= resteProchainPoint ? " · +1 point" : ""}
                   </button>
                 ))}
               </div>
