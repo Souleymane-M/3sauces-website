@@ -32,6 +32,8 @@ export interface LigneCommande {
   saucesSupplementaires?: string[];
   /** Oignons frits en supplément (snacks) — leur prix est déjà dans `prixUnitaire`. */
   oignonsFrits?: boolean;
+  /** Nombre d'unités ajoutées depuis le bloc « Et avec ça ? » du panier (suivi des ventes complémentaires), 0 ou absent sinon. */
+  quantiteSuggeree?: number;
   canetteIncluse: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
@@ -85,6 +87,8 @@ export interface LigneCommandePayload {
   saladeOption?: boolean;
   /** Prix saisi manuellement, uniquement pour un produit à prix libre (plat du jour). */
   prixSaisi?: number;
+  /** Unités ajoutées depuis le bloc « Et avec ça ? » — borné à `quantite` côté serveur. */
+  quantiteSuggeree?: number;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
   pourQui: string | null;

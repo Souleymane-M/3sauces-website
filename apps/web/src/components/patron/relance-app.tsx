@@ -48,6 +48,7 @@ export function RelanceApp() {
   const [campagne, setCampagne] = useState(CAMPAGNE_PAR_DEFAUT.points);
   const [resultats, setResultats] = useState<{ source: string; commandes: number; ca: number }[] | null>(null);
   const [erreurResultats, setErreurResultats] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<{ totalCommandes: number; commandes: number; unites: number; ca: number; parProduit: { nom: string; unites: number; ca: number }[] } | null>(null);
   const [adresseTest, setAdresseTest] = useState("");
   const [etat, setEtat] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -86,6 +87,8 @@ export function RelanceApp() {
       const data = await reponse.json().catch(() => ({}));
       if (!reponse.ok) throw new Error(data.error ?? "Chargement impossible.");
       setResultats(data.sources);
+      const rs = await fetch("/api/patron/relance?stats=suggestions");
+      if (rs.ok) setSuggestions(await rs.json());
     } catch (e) {
       setErreurResultats(e instanceof Error ? e.message : "Chargement impossible.");
     }
@@ -315,6 +318,25 @@ export function RelanceApp() {
             </tbody>
           </table>
         ))}
+        {suggestions && (
+          <div className="space-y-1 border-t border-gray-200 pt-2">
+            <h4 className="font-bold text-gray-900">Bloc « Et avec ça ? » du panier (60 derniers jours)</h4>
+            <p className="text-sm text-gray-900">
+              <b>{suggestions.unites}</b> article{suggestions.unites > 1 ? "s" : ""} ajouté{suggestions.unites > 1 ? "s" : ""} depuis ce bloc, dans{" "}
+              <b>{suggestions.commandes}</b> commande{suggestions.commandes > 1 ? "s" : ""} sur {suggestions.totalCommandes}, soit{" "}
+              <b>{suggestions.ca.toFixed(2)} €</b> de ventes en plus.
+            </p>
+            {suggestions.parProduit.length > 0 && (
+              <ul className="text-sm text-gray-800">
+                {suggestions.parProduit.map((p) => (
+                  <li key={p.nom}>
+                    {p.nom} : {p.unites} × · {p.ca.toFixed(2)} €
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -137,6 +137,8 @@ export interface ParametresLivraisonPublic {
 export interface LigneCommandePubliquePayload {
   produitId: string;
   quantite: number;
+  /** Unités ajoutées depuis le bloc « Et avec ça ? » du panier (suivi des ventes complémentaires), revérifié côté serveur. */
+  quantiteSuggeree?: number;
   viandes: string[];
   sauces: string[];
   saveurs: string[];

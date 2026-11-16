@@ -24,6 +24,41 @@ export async function GET(request: Request) {
   const session = await requireRole(["patron"]);
   if (!session) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   const url = new URL(request.url);
+  if (url.searchParams.get("stats") === "suggestions") {
+    const supabase = createServiceSupabaseClient();
+    const depuis = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const { data, error } = await supabase.from("commandes").select("contenu, created_at").neq("statut", "annulee").gte("created_at", depuis);
+    if (error) return NextResponse.json({ error: "Suivi indisponible." }, { status: 500 });
+    let commandes = 0;
+    let unites = 0;
+    let ca = 0;
+    const parProduit = new Map<string, { unites: number; ca: number }>();
+    for (const c of data ?? []) {
+      const lignes = Array.isArray(c.contenu) ? (c.contenu as { nom?: string; quantiteSuggeree?: number; prixUnitaire?: number }[]) : [];
+      let avec = false;
+      for (const l of lignes) {
+        const q = Number(l.quantiteSuggeree) || 0;
+        if (q <= 0) continue;
+        avec = true;
+        const montant = q * Number(l.prixUnitaire ?? 0);
+        unites += q;
+        ca += montant;
+        const nom = String(l.nom ?? "?");
+        const x = parProduit.get(nom) ?? { unites: 0, ca: 0 };
+        x.unites += q;
+        x.ca += montant;
+        parProduit.set(nom, x);
+      }
+      if (avec) commandes += 1;
+    }
+    return NextResponse.json({
+      totalCommandes: (data ?? []).length,
+      commandes,
+      unites,
+      ca,
+      parProduit: [...parProduit].map(([nom, v]) => ({ nom, ...v })).sort((a, b) => b.unites - a.unites),
+    });
+  }
   if (url.searchParams.get("stats") === "1") {
     const supabase = createServiceSupabaseClient();
     const depuis = new Date(Date.now() - 60 * 86_400_000).toISOString();

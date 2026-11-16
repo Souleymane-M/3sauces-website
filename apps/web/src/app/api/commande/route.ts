@@ -666,6 +666,7 @@ export async function POST(request: Request) {
       viandesSupplementaires,
       saucesSupplementaires,
       oignonsFrits,
+      quantiteSuggeree: Math.min(quantite, Math.max(0, Math.floor(Number(ligneBrute.quantiteSuggeree) || 0))) || undefined,
       saveurs,
       boissonIncluse,
       sansBoisson,
