@@ -355,11 +355,11 @@ export function CommandeNouvelleApp({
 
   const onglets = useMemo(() => {
     const liste: { cle: Onglet; titre: string }[] = [];
-    if (platsDuJour.length > 0) liste.push({ cle: "plats", titre: "Plats du jour" });
-    if (groupes.tacos.length + menusSpeciaux.length > 0) liste.push({ cle: "tacos", titre: "Tacos" });
-    if (groupes.barquettes.length + groupes.bowls.length > 0) liste.push({ cle: "barquettes", titre: "Barquettes & Bowls" });
     if (groupes.grillades.length + groupes.accompagnements.length > 0)
       liste.push({ cle: "grillades", titre: "Grillades & accompagnements" });
+    if (groupes.tacos.length + menusSpeciaux.length > 0) liste.push({ cle: "tacos", titre: "Tacos" });
+    if (groupes.barquettes.length + groupes.bowls.length > 0) liste.push({ cle: "barquettes", titre: "Barquettes & Bowls" });
+    if (platsDuJour.length > 0) liste.push({ cle: "plats", titre: "Plats du jour" });
     return liste;
   }, [platsDuJour, groupes, menusSpeciaux]);
   const ongletActif: Onglet | null = onglet && onglets.some((o) => o.cle === onglet) ? onglet : (onglets[0]?.cle ?? null);
