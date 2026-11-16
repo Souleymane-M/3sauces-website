@@ -356,7 +356,7 @@ export function CommandeNouvelleApp({
   const onglets = useMemo(() => {
     const liste: { cle: Onglet; titre: string }[] = [];
     if (groupes.grillades.length + groupes.accompagnements.length > 0)
-      liste.push({ cle: "grillades", titre: "Grillades & accompagnements" });
+      liste.push({ cle: "grillades", titre: "Grillades & acc." });
     if (groupes.tacos.length + menusSpeciaux.length > 0) liste.push({ cle: "tacos", titre: "Tacos" });
     if (groupes.barquettes.length + groupes.bowls.length > 0) liste.push({ cle: "barquettes", titre: "Barquettes & Bowls" });
     if (platsDuJour.length > 0) liste.push({ cle: "plats", titre: "Plats du jour" });
