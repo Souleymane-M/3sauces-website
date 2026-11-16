@@ -540,7 +540,13 @@ export async function signalerLivraisonNonEffectuee(
  * explicite du patron, 2026-10-20, pour couvrir le cas où le livreur ne
  * peut pas agir lui-même).
  */
-export async function relacherLivraison(commandeId: string, profilId: string, roleMetier: RoleMetier): Promise<void> {
+export async function relacherLivraison(
+  commandeId: string,
+  profilId: string,
+  roleMetier: RoleMetier,
+  /** Retour en « prête » pour MODIFIER la commande (heure décalée, produit ajouté) : le même livreur peut la reprendre ensuite, contrairement à un vrai relâchement. */
+  options: { pourModification?: boolean } = {}
+): Promise<void> {
   const supabase = createServiceSupabaseClient();
 
   const { data: commande, error: erreurCommande } = await supabase
@@ -563,7 +569,7 @@ export async function relacherLivraison(commandeId: string, profilId: string, ro
     throw new Error("Cette livraison n'est pas assignée à toi.");
   }
 
-  const livreurExclu = livraison.livreur_id;
+  const livreurExclu = options.pourModification ? null : livraison.livreur_id;
 
   const { data: commandeRelachee, error: erreurRelacher } = await supabase
     .from("commandes")

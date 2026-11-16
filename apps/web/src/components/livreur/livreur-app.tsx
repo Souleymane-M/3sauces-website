@@ -112,6 +112,8 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // est ouvert + motif choisi/saisi.
   const [echecOuvertId, setEchecOuvertId] = useState<string | null>(null);
   const [partielOuvertId, setPartielOuvertId] = useState<string | null>(null);
+  // Retour en « prête » pour modifier la commande (heure décalée, produit ajouté) : confirmation en deux temps.
+  const [retourOuvertId, setRetourOuvertId] = useState<string | null>(null);
   // Remarque libre facultative par livraison (envoyée avec la déclaration de livraison).
   const [commentaires, setCommentaires] = useState<Record<string, string>>({});
   // La commande reste "en livraison" côté serveur (le responsable décide de la suite) : on mémorise juste ici
@@ -168,6 +170,36 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
       clearInterval(minuteur);
     };
   }, [enCours, declarationsOuvertes]);
+
+  async function remettreEnAttente(livraison: LivraisonAssignee) {
+    setErreur(null);
+    setEnCours(livraison.id);
+    try {
+      const reponse = await fetch("/api/livreur/relacher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandeId: livraison.id, pourModification: true }),
+      });
+      const data = await reponse.json().catch(() => ({}));
+      if (!reponse.ok) {
+        setErreur(data.error ?? "Impossible de remettre la commande en attente.");
+        return;
+      }
+      setRetourOuvertId(null);
+      const maj = await fetch("/api/livreur/commandes");
+      if (maj.ok) {
+        const d = await maj.json();
+        if (Array.isArray(d.livraisons)) setLivraisons(d.livraisons);
+        if (Array.isArray(d.enAttente)) setEnAttente(d.enAttente);
+      } else {
+        setLivraisons((l) => l.filter((x) => x.id !== livraison.id));
+      }
+    } catch {
+      setErreur("Connexion impossible, réessaie.");
+    } finally {
+      setEnCours(null);
+    }
+  }
 
   async function signalerEchec(livraison: LivraisonAssignee, motif: string) {
     setErreur(null);
@@ -474,6 +506,39 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               >
                 ❌ Impossible à livrer
               </button>
+            )}
+
+            {!declaration && retourOuvertId !== livraison.id && echecOuvertId !== livraison.id && (
+              <button
+                onClick={() => {
+                  setErreur(null);
+                  setRetourOuvertId(livraison.id);
+                }}
+                className="mt-2 w-full rounded border-2 border-gray-500 py-3 text-lg font-bold text-gray-800"
+              >
+                ↩ Remettre en attente (modifier)
+              </button>
+            )}
+
+            {!declaration && retourOuvertId === livraison.id && (
+              <div className="mt-2 space-y-2 rounded border-2 border-gray-500 bg-gray-50 p-3">
+                <p className="text-base font-bold text-gray-900">Remettre la commande #{String(livraison.numero).padStart(4, "0")} en attente ?</p>
+                <p className="text-sm text-gray-700">
+                  Elle repasse en « prête » : la caisse peut changer l&apos;heure ou ajouter un produit. Tu pourras ensuite la reprendre.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => remettreEnAttente(livraison)}
+                    disabled={enCours === livraison.id}
+                    className="rounded bg-gray-800 py-3 text-base font-bold text-white disabled:opacity-40"
+                  >
+                    Oui, remettre
+                  </button>
+                  <button onClick={() => setRetourOuvertId(null)} className="rounded border border-gray-400 py-3 text-base font-bold text-gray-800">
+                    Annuler
+                  </button>
+                </div>
+              </div>
             )}
 
             {!declaration && echecOuvertId === livraison.id && (

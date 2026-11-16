@@ -9,13 +9,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as { commandeId?: string } | null;
+  const body = (await request.json().catch(() => null)) as { commandeId?: string; pourModification?: boolean } | null;
   if (!body?.commandeId || typeof body.commandeId !== "string") {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
   try {
-    await relacherLivraison(body.commandeId, session.profilId, "livreur");
+    await relacherLivraison(body.commandeId, session.profilId, "livreur", { pourModification: body.pourModification === true });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur inconnue.";
