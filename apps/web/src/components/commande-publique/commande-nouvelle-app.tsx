@@ -39,7 +39,7 @@ import {
 import { FooterLegal } from "@/components/legal/footer-legal";
 import { ConfigurateurNouveau } from "./configurateur-nouveau";
 import { SaveurModalPublique } from "./saveur-modal-publique";
-import { LIEUX_PRINCIPAUX, VILLAGES, creneauxLivraisonPossibles, libelleCreneauLieu, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
+import { LIEUX_PRINCIPAUX, VILLAGES, creneauxLivraisonPossibles, libelleCreneauLieu, lieuPrincipalDeAdresse, trouverLieu } from "@/lib/commande-publique/lieux-livraison";
 import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
@@ -289,6 +289,8 @@ export function CommandeNouvelleApp({
   const [adresse, setAdresse] = useState("");
   const [zone, setZone] = useState(parametres.zonesActives[0] ?? "");
   const [lieuId, setLieuId] = useState("");
+  // Dernier lieu de livraison connu du client reconnu : présélectionné dès qu'il choisit la livraison (modifiable en un clic).
+  const [dernierLieu, setDernierLieu] = useState<{ lieuId: string; precision: string } | null>(null);
   const lieu = trouverLieu(lieuId);
   const [dateCommande, setDateCommande] = useState(() => datesOuvertes[0] ?? aujourdHui);
   const creneauxValides = useMemo(
@@ -1237,6 +1239,15 @@ export function CommandeNouvelleApp({
       if (canal === "livraison") {
         if (infos.zone) setZone((precedent) => precedent.trim() || infos.zone!);
       }
+      const dernier = lieuPrincipalDeAdresse(infos.adresse);
+      if (dernier) {
+        const precision = dernier.village && infos.adresse?.includes(" — ") ? infos.adresse.split(" — ").slice(1).join(" — ").trim() : "";
+        setDernierLieu({ lieuId: dernier.id, precision });
+        if (canal === "livraison" && !lieuId) {
+          changerLieu(dernier.id);
+          if (precision) setAdresse(precision);
+        }
+      }
     },
   };
 
@@ -1620,6 +1631,10 @@ export function CommandeNouvelleApp({
                   type="button"
                   onClick={() => {
                     setCanal(valeur);
+                    if (valeur === "livraison" && !lieuId && dernierLieu) {
+                      changerLieu(dernierLieu.lieuId);
+                      if (dernierLieu.precision) setAdresse(dernierLieu.precision);
+                    }
                     if (valeur === "livraison") {
                       const possibles = creneauxLivraisonPossibles(
                         creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin),
