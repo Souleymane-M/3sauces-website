@@ -1346,7 +1346,8 @@ export function CommandeNouvelleApp({
             </div>
           )}
           <div className="border-b border-gray-300 bg-[#F5F0E8]/95 backdrop-blur">
-            <div className="mx-auto flex max-w-lg gap-2 overflow-x-auto px-4 py-2">
+            {/* Tous les onglets visibles d'un coup, à largeur égale (le titre passe sur 2 lignes si besoin) : plus de défilement caché sur téléphone. */}
+            <div className="mx-auto grid max-w-lg gap-1.5 px-3 py-2" style={{ gridTemplateColumns: `repeat(${Math.max(onglets.length, 1)}, minmax(0, 1fr))` }}>
               {onglets.map((o) => (
                 <button
                   key={o.cle}
@@ -1355,7 +1356,7 @@ export function CommandeNouvelleApp({
                     setOnglet(o.cle);
                     setAutresBoissonsOuvert(false);
                   }}
-                  className={`shrink-0 whitespace-nowrap rounded-full border-2 px-4 py-2 text-sm font-extrabold ${
+                  className={`flex min-h-[3rem] items-center justify-center rounded-xl border-2 px-1 py-1.5 text-center text-[13px] font-extrabold leading-tight sm:text-sm ${
                     ongletActif === o.cle ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
                   }`}
                 >
