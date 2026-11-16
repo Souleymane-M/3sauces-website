@@ -2,19 +2,8 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { nomSansMultiplicateur } from "@/lib/pieces-produit";
-import {
-  MONTANT_RECOMPENSE,
-  NB_TAMPONS_RECOMPENSE,
-  SEUIL_TAMPON,
-  calculerProgressionCommande,
-  formaterEuros,
-  progressionTampons,
-} from "@/lib/fidelite/regles";
-import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { envoyerEmail } from "./email";
 import { construireEmailClientHtml } from "./template";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@3sauces/supabase";
 
 /** « en espèces », « par carte »… tel que dit au client et au restaurant. */
 function libellePaiement(mode: string | null, canal?: string): string {
@@ -35,53 +24,6 @@ function libellePaiement(mode: string | null, canal?: string): string {
 const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /**
- * Bloc fidélité de l'email « Paiement reçu » — toujours le vrai statut du client juste après ce paiement : points
- * gagnés avec cette commande, total de points, et récompense disponible ou points qui manquent. Appelée après que
- * le trigger de paiement ait tourné : `clients.montant_cumule` et `fidelite_tampons` sont déjà à jour. Le montant de
- * la commande est stocké net des points utilisés.
- */
-async function construireBlocFidelite(
-  supabase: SupabaseClient<Database>,
-  telephone: string,
-  tamponsUtilises: number,
-  montantNet: number
-): Promise<{ html: string; texteBouton: string }> {
-  const [solde, { data: clientRow }] = await Promise.all([
-    compterTamponsDisponibles(supabase, telephone),
-    supabase.from("clients").select("montant_cumule").eq("telephone", telephone).maybeSingle(),
-  ]);
-
-  const cumul = clientRow?.montant_cumule ?? 0;
-  const avant = (((cumul - montantNet) % SEUIL_TAMPON) + SEUIL_TAMPON) % SEUIL_TAMPON;
-  const gagnes = calculerProgressionCommande(montantNet, avant, solde.nombre, 0).tamponsGagnes;
-  const total = progressionTampons(cumul, solde.nombre);
-  const manque = NB_TAMPONS_RECOMPENSE - (Math.floor(cumul / MONTANT_RECOMPENSE) % NB_TAMPONS_RECOMPENSE);
-  const pts = (n: number) => `${n} point${n > 1 ? "s" : ""}`;
-
-  const lignes: string[] = [];
-  if (tamponsUtilises > 0) {
-    lignes.push(`Tu as utilisé ${formaterEuros(tamponsUtilises * MONTANT_RECOMPENSE)} de récompense sur cette commande, merci de ta fidélité !`);
-  }
-  const resteProchainPoint = MONTANT_RECOMPENSE - (cumul % MONTANT_RECOMPENSE);
-  if (gagnes > 0) {
-    lignes.push(`🎁 Tu viens de gagner ${pts(gagnes)} de fidélité : tu en as maintenant ${total}.`);
-  } else if (total > 0) {
-    lignes.push(`🎁 Tu as ${pts(total)} de fidélité. Plus que ${formaterEuros(resteProchainPoint)} pour le prochain.`);
-  } else {
-    lignes.push(`🎁 Plus que ${formaterEuros(resteProchainPoint)} pour gagner ton premier point de fidélité.`);
-  }
-  lignes.push(
-    solde.nombre > 0
-      ? `🎉 Tu as ${formaterEuros(solde.nombre * MONTANT_RECOMPENSE)} de récompense disponible, à utiliser quand tu veux sur ta prochaine commande.`
-      : `Encore ${pts(manque)} pour avoir ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`
-  );
-  return {
-    html: lignes.map((l) => `<p>${l}</p>`).join(""),
-    texteBouton: solde.nombre > 0 ? "Commander maintenant" : "Retourner sur le site",
-  };
-}
-
-/**
  * Confirme la bonne réception d'une commande du site public payée en
  * personne (espèces/CB au comptoir ou à la livraison) — jamais pour
  * Stripe, où la confirmation n'a de sens qu'une fois le paiement réellement
@@ -100,7 +42,7 @@ async function construireBlocFidelite(
  * livraison) — repéré le 2026-10-05 après une vague de commandes sans
  * aucune confirmation reçue.
  */
-export async function notifierCommandeRecue(commandeId: string): Promise<void> {
+export async function notifierCommandeRecue(commandeId: string, payeeEnLigne: boolean = false): Promise<void> {
   const supabase = createServiceSupabaseClient();
   const { data: commande, error } = await supabase
     .from("commandes")
@@ -137,9 +79,11 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
           construireEmailClientHtml(
             `<p>Merci${prenom ? ` ${prenom}` : ""} pour ta commande ! La #${commande.numero} (<strong>${montantAffiche} €</strong>) est bien enregistrée.</p>` +
               `<p>${resume}</p>` +
-              (libellePaiement(commande.mode_paiement, commande.canal)
-                ? `<p>Paiement prévu : <strong>${libellePaiement(commande.mode_paiement, commande.canal)}</strong>.</p>`
-                : "") +
+              (payeeEnLigne
+                ? `<p>Paiement : <strong>payé en ligne par carte</strong>.</p>`
+                : libellePaiement(commande.mode_paiement, commande.canal)
+                  ? `<p>Paiement prévu : <strong>${libellePaiement(commande.mode_paiement, commande.canal)}</strong>.</p>`
+                  : "") +
               `<p>Pour être ${commande.canal === "livraison" ? "livré" : "servi"} à l'heure prévue, commande le plus tôt possible : plus tu commandes tôt, plus on est ponctuels.</p>` +
               `<p>À très vite chez 3 Sauces !</p>`,
             "Retourner sur le site"
@@ -160,8 +104,11 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
       envoyerEmail(
         emailRestaurant,
         `Nouvelle commande — commande #${commande.numero}`,
-        `<p><strong>Nouvelle commande reçue (pas encore payée).</strong></p>` +
-          `<p>Commande #${commande.numero} — ${montantAffiche} €${libellePaiement(commande.mode_paiement, commande.canal) ? ` — paiement prévu ${libellePaiement(commande.mode_paiement, commande.canal)}` : ""}</p>` +
+        (payeeEnLigne
+          ? `<p><strong>Nouvelle commande reçue, payée en ligne par carte.</strong></p>` +
+            `<p>Commande #${commande.numero} — ${montantAffiche} €</p>`
+          : `<p><strong>Nouvelle commande reçue (pas encore payée).</strong></p>` +
+            `<p>Commande #${commande.numero} — ${montantAffiche} €${libellePaiement(commande.mode_paiement, commande.canal) ? ` — paiement prévu ${libellePaiement(commande.mode_paiement, commande.canal)}` : ""}</p>`) +
           `<p>${resume}</p>`
       )
     );
@@ -178,89 +125,16 @@ export async function notifierCommandeRecue(commandeId: string): Promise<void> {
 }
 
 /**
- * Notifie un paiement confirmé (comptoir, livraison, ou en ligne via le
- * webhook Stripe) — appelé après que `commandes.paiement_statut` soit
- * effectivement passé à "paye" (donc après que le trigger de fidélité ait
- * déjà mis à jour `clients`). Uniquement par email pour l'instant (pas de
- * SMS configuré). Best effort : un échec (email non configuré, domaine non
- * vérifié) ne doit jamais faire échouer le paiement lui-même déjà
- * enregistré — chaque envoi est indépendant (`Promise.allSettled`).
+ * Appelée quand une commande passe à « payée » (comptoir, livraison, ou en ligne via le webhook Stripe). Plus aucun
+ * e-mail « paiement reçu » nulle part (demande du patron, 2026-11-16) : le client ne reçoit qu'un seul message, celui de
+ * commande reçue. Une commande payée en ligne n'en a pas reçu à sa création (le paiement n'était pas acquis) : c'est
+ * donc ici, une fois le paiement confirmé, qu'on lui envoie ce même message de commande reçue, ainsi qu'au restaurant.
  */
 export async function notifierPaiementConfirme(commandeId: string): Promise<void> {
   const supabase = createServiceSupabaseClient();
-  const { data: commande, error } = await supabase
-    .from("commandes")
-    .select(
-      "numero, montant, contenu, nom_livraison, prenom, client_telephone, tampons_utilises, mode_paiement, canal"
-    )
-    .eq("id", commandeId)
-    .maybeSingle();
-
-  if (error || !commande) {
-    console.error("[notifications/paiement] commande introuvable :", commandeId, error?.message);
-    return;
-  }
-
-  const lignes = Array.isArray(commande.contenu) ? (commande.contenu as LigneCommande[]) : [];
-  const resume = lignes.map((l) => `${l.quantite}x ${nomSansMultiplicateur(l.nom)}`).join(", ") || "—";
-  const montantAffiche = commande.montant.toFixed(2);
-
-  const emailRestaurant = process.env.NOTIF_RESTAURANT_EMAIL || null;
-
-  let clientEmail: string | null = null;
-  if (commande.client_telephone) {
-    const { data } = await supabase.from("clients").select("email").eq("telephone", commande.client_telephone).maybeSingle();
-    clientEmail = data?.email ?? null;
-  }
-
-  const envois: Promise<{ ok: boolean; erreur?: string }>[] = [];
-
-  if (clientEmail && commande.client_telephone) {
-    const blocFidelite = await construireBlocFidelite(
-      supabase,
-      commande.client_telephone,
-      commande.tampons_utilises,
-      Number(commande.montant)
-    );
-    const prenom = commande.prenom?.trim() ? echapper(commande.prenom.trim()) : null;
-
-    // Même sujet qu'on paie en ligne ou en personne : le paiement est bien reçu.
-    const payeEnLigne = commande.mode_paiement === "stripe";
-    const sujet = "Paiement reçu";
-    const intro = payeEnLigne
-      ? `<p>Merci${prenom ? ` ${prenom}` : ""}, ton paiement de <strong>${montantAffiche} €</strong> pour la commande #${commande.numero} est bien reçu${libellePaiement(commande.mode_paiement) ? ` (${libellePaiement(commande.mode_paiement)})` : ""}. Tout est en ordre, on s'occupe du reste.</p>`
-      : `<p>Merci${prenom ? ` ${prenom}` : ""}, nous avons bien reçu ton paiement de <strong>${montantAffiche} €</strong>${libellePaiement(commande.mode_paiement) ? ` ${libellePaiement(commande.mode_paiement)}` : ""} pour la commande #${commande.numero}. Bon appétit !</p>`;
-
-    envois.push(
-      envoyerEmail(
-        clientEmail,
-        sujet,
-        construireEmailClientHtml(intro + `<p>${resume}</p>` + blocFidelite.html + `<p>À très vite !</p>`, blocFidelite.texteBouton),
-        emailRestaurant ?? undefined
-      )
-    );
-  }
-
-  if (emailRestaurant) {
-    envois.push(
-      envoyerEmail(
-        emailRestaurant,
-        `Paiement reçu — commande #${commande.numero}`,
-        `<p><strong>Nouveau paiement confirmé.</strong></p>` +
-          `<p>Commande #${commande.numero} — ${montantAffiche} €${libellePaiement(commande.mode_paiement) ? ` — payé ${libellePaiement(commande.mode_paiement)}` : ""}</p>` +
-          `<p>Client : ${commande.nom_livraison ?? "—"} — ${commande.client_telephone ?? "—"}</p>` +
-          `<p>${resume}</p>`
-      )
-    );
-  }
-
-  const resultats = await Promise.allSettled(envois);
-  for (const resultat of resultats) {
-    if (resultat.status === "fulfilled" && !resultat.value.ok) {
-      console.error("[notifications/paiement] échec envoi :", resultat.value.erreur);
-    } else if (resultat.status === "rejected") {
-      console.error("[notifications/paiement] envoi rejeté :", resultat.reason);
-    }
+  const { data: commande } = await supabase.from("commandes").select("mode_paiement").eq("id", commandeId).maybeSingle();
+  if (commande?.mode_paiement === "stripe") {
+    await notifierCommandeRecue(commandeId, true);
   }
 }
 

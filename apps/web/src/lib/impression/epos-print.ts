@@ -403,7 +403,7 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   if (commande.clientTelephone && commande.tamponsAffiches !== null) {
     if (commande.tamponsUtilises > 0) {
       const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
-      b.ligne(`✅ ${remise.toFixed(2)} € de points de fidélité utilisés sur cette commande`, {
+      b.ligne(`${remise.toFixed(2)} € de points de fidélité utilisés sur cette commande`, {
         align: "center",
         gras: true,
         taille: 1,
@@ -442,17 +442,17 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
   if (commande.canal === "livraison") {
     if (commande.tamponsAffiches === null) return null;
     if (commande.recompenseDisponible) {
-      return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser 🙂`;
+      return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser`;
     }
     const reste = NB_TAMPONS_RECOMPENSE - commande.tamponsAffiches;
-    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts 🙂`;
+    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts`;
   }
 
   if (!commande.origineCaisse) return null;
   if (commande.clientNouveau) {
-    return `${salutation} pour ta commande. La prochaine fois, commande sur 3sauces.fr pour activer tes points de fidélité 🙂`;
+    return `${salutation} pour ta commande. La prochaine fois, commande sur 3sauces.fr pour activer tes points de fidélité`;
   }
-  return `${salutation} pour ta confiance et ta fidélité, la prochaine fois, avant de venir, commande sur 3sauces.fr pour éviter de faire la queue 🙂`;
+  return `${salutation} pour ta confiance et ta fidélité, la prochaine fois, avant de venir, commande sur 3sauces.fr pour éviter de faire la queue`;
 }
 
 function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
