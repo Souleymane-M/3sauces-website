@@ -310,6 +310,8 @@ export function CommandeNouvelleApp({
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
+  // Commande groupée : plat choisi par le client pour les ajouts du bloc « Et avec ça ? » (jamais déduit).
+  const [platEtAvecCa, setPlatEtAvecCa] = useState<number | null>(null);
 
   // Suivi anonyme (voir lib/suivi) : jamais de donnée personnelle, jamais d'effet sur la commande.
   const etapeSuivie: EtapeVisiteur = envoiEnCours ? "validation" : panier.length > 0 ? "panier" : "menu";
@@ -432,6 +434,8 @@ export function CommandeNouvelleApp({
   const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE);
   const pointsProchainPoint = pointsGagnesPour(montantAPayer) + 1;
   // On pousse toujours vers l'objectif le plus proche : prochain point de fidélité ou prochaine boisson 2 L offerte.
+  const platEtAvecCaValide = enGroupe ? (platEtAvecCa !== null && platEtAvecCa < nomsPlats.length ? platEtAvecCa : null) : platCourant;
+  const etAvecCaBloque = enGroupe && platEtAvecCaValide === null;
   const viseBoisson2L = resteAvantProchaineBoisson < resteProchainPoint;
   const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
   const pourcentageProchaineBoisson = viseBoisson2L
@@ -1519,6 +1523,26 @@ export function CommandeNouvelleApp({
                 Ajoute-le en un clic
                 {!viseBoisson2L ? ` · il te manque ${euros(resteProchainPoint)} pour ton prochain point de fidélité` : ""}
               </p>
+              {enGroupe && (
+                <div className="mt-3">
+                  <p className="text-sm font-extrabold text-gray-900">Pour quel plat ?</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {nomsPlats.map((nom, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPlatEtAvecCa(i)}
+                        className={`rounded-full border-2 px-4 py-2 text-sm font-extrabold ${
+                          platEtAvecCaValide === i ? "border-[#1E3A8A] bg-[#1E3A8A] text-white" : "border-gray-500 bg-white text-gray-900"
+                        }`}
+                      >
+                        {nom.trim() ? nom : `Plat ${i + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                  {etAvecCaBloque && <p className="mt-1 text-sm font-bold text-amber-900">Choisis d&apos;abord le plat concerné.</p>}
+                </div>
+              )}
               {accompagnementsSuggeres.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {accompagnementsSuggeres.map((p) => {
@@ -1526,8 +1550,9 @@ export function CommandeNouvelleApp({
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => ajouterAuPanier(p, [], [], [], null, 1, null, [], false, false, false, [], [], undefined, false, true)}
-                        className="rounded-full border-2 border-[#8B2020] bg-white px-4 py-2 text-base font-extrabold text-gray-900 active:scale-95"
+                        onClick={() => ajouterAuPanier(p, [], [], [], null, 1, null, [], false, false, false, [], [], platEtAvecCaValide ?? undefined, false, true)}
+                        disabled={etAvecCaBloque}
+                        className="rounded-full disabled:opacity-40 border-2 border-[#8B2020] bg-white px-4 py-2 text-base font-extrabold text-gray-900 active:scale-95"
                       >
                         {p.nom} + {euros(p.prix)}
                         {!viseBoisson2L && p.prix >= resteProchainPoint ? " · +1 point" : ""}
@@ -1548,8 +1573,9 @@ export function CommandeNouvelleApp({
                         <button
                           key={s.id}
                           type="button"
-                          onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [s.nom], null, 1, null, [], false, false, false, [], [], undefined, false, true)}
-                          className="rounded-full border-2 border-[#8B2020] bg-white px-4 py-2 text-sm font-bold text-gray-900 active:scale-95"
+                          onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [s.nom], null, 1, null, [], false, false, false, [], [], platEtAvecCaValide ?? undefined, false, true)}
+                          disabled={etAvecCaBloque}
+                          className="rounded-full disabled:opacity-40 border-2 border-[#8B2020] bg-white px-4 py-2 text-sm font-bold text-gray-900 active:scale-95"
                         >
                           {s.nom}
                         </button>
