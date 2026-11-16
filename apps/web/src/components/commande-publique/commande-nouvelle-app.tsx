@@ -188,6 +188,7 @@ export function CommandeNouvelleApp({
   );
 
   const [vue, setVue] = useState<Vue>("menu");
+  const [accueilFideliteOuvert, setAccueilFideliteOuvert] = useState(false);
   const [onglet, setOnglet] = useState<Onglet | null>(null);
   const [autresBoissonsOuvert, setAutresBoissonsOuvert] = useState(false);
   const [panier, setPanier] = useState<LignePanierPublique[]>([]);
@@ -1257,31 +1258,54 @@ export function CommandeNouvelleApp({
 
       {vue === "menu" && (
         <div className="mx-auto max-w-lg px-4 pt-3">
-          <div className="space-y-2 rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0] p-3">
-            <p className="text-sm font-extrabold text-gray-900">
-              🎁 Déjà client chez 3 Sauces ? Renseigne ton numéro de téléphone et ton e-mail pour voir tes points de fidélité.
-            </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <input
-                id="accueil-telephone"
-                value={telephone}
-                onChange={(e) => setTelephone(e.target.value)}
-                inputMode="tel"
-                placeholder="Téléphone (0639123456)"
-                aria-label="Ton numéro de téléphone"
-                className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
-              />
-              <input
-                id="accueil-email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                placeholder="E-mail"
-                aria-label="Ton e-mail"
-                className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
-              />
+          <div className="rounded-lg border-2 border-[#2D5A27] bg-[#FFF8F0]">
+            {/* Une seule ligne tant que le client ne l'ouvre pas : le menu reste visible sans défiler. */}
+            <button
+              type="button"
+              onClick={() => setAccueilFideliteOuvert((v) => !v)}
+              aria-expanded={accueilFideliteOuvert}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
+            >
+              <span className="text-sm font-extrabold text-gray-900">
+                {fideliteVerifiee
+                  ? (() => {
+                      const points = progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles);
+                      if (points === 0) return "🎁 Ton compte fidélité · voir mes points";
+                      return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité${
+                        fideliteVerifiee.tamponsDisponibles > 0 ? ` · ${fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense` : ""
+                      }`;
+                    })()
+                  : "🎁 Déjà client chez 3 Sauces ? Vois tes points de fidélité"}
+              </span>
+              <span aria-hidden="true" className="text-gray-700">
+                {accueilFideliteOuvert ? "▲" : "▼"}
+              </span>
+            </button>
+            {/* Toujours monté (même replié) : la reconnaissance du client et ses points se calculent dès l'arrivée. */}
+            <div className={accueilFideliteOuvert ? "space-y-2 px-3 pb-3" : "hidden"}>
+              <p className="text-sm font-semibold text-gray-900">Renseigne ton numéro de téléphone et ton e-mail pour voir tes points de fidélité.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input
+                  id="accueil-telephone"
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  inputMode="tel"
+                  placeholder="Téléphone (0639123456)"
+                  aria-label="Ton numéro de téléphone"
+                  className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
+                />
+                <input
+                  id="accueil-email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  placeholder="E-mail"
+                  aria-label="Ton e-mail"
+                  className="rounded border border-gray-300 bg-white p-2 text-base text-gray-900"
+                />
+              </div>
+              <CarteFidelite {...proprietesCarteFidelite} integre />
             </div>
-            <CarteFidelite {...proprietesCarteFidelite} integre />
           </div>
         </div>
       )}
