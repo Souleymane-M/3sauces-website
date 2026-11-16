@@ -82,15 +82,22 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
 
   return (
     <div className="mx-auto w-full max-w-sm space-y-4 text-center">
-      <p className="text-4xl">🎉</p>
+      <p className="text-4xl">🎁</p>
       <h1 className="text-xl font-bold text-black">
-        Commande bien reçue{etape === "tampons" || etape === "email" ? (activation?.prenom ? `, ${activation.prenom}` : "") : ""} !
+        {etape === "tampons" || etape === "email"
+          ? `Tes points de fidélité${activation?.prenom ? `, ${activation.prenom}` : ""}`
+          : "Tes points de fidélité"}
       </h1>
+      {etape === "telephone" && (
+        <p className="text-sm text-gray-800">
+          Chez 3 Sauces, chaque 10 € dépensés = 1 point de fidélité, et 10 points = 10 € offerts. Retrouve ici tes points et tes récompenses.
+        </p>
+      )}
 
       {etape === "telephone" && (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-[#FFF8F0] p-4 text-left">
           <p className="text-sm font-semibold text-gray-900">
-            Pour confirmer que c&apos;est bien toi, entre le numéro de téléphone renseigné à la commande.
+            Pour voir tes points, confirme que c&apos;est bien toi : entre le numéro de téléphone de ta commande.
           </p>
           <input
             value={telephone}
