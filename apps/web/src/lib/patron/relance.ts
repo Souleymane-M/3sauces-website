@@ -162,11 +162,19 @@ export function phrasePointsLundi(c: Pick<ClientRelance, "recompenses" | "procha
   return `tu as ${pts(c.tampons)} de fidélité, il t'en manque ${manque} pour ${MONTANT_RECOMPENSE} € offerts`;
 }
 
+/** Dernière phrase du mail du lundi : elle pousse à commander, avec un angle qui dépend de la situation du client. */
+export function phraseInvitationLundi(c: Pick<ClientRelance, "recompenses" | "tampons">): string {
+  if (c.recompenses > 0) return "Utilise-la sur ta prochaine commande : saisis ton numéro et ton e-mail au moment de commander sur 3sauces.fr.";
+  if (c.tampons >= 1) return "Chaque 10 € dépensés te rapproche de ta récompense : commande dès aujourd'hui sur 3sauces.fr.";
+  return "Une seule commande suffit pour y arriver : commande dès aujourd'hui sur 3sauces.fr.";
+}
+
 export function personnaliserMessage(modele: string, c: ClientRelance): string {
   return modele
     .replaceAll("{prenom}", c.prenom?.trim() || "")
     .replaceAll("{fidelite}", phraseFidelite(c))
     .replaceAll("{pointsfidelite}", phrasePointsLundi(c))
+    .replaceAll("{invitation}", phraseInvitationLundi(c))
     .replace(/^ +,/gm, ",")
     .replace(/Bonjour ,/g, "Bonjour,");
 }

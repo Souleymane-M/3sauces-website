@@ -20,7 +20,7 @@ const MODELES: Record<Mode, { sujet: string; message: string }> = {
   points: {
     sujet: "Bon début de semaine chez 3 Sauces",
     message:
-      "Bonjour {prenom},\n\nOn espère que ton week-end s'est bien passé. Pour bien démarrer la semaine, une bonne nouvelle : {pointsfidelite}.\n\nSur 3sauces.fr, saisis ton numéro et ton e-mail au moment de commander : tu retrouves tes points et tu choisis quand les utiliser.\n\nBonne semaine !",
+      "Bonjour {prenom},\n\nOn espère que ton week-end s'est bien passé. Pour bien démarrer la semaine, une bonne nouvelle : {pointsfidelite}.\n\n{invitation}\n\nBonne semaine !",
   },
   relance: {
     sujet: "Ça fait un moment chez 3 Sauces !",
@@ -255,7 +255,7 @@ export function RelanceApp() {
           )}
         </div>
         <p className="text-xs text-gray-700">
-          {"{prenom}"} = prénom du client · {"{fidelite}"} = sa situation en une phrase · {"{pointsfidelite}"} = « tu as 4 points de fidélité, il t&apos;en manque 6 pour 10 € offerts ». Un lien « Me
+          {"{prenom}"} = prénom du client · {"{fidelite}"} = sa situation en une phrase · {"{pointsfidelite}"} = « tu as 4 points de fidélité, il t&apos;en manque 6 pour 10 € offerts » · {"{invitation}"} = dernière phrase qui pousse à commander. Un lien « Me
           désinscrire » est ajouté automatiquement à chaque email.
         </p>
         <div className="flex flex-wrap items-center gap-2">
