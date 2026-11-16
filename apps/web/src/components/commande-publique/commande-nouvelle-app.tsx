@@ -1198,8 +1198,8 @@ export function CommandeNouvelleApp({
     );
   }
 
-  // « Et avec ça ? » : frites, ailes de poulet et salade (la canette a son propre bloc), ils restent affichés (avec la quantité) pour pouvoir en ajouter d'autres.
-  const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Salade"];
+  // « Et avec ça ? » : frites, ailes de poulet, brochettes de bœuf, croupion et salade (la canette est dans le même bloc), ils restent affichés (avec la quantité) pour pouvoir en ajouter d'autres.
+  const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Brochettes bœuf", "Croupion", "Salade"];
   const accompagnementsSuggeres = SUGGESTIONS_ET_AVEC_CA.map((debut) =>
     produits.find((p) => p.nom.startsWith(debut) && p.nbSaveursMax === 0 && p.nbViandesMax === 0)
   ).filter((p): p is ProduitPublic => !!p);
