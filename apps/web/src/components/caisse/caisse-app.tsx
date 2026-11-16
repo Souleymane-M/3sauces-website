@@ -48,7 +48,6 @@ import {
   SEUIL_GROUPE_4_MONTANT,
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
-  messageProgressionBoissonOfferte,
   nombreBoissonsOffertes,
 } from "@/lib/commande-publique/groupe-priorite";
 
@@ -431,6 +430,8 @@ export function CaisseApp({
   // séparée de `erreur` (formulaire, tout en bas) pour s'afficher juste
   // au-dessus du bouton "Plat suivant".
   const [erreurPlat, setErreurPlat] = useState<string | null>(null);
+  // Commande groupée : plat choisi pour les ajouts du bloc « Et avec ça ? » (jamais déduit).
+  const [platEtAvecCaId, setPlatEtAvecCaId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal; encaisse: boolean } | null>(
     null
   );
@@ -855,7 +856,14 @@ export function CaisseApp({
   );
 
   const enModeGroupe = modeCommande === "groupee";
+  // « Et avec ça ? » : mêmes suggestions que sur le site.
+  const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Brochettes bœuf", "Croupion", "Salade"];
+  const accompagnementsSuggeres = SUGGESTIONS_ET_AVEC_CA.map((debut) =>
+    produits.find((p) => p.nom.startsWith(debut) && p.nbSaveursMax === 0 && p.nbViandesMax === 0 && p.prix !== null)
+  ).filter((p): p is ProduitCaisse => !!p);
   const platActif = plats.find((p) => p.id === platActifId) ?? plats[plats.length - 1];
+  const platEtAvecCaCible = enModeGroupe ? (plats.find((p) => p.id === platEtAvecCaId) ?? null) : null;
+  const etAvecCaBloque = enModeGroupe && platEtAvecCaCible === null;
   // Prix effectif d'une ligne : prix catalogue (ou saisi pour un plat du jour
   // à prix libre), plus la boisson formule si demandée — uniquement pour les
   // produits à canette INCLUSE MAIS OPTIONNELLE (Tacos/Barquette/Bowl). Le
@@ -912,6 +920,14 @@ export function CaisseApp({
   // redescend sans attendre un second rendu.
   const maxTamponsUtilisables = Math.min(clientInfo?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTamponsAUtiliser, maxTamponsUtilisables);
+  // Objectif le plus proche à pousser au client : prochain point de fidélité ou prochaine boisson 2 L offerte.
+  const reliquatFidelite = clientInfo?.existe ? (clientInfo.montantCumule ?? 0) : 0;
+  const montantAPayerFidelite = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
+  const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayerFidelite) % MONTANT_RECOMPENSE);
+  const resteProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
+  const viseBoisson2L = resteProchaineBoisson < resteProchainPoint;
+  const pointsGagnesCommande =
+    Math.floor((reliquatFidelite + montantAPayerFidelite) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
   // Nom jamais requis en caisse. Prénom requis seulement en livraison (le
   // livreur a besoin d'un nom à annoncer) — sur place/à emporter, seul le
   // téléphone est obligatoire : le numéro de commande suffit à appeler le
@@ -993,7 +1009,8 @@ export function CaisseApp({
     accompagnementsInclus: string[] = [],
     sansBoisson: boolean = false,
     sansSauce: boolean = false,
-    saladeOption: boolean = false
+    saladeOption: boolean = false,
+    platCibleId?: string
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -1037,7 +1054,7 @@ export function CaisseApp({
     if (enModeGroupe) {
       setErreurPlat(null);
       setPlats((precedent) => {
-        const index = precedent.findIndex((p) => p.id === platActifId);
+        const index = precedent.findIndex((p) => p.id === (platCibleId ?? platActifId));
         const cible = index === -1 ? precedent.length - 1 : index;
         const copie = [...precedent];
         const actif = copie[cible];
@@ -1054,7 +1071,7 @@ export function CaisseApp({
         copie[cible] = { ...actif, lignes };
         return copie;
       });
-      setPlatDeplie(platActif.id);
+      setPlatDeplie(platCibleId ?? platActif.id);
       return;
     }
 
@@ -1796,7 +1813,7 @@ export function CaisseApp({
   }
 
   return (
-    <div className={`space-y-4 ${modeCommande !== null ? "pb-20" : ""}`}>
+    <div className={`space-y-4 ${modeCommande !== null ? (enModeGroupe ? "pb-44" : "pb-20") : ""}`}>
       {!enModeEdition && commandesEnAttente.length > 0 && (
         <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-700">
@@ -1951,14 +1968,6 @@ export function CaisseApp({
                   >
                     ← Plat précédent
                   </button>
-                  <button
-                    type="button"
-                    onClick={platSuivant}
-                    disabled={platActif.lignes.length === 0}
-                    className="flex-1 rounded bg-[#2D5A27] py-2 text-sm font-semibold text-white disabled:opacity-40"
-                  >
-                    Plat suivant →
-                  </button>
                 </div>
               </div>
             )}
@@ -2052,9 +2061,95 @@ export function CaisseApp({
                     🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
                     {nbBoissonsOffertes > 1 ? "s" : ""} activée{nbBoissonsOffertes > 1 ? "s" : ""} !
                   </p>
-                ) : (
-                  <p className="mt-2 text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>
-                ))}
+                ) : null)}
+              {nbArticles > 0 && (
+                <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-white p-2">
+                  <p className="text-sm font-extrabold text-gray-900">
+                    {viseBoisson2L
+                      ? `Plus que ${resteProchaineBoisson.toFixed(2).replace(".", ",")} € : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte`
+                      : `Ajoute encore ${resteProchainPoint.toFixed(2).replace(".", ",")} € : +1 point de fidélité`}
+                  </p>
+                  {pointsGagnesCommande > 0 && (
+                    <p className="mt-0.5 text-sm font-bold text-[#2D5A27]">
+                      🎁 +{pointsGagnesCommande} point{pointsGagnesCommande > 1 ? "s" : ""} de fidélité avec cette commande
+                    </p>
+                  )}
+                </div>
+              )}
+              {nbArticles > 0 && (accompagnementsSuggeres.length > 0 || (produitCanetteRapide && saveurs.length > 0)) && (
+                <div className="mt-3 rounded-xl border-4 border-[#8B2020] bg-[#FFF1E0] p-3">
+                  <p className="text-xl font-extrabold leading-tight" style={{ color: ROUGE }}>
+                    Et avec ça ?
+                  </p>
+                  <p className="text-xs font-semibold text-gray-800">À proposer au client — ajout en un clic</p>
+                  {enModeGroupe && (
+                    <div className="mt-2 rounded-lg border-2 border-[#1E3A8A] bg-white p-2">
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-[#1E3A8A]">① Pour quel plat ?</p>
+                      <div className="mt-1 grid grid-cols-2 gap-2">
+                        {plats.map((plat, i) => (
+                          <button
+                            key={plat.id}
+                            type="button"
+                            onClick={() => setPlatEtAvecCaId(plat.id)}
+                            className={`rounded-lg border-2 px-2 py-2 text-sm font-extrabold ${
+                              platEtAvecCaCible?.id === plat.id
+                                ? "border-[#1E3A8A] bg-[#1E3A8A] text-white"
+                                : "border-dashed border-[#1E3A8A] bg-[#EEF2FF] text-[#1E3A8A]"
+                            }`}
+                          >
+                            <span className="block">
+                              {platEtAvecCaCible?.id === plat.id ? "✓ " : ""}
+                              {plat.pourQui.trim() || `Plat ${i + 1}`}
+                            </span>
+                            <span className="block text-base">{totalPlat(plat).toFixed(2).replace(".", ",")} €</span>
+                          </button>
+                        ))}
+                      </div>
+                      {etAvecCaBloque && <p className="mt-1 text-xs font-bold text-amber-900">Choisis d&apos;abord le plat concerné.</p>}
+                    </div>
+                  )}
+                  {enModeGroupe && (
+                    <p className="mt-2 text-xs font-extrabold uppercase tracking-wide" style={{ color: ROUGE }}>
+                      ② Que veux-tu ajouter{platEtAvecCaCible ? ` à ${platEtAvecCaCible.pourQui.trim() || `Plat ${plats.indexOf(platEtAvecCaCible) + 1}`}` : ""} ?
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {accompagnementsSuggeres.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={etAvecCaBloque}
+                        onClick={() => ajouterAuPanier(p, [], [], [], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id)}
+                        className="rounded-full border-2 border-[#8B2020] bg-white px-3 py-2 text-sm font-extrabold text-gray-900 active:scale-95 disabled:opacity-40"
+                      >
+                        {p.nom} + {(p.prix ?? 0).toFixed(2).replace(".", ",")} €
+                        {!viseBoisson2L && (p.prix ?? 0) >= resteProchainPoint ? " · +1 point" : ""}
+                      </button>
+                    ))}
+                  </div>
+                  {produitCanetteRapide && saveurs.length > 0 && (
+                    <>
+                      <p className="mt-2 text-xs font-extrabold text-gray-900">
+                        Une canette ? + {(produitCanetteRapide.prix ?? 0).toFixed(2).replace(".", ",")} €
+                        {!viseBoisson2L && (produitCanetteRapide.prix ?? 0) >= resteProchainPoint ? " · +1 point" : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {saveurs.map((sv) => (
+                          <button
+                            key={sv.id}
+                            type="button"
+                            disabled={etAvecCaBloque}
+                            onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [sv.nom], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id)}
+                            className="rounded-full border-2 border-[#8B2020] bg-white px-3 py-2 text-sm font-bold text-gray-900 active:scale-95 disabled:opacity-40"
+                          >
+                            {sv.nom}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               {palierGroupeReel === "GROUPE_4" && (
                 <div
                   id="boisson-offerte"
@@ -2576,41 +2671,68 @@ export function CaisseApp({
 
       {modeCommande !== null && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-            {panierActuel.length === 0 ? (
-              <span className="text-sm text-gray-600">Panier vide</span>
-            ) : (
-              <>
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">
-                    {enModeGroupe
-                      ? `${nbPlatsValides} plat${nbPlatsValides > 1 ? "s" : ""}`
-                      : `${panierActuel.reduce((acc, l) => acc + l.quantite, 0)} article${
-                          panierActuel.reduce((acc, l) => acc + l.quantite, 0) > 1 ? "s" : ""
-                        }`}
-                  </div>
-                  <div className="text-xs text-gray-700">{total.toFixed(2)} €</div>
+          <div className="mx-auto max-w-5xl space-y-2">
+            {enModeGroupe &&
+              (totalPlat(platActif) < SEUIL_MINIMUM_PLAT ? (
+                <div className="rounded-xl border-2 border-gray-500 bg-white px-4 py-2 text-center">
+                  <p className="text-sm font-extrabold text-gray-900">
+                    {platActif.lignes.length === 0
+                      ? `Choisis les produits du plat ${plats.findIndex((p) => p.id === platActifId) + 1}`
+                      : `Ajoute encore ${(SEUIL_MINIMUM_PLAT - totalPlat(platActif)).toFixed(2).replace(".", ",")} € pour passer au plat suivant`}
+                  </p>
                 </div>
-                {boissonsOffertesAChoisir > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                    className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white"
-                  >
-                    🎁 Choisir la boisson offerte
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                    style={{ backgroundColor: ROUGE }}
-                  >
-                    Voir le panier
-                  </button>
-                )}
-              </>
-            )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={platSuivant}
+                  className="flex w-full items-center justify-between rounded-xl border-4 border-white px-5 py-3 text-left text-white shadow-2xl ring-4 ring-[#1E3A8A]/40 active:scale-[0.99]"
+                  style={{ backgroundColor: "#1E3A8A" }}
+                >
+                  <span>
+                    <span className="block text-xs font-bold uppercase tracking-wide">
+                      Plat {plats.findIndex((p) => p.id === platActifId) + 1} complet ✓
+                    </span>
+                    <span className="block text-xl font-extrabold">Passer au plat {plats.findIndex((p) => p.id === platActifId) + 2}</span>
+                  </span>
+                  <span className="text-4xl font-extrabold leading-none" aria-hidden="true">
+                    →
+                  </span>
+                </button>
+              ))}
+            <div className="flex items-center justify-between gap-3">
+              {panierActuel.length === 0 ? (
+                <span className="text-sm text-gray-600">Panier vide</span>
+              ) : (
+                <>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {enModeGroupe
+                        ? `Plat ${plats.findIndex((p) => p.id === platActifId) + 1}`
+                        : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
+                    </div>
+                    <div className="text-xs text-gray-700">{(enModeGroupe ? totalPlat(platActif) : total).toFixed(2)} €</div>
+                  </div>
+                  {boissonsOffertesAChoisir > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                      className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white"
+                    >
+                      🎁 Choisir la boisson offerte
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
+                      style={{ backgroundColor: ROUGE }}
+                    >
+                      {enModeGroupe && nbPlatsValides >= SEUIL_MINIMUM_GROUPE ? "C'est tout → voir le panier" : "Voir le panier"}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
