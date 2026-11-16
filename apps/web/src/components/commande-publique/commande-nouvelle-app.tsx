@@ -1524,24 +1524,32 @@ export function CommandeNouvelleApp({
                 {!viseBoisson2L ? ` · il te manque ${euros(resteProchainPoint)} pour ton prochain point de fidélité` : ""}
               </p>
               {enGroupe && (
-                <div className="mt-3">
-                  <p className="text-sm font-extrabold text-gray-900">Pour quel plat ?</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
+                <div className="mt-3 rounded-lg border-2 border-[#1E3A8A] bg-white p-3">
+                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1E3A8A]">① Pour quel plat ?</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
                     {nomsPlats.map((nom, i) => (
                       <button
                         key={i}
                         type="button"
                         onClick={() => setPlatEtAvecCa(i)}
-                        className={`rounded-full border-2 px-4 py-2 text-sm font-extrabold ${
-                          platEtAvecCaValide === i ? "border-[#1E3A8A] bg-[#1E3A8A] text-white" : "border-gray-500 bg-white text-gray-900"
+                        className={`rounded-lg border-2 px-3 py-3 text-base font-extrabold ${
+                          platEtAvecCaValide === i
+                            ? "border-[#1E3A8A] bg-[#1E3A8A] text-white"
+                            : "border-dashed border-[#1E3A8A] bg-[#EEF2FF] text-[#1E3A8A]"
                         }`}
                       >
+                        {platEtAvecCaValide === i ? "✓ " : ""}
                         {nom.trim() ? nom : `Plat ${i + 1}`}
                       </button>
                     ))}
                   </div>
-                  {etAvecCaBloque && <p className="mt-1 text-sm font-bold text-amber-900">Choisis d&apos;abord le plat concerné.</p>}
+                  {etAvecCaBloque && <p className="mt-2 text-sm font-bold text-amber-900">Choisis d&apos;abord le plat concerné.</p>}
                 </div>
+              )}
+              {enGroupe && (
+                <p className="mt-4 text-sm font-extrabold uppercase tracking-wide" style={{ color: ROUGE }}>
+                  ② Que veux-tu ajouter{platEtAvecCaValide !== null ? ` à ${nomsPlats[platEtAvecCaValide]?.trim() || `Plat ${platEtAvecCaValide + 1}`}` : ""} ?
+                </p>
               )}
               {accompagnementsSuggeres.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
