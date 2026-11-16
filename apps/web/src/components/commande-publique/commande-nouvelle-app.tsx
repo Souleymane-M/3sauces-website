@@ -1538,8 +1538,11 @@ export function CommandeNouvelleApp({
                             : "border-dashed border-[#1E3A8A] bg-[#EEF2FF] text-[#1E3A8A]"
                         }`}
                       >
-                        {platEtAvecCaValide === i ? "✓ " : ""}
-                        {nom.trim() ? nom : `Plat ${i + 1}`}
+                        <span className="block">
+                          {platEtAvecCaValide === i ? "✓ " : ""}
+                          {nom.trim() ? nom : `Plat ${i + 1}`}
+                        </span>
+                        <span className="block text-lg">{euros(totalDuPlat(i))}</span>
                       </button>
                     ))}
                   </div>
@@ -1549,6 +1552,11 @@ export function CommandeNouvelleApp({
               {enGroupe && (
                 <p className="mt-4 text-sm font-extrabold uppercase tracking-wide" style={{ color: ROUGE }}>
                   ② Que veux-tu ajouter{platEtAvecCaValide !== null ? ` à ${nomsPlats[platEtAvecCaValide]?.trim() || `Plat ${platEtAvecCaValide + 1}`}` : ""} ?
+                </p>
+              )}
+              {enGroupe && platEtAvecCaValide !== null && (
+                <p className="sticky top-2 z-30 mt-2 rounded-lg bg-[#1E3A8A] px-3 py-2 text-center text-base font-extrabold text-white shadow-lg">
+                  {nomsPlats[platEtAvecCaValide]?.trim() || `Plat ${platEtAvecCaValide + 1}`} : {euros(totalDuPlat(platEtAvecCaValide))} en ce moment
                 </p>
               )}
               {accompagnementsSuggeres.length > 0 && (
