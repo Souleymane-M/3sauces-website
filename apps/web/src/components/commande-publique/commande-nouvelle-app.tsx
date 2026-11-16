@@ -112,9 +112,6 @@ function lireSourceCampagne(): string | undefined {
   }
 }
 
-/** Au-dessus de ce panier, le message pousse vers la boisson 2 L offerte (40 €) plutôt que vers le prochain point. */
-const SEUIL_VISE_BOISSON_2L = 30;
-
 const euros = (montant: number) => `${montant.toFixed(2).replace(".", ",")} €`;
 
 function Titre({ children, couleur = ROUGE, sousTitre }: { children: string; couleur?: string; sousTitre?: string }) {
@@ -434,8 +431,8 @@ export function CommandeNouvelleApp({
     Math.floor((reliquatFidelite + montant) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
   const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE);
   const pointsProchainPoint = pointsGagnesPour(montantAPayer) + 1;
-  // Tant que le panier est loin des 40 €, on pousse vers le prochain point ; à partir de 30 €, vers la boisson 2 L offerte.
-  const viseBoisson2L = total >= SEUIL_VISE_BOISSON_2L;
+  // On pousse toujours vers l'objectif le plus proche : prochain point de fidélité ou prochaine boisson 2 L offerte.
+  const viseBoisson2L = resteAvantProchaineBoisson < resteProchainPoint;
   const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
   const pourcentageProchaineBoisson = viseBoisson2L
     ? Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
@@ -1525,19 +1522,15 @@ export function CommandeNouvelleApp({
               {accompagnementsSuggeres.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {accompagnementsSuggeres.map((p) => {
-                    const q = panier.filter((l) => l.produit.id === p.id).reduce((s, l) => s + l.quantite, 0);
                     return (
                       <button
                         key={p.id}
                         type="button"
                         onClick={() => ajouterAuPanier(p, [], [], [], null, 1, null, [], false, false, false, [], [], undefined, false, true)}
-                        className={`rounded-full border-2 px-4 py-2 text-base font-extrabold active:scale-95 ${
-                          q > 0 ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-[#8B2020] bg-white text-gray-900"
-                        }`}
+                        className="rounded-full border-2 border-[#8B2020] bg-white px-4 py-2 text-base font-extrabold text-gray-900 active:scale-95"
                       >
                         {p.nom} + {euros(p.prix)}
                         {!viseBoisson2L && p.prix >= resteProchainPoint ? " · +1 point" : ""}
-                        {q > 0 ? ` · ×${q}` : ""}
                       </button>
                     );
                   })}
@@ -1551,20 +1544,14 @@ export function CommandeNouvelleApp({
                   </p>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {saveurs.map((s) => {
-                      const q = panier
-                        .filter((l) => l.produit.id === produitCanetteRapide.id && (l.saveurs[0] ?? null) === s.nom)
-                        .reduce((somme, l) => somme + l.quantite, 0);
                       return (
                         <button
                           key={s.id}
                           type="button"
                           onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [s.nom], null, 1, null, [], false, false, false, [], [], undefined, false, true)}
-                          className={`rounded-full border-2 px-4 py-2 text-sm font-bold active:scale-95 ${
-                            q > 0 ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-[#8B2020] bg-white text-gray-900"
-                          }`}
+                          className="rounded-full border-2 border-[#8B2020] bg-white px-4 py-2 text-sm font-bold text-gray-900 active:scale-95"
                         >
                           {s.nom}
-                          {q > 0 ? ` ×${q}` : ""}
                         </button>
                       );
                     })}
@@ -1976,8 +1963,8 @@ export function CommandeNouvelleApp({
                 <button
                   type="button"
                   onClick={platSuivant}
-                  className="flex w-full items-center justify-between rounded-xl border-4 border-white px-5 py-3 text-left text-white shadow-2xl ring-4 ring-[#2D5A27]/40 active:scale-[0.99]"
-                  style={{ backgroundColor: VERT }}
+                  className="flex w-full items-center justify-between rounded-xl border-4 border-white px-5 py-3 text-left text-white shadow-2xl ring-4 ring-[#1E3A8A]/40 active:scale-[0.99]"
+                  style={{ backgroundColor: "#1E3A8A" }}
                 >
                   <span>
                     <span className="block text-xs font-bold uppercase tracking-wide">Plat {platActif + 1} complet ✓</span>
@@ -1998,10 +1985,10 @@ export function CommandeNouvelleApp({
                 style={{ backgroundColor: enGroupe ? ROUGE : VERT }}
               >
                 <span className="text-base font-extrabold">
-                  {enGroupe ? `${nbPlatsRemplis} plat${nbPlatsRemplis > 1 ? "s" : ""}` : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
+                  {enGroupe ? `Plat ${platActif + 1}` : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
                 </span>
-                <span className="text-base font-extrabold">{enGroupe ? "C'est tout → voir le panier" : "Voir le panier"}</span>
-                <span className="whitespace-nowrap text-base font-extrabold">{euros(total)}</span>
+                <span className="text-base font-extrabold">{enGroupe && nbPlatsRemplis >= 2 ? "C'est tout → voir le panier" : "Voir le panier"}</span>
+                <span className="whitespace-nowrap text-base font-extrabold">{euros(enGroupe ? totalPlatActif : total)}</span>
               </button>
             )}
           </div>
