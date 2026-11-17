@@ -22,6 +22,8 @@ import {
   prochainCreneauValide,
   creneauxPourDate,
   prochainesDatesOuvertes,
+  jourSemaineIso,
+  genererCreneaux,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
 import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
@@ -444,10 +446,12 @@ export function CaisseApp({
   // exiger de prépaiement en ligne contrairement au site public : c'est
   // l'équipe elle-même qui encaisse, en personne ou plus tard (2026-10-07).
   const aujourdHui = useMemo(() => dateMayotteIso(), []);
-  const datesOuvertes = useMemo(
-    () => prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin),
-    [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin]
-  );
+  // Aujourd'hui reste toujours proposé (sauf jour de fermeture), même passée l'heure de fermeture : un client qui appelle à 14h55 doit pouvoir être saisi à 15h01.
+  const datesOuvertes = useMemo(() => {
+    const dates = prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin);
+    const ouvertAujourdhui = !parametres.joursFermeture.includes(jourSemaineIso(aujourdHui));
+    return ouvertAujourdhui && !dates.includes(aujourdHui) ? [aujourdHui, ...dates] : dates;
+  }, [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin, aujourdHui]);
   // En modification, on garde la date ET l'heure déjà enregistrées, même
   // si elles sont dépassées (retour du patron, 2026-10-28 : modifier une
   // commande dont le créneau est passé était refusé).
@@ -466,7 +470,9 @@ export function CaisseApp({
   // réellement obligatoires (moins stricts qu'au site public).
   const creneauxValides = useMemo(() => {
     const toutes = creneauxPourDate(dateCommande, parametres.heureDebut, parametres.heureFin);
-    const base = toutes;
+    // Après la fermeture, il ne reste aucun créneau à venir : on garde le dernier créneau de la journée.
+    const dernier = genererCreneaux(parametres.heureDebut, parametres.heureFin).at(-1);
+    const base = toutes.length === 0 && dernier ? [dernier] : toutes;
     // Le créneau d'origine reste toujours proposé (jamais de "créneau passé" imposé en modification).
     return creneauOrigine && dateCommande === dateOrigine && !base.includes(creneauOrigine)
       ? [creneauOrigine, ...base]
@@ -510,7 +516,8 @@ export function CaisseApp({
   function changerDate(nouvelleDate: string) {
     setDateCommande(nouvelleDate);
     const toutesCreneaux = creneauxPourDate(nouvelleDate, parametres.heureDebut, parametres.heureFin);
-    const creneaux = [...toutesCreneaux];
+    const dernierCreneau = genererCreneaux(parametres.heureDebut, parametres.heureFin).at(-1);
+    const creneaux = toutesCreneaux.length === 0 && dernierCreneau ? [dernierCreneau] : [...toutesCreneaux];
     if (nouvelleDate === dateOrigine && creneauOrigine) creneaux.unshift(creneauOrigine);
     setCreneauHeure(creneaux.includes(creneauHeure) ? creneauHeure : (creneaux[0] ?? ""));
   }
@@ -1941,7 +1948,7 @@ export function CaisseApp({
               if (tacos || menus)
                 onglets.push({
                   cle: "tacos",
-                  titre: "Tacos",
+                  titre: "Tacos & Menu étudiant",
                   contenu: (
                     <div className="space-y-6">
                       {tacos && afficherSection(tacos)}
