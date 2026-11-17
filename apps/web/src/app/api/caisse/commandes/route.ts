@@ -390,6 +390,7 @@ async function validerLignesCommande(
       sauces,
       sansSauce,
       saladeOption,
+      quantiteSuggeree: Math.min(quantite, Math.max(0, Math.floor(Number(ligneBrute.quantiteSuggeree) || 0))) || undefined,
       saveurs,
       boissonIncluse,
       sansBoisson,

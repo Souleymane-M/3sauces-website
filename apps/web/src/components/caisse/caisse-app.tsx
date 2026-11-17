@@ -67,6 +67,8 @@ interface LignePanier {
   prixSaisi?: number;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
+  /** Unités ajoutées depuis « Et avec ça ? » (suivi des ventes complémentaires). */
+  quantiteSuggeree?: number;
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
@@ -243,6 +245,7 @@ export function CaisseApp({
       prixSaisi: produit.prix === null ? l.prixUnitaire : undefined,
       saladeIncluse: l.saladeIncluse ?? null,
       accompagnementsInclus: l.accompagnementsInclus ?? [],
+      quantiteSuggeree: l.quantiteSuggeree,
     };
   }
 
@@ -1019,7 +1022,8 @@ export function CaisseApp({
     sansBoisson: boolean = false,
     sansSauce: boolean = false,
     saladeOption: boolean = false,
-    platCibleId?: string
+    platCibleId?: string,
+    viaSuggestion: boolean = false
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -1047,6 +1051,7 @@ export function CaisseApp({
       prixSaisi,
       saladeIncluse,
       accompagnementsInclus,
+      quantiteSuggeree: viaSuggestion ? quantite : undefined,
     });
 
     // Avertit plutôt que d'ajuster silencieusement — un ajout refusé ou
@@ -1071,7 +1076,13 @@ export function CaisseApp({
         let lignes: LignePanier[];
         if (existante) {
           lignes = actif.lignes.map((l) =>
-            l === existante ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite) } : l
+            l === existante
+              ? {
+                  ...l,
+                  quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite),
+                  quantiteSuggeree: viaSuggestion ? (l.quantiteSuggeree ?? 0) + quantite : l.quantiteSuggeree,
+                }
+              : l
           );
         } else {
           const quantiteAjoutee = plafonnerQuantite(produit, null, quantite);
@@ -1088,7 +1099,13 @@ export function CaisseApp({
       const existante = precedent.find(cle);
       if (existante) {
         return precedent.map((l) =>
-          l === existante ? { ...l, quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite) } : l
+          l === existante
+            ? {
+                ...l,
+                quantite: plafonnerQuantite(l.produit, l.id, l.quantite + quantite),
+                quantiteSuggeree: viaSuggestion ? (l.quantiteSuggeree ?? 0) + quantite : l.quantiteSuggeree,
+              }
+            : l
         );
       }
       const quantiteAjoutee = plafonnerQuantite(produit, null, quantite);
@@ -1482,6 +1499,7 @@ export function CaisseApp({
             prixSaisi: l.prixSaisi,
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
+            quantiteSuggeree: l.quantiteSuggeree,
             platIndex: index,
             pourQui: plat.pourQui.trim() || null,
           }))
@@ -1499,6 +1517,7 @@ export function CaisseApp({
           prixSaisi: l.prixSaisi,
           saladeIncluse: l.saladeIncluse,
           accompagnementsInclus: l.accompagnementsInclus,
+          quantiteSuggeree: l.quantiteSuggeree,
           platIndex: null,
           pourQui: null,
         }));
@@ -2178,7 +2197,7 @@ export function CaisseApp({
                         key={p.id}
                         type="button"
                         disabled={etAvecCaBloque}
-                        onClick={() => ajouterAuPanier(p, [], [], [], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id)}
+                        onClick={() => ajouterAuPanier(p, [], [], [], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id, true)}
                         className="rounded-full border-2 border-[#8B2020] bg-white px-3 py-2 text-sm font-extrabold text-gray-900 active:scale-95 disabled:opacity-40"
                       >
                         {p.nom} + {(p.prix ?? 0).toFixed(2).replace(".", ",")} €
@@ -2198,7 +2217,7 @@ export function CaisseApp({
                             key={sv.id}
                             type="button"
                             disabled={etAvecCaBloque}
-                            onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [sv.nom], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id)}
+                            onClick={() => ajouterAuPanier(produitCanetteRapide, [], [], [sv.nom], null, 1, undefined, null, [], false, false, false, platEtAvecCaCible?.id, true)}
                             className="rounded-full border-2 border-[#8B2020] bg-white px-3 py-2 text-sm font-bold text-gray-900 active:scale-95 disabled:opacity-40"
                           >
                             {sv.nom}
