@@ -2515,6 +2515,28 @@ export function CaisseApp({
               </div>
             )}
 
+            {/* « Dès que possible » : aujourd'hui, prochain créneau libre (ou le dernier de la journée après la fermeture). */}
+            {!enModeEdition && (
+              <button
+                type="button"
+                onClick={() => {
+                  const aujourdhuiCreneaux = creneauxPourDate(aujourdHui, parametres.heureDebut, parametres.heureFin);
+                  const dernier = genererCreneaux(parametres.heureDebut, parametres.heureFin).at(-1);
+                  const liste = aujourdhuiCreneaux.length > 0 ? aujourdhuiCreneaux : dernier ? [dernier] : [];
+                  setDateCommande(aujourdHui);
+                  setCreneauHeure(prochainCreneauValide(liste));
+                }}
+                className={`w-full rounded-xl border-2 px-4 py-3 text-left text-base font-extrabold ${
+                  dateCommande === aujourdHui && creneauHeure === prochainCreneauValide(creneauxValides)
+                    ? "border-[#8B2020] bg-[#8B2020] text-white"
+                    : "border-gray-400 bg-white text-gray-900"
+                }`}
+              >
+                Dès que possible
+                <span className="block text-sm font-semibold">Aujourd&apos;hui, prochain créneau ({prochainCreneauValide(creneauxValides) || "—"})</span>
+              </button>
+            )}
+
             <DatePicker
               dates={datesAffichees}
               aujourdHui={aujourdHui}
