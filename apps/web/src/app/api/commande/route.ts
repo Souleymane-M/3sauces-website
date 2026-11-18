@@ -935,7 +935,7 @@ export async function POST(request: Request) {
       lignes.push(
         {
           produitId: ailes.id,
-          nom: `${ailes.nom} (offerte — box du jour)`,
+          nom: `BOX OFFERTE — ${ailes.nom}`,
           categorie: ailes.categorie,
           quantite: 1,
           prixUnitaire: 0,
@@ -947,7 +947,7 @@ export async function POST(request: Request) {
         },
         {
           produitId: frites.id,
-          nom: `${frites.nom} (offertes — box du jour)`,
+          nom: `BOX OFFERTE — ${frites.nom}`,
           categorie: frites.categorie,
           quantite: 1,
           prixUnitaire: 0,
