@@ -1218,6 +1218,44 @@ export function CommandeNouvelleApp({
     );
   }
 
+  // Choix des sauces de la box offerte : affiché dès le panier (juste sous le message « Bravo ») et rappelé à la validation.
+  const blocChoixSauces = cadeauAcquis ? (
+      <section
+        id="cadeau-offert"
+        className={`rounded-xl border-2 p-4 ${saucesCadeauAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
+      >
+        <p className="text-base font-extrabold text-gray-900">
+          🎁 {nbBox > 1 ? `Tes ${nbBox} box OFFERTES` : "Ta box OFFERTE"} : 3 ailes grillées + frites
+        </p>
+        <p className="mt-0.5 text-sm font-semibold text-gray-800">Choisis {NB_SAUCES_CADEAU} sauces pour {nbBox > 1 ? "chaque box" : "ta box"}</p>
+        {Array.from({ length: nbSaucesCadeau }, (_, index) => (
+          <div key={index} className="mt-2">
+            <p className="text-sm font-semibold text-gray-900">
+              {nbBox > 1 ? `Box n°${Math.floor(index / NB_SAUCES_CADEAU) + 1} · ` : ""}Sauce n°{(index % NB_SAUCES_CADEAU) + 1}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {sauces.map((sa) => (
+                <button
+                  key={sa.id}
+                  type="button"
+                  onClick={() =>
+                    setCadeauSauces((prev) =>
+                      Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sa.nom : prev[i]))
+                    )
+                  }
+                  className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
+                    cadeauSauces[index] === sa.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                  }`}
+                >
+                  {sa.nom}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
+  ) : null;
+
   // « Et avec ça ? » : frites, ailes de poulet, brochettes de bœuf, croupion et salade (la canette est dans le même bloc), ils restent affichés (avec la quantité) pour pouvoir en ajouter d'autres.
   const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Brochettes bœuf", "Croupion", "Salade"];
   const accompagnementsSuggeres = SUGGESTIONS_ET_AVEC_CA.map((debut) =>
@@ -1543,6 +1581,8 @@ export function CommandeNouvelleApp({
               </p>
             </div>
           )}
+
+          {blocChoixSauces}
 
           {nbArticles > 0 && (accompagnementsSuggeres.length > 0 || (produitCanetteRapide && saveurs.length > 0)) && (
             <div className="rounded-xl border-4 border-[#8B2020] bg-[#FFF1E0] p-4" id="et-avec-ca">
@@ -1921,43 +1961,7 @@ export function CommandeNouvelleApp({
             </section>
           )}
 
-          {/* Cadeau du jour : ailes + frites + 2 sauces (offre du jour dès 20 €) */}
-          {cadeauAcquis && (
-            <section
-              id="cadeau-offert"
-              className={`rounded-xl border-2 p-4 ${saucesCadeauAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
-            >
-              <p className="text-base font-extrabold text-gray-900">
-                🎁 {nbBox > 1 ? `Tes ${nbBox} box OFFERTES` : "Ta box OFFERTE"} : 3 ailes grillées + frites
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-gray-800">Choisis {NB_SAUCES_CADEAU} sauces pour {nbBox > 1 ? "chaque box" : "ta box"}</p>
-              {Array.from({ length: nbSaucesCadeau }, (_, index) => (
-                <div key={index} className="mt-2">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {nbBox > 1 ? `Box n°${Math.floor(index / NB_SAUCES_CADEAU) + 1} · ` : ""}Sauce n°{(index % NB_SAUCES_CADEAU) + 1}
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {sauces.map((sa) => (
-                      <button
-                        key={sa.id}
-                        type="button"
-                        onClick={() =>
-                          setCadeauSauces((prev) =>
-                            Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sa.nom : prev[i]))
-                          )
-                        }
-                        className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
-                          cadeauSauces[index] === sa.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
-                        }`}
-                      >
-                        {sa.nom}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </section>
-          )}
+          {blocChoixSauces}
 
           {/* Canette offerte (offre du jour) */}
           {nbCanettesOffertes > 0 && (
