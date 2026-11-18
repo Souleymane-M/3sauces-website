@@ -1280,7 +1280,7 @@ export function CommandeNouvelleApp({
       </div>
       {offreCadeauActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE : 3 ailes grillées + frites + 2 sauces au choix par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (
@@ -1506,10 +1506,10 @@ export function CommandeNouvelleApp({
               {offreCadeauJour && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: cadeauAcquis ? VERT : "#1F3A5F" }}>
                   {cadeauAcquis
-                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} : 3 ailes grillées + frites + 2 sauces au choix, avec cette commande !${
+                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} (3 ailes grillées + frites + 2 sauces au choix) avec cette commande !${
                         ` Plus que ${euros(resteAvantCadeau)} pour la suivante.`
                       }`
-                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE : 3 ailes grillées + frites + 2 sauces au choix`}
+                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE (3 ailes grillées + frites + 2 sauces au choix)`}
                 </p>
               )}
               <p className="text-sm font-extrabold text-gray-900">
