@@ -304,6 +304,27 @@ function fusionnerLignesIdentiques(lignes: LigneCommande[]): LigneCommande[] {
   return [...parCle.values()];
 }
 
+/** Lignes de la « BOX OFFERTE » du jour (3 ailes grillées + frites + 2 sauces) : imprimées dans un bloc à part, bien visible. */
+const PREFIXE_BOX = "BOX OFFERTE";
+function estLigneBox(l: LigneCommande): boolean {
+  return l.nom.startsWith(PREFIXE_BOX);
+}
+
+function imprimerBoxOfferte(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+  const box = lignes.filter(estLigneBox);
+  if (box.length === 0) return;
+  b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+  b.ligne(" *** BOX OFFERTE *** ", { align: "center", gras: true, taille: 2, surligne: true });
+  for (const l of box) {
+    const nom = l.nom.replace(/^BOX OFFERTE\s*—\s*/, "");
+    b.ligne(` ${l.quantite * piecesParPaquet(nom)}x ${nomSansMultiplicateur(nom).toUpperCase()} `, { align: "left", gras: true, taille: 2, surligne: true });
+    if (l.sauces && l.sauces.length > 0) {
+      b.ligne(` SAUCES : ${l.sauces.join(", ").toUpperCase()} `, { align: "left", gras: true, taille: 2, surligne: true }, "  ");
+    }
+  }
+  b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+}
+
 function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneCommande[]): void {
   const groupes = regrouperLignesParCategorie(fusionnerLignesIdentiques(lignes));
   groupes.forEach((groupe, index) => {
@@ -347,7 +368,9 @@ function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneComm
 }
 
 /** Commande groupée (au moins une ligne avec `platIndex`) : un bloc "PLAT N" par convive plutôt qu'un classement par catégorie. */
-function imprimerArticlesCuisine(b: ConstructeurTicket, commande: CommandePourImpression): void {
+function imprimerArticlesCuisine(b: ConstructeurTicket, commandeComplete: CommandePourImpression): void {
+  imprimerBoxOfferte(b, commandeComplete.lignes);
+  const commande = { ...commandeComplete, lignes: commandeComplete.lignes.filter((l) => !estLigneBox(l)) };
   const estGroupee = commande.lignes.some((l) => l.platIndex !== null);
   if (!estGroupee) {
     imprimerGroupeCategorieCuisine(b, commande.lignes);
@@ -522,7 +545,8 @@ function construireContenuTicketClient(
   b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
   separateur(b);
 
-  regrouperLignesParCategorie(commande.lignes).forEach((groupe, index) => {
+  imprimerBoxOfferte(b, commande.lignes);
+  regrouperLignesParCategorie(commande.lignes.filter((l) => !estLigneBox(l))).forEach((groupe, index) => {
     // Espace entre chaque catégorie (jamais avant la première) — pour
     // s'y retrouver d'un coup d'œil dès qu'une commande mélange plusieurs
     // catégories (demande explicite du patron, 2026-10-15).
