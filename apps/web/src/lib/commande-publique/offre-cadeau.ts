@@ -1,5 +1,5 @@
 /**
- * Offre du jour « une box OFFERTE : barquette de 3 ailes grillées + frites + 2 sauces au choix, par tranche de 20 € d'achats », site public
+ * Offre du jour « une box OFFERTE : 3 ailes grillées + frites + 2 sauces au choix, par tranche de 20 € d'achats », site public
  * uniquement (demande du patron, mercredi 2026-11-18). Aucune base de données : on ajoute les jours concernés à
  * `JOURS_OFFRE_CADEAU`. Calculée sur le montant réellement payé (après points de fidélité ou remise : pas de
  * cumul d'offres) et seulement pour les commandes SERVIES un jour de l'offre. Une box par tranche de 20 € payés (20 € → 1, 40 € → 2, 80 € → 4).

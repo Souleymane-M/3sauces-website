@@ -704,7 +704,7 @@ export function CommandeNouvelleApp({
       return;
     }
     if (saucesCadeauAChoisir > 0) {
-      setErreur(`Choisis les sauces de ${nbBox > 1 ? "tes box offertes" : "ta box offerte"} (barquette de 3 ailes grillées + frites) avant de valider.`);
+      setErreur(`Choisis les sauces de ${nbBox > 1 ? "tes box offertes" : "ta box offerte"} (3 ailes grillées + frites) avant de valider.`);
       return;
     }
     if (canettesOffertesAChoisir > 0) {
@@ -1280,7 +1280,7 @@ export function CommandeNouvelleApp({
       </div>
       {offreCadeauActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE (barquette de 3 ailes grillées + frites + 2 sauces au choix) par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE : 3 ailes grillées + frites + 2 sauces au choix par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (
@@ -1506,10 +1506,10 @@ export function CommandeNouvelleApp({
               {offreCadeauJour && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: cadeauAcquis ? VERT : "#1F3A5F" }}>
                   {cadeauAcquis
-                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} (barquette de 3 ailes grillées + frites + 2 sauces au choix) avec cette commande !${
+                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} : 3 ailes grillées + frites + 2 sauces au choix, avec cette commande !${
                         ` Plus que ${euros(resteAvantCadeau)} pour la suivante.`
                       }`
-                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE (barquette de 3 ailes grillées + frites + 2 sauces au choix)`}
+                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE : 3 ailes grillées + frites + 2 sauces au choix`}
                 </p>
               )}
               <p className="text-sm font-extrabold text-gray-900">
@@ -1928,7 +1928,7 @@ export function CommandeNouvelleApp({
               className={`rounded-xl border-2 p-4 ${saucesCadeauAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
             >
               <p className="text-base font-extrabold text-gray-900">
-                🎁 {nbBox > 1 ? `Tes ${nbBox} box OFFERTES` : "Ta box OFFERTE"} : barquette de 3 ailes grillées + frites
+                🎁 {nbBox > 1 ? `Tes ${nbBox} box OFFERTES` : "Ta box OFFERTE"} : 3 ailes grillées + frites
               </p>
               <p className="mt-0.5 text-sm font-semibold text-gray-800">Choisis {NB_SAUCES_CADEAU} sauces pour {nbBox > 1 ? "chaque box" : "ta box"}</p>
               {Array.from({ length: nbSaucesCadeau }, (_, index) => (

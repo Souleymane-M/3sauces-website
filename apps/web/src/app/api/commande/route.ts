@@ -909,7 +909,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Offre du jour : une box OFFERTE (barquette de 3 ailes grillées + frites + 2 sauces au choix) par tranche de 20 € payés (site uniquement, cf. offre-cadeau.ts).
+  // Offre du jour : une box OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de 20 € payés (site uniquement, cf. offre-cadeau.ts).
   const nbBox = nombreBoxOffertes(montantFinal, dateCommande);
   if (nbBox > 0) {
     const saucesCadeau = (Array.isArray(body.cadeauSauces) ? body.cadeauSauces : []).filter(
