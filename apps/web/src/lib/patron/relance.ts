@@ -5,6 +5,8 @@ import { construireEmailClientHtml } from "@/lib/notifications/template";
 
 /** « relance » : sans commande depuis X jours ; « recompense » : au moins une récompense disponible ; « points » : au moins 1 point de fidélité (ou une récompense). */
 export type ModeRelance = "relance" | "recompense" | "points" | "tous";
+export type ModeRelanceEtendu = ModeRelance | "reviens" | "actifs";
+// « reviens » : sans commande depuis `jours` jours OU une seule commande ; « actifs » : le reste (commande récente et au moins 2 commandes).
 
 export const SOURCE_RELANCE = "relance_client";
 const TEXTE_CONSENTEMENT_RELANCE =
@@ -38,7 +40,7 @@ async function toutLire<T>(lire: (debut: number, fin: number) => PromiseLike<{ d
 }
 
 /** Clients avec email, non désinscrits, qui correspondent au mode demandé — les plus anciens à relancer d'abord. */
-export async function listerClientsRelance(mode: ModeRelance, jours: number): Promise<ClientRelance[]> {
+export async function listerClientsRelance(mode: ModeRelanceEtendu, jours: number): Promise<ClientRelance[]> {
   const supabase = createServiceSupabaseClient();
   const maintenant = Date.now();
 
@@ -100,6 +102,10 @@ export async function listerClientsRelance(mode: ModeRelance, jours: number): Pr
       if (expirations.length === 0) continue;
     } else if (mode === "tous") {
       if (joursDepuis === null) continue;
+    } else if (mode === "reviens") {
+      if (joursDepuis === null || !(joursDepuis >= jours || (stats?.nb ?? 0) <= 1)) continue;
+    } else if (mode === "actifs") {
+      if (joursDepuis === null || joursDepuis >= jours || (stats?.nb ?? 0) <= 1) continue;
     } else if (mode === "points") {
       if (expirations.length === 0 && tamponsClient < 1) continue;
     } else if (joursDepuis === null || joursDepuis < jours) {

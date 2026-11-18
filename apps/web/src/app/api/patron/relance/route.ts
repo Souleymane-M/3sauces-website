@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-session";
-import { construireHtmlCampagne, jetonDesinscription, listerClientsRelance, personnaliserMessage, phraseFidelite, type ModeRelance } from "@/lib/patron/relance";
+import { construireHtmlCampagne, jetonDesinscription, listerClientsRelance, personnaliserMessage, phraseFidelite, type ModeRelanceEtendu } from "@/lib/patron/relance";
 import { envoyerEmail } from "@/lib/notifications/email";
 import { normaliserEmail } from "@/lib/email";
 import { normaliserSourceCampagne } from "@/lib/campagne";
@@ -10,8 +10,8 @@ const TAILLE_LOT = 20;
 const SUJET_MAX = 150;
 const MESSAGE_MAX = 3000;
 
-function lireMode(valeur: unknown): ModeRelance | null {
-  return valeur === "relance" || valeur === "recompense" || valeur === "points" || valeur === "tous" ? valeur : null;
+function lireMode(valeur: unknown): ModeRelanceEtendu | null {
+  return valeur === "relance" || valeur === "recompense" || valeur === "points" || valeur === "tous" || valeur === "reviens" || valeur === "actifs" ? valeur : null;
 }
 
 function lireJours(valeur: unknown): number {
