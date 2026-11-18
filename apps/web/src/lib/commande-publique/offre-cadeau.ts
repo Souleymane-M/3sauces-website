@@ -1,8 +1,8 @@
 /**
- * Offre du jour « 3 ailes de poulet + frites + 2 sauces au choix OFFERTES dès 20 € d'achats », site public
+ * Offre du jour « une box OFFERTE : barquette de 3 ailes grillées + frites + 2 sauces au choix, par tranche de 20 € d'achats », site public
  * uniquement (demande du patron, mercredi 2026-11-18). Aucune base de données : on ajoute les jours concernés à
  * `JOURS_OFFRE_CADEAU`. Calculée sur le montant réellement payé (après points de fidélité ou remise : pas de
- * cumul d'offres) et seulement pour les commandes SERVIES un jour de l'offre. Un seul cadeau par commande.
+ * cumul d'offres) et seulement pour les commandes SERVIES un jour de l'offre. Une box par tranche de 20 € payés (20 € → 1, 40 € → 2, 80 € → 4).
  */
 export const JOURS_OFFRE_CADEAU: readonly string[] = ["2026-11-18"];
 export const SEUIL_OFFRE_CADEAU = 20;
@@ -15,5 +15,11 @@ export function offreCadeauActive(dateService: string): boolean {
 }
 
 export function cadeauDebloque(montantPaye: number, dateService: string): boolean {
-  return offreCadeauActive(dateService) && montantPaye >= SEUIL_OFFRE_CADEAU;
+  return nombreBoxOffertes(montantPaye, dateService) > 0;
+}
+
+/** Une box par tranche de 20 € complète : 20 € → 1, 39,90 € → 1, 40 € → 2. */
+export function nombreBoxOffertes(montantPaye: number, dateService: string): number {
+  if (!offreCadeauActive(dateService)) return 0;
+  return Math.floor(montantPaye / SEUIL_OFFRE_CADEAU);
 }

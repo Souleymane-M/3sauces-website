@@ -33,7 +33,7 @@ import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxPa
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
-import { cadeauDebloque, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
+import { nombreBoxOffertes, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { normaliserSourceCampagne } from "@/lib/campagne";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
 import {
@@ -909,13 +909,17 @@ export async function POST(request: Request) {
     }
   }
 
-  // Offre du jour « ailes + frites + 2 sauces offertes dès 20 € » (site uniquement, cf. offre-cadeau.ts).
-  if (cadeauDebloque(montantFinal, dateCommande)) {
+  // Offre du jour : une box OFFERTE (barquette de 3 ailes grillées + frites + 2 sauces au choix) par tranche de 20 € payés (site uniquement, cf. offre-cadeau.ts).
+  const nbBox = nombreBoxOffertes(montantFinal, dateCommande);
+  if (nbBox > 0) {
     const saucesCadeau = (Array.isArray(body.cadeauSauces) ? body.cadeauSauces : []).filter(
       (s: unknown): s is string => typeof s === "string" && nomsSaucesValides.has(s)
     );
-    if (saucesCadeau.length !== NB_SAUCES_CADEAU) {
-      return NextResponse.json({ error: `Choisis tes ${NB_SAUCES_CADEAU} sauces pour le cadeau offert.` }, { status: 400 });
+    if (saucesCadeau.length !== NB_SAUCES_CADEAU * nbBox) {
+      return NextResponse.json(
+        { error: nbBox > 1 ? `Choisis les ${NB_SAUCES_CADEAU} sauces de chacune de tes ${nbBox} box offertes.` : `Choisis les ${NB_SAUCES_CADEAU} sauces de ta box offerte.` },
+        { status: 400 }
+      );
     }
     const { data: produitsCadeau, error: erreurCadeau } = await supabase
       .from("produits")
@@ -925,33 +929,35 @@ export async function POST(request: Request) {
     const ailes = (produitsCadeau ?? []).find((p) => p.nom.startsWith(NOM_AILES_CADEAU));
     const frites = (produitsCadeau ?? []).find((p) => p.nom === NOM_FRITES_CADEAU);
     if (erreurCadeau || !ailes || !frites) {
-      return NextResponse.json({ error: "Erreur serveur (cadeau offert), réessaie ou préviens-nous." }, { status: 500 });
+      return NextResponse.json({ error: "Erreur serveur (box offerte), réessaie ou préviens-nous." }, { status: 500 });
     }
-    lignes.push(
-      {
-        produitId: ailes.id,
-        nom: `${ailes.nom} (offerte — offre du jour)`,
-        categorie: ailes.categorie,
-        quantite: 1,
-        prixUnitaire: 0,
-        coutMatiereUnitaire: null,
-        viandes: [],
-        sauces: saucesCadeau,
-        canetteIncluse: false,
-        platIndex: null,
-      },
-      {
-        produitId: frites.id,
-        nom: `${frites.nom} (offertes — offre du jour)`,
-        categorie: frites.categorie,
-        quantite: 1,
-        prixUnitaire: 0,
-        coutMatiereUnitaire: null,
-        viandes: [],
-        canetteIncluse: false,
-        platIndex: null,
-      }
-    );
+    for (let i = 0; i < nbBox; i++) {
+      lignes.push(
+        {
+          produitId: ailes.id,
+          nom: `${ailes.nom} (offerte — box du jour)`,
+          categorie: ailes.categorie,
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null,
+          viandes: [],
+          sauces: saucesCadeau.slice(i * NB_SAUCES_CADEAU, (i + 1) * NB_SAUCES_CADEAU),
+          canetteIncluse: false,
+          platIndex: null,
+        },
+        {
+          produitId: frites.id,
+          nom: `${frites.nom} (offertes — box du jour)`,
+          categorie: frites.categorie,
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null,
+          viandes: [],
+          canetteIncluse: false,
+          platIndex: null,
+        }
+      );
+    }
   }
 
   // Minimum de commande pour la livraison : vérifié sur le montant RÉEL à
