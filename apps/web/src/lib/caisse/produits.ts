@@ -39,7 +39,8 @@ export async function listerProduitsActifs(): Promise<ProduitCaisse[]> {
     nbViandesMax: p.nb_viandes_max,
     viandeImposee: p.viande_imposee,
     nbSaucesIncluses: p.nb_sauces_incluses,
-    autoriseExtras: p.autorise_extras,
+    // Comme sur le site /commander : viande et sauces en plus proposées sur tous les snacks (tacos, barquettes, bowls).
+    autoriseExtras: p.categorie === "snacking" ? true : p.autorise_extras,
     nbSaveursMax: p.nb_saveurs_max,
     estPlatDuJour: p.est_plat_du_jour,
     estDesactivable: p.est_desactivable,
