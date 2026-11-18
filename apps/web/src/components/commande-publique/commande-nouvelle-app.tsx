@@ -45,6 +45,7 @@ import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
+import { cadeauDebloque, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MessageErreur } from "@/components/message-erreur";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -204,6 +205,7 @@ export function CommandeNouvelleApp({
   const [canal, setCanal] = useState<CanalPublic | null>(null);
   const [boissonOfferteSaveurs, setBoissonOfferteSaveurs] = useState<string[]>([]);
   const [canetteOfferteSaveurs, setCanetteOfferteSaveurs] = useState<string[]>([]);
+  const [cadeauSauces, setCadeauSauces] = useState<string[]>([]);
 
   const [pretPourPersistance, setPretPourPersistance] = useState(false);
   const [nom, setNom] = useState("");
@@ -424,6 +426,11 @@ export function CommandeNouvelleApp({
   const montantAPayer = totalApresTampons;
   // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
   const nbCanettesOffertes = nombreCanettesOffertes(montantAPayer, dateCommande);
+  // Offre du jour : 3 ailes + frites + 2 sauces offertes dès 20 € payés (commandes servies le jour de l'offre).
+  const offreCadeauJour = offreCadeauActive(dateCommande);
+  const cadeauAcquis = cadeauDebloque(montantAPayer, dateCommande);
+  const resteAvantCadeau = Math.max(0, SEUIL_OFFRE_CADEAU - montantAPayer);
+  const saucesCadeauAChoisir = cadeauAcquis ? Math.max(0, NB_SAUCES_CADEAU - cadeauSauces.slice(0, NB_SAUCES_CADEAU).filter(Boolean).length) : 0;
   const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
   const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
@@ -692,6 +699,10 @@ export function CommandeNouvelleApp({
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
+    if (saucesCadeauAChoisir > 0) {
+      setErreur(`Choisis tes ${NB_SAUCES_CADEAU} sauces pour ton cadeau offert (3 ailes de poulet + frites) avant de valider.`);
+      return;
+    }
     if (canettesOffertesAChoisir > 0) {
       setErreur(`Choisis le parfum de ta canette offerte${nbCanettesOffertes > 1 ? "s" : ""} avant de valider.`);
       return;
@@ -817,6 +828,7 @@ export function CommandeNouvelleApp({
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
+          cadeauSauces: cadeauAcquis ? cadeauSauces.slice(0, NB_SAUCES_CADEAU) : undefined,
           sourceCampagne: lireSourceCampagne(),
         }),
       });
@@ -1262,6 +1274,11 @@ export function CommandeNouvelleApp({
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
         10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
       </div>
+      {offreCadeauActive(aujourdHui) && (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : dès {SEUIL_OFFRE_CADEAU} € d&apos;achats, 3 ailes de poulet + frites + 2 sauces au choix OFFERTES
+        </div>
+      )}
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: "#1F3A5F" }}>
           🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
@@ -1480,6 +1497,13 @@ export function CommandeNouvelleApp({
               {palierGroupeReel === "GROUPE_4" && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
                   Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
+                </p>
+              )}
+              {offreCadeauJour && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: cadeauAcquis ? VERT : "#1F3A5F" }}>
+                  {cadeauAcquis
+                    ? "🎁 Bravo : 3 ailes de poulet + frites + 2 sauces OFFERTES avec cette commande !"
+                    : `Plus que ${euros(resteAvantCadeau)} : 3 ailes de poulet + frites + 2 sauces OFFERTES`}
                 </p>
               )}
               <p className="text-sm font-extrabold text-gray-900">
@@ -1883,6 +1907,40 @@ export function CommandeNouvelleApp({
                         }`}
                       >
                         {s.nom}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {/* Cadeau du jour : ailes + frites + 2 sauces (offre du jour dès 20 €) */}
+          {cadeauAcquis && (
+            <section
+              id="cadeau-offert"
+              className={`rounded-xl border-2 p-4 ${saucesCadeauAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
+            >
+              <p className="text-base font-extrabold text-gray-900">🎁 Ton cadeau : 3 ailes de poulet + frites OFFERTES</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-800">Choisis tes {NB_SAUCES_CADEAU} sauces</p>
+              {Array.from({ length: NB_SAUCES_CADEAU }, (_, index) => (
+                <div key={index} className="mt-2">
+                  <p className="text-sm font-semibold text-gray-900">Sauce n°{index + 1}</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {sauces.map((sa) => (
+                      <button
+                        key={sa.id}
+                        type="button"
+                        onClick={() =>
+                          setCadeauSauces((prev) =>
+                            Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sa.nom : prev[i]))
+                          )
+                        }
+                        className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
+                          cadeauSauces[index] === sa.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                        }`}
+                      >
+                        {sa.nom}
                       </button>
                     ))}
                   </div>

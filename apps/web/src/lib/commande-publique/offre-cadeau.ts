@@ -1,0 +1,19 @@
+/**
+ * Offre du jour « 3 ailes de poulet + frites + 2 sauces au choix OFFERTES dès 20 € d'achats », site public
+ * uniquement (demande du patron, mercredi 2026-11-18). Aucune base de données : on ajoute les jours concernés à
+ * `JOURS_OFFRE_CADEAU`. Calculée sur le montant réellement payé (après points de fidélité ou remise : pas de
+ * cumul d'offres) et seulement pour les commandes SERVIES un jour de l'offre. Un seul cadeau par commande.
+ */
+export const JOURS_OFFRE_CADEAU: readonly string[] = ["2026-11-18"];
+export const SEUIL_OFFRE_CADEAU = 20;
+export const NB_SAUCES_CADEAU = 2;
+export const NOM_AILES_CADEAU = "Ailes de poulet";
+export const NOM_FRITES_CADEAU = "Frites";
+
+export function offreCadeauActive(dateService: string): boolean {
+  return JOURS_OFFRE_CADEAU.includes(dateService);
+}
+
+export function cadeauDebloque(montantPaye: number, dateService: string): boolean {
+  return offreCadeauActive(dateService) && montantPaye >= SEUIL_OFFRE_CADEAU;
+}
