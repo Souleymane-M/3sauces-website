@@ -298,6 +298,8 @@ export function CaisseApp({
   }, [enModeEdition, commandeExistante, produits]);
 
   const [produitEnSelection, setProduitEnSelection] = useState<ProduitCaisse | null>(null);
+  // Ligne du panier en cours de modification (rouvre le même écran de choix, déjà rempli).
+  const [ligneEnEdition, setLigneEnEdition] = useState<{ ligne: LignePanier; platId: string | null } | null>(null);
   const [produitEnQuantite, setProduitEnQuantite] = useState<ProduitCaisse | null>(null);
   // Ligne du panier pour laquelle le client vient de changer d'avis sur une
   // formule passée en "Sans boisson" : ouvre un choix de saveur si plusieurs
@@ -1177,6 +1179,21 @@ export function CaisseApp({
     );
   }
 
+  /** Ligne configurable à rouvrir pour la modifier (viande, sauces, boisson…) — sans la supprimer d'abord. */
+  function ligneModifiable(l: LignePanier): boolean {
+    const p = l.produit;
+    return (
+      p.nbSaveursMax === 0 &&
+      ((!p.viandeImposee && p.nbViandesMax > 0) || p.nbSaucesIncluses > 0 || p.accompagnementInclus || p.canetteIncluse || p.saladeOuBoisson)
+    );
+  }
+
+  function modifierLigne(l: LignePanier) {
+    const plat = plats.find((p) => p.lignes.some((x) => x.id === l.id));
+    setLigneEnEdition({ ligne: l, platId: enModeGroupe ? (plat?.id ?? null) : null });
+    setProduitEnSelection(l.produit);
+  }
+
   function retirerLigne(id: string) {
     if (enModeGroupe) {
       setPlats((precedent) => precedent.map((plat) => ({ ...plat, lignes: plat.lignes.filter((l) => l.id !== id) })));
@@ -1770,9 +1787,16 @@ export function CaisseApp({
       <li key={l.id} className="text-sm">
         <div className="flex items-center justify-between">
           <span className="text-gray-900">{l.produit.nom}</span>
-          <button onClick={() => retirerLigne(l.id)} className="text-gray-600 hover:text-gray-700">
-            ✕
-          </button>
+          <span className="flex items-center gap-3">
+            {ligneModifiable(l) && (
+              <button type="button" onClick={() => modifierLigne(l)} className="text-sm font-bold text-[#1E3A8A] underline">
+                ✎ Modifier
+              </button>
+            )}
+            <button onClick={() => retirerLigne(l.id)} className="text-gray-600 hover:text-gray-700">
+              ✕
+            </button>
+          </span>
         </div>
         {l.viandes.length > 0 && <div className="text-xs text-gray-700">{l.viandes.join(", ")}</div>}
         {l.saveurs.length > 0 && <div className="text-xs text-gray-700">{l.saveurs.join(", ")}</div>}
@@ -2845,7 +2869,11 @@ export function CaisseApp({
               ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
               : undefined
           }
-          onAnnuler={() => setProduitEnSelection(null)}
+          valeursInitiales={ligneEnEdition ? { ...ligneEnEdition.ligne } : null}
+          onAnnuler={() => {
+            setProduitEnSelection(null);
+            setLigneEnEdition(null);
+          }}
           onValider={(
             viandesChoisies,
             saucesChoisies,
@@ -2859,6 +2887,8 @@ export function CaisseApp({
             canettesRapidesChoisies,
             sansSauce
           ) => {
+            // Modification : l'ancienne version de la ligne est remplacée (dans le même plat en commande groupée).
+            if (ligneEnEdition) retirerLigne(ligneEnEdition.ligne.id);
             ajouterAuPanier(
               produitEnSelection,
               viandesChoisies,
@@ -2871,8 +2901,10 @@ export function CaisseApp({
               accompagnementsInclus,
               sansBoisson,
               sansSauce,
-              saladeOption
+              saladeOption,
+              ligneEnEdition?.platId ?? undefined
             );
+            setLigneEnEdition(null);
             if (produitViandeSupplementaire) {
               for (const nomViande of extras.viandesSupplementaires) {
                 ajouterAuPanier(produitViandeSupplementaire, [nomViande], [], [], null, 1, undefined, null);

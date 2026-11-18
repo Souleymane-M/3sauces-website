@@ -45,6 +45,17 @@ interface ViandeModalPubliqueProps {
   /** Boisson proposée en ajout rapide (Plats du jour sans canette incluse, ex: Poisson grillé) — évite d'aller la chercher dans une autre section. `null`/omis = pas de section boisson. */
   canetteRapideProduit?: ProduitConfigurable | null;
   canetteRapideSaveurs?: SaveurPublique[];
+  /** Modification d'une ligne déjà au panier (caisse) : préremplit le choix au lieu de repartir de zéro. */
+  valeursInitiales?: {
+    quantite: number;
+    viandes: string[];
+    sauces: string[];
+    sansSauce: boolean;
+    boissonIncluse: string | null;
+    saladeIncluse: boolean | null;
+    saladeOption: boolean;
+    accompagnementsInclus: string[];
+  } | null;
   onValider: (
     viandes: string[],
     sauces: string[],
@@ -91,28 +102,29 @@ export function ViandeModalPublique({
   produitSauceSupplementaire,
   canetteRapideProduit,
   canetteRapideSaveurs = [],
+  valeursInitiales = null,
   onValider,
   onAnnuler,
   quantiteMax = QUANTITE_MAX_DEFAUT,
 }: ViandeModalPubliqueProps) {
-  const [quantite, setQuantite] = useState(1);
-  const [viandesChoisies, setViandesChoisies] = useState<string[]>([]);
-  const [saucesChoisies, setSaucesChoisies] = useState<string[]>([]);
+  const [quantite, setQuantite] = useState(valeursInitiales?.quantite ?? 1);
+  const [viandesChoisies, setViandesChoisies] = useState<string[]>(valeursInitiales?.viandes ?? []);
+  const [saucesChoisies, setSaucesChoisies] = useState<string[]>(valeursInitiales?.sauces ?? []);
   // "Sans sauce" : certains clients n'en veulent aucune.
-  const [sansSauce, setSansSauce] = useState(false);
+  const [sansSauce, setSansSauce] = useState(valeursInitiales?.sansSauce ?? false);
   const [extraViandes, setExtraViandes] = useState<string[]>([]);
   const [extraSauces, setExtraSauces] = useState<string[]>([]);
   const [canettesRapides, setCanettesRapides] = useState<string[]>([]);
   // Aucune case à cocher : le client clique directement une saveur pour
   // ajouter la boisson (comme l'ajout rapide des plats du jour), ou ne
   // clique rien pour ne pas en avoir — un seul geste au lieu de deux.
-  const [boissonChoisie, setBoissonChoisie] = useState<string | null>(null);
-  const [saladeGardee, setSaladeGardee] = useState<boolean | null>(null);
+  const [boissonChoisie, setBoissonChoisie] = useState<string | null>(valeursInitiales?.boissonIncluse ?? null);
+  const [saladeGardee, setSaladeGardee] = useState<boolean | null>(valeursInitiales?.saladeIncluse ?? null);
   // "Salade ou boisson" : le client peut prendre l'une, l'autre ou les deux
   // (les deux = supplément). `saladeGardee` vaut true si la salade est prise.
-  const [boissonVoulue, setBoissonVoulue] = useState(false);
-  const [saladeOptionCochee, setSaladeOptionCochee] = useState(false);
-  const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>([]);
+  const [boissonVoulue, setBoissonVoulue] = useState(valeursInitiales?.boissonIncluse != null);
+  const [saladeOptionCochee, setSaladeOptionCochee] = useState(valeursInitiales?.saladeOption ?? false);
+  const [accompagnementsChoisis, setAccompagnementsChoisis] = useState<string[]>(valeursInitiales?.accompagnementsInclus ?? []);
 
   const demandeViande = !produit.viandeImposee && produit.nbViandesMax > 0;
   // Le Menu Étudiant n'est jamais éligible à "Sans boisson" — décision
