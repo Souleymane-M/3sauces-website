@@ -1989,8 +1989,8 @@ export function CaisseApp({
             </button>
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
+          <div className="space-y-6">
             {(() => {
               const parKey = new Map(sections.map((s) => [s.key, s]));
               const tacos = parKey.get("tacos");
@@ -2071,13 +2071,13 @@ export function CaisseApp({
 
               return (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="flex gap-2">
                     {onglets.map((o) => (
                       <button
                         key={o.cle}
                         type="button"
                         onClick={() => setOngletCaisse(o.cle)}
-                        className={`rounded-xl border-2 px-3 py-3 text-base font-extrabold ${
+                        className={`flex-1 rounded-xl border-2 px-2 py-3 text-center text-sm font-extrabold leading-tight sm:text-base ${
                           actif?.cle === o.cle ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
                         }`}
                       >
@@ -2091,7 +2091,9 @@ export function CaisseApp({
             })()}
           </div>
 
-          <div id="panier-caisse" className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div id="panier-caisse" className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-3">
+            {/* Colonne 1 : le panier */}
+            <div className="space-y-4">
             <p className="text-sm text-gray-700">Caissier·e : {nomEmploye}</p>
 
             {enModeGroupe && (
@@ -2347,6 +2349,9 @@ export function CaisseApp({
               )}
             </div>
 
+            </div>
+            {/* Colonne 2 : le client et le retrait */}
+            <div className="space-y-4">
             <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-gray-700">
@@ -2433,7 +2438,7 @@ export function CaisseApp({
                   )}
                 </div>
               )}
-              {!enModeEdition && telephone.trim() && !clientInfo?.existe && (
+              {!enModeEdition && !clientInfo?.existe && (
                 <div className="mt-2">
                   <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Nouveau client : il est… (facultatif)" />
                 </div>
@@ -2666,6 +2671,9 @@ export function CaisseApp({
               </div>
             )}
 
+            </div>
+            {/* Colonne 3 : le paiement et la validation */}
+            <div className="space-y-4">
             <div>
               <label className="text-xs text-gray-700">Paiement</label>
               <select
@@ -2841,6 +2849,7 @@ export function CaisseApp({
                     ? "Encaisser"
                     : "Valider la commande"}
             </button>
+            </div>
           </div>
           </div>
         </div>
