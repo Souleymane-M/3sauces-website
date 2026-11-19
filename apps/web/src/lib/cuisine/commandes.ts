@@ -6,6 +6,7 @@ import { dateMayotteIso, plageJourMayotteUtc } from "@/lib/commande-publique/cre
 import type { PalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { notifierCommandeAnnulee } from "@/lib/notifications/paiement";
 import {
+  RECUL_STATUT,
   STATUTS_TERMINAUX,
   TRANSITIONS_PAR_CANAL,
   type CommandeCuisine,
@@ -312,7 +313,8 @@ export async function changerStatutCommande({
   }
 
   const statutSuivantAttendu = TRANSITIONS_PAR_CANAL[commande.canal]?.[commande.statut];
-  if (statutSuivantAttendu !== statut) {
+  const estUnRecul = RECUL_STATUT[commande.statut as keyof typeof RECUL_STATUT] === statut;
+  if (statutSuivantAttendu !== statut && !estUnRecul) {
     throw new Error(`Transition invalide : ${commande.statut} -> ${statut} pour le canal ${commande.canal}.`);
   }
   if (statut === "pris_par_livreur" && !livreurId) {

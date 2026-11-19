@@ -5,7 +5,7 @@ import { RemiseCommande, remiseDemandeDesChoix, type ChoixRemise } from "@/compo
 import { libellePayee } from "@/lib/libelle-paiement";
 import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivraisonEnCours } from "@/lib/cuisine/types";
-import { LIBELLES_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
+import { LIBELLES_STATUT, RECUL_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
 import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -404,6 +404,15 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
             />
           )}
         </div>
+      )}
+      {RECUL_STATUT[commande.statut] && (
+        <button
+          type="button"
+          onClick={() => demanderChangement(commande.id, RECUL_STATUT[commande.statut] as string)}
+          className="mt-2 w-full rounded border-2 border-[#1E3A8A] py-2 text-sm font-bold text-[#1E3A8A]"
+        >
+          ↩ Revenir à « {LIBELLES_STATUT[RECUL_STATUT[commande.statut] as keyof typeof LIBELLES_STATUT]} »
+        </button>
       )}
       {STATUTS_MODIFIABLES.includes(commande.statut) && (
         <div className="mt-2 flex gap-2">

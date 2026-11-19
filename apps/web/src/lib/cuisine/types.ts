@@ -95,6 +95,9 @@ export interface LivraisonEnCours {
  * `changerStatutCommande` réutilisée dans les deux cas, cf.
  * lib/livreur/commandes.ts.
  */
+/** Retour d'une étape en arrière (client qui change d'avis, commande à refaire) : jamais plus loin que « prête » → « en préparation » → « en attente ». */
+export const RECUL_STATUT: Partial<Record<StatutCommande, StatutCommande>> = { pret: "en_preparation", en_preparation: "en_attente" };
+
 export const TRANSITIONS_PAR_CANAL: Record<Canal, Partial<Record<StatutCommande, StatutCommande>>> = {
   sur_place: { en_attente: "en_preparation", en_preparation: "pret", pret: "remis_au_client" },
   emporter: { en_attente: "en_preparation", en_preparation: "pret", pret: "remis_au_client" },
