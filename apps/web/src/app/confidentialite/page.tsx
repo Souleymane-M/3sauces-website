@@ -23,6 +23,10 @@ export default function ConfidentialitePage() {
           Lors de la création d&apos;un compte fidélité : adresse email, obligatoire pour recevoir les
           notifications liées au programme de fidélité (récompense disponible, rappel avant expiration).
         </p>
+        <p>
+          Profil déclaré (étudiant, lycéen ou collégien, enseignant ou personnel d&apos;un établissement, salarié,
+          autre) : utilisé uniquement pour adapter nos offres et nos e-mails, jamais transmis à des tiers.
+        </p>
       </section>
 
       <section className="space-y-1">

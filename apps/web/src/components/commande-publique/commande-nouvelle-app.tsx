@@ -713,7 +713,7 @@ export function CommandeNouvelleApp({
       return;
     }
     if (!profilDejaConnu && !profil) {
-      setErreur("Choisis ton profil (étudiant, lycéen, enseignant, salarié ou autre) avant de valider : une seule fois, ça nous aide à mieux te proposer nos offres.");
+      setErreur("Choisis ce qui te correspond le mieux (une seule fois) : ça nous permet de t'envoyer des offres adaptées.");
       return;
     }
     if (saucesCadeauAChoisir > 0) {
@@ -1937,7 +1937,11 @@ export function CommandeNouvelleApp({
               />
               {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes points de fidélité, ou laisse vide.</p>}
             </div>
-            {!profilDejaConnu && <ProfilClientChoix valeur={profil} onChange={setProfil} />}
+            {!profilDejaConnu && <ProfilClientChoix
+                valeur={profil}
+                onChange={setProfil}
+                explication="Une seule question, une seule fois : elle nous permet de te proposer des offres qui te correspondent. Ta réponse reste confidentielle."
+              />}
             <CarteFidelite {...proprietesCarteFidelite} />
           </section>
 

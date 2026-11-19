@@ -8,16 +8,18 @@ interface Props {
   /** Obligatoire : le cadre est mis en évidence tant que rien n'est choisi. */
   obligatoire?: boolean;
   titre?: string;
+  /** Phrase affichée sous le titre pour expliquer pourquoi on pose la question. */
+  explication?: string;
 }
 
 /** Case à cocher « Tu es… » (profil du client) : une seule réponse, demandée une fois par client. */
-export function ProfilClientChoix({ valeur, onChange, obligatoire = true, titre = "Tu es…" }: Props) {
+export function ProfilClientChoix({ valeur, onChange, obligatoire = true, titre = "Tu es…", explication }: Props) {
   return (
     <div className={`rounded-lg border-2 p-3 ${obligatoire && !valeur ? "border-[#8B2020] bg-[#FFF8F0]" : "border-gray-300 bg-white"}`}>
       <p className="text-sm font-extrabold text-gray-900">
         {titre}
-        {obligatoire && <span className="text-[#8B2020]"> (obligatoire)</span>}
       </p>
+      {explication && <p className="mt-0.5 text-sm font-semibold text-gray-700">{explication}</p>}
       <div className="mt-2 space-y-2">
         {PROFILS_CLIENT.map((p) => (
           <label
