@@ -5,6 +5,8 @@ import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
 import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
 import {
+  NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
+  MONTANT_OIGNONS_FRITS,
   NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE,
   ajustementBoissonFormule,
   NOM_EAU_FORMULE_PLAT,
@@ -22,7 +24,6 @@ import {
 import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, ModifierCommandePayload } from "@/lib/caisse/types";
 import { STATUTS_MODIFIABLES } from "@/lib/caisse/modification";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
-import { combinaisonAccompagnementsValide } from "@/lib/commande-publique/accompagnements";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles, calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
@@ -173,12 +174,31 @@ async function validerLignesCommande(
   // jamais "Salade", incluse automatiquement sans choix (mécanisme distinct).
   const { data: accompagnementsActifs, error: erreurAccompagnements } = await supabase
     .from("produits")
-    .select("nom")
+    .select("nom, prix")
     .eq("categorie", "accompagnement")
     .eq("actif", true)
     .neq("nom", "Salade");
   if (erreurAccompagnements) throw new Error("Erreur serveur (accompagnements).");
   const nomsAccompagnementsValides = new Set((accompagnementsActifs ?? []).map((a) => a.nom));
+  const prixAccompagnement = new Map((accompagnementsActifs ?? []).map((a) => [a.nom, Number(a.prix ?? 0)]));
+
+  // Mêmes règles que le site public : prix des suppléments (viande / sauce en plus) et boissons 50 cl lus en base.
+  const { data: produitsSupplements, error: erreurSupplements } = await supabase
+    .from("produits")
+    .select("nom, prix")
+    .in("nom", [NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE, NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE])
+    .eq("actif", true);
+  if (erreurSupplements) throw new Error("Erreur serveur (suppléments).");
+  const prixViandeSupplementaire = (produitsSupplements ?? []).find((p) => p.nom === NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE)?.prix ?? null;
+  const prixSauceSupplementaire = (produitsSupplements ?? []).find((p) => p.nom === NOM_PRODUIT_SAUCE_SUPPLEMENTAIRE)?.prix ?? null;
+  const { data: boissons50clActives, error: erreurBoissons50cl } = await supabase
+    .from("produits")
+    .select("nom, prix")
+    .eq("categorie", "boisson")
+    .eq("famille_boisson", "boisson_50cl")
+    .eq("actif", true);
+  if (erreurBoissons50cl) throw new Error("Erreur serveur (boissons 50 cl).");
+  const boissons50cl = (boissons50clActives ?? []).map((b) => ({ nom: b.nom, prix: Number(b.prix ?? 0) }));
 
   const produitParId = new Map((produits ?? []).map((p) => [p.id, p]));
   const lignes: LigneCommande[] = [];
@@ -281,7 +301,8 @@ async function validerLignesCommande(
         throw new ErreurValidation(`Pas de canette incluse sur ${produit.nom}.`);
       }
       const eauAutorisee = boissonIncluse === NOM_EAU_FORMULE_PLAT && produit.categorie === "plat_du_jour" && produit.canette_incluse;
-      if (!eauAutorisee && !nomsSaveursValides.has(boissonIncluse)) {
+      const est50cl = boissons50cl.some((b) => b.nom === boissonIncluse);
+      if (!eauAutorisee && !est50cl && !nomsSaveursValides.has(boissonIncluse)) {
         throw new ErreurValidation(`Saveur de canette invalide sur la ligne ${produit.nom}.`);
       }
     }
@@ -317,7 +338,7 @@ async function validerLignesCommande(
     // Le Menu Étudiant fait exception : sa boisson est incluse
     // obligatoirement dans son prix de base, jamais de supplément.
     if (produit.canette_incluse && produit.nom !== NOM_PRODUIT_MENU_ETUDIANT) {
-      const ajustement = ajustementBoissonFormule({ categorie: produit.categorie, canetteIncluse: true, nom: produit.nom }, sansBoisson);
+      const ajustement = ajustementBoissonFormule({ categorie: produit.categorie, canetteIncluse: true, nom: produit.nom }, sansBoisson, boissonIncluse, boissons50cl);
       prixUnitaire = Math.round((prixUnitaire + ajustement) * 100) / 100;
     }
 
@@ -356,9 +377,11 @@ async function validerLignesCommande(
     let accompagnementsInclus: string[] = [];
     if (produit.accompagnement_inclus) {
       const brut = Array.isArray(ligneBrute.accompagnementsInclus) ? ligneBrute.accompagnementsInclus : null;
-      if (!brut || !combinaisonAccompagnementsValide(brut)) {
+      if (!brut || brut.length === 0 || brut.length > 6 || brut.some((n) => typeof n !== "string") || new Set(brut).size !== brut.length) {
         throw new ErreurValidation(`Choix d'accompagnement invalide sur ${produit.nom}.`);
       }
+      // 2 accompagnements inclus, le 3e et les suivants au prix de l'accompagnement (comme sur le site).
+      prixUnitaire = Math.round((prixUnitaire + brut.slice(2).reduce((t, n) => t + (prixAccompagnement.get(n) ?? 0), 0)) * 100) / 100;
       if (brut.some((n) => !nomsAccompagnementsValides.has(n))) {
         throw new ErreurValidation(`Accompagnement non disponible sur ${produit.nom}.`);
       }
@@ -370,6 +393,28 @@ async function validerLignesCommande(
     ) {
       throw new ErreurValidation(`Accompagnement non proposé sur ${produit.nom}.`);
     }
+
+    // Viandes / sauces en plus et oignons frits (snacks) : rattachés à la ligne du produit, comme sur le site.
+    const viandesSupplementaires = Array.isArray(ligneBrute.viandesSupplementaires) ? ligneBrute.viandesSupplementaires : [];
+    const saucesSupplementaires = Array.isArray(ligneBrute.saucesSupplementaires) ? ligneBrute.saucesSupplementaires : [];
+    if (viandesSupplementaires.length > 0 || saucesSupplementaires.length > 0) {
+      if (produit.categorie !== "snacking") throw new ErreurValidation(`Suppléments non proposés sur ${produit.nom}.`);
+      if (viandesSupplementaires.length > 20 || saucesSupplementaires.length > 20) throw new ErreurValidation(`Trop de suppléments sur ${produit.nom}.`);
+      if (viandesSupplementaires.some((v) => typeof v !== "string" || !nomsViandesValides.has(v))) throw new ErreurValidation(`Viande supplémentaire invalide sur ${produit.nom}.`);
+      if (saucesSupplementaires.some((v) => typeof v !== "string" || !nomsSaucesValides.has(v))) throw new ErreurValidation(`Sauce supplémentaire invalide sur ${produit.nom}.`);
+      if (viandesSupplementaires.length > 0 && prixViandeSupplementaire === null) throw new ErreurValidation("La viande supplémentaire n'est pas disponible.");
+      if (saucesSupplementaires.length > 0 && prixSauceSupplementaire === null) throw new ErreurValidation("La sauce supplémentaire n'est pas disponible.");
+    }
+    const oignonsFrits = ligneBrute.oignonsFrits === true;
+    if (oignonsFrits && produit.categorie !== "snacking") throw new ErreurValidation(`Oignons frits non proposés sur ${produit.nom}.`);
+    prixUnitaire =
+      Math.round(
+        (prixUnitaire +
+          (oignonsFrits ? MONTANT_OIGNONS_FRITS : 0) +
+          viandesSupplementaires.length * Number(prixViandeSupplementaire ?? 0) +
+          saucesSupplementaires.length * Number(prixSauceSupplementaire ?? 0)) *
+          100
+      ) / 100;
 
     const pourQuiBrut = typeof ligneBrute.pourQui === "string" ? ligneBrute.pourQui.trim() : "";
     const pourQui = pourQuiBrut ? pourQuiBrut.slice(0, 60) : null;
@@ -390,6 +435,9 @@ async function validerLignesCommande(
       sauces,
       sansSauce,
       saladeOption,
+      viandesSupplementaires,
+      saucesSupplementaires,
+      oignonsFrits,
       quantiteSuggeree: Math.min(quantite, Math.max(0, Math.floor(Number(ligneBrute.quantiteSuggeree) || 0))) || undefined,
       saveurs,
       boissonIncluse,

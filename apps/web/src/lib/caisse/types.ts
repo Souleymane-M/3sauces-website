@@ -89,6 +89,10 @@ export interface LigneCommandePayload {
   prixSaisi?: number;
   /** Unités ajoutées depuis le bloc « Et avec ça ? » — borné à `quantite` côté serveur. */
   quantiteSuggeree?: number;
+  /** Viandes / sauces en plus et oignons frits, rattachés à la ligne (snacks) — prix relus en base côté serveur. */
+  viandesSupplementaires?: string[];
+  saucesSupplementaires?: string[];
+  oignonsFrits?: boolean;
   saladeIncluse: boolean | null;
   accompagnementsInclus: string[];
   pourQui: string | null;

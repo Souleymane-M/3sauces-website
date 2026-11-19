@@ -17,6 +17,7 @@ import {
   saveursFormule,
   ajustementBoissonFormule,
   MONTANT_SUPPLEMENT_SALADE_ET_BOISSON,
+  MONTANT_OIGNONS_FRITS,
 } from "@/lib/commande-publique/types";
 import {
   prochainCreneauValide,
@@ -26,7 +27,7 @@ import {
   genererCreneaux,
   dateMayotteIso,
 } from "@/lib/commande-publique/creneau";
-import { ViandeModalPublique } from "@/components/commande-publique/viande-modal-publique";
+import { ConfigurateurNouveau } from "@/components/commande-publique/configurateur-nouveau";
 import { SaveurModalPublique } from "@/components/commande-publique/saveur-modal-publique";
 import { QuantiteModalPublique } from "@/components/commande-publique/quantite-modal-publique";
 import { CreneauPicker } from "@/components/commande-publique/creneau-picker";
@@ -69,6 +70,10 @@ interface LignePanier {
   accompagnementsInclus: string[];
   /** Unités ajoutées depuis « Et avec ça ? » (suivi des ventes complémentaires). */
   quantiteSuggeree?: number;
+  /** Viandes / sauces en plus et oignons frits, rattachés à la ligne (comme sur le site). */
+  viandesSupp?: string[];
+  saucesSupp?: string[];
+  oignonsFrits?: boolean;
 }
 
 /** Un "plat" en mode Commande groupée : conteneur explicite dans lequel l'employé range tout ce que le client décrit pour une personne — jamais déduit automatiquement du contenu. */
@@ -246,6 +251,9 @@ export function CaisseApp({
       saladeIncluse: l.saladeIncluse ?? null,
       accompagnementsInclus: l.accompagnementsInclus ?? [],
       quantiteSuggeree: l.quantiteSuggeree,
+      viandesSupp: l.viandesSupplementaires ?? [],
+      saucesSupp: l.saucesSupplementaires ?? [],
+      oignonsFrits: l.oignonsFrits === true,
     };
   }
 
@@ -884,11 +892,17 @@ export function CaisseApp({
   // Menu Étudiant a sa boisson incluse obligatoirement dans son prix de
   // base — jamais de supplément, exactement comme `proposeSansBoisson`
   // dans ViandeModalPublique.
+  const boissons50cl = produits.filter((p) => p.familleBoisson === "boisson_50cl" && p.prix !== null).map((p) => ({ nom: p.nom, prix: p.prix as number }));
   const prixLigne = (l: LignePanier) =>
     (l.produit.prix ?? l.prixSaisi ?? 0) +
-    ajustementBoissonFormule(l.produit, l.sansBoisson === true) +
+    ajustementBoissonFormule(l.produit, l.sansBoisson === true, l.boissonIncluse, boissons50cl) +
     (l.saladeOption === true ? (l.produit.saladePrixOption ?? 0) : 0) +
-    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0);
+    (l.produit.saladeOuBoisson && l.saladeIncluse === true && l.boissonIncluse ? MONTANT_SUPPLEMENT_SALADE_ET_BOISSON : 0) +
+    // Accompagnements : 2 inclus au choix, le 3e et les suivants au prix de l'accompagnement (comme sur le site).
+    l.accompagnementsInclus.slice(2).reduce((t, nomAcc) => t + (produits.find((p) => p.nom === nomAcc)?.prix ?? 0), 0) +
+    (l.viandesSupp?.length ?? 0) * (produitViandeSupplementaire?.prix ?? 0) +
+    (l.saucesSupp?.length ?? 0) * (produitSauceSupplementaire?.prix ?? 0) +
+    (l.oignonsFrits === true ? MONTANT_OIGNONS_FRITS : 0);
   const totalPlat = (plat: PlatGroupeCaisse) => plat.lignes.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbPlatsValides = plats.filter((p) => p.lignes.length > 0).length;
 
@@ -1025,7 +1039,10 @@ export function CaisseApp({
     sansSauce: boolean = false,
     saladeOption: boolean = false,
     platCibleId?: string,
-    viaSuggestion: boolean = false
+    viaSuggestion: boolean = false,
+    viandesSupp: string[] = [],
+    saucesSupp: string[] = [],
+    oignonsFrits: boolean = false
   ) {
     const cle = (l: LignePanier) =>
       l.produit.id === produit.id &&
@@ -1038,7 +1055,10 @@ export function CaisseApp({
       (l.sansSauce === true) === sansSauce &&
       (l.saladeOption === true) === saladeOption &&
       l.saladeIncluse === saladeIncluse &&
-      JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort());
+      JSON.stringify([...l.accompagnementsInclus].sort()) === JSON.stringify([...accompagnementsInclus].sort()) &&
+      JSON.stringify([...(l.viandesSupp ?? [])].sort()) === JSON.stringify([...viandesSupp].sort()) &&
+      JSON.stringify([...(l.saucesSupp ?? [])].sort()) === JSON.stringify([...saucesSupp].sort()) &&
+      (l.oignonsFrits === true) === oignonsFrits;
     const nouvelleLigne = (): LignePanier => ({
       id: `${produit.id}-${Date.now()}-${Math.random()}`,
       produit,
@@ -1054,6 +1074,9 @@ export function CaisseApp({
       saladeIncluse,
       accompagnementsInclus,
       quantiteSuggeree: viaSuggestion ? quantite : undefined,
+      viandesSupp,
+      saucesSupp,
+      oignonsFrits,
     });
 
     // Avertit plutôt que d'ajuster silencieusement — un ajout refusé ou
@@ -1517,6 +1540,9 @@ export function CaisseApp({
             saladeIncluse: l.saladeIncluse,
             accompagnementsInclus: l.accompagnementsInclus,
             quantiteSuggeree: l.quantiteSuggeree,
+            viandesSupplementaires: l.viandesSupp,
+            saucesSupplementaires: l.saucesSupp,
+            oignonsFrits: l.oignonsFrits === true ? true : undefined,
             platIndex: index,
             pourQui: plat.pourQui.trim() || null,
           }))
@@ -1535,6 +1561,9 @@ export function CaisseApp({
           saladeIncluse: l.saladeIncluse,
           accompagnementsInclus: l.accompagnementsInclus,
           quantiteSuggeree: l.quantiteSuggeree,
+          viandesSupplementaires: l.viandesSupp,
+          saucesSupplementaires: l.saucesSupp,
+          oignonsFrits: l.oignonsFrits === true ? true : undefined,
           platIndex: null,
           pourQui: null,
         }));
@@ -1802,6 +1831,13 @@ export function CaisseApp({
         {l.saveurs.length > 0 && <div className="text-xs text-gray-700">{l.saveurs.join(", ")}</div>}
         {l.sauces.length > 0 && <div className="text-xs text-gray-600">Sauces : {l.sauces.join(", ")}</div>}
         {l.sansSauce === true && <div className="text-xs font-semibold text-gray-700">Sans sauce</div>}
+        {(l.viandesSupp?.length ?? 0) > 0 && (
+          <div className="text-xs font-bold text-[#8B2020]">+ Viande en plus : {(l.viandesSupp ?? []).join(", ")}</div>
+        )}
+        {(l.saucesSupp?.length ?? 0) > 0 && (
+          <div className="text-xs font-bold text-[#8B2020]">+ Sauce en plus : {(l.saucesSupp ?? []).join(", ")}</div>
+        )}
+        {l.oignonsFrits === true && <div className="text-xs font-bold text-[#8B2020]">+ Oignons frits</div>}
         {l.saladeOption === true && <div className="text-xs text-gray-600">+ Salade (+{(l.produit.saladePrixOption ?? 0).toFixed(2)} €)</div>}
         {l.boissonIncluse && (
           <div className="text-xs text-gray-600">
@@ -2876,7 +2912,7 @@ export function CaisseApp({
       )}
 
       {produitEnSelection && produitEnSelection.nbSaveursMax === 0 && (
-        <ViandeModalPublique
+        <ConfigurateurNouveau
           produit={produitEnSelection}
           viandes={viandes}
           sauces={sauces}
@@ -2886,12 +2922,27 @@ export function CaisseApp({
           produitSauceSupplementaire={produitSauceSupplementaire}
           canetteRapideProduit={produitEnSelection.categorie === "plat_du_jour" ? produitCanetteRapide : null}
           canetteRapideSaveurs={saveurs}
+          boissons50cl={boissons50cl}
           quantiteMax={
             produitEnSelection.stockJour !== null
               ? plafonnerQuantite(produitEnSelection, null, produitEnSelection.stockJour)
               : undefined
           }
-          valeursInitiales={ligneEnEdition ? { ...ligneEnEdition.ligne } : null}
+          initial={
+            ligneEnEdition
+              ? {
+                  quantite: ligneEnEdition.ligne.quantite,
+                  viandes: [...ligneEnEdition.ligne.viandes, ...(ligneEnEdition.ligne.viandesSupp ?? [])],
+                  sauces: [...ligneEnEdition.ligne.sauces, ...(ligneEnEdition.ligne.saucesSupp ?? [])],
+                  sansSauce: ligneEnEdition.ligne.sansSauce === true,
+                  oignonsFrits: ligneEnEdition.ligne.oignonsFrits === true,
+                  boisson: ligneEnEdition.ligne.boissonIncluse,
+                  saladeGardee: ligneEnEdition.ligne.saladeIncluse,
+                  saladeOption: ligneEnEdition.ligne.saladeOption === true,
+                  accompagnements: ligneEnEdition.ligne.accompagnementsInclus,
+                }
+              : undefined
+          }
           onAnnuler={() => {
             setProduitEnSelection(null);
             setLigneEnEdition(null);
@@ -2909,6 +2960,11 @@ export function CaisseApp({
             canettesRapidesChoisies,
             sansSauce
           ) => {
+            // Les suppléments font partie du tacos / de la barquette lui-même ; avec plusieurs exemplaires,
+            // ils vont sur UN seul (jamais répétés sur chaque exemplaire).
+            const aDesSupplements =
+              extras.viandesSupplementaires.length > 0 || extras.saucesSupplementaires.length > 0 || extras.oignonsFrits === true;
+            const platCible = ligneEnEdition?.platId ?? undefined;
             // Modification : l'ancienne version de la ligne est remplacée (dans le même plat en commande groupée).
             if (ligneEnEdition) retirerLigne(ligneEnEdition.ligne.id);
             ajouterAuPanier(
@@ -2917,26 +2973,37 @@ export function CaisseApp({
               saucesChoisies,
               [],
               boissonIncluse,
-              quantite,
+              aDesSupplements ? 1 : quantite,
               undefined,
               saladeIncluse,
               accompagnementsInclus,
               sansBoisson,
               sansSauce,
               saladeOption,
-              ligneEnEdition?.platId ?? undefined
+              platCible,
+              false,
+              extras.viandesSupplementaires,
+              extras.saucesSupplementaires,
+              extras.oignonsFrits === true
             );
+            if (aDesSupplements && quantite > 1) {
+              ajouterAuPanier(
+                produitEnSelection,
+                viandesChoisies,
+                saucesChoisies,
+                [],
+                boissonIncluse,
+                quantite - 1,
+                undefined,
+                saladeIncluse,
+                accompagnementsInclus,
+                sansBoisson,
+                sansSauce,
+                saladeOption,
+                platCible
+              );
+            }
             setLigneEnEdition(null);
-            if (produitViandeSupplementaire) {
-              for (const nomViande of extras.viandesSupplementaires) {
-                ajouterAuPanier(produitViandeSupplementaire, [nomViande], [], [], null, 1, undefined, null);
-              }
-            }
-            if (produitSauceSupplementaire) {
-              for (const nomSauce of extras.saucesSupplementaires) {
-                ajouterAuPanier(produitSauceSupplementaire, [], [nomSauce], [], null, 1, undefined, null);
-              }
-            }
             if (produitCanetteRapide) {
               for (const saveur of canettesRapidesChoisies) {
                 ajouterAuPanier(produitCanetteRapide, [], [], [saveur], null, 1);
