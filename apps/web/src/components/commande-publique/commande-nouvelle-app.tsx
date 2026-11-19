@@ -1548,6 +1548,38 @@ export function CommandeNouvelleApp({
             <ul className="space-y-3">{panier.map(lignePanier)}</ul>
           )}
 
+          {/* Récompense en un clic : le client choisit, jamais appliquée toute seule. */}
+          {nbArticles > 0 && fideliteVerifiee && fideliteVerifiee.tamponsDisponibles > 0 && (
+            <div className="rounded-xl border-4 border-[#2D5A27] bg-green-50 p-3">
+              <p className="text-lg font-extrabold text-gray-900">
+                🎁 Tu as {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense !
+              </p>
+              {maxTamponsUtilisables === 0 ? (
+                <p className="mt-1 text-sm font-bold text-gray-900">
+                  Ajoute encore {euros(MONTANT_RECOMPENSE - total)} à ton panier pour pouvoir l&apos;utiliser.
+                </p>
+              ) : nbTamponsEffectif > 0 ? (
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-base font-extrabold" style={{ color: VERT }}>
+                    ✓ Utilisée : −{euros(nbTamponsEffectif * MONTANT_RECOMPENSE)} sur ta commande
+                  </p>
+                  <button type="button" onClick={() => setNbTampons(0)} className="shrink-0 text-sm font-bold text-gray-800 underline">
+                    Ne pas l&apos;utiliser
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNbTampons(maxTamponsUtilisables)}
+                  className="mt-2 w-full rounded-xl py-3 text-lg font-extrabold text-white active:scale-[0.99]"
+                  style={{ backgroundColor: VERT }}
+                >
+                  Utiliser mes {maxTamponsUtilisables * MONTANT_RECOMPENSE} € · −{euros(maxTamponsUtilisables * MONTANT_RECOMPENSE)} sur ma commande
+                </button>
+              )}
+            </div>
+          )}
+
           {nbArticles > 0 && (
             <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
               {palierGroupeReel === "GROUPE_4" && (
@@ -1578,12 +1610,6 @@ export function CommandeNouvelleApp({
                     <p className="mt-2 text-sm font-extrabold text-gray-900">
                       🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
                       {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
-                    </p>
-                  )}
-                  {fideliteVerifiee.tamponsDisponibles > 0 && (
-                    <p className="mt-1 text-sm font-extrabold" style={{ color: VERT }}>
-                      🎉 Dont {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense déjà acquise
-                      {nbTamponsEffectif > 0 ? " (appliquée)" : " : utilise-la dans le bloc fidélité plus bas"}.
                     </p>
                   )}
                 </>
