@@ -998,8 +998,6 @@ export function CaisseApp({
               ? "précise l'endroit de livraison dans le champ « Précision » (mairie, CCAS, rue…)."
               : !telephone.trim()
                 ? "saisis le numéro de téléphone du client."
-                : !enModeEdition && !clientInfo?.existe && !profilCaisse
-                  ? "choisis le profil du nouveau client (étudiant, lycéen, enseignant, salarié ou autre)."
                 : canal === "livraison" && !prenom.trim()
                   ? "saisis le prénom du client (obligatoire pour une livraison)."
                   : !enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null
@@ -2437,12 +2435,12 @@ export function CaisseApp({
               )}
               {!enModeEdition && telephone.trim() && !clientInfo?.existe && (
                 <div className="mt-2">
-                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} titre="Nouveau client : il est…" />
+                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Nouveau client : il est… (facultatif)" />
                 </div>
               )}
               {!enModeEdition && clientInfo?.existe && !clientInfo.profil && (
                 <div className="mt-2">
-                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Profil (à demander si le client est là)" />
+                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Profil (facultatif, à demander si le client est là)" />
                 </div>
               )}
               {!clientInfo && <p className="mt-2 text-xs text-gray-700">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}
