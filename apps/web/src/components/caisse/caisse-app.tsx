@@ -429,6 +429,8 @@ export function CaisseApp({
   }, [enModeEdition]);
 
   const [modePaiement, setModePaiement] = useState<ModePaiementCommande>(() => commandeExistante?.modePaiement ?? "especes");
+  // Le mode de paiement n'est JAMAIS présélectionné : la caissière doit choisir (espèces / carte / mixte), sinon on ne sait pas comment le client a payé.
+  const [modePaiementChoisi, setModePaiementChoisi] = useState(() => commandeExistante != null);
   const [montantEspecesMixte, setMontantEspecesMixte] = useState("");
   // Pur calcul d'appoint à l'écran, jamais envoyé au serveur ni enregistré —
   // seul le montant réellement dû (totalApresRemises / part espèces du
@@ -596,6 +598,7 @@ export function CaisseApp({
     setPlatDeplie(null);
     setBoissonOfferteSaveurs([]);
     setModePaiement("especes");
+    setModePaiementChoisi(false);
     setMontantEspecesMixte("");
     setTelephone("");
     setClientInfo(null);
@@ -621,6 +624,7 @@ export function CaisseApp({
     setCanal(c.canal);
     setBoissonOfferteSaveurs(c.boissonOfferteSaveurs);
     setModePaiement(c.modePaiement);
+    setModePaiementChoisi(true);
     setMontantEspecesMixte(c.montantEspecesMixte);
     setTelephone(c.telephone);
     setClientInfo(c.clientInfo);
@@ -998,6 +1002,8 @@ export function CaisseApp({
               ? "précise l'endroit de livraison dans le champ « Précision » (mairie, CCAS, rue…)."
               : !telephone.trim()
                 ? "saisis le numéro de téléphone du client."
+                : encaisserEffectif && !enModeEdition && !modePaiementChoisi
+                  ? "choisis comment le client paie (espèces, carte ou mixte) dans la colonne Paiement."
                 : canal === "livraison" && !prenom.trim()
                   ? "saisis le prénom du client (obligatoire pour une livraison)."
                   : !enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null
@@ -2677,10 +2683,18 @@ export function CaisseApp({
             <div>
               <label className="text-xs text-gray-700">Paiement</label>
               <select
-                value={modePaiement}
-                onChange={(e) => setModePaiement(e.target.value as ModePaiementCommande)}
-                className="mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900"
+                value={modePaiementChoisi ? modePaiement : ""}
+                onChange={(e) => {
+                  setModePaiement(e.target.value as ModePaiementCommande);
+                  setModePaiementChoisi(true);
+                }}
+                className={`mt-1 w-full rounded border-2 p-2 text-sm text-gray-900 ${
+                  encaisserEffectif && !modePaiementChoisi ? "border-[#8B2020] bg-[#FFF8F0] font-bold" : "border-gray-300 bg-white"
+                }`}
               >
+                <option value="" disabled>
+                  — Choisis : espèces ou carte —
+                </option>
                 <option value="especes">Espèces</option>
                 <option value="cb">Carte (SumUp)</option>
                 <option value="mixte">Mixte (espèces + carte)</option>
