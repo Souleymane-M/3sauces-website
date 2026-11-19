@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
 import { limiterDebit } from "@/lib/auth/rate-limit";
+import { lireProfilEnregistre } from "@/lib/profil-client-serveur";
 
 const MAX_APPELS_PAR_FENETRE = 30;
 const FENETRE_RATE_LIMIT_MS = 5 * 60 * 1000;
@@ -29,5 +30,7 @@ export async function GET(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
 
-  return NextResponse.json({ emailConnu: Boolean(data?.email) });
+  // Oui/non seulement, comme pour l'email : jamais la valeur du profil.
+  const profilConnu = Boolean(data) && (await lireProfilEnregistre(supabase, telephone)) !== null;
+  return NextResponse.json({ emailConnu: Boolean(data?.email), profilConnu });
 }

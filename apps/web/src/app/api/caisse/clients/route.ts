@@ -1,3 +1,4 @@
+import { lireProfilEnregistre } from "@/lib/profil-client-serveur";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
@@ -38,9 +39,12 @@ export async function GET(request: Request) {
 
   const tampons = await compterTamponsDisponibles(supabase, telephoneNormalise);
 
+  const profil = await lireProfilEnregistre(supabase, telephoneNormalise);
+
   return NextResponse.json({
     existe: true,
     ...client,
+    profil,
     montantCumule: client.montant_cumule,
     tamponsDisponibles: tampons.nombre,
     prochaineExpiration: tampons.prochaineExpiration,

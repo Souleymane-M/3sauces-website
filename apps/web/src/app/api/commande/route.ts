@@ -33,6 +33,8 @@ import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxPa
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
+import { lireProfilClient } from "@/lib/profil-client";
+import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { normaliserSourceCampagne } from "@/lib/campagne";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
@@ -988,6 +990,8 @@ export async function POST(request: Request) {
     console.error("[/api/commande] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
+  // Profil déclaré par le client (étudiant, lycéen…) : enregistré sans jamais bloquer la commande.
+  await enregistrerProfilClient(supabase, telephone, lireProfilClient(body.profil));
 
   // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
   // récente — distinct des colonnes fidélité (montant_cumule, tampons...)

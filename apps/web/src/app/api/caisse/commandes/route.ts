@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
+import { lireProfilClient } from "@/lib/profil-client";
+import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { normaliserEmail } from "@/lib/email";
 import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
 import {
@@ -727,6 +729,7 @@ export async function POST(request: Request) {
   // mais seulement après l'insertion de la commande (AFTER INSERT) — trop tard
   // pour satisfaire la contrainte de clé étrangère `commandes_client_telephone_fkey`
   // au moment de l'insert. On s'assure donc ici que le client existe déjà.
+  // Le profil du nouveau client est exigé par l'écran de la caisse ; ici on ne bloque jamais une commande déjà prête (ancien écran resté ouvert).
   const { error: erreurUpsertClient } = await supabase
     .from("clients")
     .upsert({ telephone: clientTelephone }, { onConflict: "telephone", ignoreDuplicates: true });
@@ -735,6 +738,8 @@ export async function POST(request: Request) {
     console.error("[/api/caisse/commandes] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
+  // Profil du nouveau client (étudiant, lycéen…) saisi en caisse : sans jamais bloquer la commande.
+  await enregistrerProfilClient(supabase, clientTelephone, lireProfilClient((body as { profil?: unknown }).profil));
 
   // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
   // récente — distinct des colonnes fidélité (montant_cumule, tampons...)

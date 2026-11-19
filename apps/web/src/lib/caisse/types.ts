@@ -101,6 +101,8 @@ export interface LigneCommandePayload {
 
 export interface CreerCommandePayload {
   canal: Canal;
+  /** Profil déclaré du client (nouveau client en caisse) — voir lib/profil-client.ts. */
+  profil?: string;
   modePaiement: ModePaiementCommande;
   /** Détail espèces/carte si modePaiement === "mixte" — ignoré sinon. Les montants doivent sommer exactement au total de la commande, revérifié côté serveur. */
   paiements?: { mode: ModePaiement; montant: number }[];

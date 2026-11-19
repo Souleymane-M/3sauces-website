@@ -1,6 +1,8 @@
 "use client";
 
 import { MessageErreur } from "@/components/message-erreur";
+import { ProfilClientChoix } from "@/components/profil-client-choix";
+import type { ProfilClient } from "@/lib/profil-client";
 import { FAMILLES_BOISSON } from "@/lib/boissons";
 import { suspendreVerrou } from "@/lib/verrou-appareil";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -181,6 +183,7 @@ interface ClientInfo {
   tamponsDisponibles?: number;
   prochaineExpiration?: string | null;
   montantCumule?: number;
+  profil?: string | null;
 }
 
 function platVide(numero: number): PlatGroupeCaisse {
@@ -434,6 +437,8 @@ export function CaisseApp({
   const [montantRecuEspeces, setMontantRecuEspeces] = useState("");
   const [telephone, setTelephone] = useState(() => commandeExistante?.telephone ?? "");
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
+  // Profil du client (étudiant, lycéen…) : obligatoire pour un nouveau client, jamais redemandé ensuite.
+  const [profilCaisse, setProfilCaisse] = useState<ProfilClient | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   // Dernier numéro (normalisé) déjà recherché automatiquement — évite de
   // relancer la recherche à chaque frappe une fois le client trouvé.
@@ -585,6 +590,7 @@ export function CaisseApp({
   /** Vide intégralement le formulaire — réutilisé après un encaissement réussi et avant de mettre une commande de côté. */
   function reinitialiserFormulaire() {
     setModeCommande(null);
+    setProfilCaisse(null);
     setPanierSimple([]);
     setPlats([platVide(1)]);
     setPlatDeplie(null);
@@ -992,6 +998,8 @@ export function CaisseApp({
               ? "précise l'endroit de livraison dans le champ « Précision » (mairie, CCAS, rue…)."
               : !telephone.trim()
                 ? "saisis le numéro de téléphone du client."
+                : !enModeEdition && !clientInfo?.existe && !profilCaisse
+                  ? "choisis le profil du nouveau client (étudiant, lycéen, enseignant, salarié ou autre)."
                 : canal === "livraison" && !prenom.trim()
                   ? "saisis le prénom du client (obligatoire pour une livraison)."
                   : !enModeEdition && !impressionTicketObligatoire && !ticketClientALaRemise && choixImpressionTicket === null
@@ -1690,6 +1698,7 @@ export function CaisseApp({
           zone: canal === "livraison" ? zone : undefined,
           lignes: lignesPayload,
           imprimerTicketClient: imprimerTicketClient ?? true,
+          profil: profilCaisse ?? undefined,
         }),
       });
       const data = await reponse.json();
@@ -2424,6 +2433,16 @@ export function CaisseApp({
                   ) : (
                     <p className="text-xs text-gray-700">Nouveau client (sera créé au paiement).</p>
                   )}
+                </div>
+              )}
+              {!enModeEdition && telephone.trim() && !clientInfo?.existe && (
+                <div className="mt-2">
+                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} titre="Nouveau client : il est…" />
+                </div>
+              )}
+              {!enModeEdition && clientInfo?.existe && !clientInfo.profil && (
+                <div className="mt-2">
+                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Profil (à demander si le client est là)" />
                 </div>
               )}
               {!clientInfo && <p className="mt-2 text-xs text-gray-700">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}

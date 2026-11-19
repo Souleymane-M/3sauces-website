@@ -48,6 +48,8 @@ import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publi
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MessageErreur } from "@/components/message-erreur";
+import { ProfilClientChoix } from "@/components/profil-client-choix";
+import type { ProfilClient } from "@/lib/profil-client";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import { normaliserTelephone } from "@/lib/telephone";
@@ -213,6 +215,9 @@ export function CommandeNouvelleApp({
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
   const [emailDejaConnu, setEmailDejaConnu] = useState(false);
+  // Profil du client (étudiant, lycéen…) : demandé une fois ; déjà connu pour ce numéro = plus redemandé.
+  const [profil, setProfil] = useState<ProfilClient | null>(null);
+  const [profilDejaConnu, setProfilDejaConnu] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -267,7 +272,10 @@ export function CommandeNouvelleApp({
     const telephoneComplet = normaliserTelephone(telephone);
     const minuteur = setTimeout(async () => {
       if (!telephoneComplet) {
-        if (!annule) setEmailDejaConnu(false);
+        if (!annule) {
+          setEmailDejaConnu(false);
+          setProfilDejaConnu(false);
+        }
         return;
       }
       try {
@@ -275,6 +283,7 @@ export function CommandeNouvelleApp({
         if (annule) return;
         const data = await reponse.json();
         setEmailDejaConnu(Boolean(data.emailConnu));
+        setProfilDejaConnu(Boolean(data.profilConnu));
       } catch {
         // Échec silencieux : le pire cas est de redemander l'email.
       }
@@ -703,6 +712,10 @@ export function CommandeNouvelleApp({
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
+    if (!profilDejaConnu && !profil) {
+      setErreur("Choisis ton profil (étudiant, lycéen, enseignant, salarié ou autre) avant de valider : une seule fois, ça nous aide à mieux te proposer nos offres.");
+      return;
+    }
     if (saucesCadeauAChoisir > 0) {
       setErreur(`Choisis les sauces de ${nbBox > 1 ? "tes box offertes" : "ta box offerte"} (3 ailes grillées + frites) avant de valider.`);
       return;
@@ -832,6 +845,7 @@ export function CommandeNouvelleApp({
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
+          profil: !profilDejaConnu && profil ? profil : undefined,
           cadeauSauces: cadeauAcquis ? cadeauSauces.slice(0, nbSaucesCadeau) : undefined,
           sourceCampagne: lireSourceCampagne(),
         }),
@@ -1923,6 +1937,7 @@ export function CommandeNouvelleApp({
               />
               {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes points de fidélité, ou laisse vide.</p>}
             </div>
+            {!profilDejaConnu && <ProfilClientChoix valeur={profil} onChange={setProfil} />}
             <CarteFidelite {...proprietesCarteFidelite} />
           </section>
 
