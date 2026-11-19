@@ -152,6 +152,8 @@ function formaterDepuis(iso: string): string {
 
 /** Minutes écoulées depuis le dernier changement de statut (remis à zéro à chaque étape, demande explicite du patron 2026-10-16) — 15 min sans action dans "En attente"/"En préparation"/"Prête" déclenche un bandeau discret, pas de son (contrairement à une nouvelle commande ou une livraison signalée : ça arriverait trop souvent en période de rush pour rester sonore sans lasser). */
 const SEUIL_RETARD_ETAPE_MIN = 15;
+/** Au-delà, une commande sur place / à emporter encore « prête » déclenche le rappel de validation (vrai mode de paiement). */
+const SEUIL_RAPPEL_VALIDATION_MIN = 20;
 
 // Mêmes statuts que côté serveur (STATUTS_MODIFIABLES de lib/caisse/modification.ts,
 // "server-only" donc non importable ici) : avant qu'une commande ne parte vraiment,
@@ -812,9 +814,27 @@ export function CommandesApp({ commandesInitiales, aVenirInitial, enLivraisonIni
   const enAttente = commandesFiltrees.filter((c) => c.statut === "en_attente");
   const enPreparation = commandesFiltrees.filter((c) => c.statut === "en_preparation");
   const prete = commandesFiltrees.filter((c) => c.statut === "pret");
+  // Rappel : une commande sur place / à emporter « prête » depuis longtemps n'a sans doute pas été validée (« Client venu »),
+  // donc son vrai mode de paiement (espèces ou carte) n'est pas enregistré.
+  const aValider = commandes.filter(
+    (c) => c.canal !== "livraison" && c.statut === "pret" && minutesDepuis(c.statutChangeLe ?? c.creeLe) >= SEUIL_RAPPEL_VALIDATION_MIN
+  );
 
   return (
     <div className="mt-4">
+      {aValider.length > 0 && (
+        <div className="mb-4 rounded-xl border-4 border-[#1E3A8A] bg-[#EEF2FF] p-4">
+          <p className="text-xl font-extrabold text-[#1E3A8A]">
+            💳 {aValider.length} commande{aValider.length > 1 ? "s" : ""} prête{aValider.length > 1 ? "s" : ""} depuis plus de {SEUIL_RAPPEL_VALIDATION_MIN} min à valider
+          </p>
+          <p className="mt-1 text-base font-bold text-gray-900">
+            {aValider.map((c) => `#${c.numero}`).join(" · ")}
+          </p>
+          <p className="mt-1 text-base font-semibold text-gray-900">
+            Si le client est venu : appuie sur « Client venu » et choisis le vrai mode de paiement (espèces ou carte). Sans ça, le total des espèces et de la carte est faux.
+          </p>
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
         <span className="text-lg text-black">
           {employeActif ? (
