@@ -64,5 +64,5 @@ $$;
 -- Nom alphabétiquement APRÈS « commandes_appliquer_fidelite » : le crédit normal passe d'abord, le bonus ensuite.
 drop trigger if exists commandes_bonus_points_doubles on commandes;
 create trigger commandes_bonus_points_doubles
-  after insert or update on commandes
+  after insert or update of paiement_statut, statut, montant on commandes
   for each row execute function appliquer_bonus_points_doubles();
