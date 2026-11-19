@@ -2,8 +2,8 @@ import "server-only";
 import type { createServiceSupabaseClient } from "@3sauces/supabase";
 
 /**
- * Jours où les points de fidélité sont doublés pour les clients ACTIFS (demande du patron, 2026-11-19) : au moins
- * 2 commandes passées et une commande dans les 14 derniers jours. Site et caisse. On ajoute les jours ici.
+ * Jours où les points de fidélité sont doublés pour les clients ACTIFS qui commandent SUR LE SITE (demande du patron, 2026-11-19 : jamais en caisse, le but est de faire commander sur le site) : au moins
+ * 2 commandes passées et une commande dans les 14 derniers jours. On ajoute les jours ici.
  */
 export const JOURS_POINTS_DOUBLES_ACTIFS: readonly string[] = ["2026-11-20"];
 const JOURS_CLIENT_ACTIF = 14;
