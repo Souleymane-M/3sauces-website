@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
 import { lireProfilClient } from "@/lib/profil-client";
+import { pointsDoublesApplicables } from "@/lib/fidelite/points-doubles";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { normaliserEmail } from "@/lib/email";
 import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
@@ -801,11 +802,14 @@ export async function POST(request: Request) {
     }
   }
 
+  // Points doublés (clients actifs, jours d'opération) : jamais bloquant.
+  const pointsDoubles = await pointsDoublesApplicables(supabase, clientTelephone, dateCommande);
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
       canal: body.canal,
       contenu: lignes,
+      ...(pointsDoubles ? { points_doubles: true } : {}),
       montant,
       paiement_statut: paiementStatut,
       mode_paiement: body.modePaiement,

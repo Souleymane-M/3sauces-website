@@ -34,6 +34,7 @@ import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
 import { lireProfilClient } from "@/lib/profil-client";
+import { pointsDoublesApplicables } from "@/lib/fidelite/points-doubles";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { normaliserSourceCampagne } from "@/lib/campagne";
@@ -1024,11 +1025,14 @@ export async function POST(request: Request) {
     }
   }
 
+  // Points doublés (clients actifs, jours d'opération) : jamais bloquant.
+  const pointsDoubles = await pointsDoublesApplicables(supabase, telephone, dateCommande);
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
       canal: body.canal,
       contenu: lignes,
+      ...(pointsDoubles ? { points_doubles: true } : {}),
       montant: montantFinal,
       // "non_paye" à l'insertion dans tous les cas (espèces/CB payés en
       // personne plus tard, ou Stripe confirmé par le webhook) — le trigger
