@@ -150,7 +150,7 @@ export function phraseFidelite(c: Pick<ClientRelance, "recompenses" | "prochaine
     return `🎁 Tu as ${montant} € de récompense disponible${pluriel ? "s" : ""}, à utiliser quand tu veux sur ta prochaine commande (sur 3sauces.fr, par téléphone ou au comptoir).${fin} ${prochaine}`;
   }
   const points = c.tampons;
-  return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité. Encore ${manque} point${manque > 1 ? "s" : ""} pour avoir ${MONTANT_RECOMPENSE} € de récompense.`;
+  return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité. Encore ${manque} point${manque > 1 ? "s" : ""} de fidélité pour avoir ${MONTANT_RECOMPENSE} € de récompense.`;
 }
 
 /** Fin de phrase du mail du lundi : « tu as 4 points de fidélité, il t'en manque 6 pour 10 € offerts ». */

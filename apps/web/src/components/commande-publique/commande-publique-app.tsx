@@ -1259,7 +1259,7 @@ export function CommandePubliqueApp({
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: FOND_PAGE }}>
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
-        10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
+        10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
       </div>
       {offreCanetteActive(aujourdHui) && (
         <div className="bg-[#1F3A5F] px-4 py-2 text-center text-sm font-bold text-white">

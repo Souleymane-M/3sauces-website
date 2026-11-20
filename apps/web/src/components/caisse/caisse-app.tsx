@@ -2281,7 +2281,7 @@ export function CaisseApp({
                         className="rounded-full border-2 border-[#8B2020] bg-white px-3 py-2 text-sm font-extrabold text-gray-900 active:scale-95 disabled:opacity-40"
                       >
                         {p.nom} + {(p.prix ?? 0).toFixed(2).replace(".", ",")} €
-                        {!viseBoisson2L && (p.prix ?? 0) >= resteProchainPoint ? " · +1 point" : ""}
+                        {!viseBoisson2L && (p.prix ?? 0) >= resteProchainPoint ? " · +1 point de fidélité" : ""}
                       </button>
                     ))}
                   </div>
@@ -2289,7 +2289,7 @@ export function CaisseApp({
                     <>
                       <p className="mt-2 text-xs font-extrabold text-gray-900">
                         Une canette ? + {(produitCanetteRapide.prix ?? 0).toFixed(2).replace(".", ",")} €
-                        {!viseBoisson2L && (produitCanetteRapide.prix ?? 0) >= resteProchainPoint ? " · +1 point" : ""}
+                        {!viseBoisson2L && (produitCanetteRapide.prix ?? 0) >= resteProchainPoint ? " · +1 point de fidélité" : ""}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-2">
                         {saveurs.map((sv) => (

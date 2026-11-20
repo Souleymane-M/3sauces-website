@@ -93,7 +93,7 @@ export default async function CommandeConfirmeePage({ searchParams }: CommandeCo
         lignes.push(
           solde.nombre > 0
             ? `🎉 Tu as ${solde.nombre * MONTANT_RECOMPENSE} € de récompense disponible : utilise-la sur ta prochaine commande.`
-            : `Encore ${pluriel(manque, "point")} pour avoir ${MONTANT_RECOMPENSE} € de récompense.`
+            : `Encore ${pluriel(manque, "point")} de fidélité pour avoir ${MONTANT_RECOMPENSE} € de récompense.`
         );
         messagesPoints = lignes;
       }

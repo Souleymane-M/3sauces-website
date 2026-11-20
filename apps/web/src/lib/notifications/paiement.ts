@@ -46,7 +46,7 @@ async function construireBlocPoints(telephone: string, montantNet: number, dejaP
   lignes.push(
     solde.nombre > 0
       ? `🎉 Tu as ${formaterEuros(solde.nombre * MONTANT_RECOMPENSE)} de récompense disponible, à utiliser quand tu veux sur ta prochaine commande.`
-      : `Encore ${pts(manque)} pour avoir ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`
+      : `Encore ${pts(manque)} de fidélité pour avoir ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`
   );
   return lignes.map((l) => `<p>${l}</p>`).join("");
 }

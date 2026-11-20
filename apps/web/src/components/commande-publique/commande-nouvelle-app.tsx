@@ -1329,7 +1329,7 @@ export function CommandeNouvelleApp({
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
       {/* Bandeau fidélité : toujours visible */}
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
-        10 € dépensés = 1 point de fidélité · 10 points = 10 € offerts
+        10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
       </div>
       {offreCadeauActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
@@ -1356,7 +1356,7 @@ export function CommandeNouvelleApp({
                 {fideliteVerifiee
                   ? (() => {
                       const points = progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles);
-                      if (points === 0) return "🎁 Ton compte fidélité · voir mes points";
+                      if (points === 0) return "🎁 Ton compte fidélité · voir mes points de fidélité";
                       return `🎁 Tu as ${points} point${points > 1 ? "s" : ""} de fidélité${
                         fideliteVerifiee.tamponsDisponibles > 0 ? ` · ${fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense` : ""
                       }`;
@@ -1608,7 +1608,7 @@ export function CommandeNouvelleApp({
                         className="rounded-full disabled:opacity-40 border-2 border-[#8B2020] bg-white px-4 py-2 text-base font-extrabold text-gray-900 active:scale-95"
                       >
                         {p.nom} + {euros(p.prix)}
-                        {!viseBoisson2L && p.prix >= resteProchainPoint ? " · +1 point" : ""}
+                        {!viseBoisson2L && p.prix >= resteProchainPoint ? " · +1 point de fidélité" : ""}
                       </button>
                     );
                   })}

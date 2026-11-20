@@ -49,7 +49,7 @@ export default function ConfidentialitePage() {
         <h2 className="font-semibold text-gray-900">Emails de fidélité et de relance aux clients</h2>
         <p>
           Si vous avez déjà commandé chez 3 Sauces et que vous nous avez donné votre adresse email, nous
-          pouvons vous écrire pour vous informer de vos points et récompenses de fidélité, ou pour vous
+          pouvons vous écrire pour vous informer de vos points de fidélité et récompenses, ou pour vous
           proposer de commander à nouveau (produits similaires à ceux déjà commandés). Base légale : notre
           intérêt légitime à fidéliser nos clients. Vous pouvez vous y opposer à tout moment grâce au lien
           « Me désinscrire » présent dans chaque email : plus aucun email de ce type ne vous sera envoyé.
@@ -60,9 +60,9 @@ export default function ConfidentialitePage() {
         <h2 className="font-semibold text-gray-900">Retenir votre numéro sur cet appareil</h2>
         <p>
           Quand vous consultez vos points de fidélité sur 3sauces.fr, votre numéro de téléphone et votre
-          adresse email sont mémorisés dans le navigateur de votre appareil, pour retrouver vos points à votre
+          adresse email sont mémorisés dans le navigateur de votre appareil, pour retrouver vos points de fidélité à votre
           prochaine visite sans les retaper. Ils restent sur votre appareil et ne sont envoyés qu&apos;à notre
-          serveur pour afficher vos points. Vous pouvez les effacer à tout moment avec le lien « Ce n&apos;est
+          serveur pour afficher vos points de fidélité. Vous pouvez les effacer à tout moment avec le lien « Ce n&apos;est
           pas moi » du panier, ou en vidant les données de votre navigateur.
         </p>
       </section>

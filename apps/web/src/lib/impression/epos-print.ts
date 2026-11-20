@@ -429,7 +429,7 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   separateur(b);
   b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 1 });
   b.ligne("10€ dépensés = 1 point de fidélité", { align: "center", gras: false, taille: 1 });
-  b.ligne("10 points = 10€ offerts", { align: "center", gras: false, taille: 1 });
+  b.ligne("10 points de fidélité = 10€ offerts", { align: "center", gras: false, taille: 1 });
 
   if (commande.clientTelephone && commande.tamponsAffiches !== null) {
     if (commande.tamponsUtilises > 0) {
@@ -445,7 +445,7 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
     // jamais soustraire une seconde fois ici, ce serait compter la remise
     // deux fois.
     const tampon = commande.tamponsAffiches > 1 ? "points" : "point";
-    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon}`, { align: "center", gras: true, taille: 2 });
+    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon} de fidélité`, { align: "center", gras: true, taille: 2 });
     if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
       b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
     }
@@ -476,7 +476,7 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
       return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser`;
     }
     const reste = NB_TAMPONS_RECOMPENSE - commande.tamponsAffiches;
-    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts`;
+    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} de fidélité pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts`;
   }
 
   // Commande passée sur le site (sur place / à emporter) : un simple remerciement.
@@ -493,10 +493,10 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
   }
   const reste = commande.resteAvantProchainPoint;
   if (!commande.clientNouveau && typeof reste === "number" && reste > 0 && reste <= 3) {
-    return `Plus que ${euros(reste)} pour ton prochain point${prenom ? `, ${prenom}` : ""}. Commande sur 3sauces.fr : chaque commande est comptée.`;
+    return `Plus que ${euros(reste)} pour ton prochain point de fidélité${prenom ? `, ${prenom}` : ""}. Commande sur 3sauces.fr : chaque commande est comptée.`;
   }
   if (commande.clientNouveau) {
-    return `${salutation} ! Commande sur 3sauces.fr : tu gagnes 1 point par 10 € dépensés et ton plat est prêt à ton arrivée.`;
+    return `${salutation} ! Commande sur 3sauces.fr : tu gagnes 1 point de fidélité par 10 € dépensés et ton plat est prêt à ton arrivée.`;
   }
   return `${salutation} ! Commande sur 3sauces.fr avant de venir : ton plat est prêt à ton arrivée, sans attente.`;
 }

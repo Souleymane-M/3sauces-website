@@ -35,7 +35,7 @@ export default function FidelitePage() {
           plusieurs sur une même commande — jamais obligé de tout dépenser d&apos;un coup.
         </p>
         <p>
-          → Chaque récompense de 10€ (10 points) est utilisable en une seule fois sur une commande d&apos;un
+          → Chaque récompense de 10€ (10 points de fidélité) est utilisable en une seule fois sur une commande d&apos;un
           montant minimum de 10€.
         </p>
         <p>

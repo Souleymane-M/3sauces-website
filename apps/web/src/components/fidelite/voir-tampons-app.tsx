@@ -90,14 +90,14 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
       </h1>
       {etape === "telephone" && (
         <p className="text-sm text-gray-800">
-          Chez 3 Sauces, chaque 10 € dépensés = 1 point de fidélité, et 10 points = 10 € offerts. Retrouve ici tes points et tes récompenses.
+          Chez 3 Sauces, chaque 10 € dépensés = 1 point de fidélité, et 10 points de fidélité = 10 € offerts. Retrouve ici tes points de fidélité et tes récompenses.
         </p>
       )}
 
       {etape === "telephone" && (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-[#FFF8F0] p-4 text-left">
           <p className="text-sm font-semibold text-gray-900">
-            Pour voir tes points, confirme que c&apos;est bien toi : entre le numéro de téléphone de ta commande.
+            Pour voir tes points de fidélité, confirme que c&apos;est bien toi : entre le numéro de téléphone de ta commande.
           </p>
           <input
             value={telephone}
