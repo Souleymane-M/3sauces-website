@@ -1334,7 +1334,7 @@ export function CommandeNouvelleApp({
       </div>
       {pointsDoublesPossibles(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : points de fidélité DOUBLÉS pour nos clients actifs
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : points de fidélité DOUBLÉS pour tous nos clients
         </div>
       )}
       {offreCadeauActive(aujourdHui) && (
