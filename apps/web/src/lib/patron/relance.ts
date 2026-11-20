@@ -159,7 +159,7 @@ export function phrasePointsLundi(c: Pick<ClientRelance, "recompenses" | "procha
   const pts = (n: number) => `${n} point${n > 1 ? "s" : ""}`;
   if (c.recompenses > 0) {
     const fin = c.prochaineExpiration ? ` (valable jusqu'au ${dateFr(c.prochaineExpiration)})` : "";
-    return `tu as ${c.recompenses * MONTANT_RECOMPENSE} € de récompense disponible${c.recompenses > 1 ? "s" : ""}${fin}, et il t'en manque ${pts(manque)} pour ${MONTANT_RECOMPENSE} € de plus`;
+    return `tu as ${c.recompenses * MONTANT_RECOMPENSE} € de récompense disponible${c.recompenses > 1 ? "s" : ""}${fin}, et il t'en manque ${pts(manque)} de fidélité pour ${MONTANT_RECOMPENSE} € de plus`;
   }
   if (c.tampons === 0) {
     const reste = MONTANT_RECOMPENSE - (c.montantCumule % MONTANT_RECOMPENSE);
