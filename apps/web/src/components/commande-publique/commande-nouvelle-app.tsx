@@ -48,6 +48,7 @@ import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publi
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MessageErreur } from "@/components/message-erreur";
+import { pointsDoublesPossibles } from "@/lib/fidelite/jours-points-doubles";
 import { ProfilClientChoix } from "@/components/profil-client-choix";
 import type { ProfilClient } from "@/lib/profil-client";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
@@ -1331,6 +1332,11 @@ export function CommandeNouvelleApp({
       <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
         10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
       </div>
+      {pointsDoublesPossibles(aujourdHui) && (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : points de fidélité DOUBLÉS pour nos clients actifs
+        </div>
+      )}
       {offreCadeauActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
           🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
