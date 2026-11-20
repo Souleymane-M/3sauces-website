@@ -2,7 +2,7 @@
 
 import { MessageErreur } from "@/components/message-erreur";
 import { ProfilClientChoix } from "@/components/profil-client-choix";
-import type { ProfilClient } from "@/lib/profil-client";
+import { PROFILS_CLIENT, type ProfilClient } from "@/lib/profil-client";
 import { FAMILLES_BOISSON } from "@/lib/boissons";
 import { suspendreVerrou } from "@/lib/verrou-appareil";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -456,6 +456,9 @@ export function CaisseApp({
   const [platEtAvecCaId, setPlatEtAvecCaId] = useState<string | null>(null);
   // Onglets de produits (même organisation que le site /commander).
   const [ongletCaisse, setOngletCaisse] = useState<string | null>(null);
+  // Blocs repliés par défaut pour garder l'écran court : « Et avec ça ? » et le profil du client.
+  const [etAvecCaOuvert, setEtAvecCaOuvert] = useState(false);
+  const [profilOuvert, setProfilOuvert] = useState(false);
   const [confirmation, setConfirmation] = useState<{ commandeId: string; montant: number; canal: Canal; encaisse: boolean } | null>(
     null
   );
@@ -1919,7 +1922,7 @@ export function CaisseApp({
   }
 
   return (
-    <div className={`space-y-4 ${modeCommande !== null ? (enModeGroupe ? "pb-44" : "pb-20") : ""}`}>
+    <div className={`space-y-4 ${modeCommande !== null ? (enModeGroupe ? "pb-56" : "pb-32") : ""}`}>
       {!enModeEdition && commandesEnAttente.length > 0 && (
         <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-3">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-700">
@@ -2236,10 +2239,14 @@ export function CaisseApp({
               )}
               {nbArticles > 0 && (accompagnementsSuggeres.length > 0 || (produitCanetteRapide && saveurs.length > 0)) && (
                 <div className="mt-3 rounded-xl border-4 border-[#8B2020] bg-[#FFF1E0] p-3">
-                  <p className="text-xl font-extrabold leading-tight" style={{ color: ROUGE }}>
-                    Et avec ça ?
-                  </p>
-                  <p className="text-xs font-semibold text-gray-800">À proposer au client — ajout en un clic</p>
+                  <button type="button" onClick={() => setEtAvecCaOuvert((v) => !v)} aria-expanded={etAvecCaOuvert} className="flex w-full items-center justify-between gap-2 text-left">
+                    <span className="text-xl font-extrabold leading-tight" style={{ color: ROUGE }}>
+                      Et avec ça ?
+                      <span className="ml-2 text-xs font-semibold text-gray-800">frites, ailes, canette… ajout en un clic</span>
+                    </span>
+                    <span className="text-sm font-extrabold text-gray-900">{etAvecCaOuvert ? "▲" : "▼"}</span>
+                  </button>
+                  {etAvecCaOuvert && (<div>
                   {enModeGroupe && (
                     <div className="mt-2 rounded-lg border-2 border-[#1E3A8A] bg-white p-2">
                       <p className="text-xs font-extrabold uppercase tracking-wide text-[#1E3A8A]">① Pour quel plat ?</p>
@@ -2306,6 +2313,7 @@ export function CaisseApp({
                       </div>
                     </>
                   )}
+                  </div>)}
                 </div>
               )}
               {palierGroupeReel === "GROUPE_4" && (
@@ -2449,14 +2457,20 @@ export function CaisseApp({
                   )}
                 </div>
               )}
-              {!enModeEdition && !clientInfo?.existe && (
-                <div className="mt-2">
-                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Nouveau client : il est… (facultatif)" />
-                </div>
-              )}
-              {!enModeEdition && clientInfo?.existe && !clientInfo.profil && (
-                <div className="mt-2">
-                  <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Profil (facultatif, à demander si le client est là)" />
+              {!enModeEdition && (!clientInfo?.existe || !clientInfo.profil) && (
+                <div className="mt-2 rounded-lg border border-gray-300 bg-white">
+                  <button type="button" onClick={() => setProfilOuvert((v) => !v)} aria-expanded={profilOuvert} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+                    <span className="text-sm font-bold text-gray-900">
+                      Profil du client (facultatif)
+                      {profilCaisse && <span className="ml-2 text-[#2D5A27]">✓ {PROFILS_CLIENT.find((p) => p.valeur === profilCaisse)?.libelle}</span>}
+                    </span>
+                    <span className="text-sm font-extrabold text-gray-900">{profilOuvert ? "▲" : "▼"}</span>
+                  </button>
+                  {profilOuvert && (
+                    <div className="px-3 pb-3">
+                      <ProfilClientChoix valeur={profilCaisse} onChange={setProfilCaisse} obligatoire={false} titre="Il est…" />
+                    </div>
+                  )}
                 </div>
               )}
               {!clientInfo && <p className="mt-2 text-xs text-gray-700">{MESSAGE_GENERIQUE_FIDELITE} Valables 3 mois.</p>}
@@ -2903,6 +2917,9 @@ export function CaisseApp({
                   </span>
                 </button>
               ))}
+            {raisonBlocage && panierActuel.length > 0 && (
+              <p className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-bold text-amber-900">⚠️ Pour valider : {raisonBlocage}</p>
+            )}
             <div className="flex items-center justify-between gap-3">
               {panierActuel.length === 0 ? (
                 <span className="text-sm text-gray-600">Panier vide</span>
@@ -2911,29 +2928,44 @@ export function CaisseApp({
                   <div>
                     <div className="text-sm font-semibold text-gray-900">
                       {enModeGroupe
-                        ? `Plat ${plats.findIndex((p) => p.id === platActifId) + 1}`
+                        ? `Plat ${plats.findIndex((p) => p.id === platActifId) + 1} : ${totalPlat(platActif).toFixed(2)} €`
                         : `${nbArticles} article${nbArticles > 1 ? "s" : ""}`}
                     </div>
-                    <div className="text-xs text-gray-700">{(enModeGroupe ? totalPlat(platActif) : total).toFixed(2)} €</div>
+                    <div className="text-lg font-extrabold text-gray-900">Total {totalApresRemises.toFixed(2)} €</div>
                   </div>
-                  {boissonsOffertesAChoisir > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                      className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white"
-                    >
-                      🎁 Choisir la boisson offerte
-                    </button>
-                  ) : (
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => document.getElementById("panier-caisse")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                      style={{ backgroundColor: ROUGE }}
+                      className="rounded-full border-2 border-[#8B2020] px-4 py-2.5 text-sm font-bold text-[#8B2020]"
                     >
-                      {enModeGroupe && nbPlatsValides >= SEUIL_MINIMUM_GROUPE ? "C'est tout → voir le panier" : "Voir le panier"}
+                      Panier ↓
                     </button>
-                  )}
+                    {boissonsOffertesAChoisir > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById("boisson-offerte")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                        className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white"
+                      >
+                        🎁 Choisir la boisson offerte
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={envoiEnCours}
+                        onClick={() => {
+                          if (raisonBlocage) {
+                            setErreur(`Impossible de valider : ${raisonBlocage}`);
+                            return;
+                          }
+                          (enModeEdition ? enregistrerModification : encaisser)();
+                        }}
+                        className={`rounded-full bg-[#2D5A27] px-6 py-2.5 text-base font-extrabold text-white disabled:opacity-40 ${raisonBlocage ? "opacity-60" : ""}`}
+                      >
+                        {envoiEnCours ? "Envoi…" : enModeEdition ? "Enregistrer" : encaisserEffectif ? "Encaisser" : "Valider"}
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
