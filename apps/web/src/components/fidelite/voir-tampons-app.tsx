@@ -163,8 +163,12 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
         </div>
       )}
 
-      <a href="/commander" className="inline-block text-sm font-semibold text-[#8B2020] underline">
-        Commander à nouveau
+      <a
+        href="/commander"
+        className="block w-full rounded-xl bg-[#8B2020] px-4 py-4 text-center text-lg font-extrabold text-white shadow-md active:scale-[0.99]"
+      >
+        Commander sur 3sauces.fr
+        <span className="block text-sm font-semibold">Ta récompense s&apos;utilise en un clic dans ton panier</span>
       </a>
     </div>
   );

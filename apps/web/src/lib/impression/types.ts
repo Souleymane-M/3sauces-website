@@ -32,6 +32,8 @@ export interface CommandePourImpression {
   clientNouveau: boolean | null;
   /** Nombre de tampons à afficher (0-10+), déjà résolu par l'appelant (jamais calculé dans epos-print.ts, qui reste pur) — null si client non identifié. */
   tamponsAffiches: number | null;
+  /** Euros qui manquent avant le prochain point de fidélité — null si client non identifié. */
+  resteAvantProchainPoint?: number | null;
   /** Une récompense (10 tampons) est disponible et pas encore utilisée. */
   recompenseDisponible: boolean;
   /** Message du moment actif à imprimer sur le reçu client — null si inactif/vide. */

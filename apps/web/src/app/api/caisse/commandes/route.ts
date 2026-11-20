@@ -927,6 +927,7 @@ export async function POST(request: Request) {
     coutIncomplet,
     qrCode,
     tamponsAffiches: soldeTicket?.tampons ?? null,
+    resteAvantProchainPoint: soldeTicket?.resteAvantProchainPoint ?? null,
     recompenseDisponible: soldeTicket?.recompenseDisponible ?? false,
     messageDuMoment: messageMoment.actif && messageMoment.texte ? messageMoment.texte : null,
   });

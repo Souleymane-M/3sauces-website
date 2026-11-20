@@ -48,10 +48,12 @@ export async function compterTamponsDisponibles(
  * l'impression du ticket, où le patron a explicitement demandé de
  * n'afficher QUE ce nombre de tampons, jamais de montant restant.
  */
+const MONTANT_PAR_POINT = 10;
+
 export async function calculerTamponsPourTicket(
   supabase: SupabaseClient<Database>,
   telephone: string
-): Promise<{ tampons: number; recompenseDisponible: boolean }> {
+): Promise<{ tampons: number; recompenseDisponible: boolean; resteAvantProchainPoint: number }> {
   const [solde, { data: clientRow }] = await Promise.all([
     compterTamponsDisponibles(supabase, telephone),
     supabase.from("clients").select("montant_cumule").eq("telephone", telephone).maybeSingle(),
@@ -60,5 +62,7 @@ export async function calculerTamponsPourTicket(
   return {
     tampons: progressionTampons(reliquat, solde.nombre),
     recompenseDisponible: solde.nombre > 0,
+    // Euros qui manquent avant le prochain point (10 € = 1 point) : jamais 0, un point tout juste gagné repart de 10 €.
+    resteAvantProchainPoint: MONTANT_PAR_POINT - (Math.round(reliquat * 100) % (MONTANT_PAR_POINT * 100)) / 100,
   };
 }

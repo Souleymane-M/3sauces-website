@@ -63,7 +63,7 @@ export async function construireCommandesPourImpression(
   if (commandes.length === 0) return [];
 
   const telephones = [...new Set(commandes.map((c) => c.client_telephone).filter((t): t is string => !!t))];
-  const soldeParTelephone = new Map<string, { tampons: number; recompenseDisponible: boolean }>();
+  const soldeParTelephone = new Map<string, { tampons: number; recompenseDisponible: boolean; resteAvantProchainPoint: number }>();
   // Date de la toute première commande jamais passée par ce numéro —
   // sert à distinguer "nouveau client" de "client déjà connu" pour le
   // message imprimé sur le ticket (cf. `determinerMessageFidelite` dans
@@ -113,6 +113,7 @@ export async function construireCommandesPourImpression(
       clientTelephone: c.client_telephone,
       clientNouveau: c.client_telephone ? premiereCommandeParTelephone.get(c.client_telephone) === c.created_at : null,
       tamponsAffiches: solde ? solde.tampons : null,
+      resteAvantProchainPoint: solde ? solde.resteAvantProchainPoint : null,
       recompenseDisponible: solde ? solde.recompenseDisponible : false,
       messageDuMoment,
       origineCaisse: c.commande_par !== null,

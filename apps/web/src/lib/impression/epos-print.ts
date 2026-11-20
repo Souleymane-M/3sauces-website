@@ -479,11 +479,26 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
     return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts`;
   }
 
-  if (!commande.origineCaisse) return null;
-  if (commande.clientNouveau) {
-    return `${salutation} pour ta commande. La prochaine fois, commande sur 3sauces.fr pour activer tes points de fidélité`;
+  // Commande passée sur le site (sur place / à emporter) : un simple remerciement.
+  if (!commande.origineCaisse) {
+    if (commande.tamponsAffiches === null) return `${salutation} d'avoir commandé sur 3sauces.fr ! À bientôt !`;
+    const n = commande.tamponsAffiches;
+    return `${salutation} d'avoir commandé sur 3sauces.fr ! Tu as ${n} point${n > 1 ? "s" : ""} de fidélité. À bientôt !`;
   }
-  return `${salutation} pour ta confiance et ta fidélité, la prochaine fois, avant de venir, commande sur 3sauces.fr pour éviter de faire la queue`;
+
+  // Commande saisie en caisse : on explique, concrètement, ce que le client gagne à commander sur le site.
+  const euros = (m: number) => `${m.toFixed(2).replace(".", ",")} €`;
+  if (commande.recompenseDisponible) {
+    return `${prenom ? `${prenom}, tu` : "Tu"} as ${MONTANT_RECOMPENSE} € de récompense ! Scanne le QR : sur 3sauces.fr, un seul clic pour l'utiliser.`;
+  }
+  const reste = commande.resteAvantProchainPoint;
+  if (!commande.clientNouveau && typeof reste === "number" && reste > 0 && reste <= 3) {
+    return `Plus que ${euros(reste)} pour ton prochain point${prenom ? `, ${prenom}` : ""}. Commande sur 3sauces.fr : chaque commande est comptée.`;
+  }
+  if (commande.clientNouveau) {
+    return `${salutation} ! Commande sur 3sauces.fr : tu gagnes 1 point par 10 € dépensés et ton plat est prêt à ton arrivée.`;
+  }
+  return `${salutation} ! Commande sur 3sauces.fr avant de venir : ton plat est prêt à ton arrivée, sans attente.`;
 }
 
 function imprimerBlocCommunication(b: ConstructeurTicket, commande: CommandePourImpression): void {
@@ -587,10 +602,10 @@ function construireContenuTicketClient(
     // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
     // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.
     b.brut(`<feed line="1"/>`);
-    b.ligne("Scanne pour voir tes points de fidélité", { align: "center", gras: true, taille: 1 });
+    b.ligne("Scanne pour voir tes points de fidélité et commander en un clic", { align: "center", gras: true, taille: 1 });
     b.brut(styleTexte({ align: "center" }));
     b.brut(
-      `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}`)}</symbol>`
+      `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}&src=${commande.origineCaisse ? "ticket-caisse" : "ticket-site"}`)}</symbol>`
     );
   }
   if (commande.canal === "livraison" && commande.qrCode) {

@@ -1548,6 +1548,38 @@ export function CommandeNouvelleApp({
             <ul className="space-y-3">{panier.map(lignePanier)}</ul>
           )}
 
+          {/* Le client se fait reconnaître ici même (numéro + e-mail) : sa récompense apparaît juste en dessous, utilisable en un clic. */}
+          {nbArticles > 0 && !fideliteVerifiee && (
+            <div className="rounded-xl border-2 border-[#2D5A27] bg-[#FFF8F0] p-3">
+              <p className="text-base font-extrabold text-gray-900">🎁 Tu as des points ou une récompense ?</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-800">
+                Saisis ton numéro et ton e-mail : ta récompense apparaît ici et s&apos;utilise en un clic.
+              </p>
+              <div className="mt-2 grid grid-cols-1 gap-2">
+                <input
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  inputMode="tel"
+                  placeholder="Téléphone (0639123456)"
+                  aria-label="Ton numéro de téléphone"
+                  className="rounded border border-gray-400 bg-white p-3 text-base text-gray-900"
+                />
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  placeholder="E-mail"
+                  aria-label="Ton e-mail"
+                  className="rounded border border-gray-400 bg-white p-3 text-base text-gray-900"
+                />
+              </div>
+            </div>
+          )}
+          {/* Toujours monté dans le panier : la reconnaissance du client se fait dès que numéro et e-mail sont valides. */}
+          <div className="hidden">
+            <CarteFidelite {...proprietesCarteFidelite} integre />
+          </div>
+
           {/* Récompense en un clic : le client choisit, jamais appliquée toute seule. */}
           {nbArticles > 0 && fideliteVerifiee && fideliteVerifiee.tamponsDisponibles > 0 && (
             <div className="rounded-xl border-4 border-[#2D5A27] bg-green-50 p-3">
