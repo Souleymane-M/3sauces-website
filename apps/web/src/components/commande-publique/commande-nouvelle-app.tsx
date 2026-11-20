@@ -318,6 +318,8 @@ export function CommandeNouvelleApp({
     null
   );
   const [nbTampons, setNbTampons] = useState(0);
+  // Un client qui a une récompense DOIT dire s'il l'utilise ou non avant de pouvoir commander (jamais appliquée toute seule).
+  const [choixRecompenseFait, setChoixRecompenseFait] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [accepteCgv, setAccepteCgv] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -424,6 +426,7 @@ export function CommandeNouvelleApp({
   const resteAuPlatActif = Math.max(0, SEUIL_MINIMUM_PLAT - totalPlatActif);
   const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
+  const choixRecompenseRequis = maxTamponsUtilisables > 0 && !choixRecompenseFait;
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
@@ -712,6 +715,11 @@ export function CommandeNouvelleApp({
     }
     if (palierGroupeReel === "GROUPE_4" && boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes) {
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
+      return;
+    }
+    if (choixRecompenseRequis) {
+      setErreur("Choisis d'abord si tu utilises ta récompense (oui ou non).");
+      aller("panier");
       return;
     }
     if (!profilDejaConnu && !profil) {
@@ -1658,9 +1666,9 @@ export function CommandeNouvelleApp({
             )}
           </div>
 
-          {/* Récompense : juste sous le total, le client choisit combien il utilise (jamais appliquée toute seule). */}
+          {/* Récompense : juste sous le total. Réponse OBLIGATOIRE (oui ou non) avant de pouvoir commander. */}
           {nbArticles > 0 && fideliteVerifiee && fideliteVerifiee.tamponsDisponibles > 0 && (
-            <div className="rounded-xl border-4 border-[#2D5A27] bg-green-50 p-3">
+            <div id="choix-recompense" className={`rounded-xl border-4 p-3 ${choixRecompenseRequis ? "border-[#8B2020] bg-[#FFF8F0]" : "border-[#2D5A27] bg-green-50"}`}>
               <p className="text-lg font-extrabold text-gray-900">
                 🎁 Tu as {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense
               </p>
@@ -1670,36 +1678,37 @@ export function CommandeNouvelleApp({
                 </p>
               ) : (
                 <>
-                  <p className="mt-1 text-base font-extrabold text-gray-900">Combien veux-tu utiliser sur cette commande ?</p>
-                  <div className="mt-2 flex items-center gap-3">
+                  <p className="mt-1 text-base font-extrabold text-gray-900">Veux-tu l&apos;utiliser sur cette commande ?</p>
+                  <div className="mt-2 space-y-2">
+                    {Array.from({ length: maxTamponsUtilisables }, (_, i) => maxTamponsUtilisables - i).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                          setNbTampons(k);
+                          setChoixRecompenseFait(true);
+                        }}
+                        className={`w-full rounded-xl border-2 px-4 py-3 text-left text-base font-extrabold ${
+                          choixRecompenseFait && nbTamponsEffectif === k ? "border-[#2D5A27] bg-[#2D5A27] text-white" : "border-[#2D5A27] bg-white text-gray-900"
+                        }`}
+                      >
+                        {choixRecompenseFait && nbTamponsEffectif === k ? "✓ " : ""}Oui, utiliser {euros(k * MONTANT_RECOMPENSE)} · −{euros(k * MONTANT_RECOMPENSE)} sur ma commande
+                      </button>
+                    ))}
                     <button
                       type="button"
-                      onClick={() => setNbTampons(Math.max(0, nbTamponsEffectif - 1))}
-                      disabled={nbTamponsEffectif === 0}
-                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#2D5A27] text-2xl font-extrabold text-[#2D5A27] disabled:opacity-30"
+                      onClick={() => {
+                        setNbTampons(0);
+                        setChoixRecompenseFait(true);
+                      }}
+                      className={`w-full rounded-xl border-2 px-4 py-3 text-left text-base font-extrabold ${
+                        choixRecompenseFait && nbTamponsEffectif === 0 ? "border-gray-700 bg-gray-700 text-white" : "border-gray-500 bg-white text-gray-900"
+                      }`}
                     >
-                      −
-                    </button>
-                    <span className="w-28 text-center text-2xl font-extrabold text-gray-900">{euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setNbTampons(Math.min(maxTamponsUtilisables, nbTamponsEffectif + 1))}
-                      disabled={nbTamponsEffectif >= maxTamponsUtilisables}
-                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#2D5A27] text-2xl font-extrabold text-[#2D5A27] disabled:opacity-30"
-                    >
-                      +
+                      {choixRecompenseFait && nbTamponsEffectif === 0 ? "✓ " : ""}Non, je la garde pour une prochaine commande
                     </button>
                   </div>
-                  {nbTamponsEffectif < maxTamponsUtilisables && (
-                    <button
-                      type="button"
-                      onClick={() => setNbTampons(maxTamponsUtilisables)}
-                      className="mt-2 w-full rounded-xl py-3 text-base font-extrabold text-white active:scale-[0.99]"
-                      style={{ backgroundColor: VERT }}
-                    >
-                      Tout utiliser : −{euros(maxTamponsUtilisables * MONTANT_RECOMPENSE)}
-                    </button>
-                  )}
+                  {choixRecompenseRequis && <p className="mt-2 text-sm font-bold text-[#8B2020]">Choisis oui ou non pour pouvoir commander.</p>}
                 </>
               )}
             </div>
@@ -1758,7 +1767,14 @@ export function CommandeNouvelleApp({
             </button>
             <button
               type="button"
-              onClick={() => aller("validation")}
+              onClick={() => {
+                if (choixRecompenseRequis) {
+                  setErreur("Choisis d'abord si tu utilises ta récompense (oui ou non).");
+                  document.getElementById("choix-recompense")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  return;
+                }
+                aller("validation");
+              }}
               disabled={nbArticles === 0}
               className="rounded-xl py-4 text-base font-extrabold text-white disabled:opacity-40"
               style={{ backgroundColor: VERT }}
