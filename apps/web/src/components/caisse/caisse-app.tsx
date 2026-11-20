@@ -441,6 +441,8 @@ export function CaisseApp({
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   // Profil du client (étudiant, lycéen…) : obligatoire pour un nouveau client, jamais redemandé ensuite.
   const [profilCaisse, setProfilCaisse] = useState<ProfilClient | null>(null);
+  // Comment la commande est arrivée : au comptoir (client présent) ou par téléphone — à choisir à chaque commande.
+  const [modePrise, setModePrise] = useState<"comptoir" | "telephone" | null>(null);
   const [rechercheEnCours, setRechercheEnCours] = useState(false);
   // Dernier numéro (normalisé) déjà recherché automatiquement — évite de
   // relancer la recherche à chaque frappe une fois le client trouvé.
@@ -596,6 +598,7 @@ export function CaisseApp({
   function reinitialiserFormulaire() {
     setModeCommande(null);
     setProfilCaisse(null);
+    setModePrise(null);
     setPanierSimple([]);
     setPlats([platVide(1)]);
     setPlatDeplie(null);
@@ -1000,6 +1003,8 @@ export function CaisseApp({
   const raisonBlocage: string | null =
     panierActuel.length === 0
       ? "le panier est vide : ajoute au moins un produit."
+      : !enModeEdition && !modePrise
+        ? "indique si la commande est prise au comptoir ou par téléphone (colonne client)."
       : canal === "livraison" && !livraisonPossible
         ? "la livraison n'est pas disponible pour le moment."
         : canal === "livraison" && !minimumAtteint
@@ -1711,6 +1716,7 @@ export function CaisseApp({
           lignes: lignesPayload,
           imprimerTicketClient: imprimerTicketClient ?? true,
           profil: profilCaisse ?? undefined,
+          modePrise: modePrise ?? undefined,
         }),
       });
       const data = await reponse.json();
@@ -2371,6 +2377,34 @@ export function CaisseApp({
             </div>
             {/* Colonne 2 : le client et le retrait */}
             <div className="space-y-4">
+            {!enModeEdition && (
+              <div>
+                <label className="text-xs font-bold text-gray-900">La commande est prise…</label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["comptoir", "🏪 Au comptoir"],
+                      ["telephone", "📞 Par téléphone"],
+                    ] as const
+                  ).map(([valeur, libelle]) => (
+                    <button
+                      key={valeur}
+                      type="button"
+                      onClick={() => setModePrise(valeur)}
+                      className={`rounded-lg border-2 py-3 text-base font-extrabold ${
+                        modePrise === valeur
+                          ? "border-[#8B2020] bg-[#8B2020] text-white"
+                          : modePrise === null
+                            ? "border-[#8B2020] bg-[#FFF8F0] text-gray-900"
+                            : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    >
+                      {libelle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-gray-700">

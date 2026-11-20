@@ -812,11 +812,15 @@ export async function POST(request: Request) {
     }
   }
 
+  // Comptoir ou téléphone : enregistré seulement si la colonne existe (migration « mode_prise »), jamais bloquant.
+  const modePrise = body.modePrise === "comptoir" || body.modePrise === "telephone" ? body.modePrise : null;
+  const colonneModePrise = modePrise ? !(await supabase.from("commandes").select("mode_prise" as never).limit(1)).error : false;
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
       canal: body.canal,
       contenu: lignes,
+      ...(colonneModePrise ? { mode_prise: modePrise } : {}),
       montant,
       paiement_statut: paiementStatut,
       mode_paiement: body.modePaiement,
