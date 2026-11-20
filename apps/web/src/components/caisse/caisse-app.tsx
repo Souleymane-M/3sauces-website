@@ -2648,43 +2648,6 @@ export function CaisseApp({
               );
             })()}
 
-            {canal !== null && canal !== "livraison" && (
-              <div>
-                <label className="text-xs text-gray-700">Quand ce paiement est-il encaissé ?</label>
-                {paiementImmediatPossible ? (
-                  <div className="mt-1 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEncaisserMaintenant(true)}
-                      className={`rounded border py-2 text-xs font-bold uppercase ${
-                        encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
-                      }`}
-                    >
-                      Maintenant (client présent)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEncaisserMaintenant(false)}
-                      className={`rounded border py-2 text-xs font-bold uppercase ${
-                        !encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
-                      }`}
-                    >
-                      Plus tard
-                    </button>
-                  </div>
-                ) : (
-                  <p className="mt-1 rounded bg-gray-100 p-2 text-xs text-gray-600">
-                    {commandeAvance
-                      ? "Commande réservée pour un autre jour : le paiement sera encaissé plus tard."
-                      : "Le paiement sera encaissé plus tard."}
-                  </p>
-                )}
-              </div>
-            )}
-
-            </div>
-            {/* Colonne 3 : le paiement et la validation */}
-            <div className="space-y-4">
             <div>
               <label className="text-xs text-gray-700">Paiement</label>
               <select
@@ -2753,7 +2716,43 @@ export function CaisseApp({
                 </div>
               )}
             </div>
+            {canal !== null && canal !== "livraison" && (
+              <div>
+                <label className="text-xs text-gray-700">Quand ce paiement est-il encaissé ?</label>
+                {paiementImmediatPossible ? (
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEncaisserMaintenant(true)}
+                      className={`rounded border py-2 text-xs font-bold uppercase ${
+                        encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Maintenant (client présent)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEncaisserMaintenant(false)}
+                      className={`rounded border py-2 text-xs font-bold uppercase ${
+                        !encaisserMaintenant ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      Plus tard
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-1 rounded bg-gray-100 p-2 text-xs text-gray-600">
+                    {commandeAvance
+                      ? "Commande réservée pour un autre jour : le paiement sera encaissé plus tard."
+                      : "Le paiement sera encaissé plus tard."}
+                  </p>
+                )}
+              </div>
+            )}
 
+            </div>
+            {/* Colonne 3 : le paiement et la validation */}
+            <div className="space-y-4">
             <div className="border-t border-gray-200 pt-3 text-lg font-bold text-gray-900">
               {remiseLancementEligible && (
                 <p className="text-sm font-semibold text-[#2D5A27]">

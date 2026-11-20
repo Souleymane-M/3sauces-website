@@ -1263,6 +1263,10 @@ export async function PATCH(request: Request) {
       // ressortait jamais avec les changements.
       ticket_imprime_le: null,
       ticket_remis_le: null,
+      // Une livraison sort TOUJOURS avec son ticket complet (adresse, QR du livreur) : sans ça, une commande à emporter dont le client
+      // avait refusé le reçu repartait en livraison avec le seul bon de cuisine. Jamais « ticket client seul » après une modification.
+      ticket_client_seul: false,
+      ...(canal === "livraison" ? { imprimer_ticket_client: true } : {}),
     })
     .eq("id", body.commandeId);
   if (erreurMaj) {

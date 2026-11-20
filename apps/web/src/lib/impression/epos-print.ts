@@ -391,6 +391,51 @@ function imprimerArticlesCuisine(b: ConstructeurTicket, commandeComplete: Comman
   b.ligne(`${commande.nbPlats} plat${commande.nbPlats > 1 ? "s" : ""}`, { align: "center", gras: true, taille: 1 });
 }
 
+/** Une ligne du reçu client : « 2x Tacos - 16.00 € » puis son détail. */
+function imprimerLigneClient(b: ConstructeurTicket, l: LigneCommande): void {
+  const prixLigne = l.quantite * l.prixUnitaire;
+  const estBoisson = l.categorie === "boisson";
+  const texteLigne = `${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)} - ${prixLigne.toFixed(2)} €`;
+  b.ligne(estBoisson ? ` ${texteLigne.toUpperCase()} ` : texteLigne, { gras: true, taille: 1, surligne: estBoisson });
+  for (const detail of detailLigne(l)) {
+    const surligne = detail.surligne === true || estBoisson;
+    b.ligne(surligne ? ` ${detail.texte.toUpperCase()} ` : detail.texte, { gras: surligne, taille: 1, surligne }, "  ");
+  }
+}
+
+/**
+ * Articles du reçu client. Commande simple : classés par catégorie (grillades, snacks…). Commande GROUPÉE : un bloc par plat
+ * (« PLAT 1 — Rachid » + ses produits + son total), jamais regroupés par catégorie : chaque convive retrouve ses produits.
+ */
+function imprimerArticlesClient(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+  const estGroupee = lignes.some((l) => l.platIndex !== null);
+  if (!estGroupee) {
+    regrouperLignesParCategorie(lignes).forEach((groupe, index) => {
+      if (index > 0) b.brut(`<feed line="1"/>`);
+      b.ligne(groupe.titre, { gras: true, taille: 1 });
+      for (const l of groupe.lignes) imprimerLigneClient(b, l);
+    });
+    return;
+  }
+  const indices = [...new Set(lignes.map((l) => l.platIndex).filter((i): i is number => i !== null))].sort((a, c) => a - c);
+  indices.forEach((indexPlat, position) => {
+    if (position > 0) separateur(b);
+    const lignesPlat = lignes.filter((l) => l.platIndex === indexPlat);
+    const pourQui = lignesPlat.find((l) => l.pourQui)?.pourQui;
+    b.ligne(`PLAT ${indexPlat + 1}${pourQui ? ` — ${pourQui}` : ""}`, { align: "left", gras: true, taille: 2 });
+    for (const l of lignesPlat) imprimerLigneClient(b, l);
+    const totalPlat = lignesPlat.reduce((t, l) => t + l.quantite * l.prixUnitaire, 0);
+    b.ligne(`Total plat : ${totalPlat.toFixed(2)} €`, { align: "right", gras: true, taille: 1 });
+  });
+  // Lignes offertes ou communes (boisson 2 L offerte, canette offerte…), rattachées à aucun plat.
+  const communes = lignes.filter((l) => l.platIndex === null);
+  if (communes.length > 0) {
+    separateur(b);
+    b.ligne("OFFERT / EN PLUS", { gras: true, taille: 1 });
+    for (const l of communes) imprimerLigneClient(b, l);
+  }
+}
+
 const URL_SITE = "https://3sauces.fr";
 const BORDURE_BLOC_CLIENT = "=".repeat(32);
 
@@ -561,23 +606,7 @@ function construireContenuTicketClient(
   separateur(b);
 
   imprimerBoxOfferte(b, commande.lignes);
-  regrouperLignesParCategorie(commande.lignes.filter((l) => !estLigneBox(l))).forEach((groupe, index) => {
-    // Espace entre chaque catégorie (jamais avant la première) — pour
-    // s'y retrouver d'un coup d'œil dès qu'une commande mélange plusieurs
-    // catégories (demande explicite du patron, 2026-10-15).
-    if (index > 0) b.brut(`<feed line="1"/>`);
-    b.ligne(groupe.titre, { gras: true, taille: 1 });
-    for (const l of groupe.lignes) {
-      const prixLigne = l.quantite * l.prixUnitaire;
-      const estBoisson = l.categorie === "boisson";
-      const texteLigne = `${l.quantite * piecesParPaquet(l.nom)}x ${nomSansMultiplicateur(l.nom)} - ${prixLigne.toFixed(2)} €`;
-      b.ligne(estBoisson ? ` ${texteLigne.toUpperCase()} ` : texteLigne, { gras: true, taille: 1, surligne: estBoisson });
-      for (const detail of detailLigne(l)) {
-        const surligne = detail.surligne === true || estBoisson;
-        b.ligne(surligne ? ` ${detail.texte.toUpperCase()} ` : detail.texte, { gras: surligne, taille: 1, surligne }, "  ");
-      }
-    }
-  });
+  imprimerArticlesClient(b, commande.lignes.filter((l) => !estLigneBox(l)));
 
   separateur(b);
   // Détail explicite dès qu'une récompense est utilisée — sinon le TOTAL
