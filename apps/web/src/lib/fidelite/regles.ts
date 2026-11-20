@@ -50,7 +50,8 @@ export const NB_TAMPONS_RECOMPENSE = SEUIL_TAMPON / MONTANT_RECOMPENSE;
 export const SEUIL_AFFICHAGE_PROGRESSION = 30;
 
 export const MESSAGE_GENERIQUE_FIDELITE = `🎁 ${formaterEuros(MONTANT_RECOMPENSE)} dépensés = 1 point de fidélité. ${NB_TAMPONS_RECOMPENSE} points = ${formaterEuros(MONTANT_RECOMPENSE)} offerts.`;
-const MESSAGE_RECOMPENSE_DISPONIBLE = `🎉 ${formaterEuros(MONTANT_RECOMPENSE)} offerts à utiliser dès votre prochaine commande !`;
+/** Sans montant : le nombre de récompenses disponibles varie (10 €, 20 €…), le message ne doit jamais en annoncer un faux. */
+const MESSAGE_RECOMPENSE_DISPONIBLE = "🎉 Tu as des euros de récompense à utiliser dès ta prochaine commande !";
 
 export interface SoldeTampons {
   /** Nombre de récompenses disponibles (groupes de 10 tampons / 10€), pas le nombre de tampons. */
@@ -67,7 +68,7 @@ export interface SoldeTampons {
  * silence quand aucune récompense n'est encore débloquée.
  */
 export function messageSoldeFidelite(reliquat: number, solde: SoldeTampons): string {
-  if (solde.nombre > 0) return MESSAGE_RECOMPENSE_DISPONIBLE;
+  if (solde.nombre > 0) return `🎉 ${formaterEuros(solde.nombre * MONTANT_RECOMPENSE)} offerts à utiliser dès ta prochaine commande !`;
   const resteRecompense = SEUIL_TAMPON - reliquat;
   if (resteRecompense <= SEUIL_AFFICHAGE_PROGRESSION) {
     return `🎁 Plus que ${formaterEuros(resteRecompense)} et vous débloquez ${formaterEuros(MONTANT_RECOMPENSE)} offerts !`;

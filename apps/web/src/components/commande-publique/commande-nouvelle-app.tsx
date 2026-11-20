@@ -423,16 +423,17 @@ export function CommandeNouvelleApp({
   const resteAuPlatActif = Math.max(0, SEUIL_MINIMUM_PLAT - totalPlatActif);
   const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
-  const palierGroupeReel = palierGroupeActif(nbArticles, total);
-  const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
-  const boissonsOffertesAChoisir =
-    palierGroupeReel === "GROUPE_4"
-      ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
-      : 0;
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const minimumAtteint = totalApresTampons >= parametres.minimumCommande;
   const montantAPayer = totalApresTampons;
+  // Boisson 2 L offerte : calculée sur le montant que le client PAIE RÉELLEMENT (après ses points de fidélité), comme toutes les offres.
+  const palierGroupeReel = palierGroupeActif(nbArticles, montantAPayer);
+  const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, montantAPayer);
+  const boissonsOffertesAChoisir =
+    palierGroupeReel === "GROUPE_4"
+      ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
+      : 0;
   // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
   const nbCanettesOffertes = nombreCanettesOffertes(montantAPayer, dateCommande);
   // Offre du jour : 3 ailes + frites + 2 sauces offertes dès 20 € payés (commandes servies le jour de l'offre).
@@ -446,7 +447,7 @@ export function CommandeNouvelleApp({
     : 0;
   const canettesOffertesAChoisir = Math.max(0, nbCanettesOffertes - canetteOfferteSaveurs.slice(0, nbCanettesOffertes).filter(Boolean).length);
   // Boisson 2 L offerte tous les 40 € (à toute heure) : progression vers la prochaine tranche.
-  const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
+  const resteAvantProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (montantAPayer % SEUIL_GROUPE_4_MONTANT);
   // Points de fidélité (10 € payés = 1 point), en tenant compte de ce que le client a déjà cumulé s'il est reconnu.
   const reliquatFidelite = fideliteVerifiee?.montantCumule ?? 0;
   const pointsGagnesPour = (montant: number) =>
@@ -459,7 +460,7 @@ export function CommandeNouvelleApp({
   const viseBoisson2L = resteAvantProchaineBoisson < resteProchainPoint;
   const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
   const pourcentageProchaineBoisson = viseBoisson2L
-    ? Math.round(((total % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
+    ? Math.round(((montantAPayer % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
     : Math.round((((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE) / MONTANT_RECOMPENSE) * 100);
 
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1548,112 +1549,6 @@ export function CommandeNouvelleApp({
             <ul className="space-y-3">{panier.map(lignePanier)}</ul>
           )}
 
-          {/* Le client se fait reconnaître ici même (numéro + e-mail) : sa récompense apparaît juste en dessous, utilisable en un clic. */}
-          {nbArticles > 0 && !fideliteVerifiee && (
-            <div className="rounded-xl border-2 border-[#2D5A27] bg-[#FFF8F0] p-3">
-              <p className="text-base font-extrabold text-gray-900">🎁 Tu as des points ou une récompense ?</p>
-              <p className="mt-0.5 text-sm font-semibold text-gray-800">
-                Saisis ton numéro et ton e-mail : ta récompense apparaît ici et s&apos;utilise en un clic.
-              </p>
-              <div className="mt-2 grid grid-cols-1 gap-2">
-                <input
-                  value={telephone}
-                  onChange={(e) => setTelephone(e.target.value)}
-                  inputMode="tel"
-                  placeholder="Téléphone (0639123456)"
-                  aria-label="Ton numéro de téléphone"
-                  className="rounded border border-gray-400 bg-white p-3 text-base text-gray-900"
-                />
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="E-mail"
-                  aria-label="Ton e-mail"
-                  className="rounded border border-gray-400 bg-white p-3 text-base text-gray-900"
-                />
-              </div>
-            </div>
-          )}
-          {/* Toujours monté dans le panier : la reconnaissance du client se fait dès que numéro et e-mail sont valides. */}
-          <div className="hidden">
-            <CarteFidelite {...proprietesCarteFidelite} integre />
-          </div>
-
-          {/* Récompense en un clic : le client choisit, jamais appliquée toute seule. */}
-          {nbArticles > 0 && fideliteVerifiee && fideliteVerifiee.tamponsDisponibles > 0 && (
-            <div className="rounded-xl border-4 border-[#2D5A27] bg-green-50 p-3">
-              <p className="text-lg font-extrabold text-gray-900">
-                🎁 Tu as {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense !
-              </p>
-              {maxTamponsUtilisables === 0 ? (
-                <p className="mt-1 text-sm font-bold text-gray-900">
-                  Ajoute encore {euros(MONTANT_RECOMPENSE - total)} à ton panier pour pouvoir l&apos;utiliser.
-                </p>
-              ) : nbTamponsEffectif > 0 ? (
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-base font-extrabold" style={{ color: VERT }}>
-                    ✓ Utilisée : −{euros(nbTamponsEffectif * MONTANT_RECOMPENSE)} sur ta commande
-                  </p>
-                  <button type="button" onClick={() => setNbTampons(0)} className="shrink-0 text-sm font-bold text-gray-800 underline">
-                    Ne pas l&apos;utiliser
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setNbTampons(maxTamponsUtilisables)}
-                  className="mt-2 w-full rounded-xl py-3 text-lg font-extrabold text-white active:scale-[0.99]"
-                  style={{ backgroundColor: VERT }}
-                >
-                  Utiliser mes {maxTamponsUtilisables * MONTANT_RECOMPENSE} € · −{euros(maxTamponsUtilisables * MONTANT_RECOMPENSE)} sur ma commande
-                </button>
-              )}
-            </div>
-          )}
-
-          {nbArticles > 0 && (
-            <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
-              {palierGroupeReel === "GROUPE_4" && (
-                <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
-                  Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
-                </p>
-              )}
-              {offreCadeauJour && (
-                <p className="mb-1 text-sm font-extrabold" style={{ color: cadeauAcquis ? VERT : "#1F3A5F" }}>
-                  {cadeauAcquis
-                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} (3 ailes grillées + frites + 2 sauces au choix) avec cette commande !${
-                        ` Plus que ${euros(resteAvantCadeau)} pour la suivante.`
-                      }`
-                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE (3 ailes grillées + frites + 2 sauces au choix)`}
-                </p>
-              )}
-              <p className="text-sm font-extrabold text-gray-900">
-                {viseBoisson2L
-                  ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
-                  : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande`}
-              </p>
-              <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
-                <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
-              </div>
-              {fideliteVerifiee ? (
-                <>
-                  {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 0 && (
-                    <p className="mt-2 text-sm font-extrabold text-gray-900">
-                      🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
-                      {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
-                    </p>
-                  )}
-                </>
-              ) : null}
-              <p className="mt-1 text-sm font-semibold text-gray-800">
-                {texteProgressionCommande(
-                  calculerProgressionCommande(total, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
-                )}
-              </p>
-            </div>
-          )}
-
           {blocChoixSauces}
 
           {nbArticles > 0 && (accompagnementsSuggeres.length > 0 || (produitCanetteRapide && saveurs.length > 0)) && (
@@ -1756,6 +1651,95 @@ export function CommandeNouvelleApp({
               </p>
             )}
           </div>
+
+          {/* Récompense : juste sous le total, le client choisit combien il utilise (jamais appliquée toute seule). */}
+          {nbArticles > 0 && fideliteVerifiee && fideliteVerifiee.tamponsDisponibles > 0 && (
+            <div className="rounded-xl border-4 border-[#2D5A27] bg-green-50 p-3">
+              <p className="text-lg font-extrabold text-gray-900">
+                🎁 Tu as {fideliteVerifiee.tamponsDisponibles * MONTANT_RECOMPENSE} € de récompense
+              </p>
+              {maxTamponsUtilisables === 0 ? (
+                <p className="mt-1 text-sm font-bold text-gray-900">
+                  Ajoute encore {euros(MONTANT_RECOMPENSE - total)} à ton panier pour pouvoir l&apos;utiliser.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-1 text-base font-extrabold text-gray-900">Combien veux-tu utiliser sur cette commande ?</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNbTampons(Math.max(0, nbTamponsEffectif - 1))}
+                      disabled={nbTamponsEffectif === 0}
+                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#2D5A27] text-2xl font-extrabold text-[#2D5A27] disabled:opacity-30"
+                    >
+                      −
+                    </button>
+                    <span className="w-28 text-center text-2xl font-extrabold text-gray-900">{euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setNbTampons(Math.min(maxTamponsUtilisables, nbTamponsEffectif + 1))}
+                      disabled={nbTamponsEffectif >= maxTamponsUtilisables}
+                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#2D5A27] text-2xl font-extrabold text-[#2D5A27] disabled:opacity-30"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {nbTamponsEffectif < maxTamponsUtilisables && (
+                    <button
+                      type="button"
+                      onClick={() => setNbTampons(maxTamponsUtilisables)}
+                      className="mt-2 w-full rounded-xl py-3 text-base font-extrabold text-white active:scale-[0.99]"
+                      style={{ backgroundColor: VERT }}
+                    >
+                      Tout utiliser : −{euros(maxTamponsUtilisables * MONTANT_RECOMPENSE)}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {nbArticles > 0 && (
+            <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
+              {palierGroupeReel === "GROUPE_4" && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
+                  Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
+                </p>
+              )}
+              {offreCadeauJour && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: cadeauAcquis ? VERT : "#1F3A5F" }}>
+                  {cadeauAcquis
+                    ? `🎁 Bravo : ${nbBox > 1 ? `${nbBox} box OFFERTES` : "une box OFFERTE"} (3 ailes grillées + frites + 2 sauces au choix) avec cette commande !${
+                        ` Plus que ${euros(resteAvantCadeau)} pour la suivante.`
+                      }`
+                    : `Plus que ${euros(resteAvantCadeau)} : une box OFFERTE (3 ailes grillées + frites + 2 sauces au choix)`}
+                </p>
+              )}
+              <p className="text-sm font-extrabold text-gray-900">
+                {viseBoisson2L
+                  ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
+                  : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande`}
+              </p>
+              <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
+                <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
+              </div>
+              {fideliteVerifiee ? (
+                <>
+                  {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 0 && (
+                    <p className="mt-2 text-sm font-extrabold text-gray-900">
+                      🎁 Tu as {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles)} point
+                      {progressionTampons(fideliteVerifiee.montantCumule, fideliteVerifiee.tamponsDisponibles) > 1 ? "s" : ""} de fidélité.
+                    </p>
+                  )}
+                </>
+              ) : null}
+              <p className="mt-1 text-sm font-semibold text-gray-800">
+                {texteProgressionCommande(
+                  calculerProgressionCommande(total, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                )}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -1993,14 +1977,17 @@ export function CommandeNouvelleApp({
                 placeholder={emailDejaConnu ? "Laisse vide pour garder ton email déjà enregistré" : "toi@exemple.com"}
                 className="mt-1 w-full rounded-lg border border-gray-400 bg-white p-3 text-base text-gray-900"
               />
-              {emailDejaConnu && <p className="mt-1 text-sm font-semibold text-[#2D5A27]">Email déjà enregistré pour ce numéro : tape-le pour retrouver ton nom et tes points de fidélité, ou laisse vide.</p>}
+
             </div>
             {!profilDejaConnu && <ProfilClientChoix
                 valeur={profil}
                 onChange={setProfil}
                 explication="Une seule question, une seule fois : elle nous permet de te proposer des offres qui te correspondent. Ta réponse reste confidentielle."
               />}
-            <CarteFidelite {...proprietesCarteFidelite} />
+            {/* Le client s'est identifié au début : plus de question ici. Reste montée, invisible, pour garder reconnaissance et préremplissage. */}
+            <div className="hidden">
+              <CarteFidelite {...proprietesCarteFidelite} />
+            </div>
           </section>
 
           {/* Boisson offerte */}

@@ -34,7 +34,7 @@ begin
     return new;
   end if;
 
-  v_net := greatest(0, new.montant - (new.tampons_utilises * 10));
+  v_net := greatest(0, new.montant);
   if v_net <= 0 then
     return new;
   end if;

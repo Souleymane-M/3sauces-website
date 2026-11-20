@@ -316,7 +316,7 @@ export function CarteFidelite({
           <p className="text-sm font-semibold text-gray-900">
             {messageSoldeFidelite(solde.montantCumule, { nombre: solde.nombre, prochaineExpiration: solde.prochaineExpiration })}
           </p>
-          {solde.nombre > 0 && (
+          {solde.nombre > 0 && !champsExternes && (
             <div className="rounded border border-[#2D5A27] bg-white p-2">
               <p className="text-sm font-semibold text-[#2D5A27]">Combien utiliser sur cette commande ?</p>
               <div className="mt-1 flex items-center gap-2">

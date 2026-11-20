@@ -701,61 +701,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Offre "commande groupée" : calculée une seule fois ici, sur le montant
-  // brut (avant remise), jamais re-dérivée plus tard (cf. migration
-  // palier_groupe) — la boisson offerte s'applique quel que soit le canal,
-  // sans aucune limite horaire. Seule la priorité (badge affiché côté UI)
-  // reste propre à la livraison. Le nombre de plats utilisé ici est
-  // volontairement distinct de `nbPlats` (nb_plats stocké) : voir
-  // `compterPlatsPourPalier`.
-  const nbPlatsPalier = compterPlatsPourPalier(lignes);
-  const palierGroupe = palierGroupeActif(nbPlatsPalier, montant);
-  if (palierGroupe === "GROUPE_4") {
-    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montant);
-    const saveursBrutes = Array.isArray(body.boissonOfferteSaveurs) ? body.boissonOfferteSaveurs : [];
-    const saveursValidees = saveursBrutes.filter(
-      (s: unknown): s is string => typeof s === "string" && nomsParfums2lValides.has(s)
-    );
-    if (saveursValidees.length !== nbOffertes) {
-      return NextResponse.json(
-        {
-          error:
-            nbOffertes > 1
-              ? `Choisis un parfum pour chacune de tes ${nbOffertes} boissons 2L offertes.`
-              : "Choisis un parfum disponible pour ta boisson 2L offerte.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
-      .from("produits")
-      .select("id, nom")
-      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
-      .eq("actif", true)
-      .maybeSingle();
-
-    if (erreurBoissonOfferte) {
-      return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
-    }
-    if (boissonOfferte) {
-      for (const saveur of saveursValidees) {
-        lignes.push({
-          produitId: boissonOfferte.id,
-          nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
-          categorie: "boisson",
-          quantite: 1,
-          prixUnitaire: 0,
-          coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
-          viandes: [],
-          saveurs: [saveur],
-          canetteIncluse: false,
-          platIndex: null,
-        });
-      }
-    }
-  }
-
   // --- Règles spécifiques à la livraison ---
   let adresse: string | null = null;
   let zone: string | null = null;
@@ -861,6 +806,61 @@ export async function POST(request: Request) {
     // une seule remise à la fois : la récompense fidélité prime toujours
     // si le client l'utilise sur cette commande (branche ci-dessus).
     montantFinal = Math.round((montant - MONTANT_REMISE_LANCEMENT) * 100) / 100;
+  }
+
+  // Offre « boisson 2 L offerte » : calculée une seule fois ici, sur le montant que le client PAIE RÉELLEMENT
+  // (après points de fidélité ou remise — demande explicite du patron, 2026-11-20), jamais re-dérivée plus tard (cf. migration
+  // palier_groupe) — la boisson offerte s'applique quel que soit le canal,
+  // sans aucune limite horaire. Seule la priorité (badge affiché côté UI)
+  // reste propre à la livraison. Le nombre de plats utilisé ici est
+  // volontairement distinct de `nbPlats` (nb_plats stocké) : voir
+  // `compterPlatsPourPalier`.
+  const nbPlatsPalier = compterPlatsPourPalier(lignes);
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantFinal);
+  if (palierGroupe === "GROUPE_4") {
+    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantFinal);
+    const saveursBrutes = Array.isArray(body.boissonOfferteSaveurs) ? body.boissonOfferteSaveurs : [];
+    const saveursValidees = saveursBrutes.filter(
+      (s: unknown): s is string => typeof s === "string" && nomsParfums2lValides.has(s)
+    );
+    if (saveursValidees.length !== nbOffertes) {
+      return NextResponse.json(
+        {
+          error:
+            nbOffertes > 1
+              ? `Choisis un parfum pour chacune de tes ${nbOffertes} boissons 2L offertes.`
+              : "Choisis un parfum disponible pour ta boisson 2L offerte.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data: boissonOfferte, error: erreurBoissonOfferte } = await supabase
+      .from("produits")
+      .select("id, nom")
+      .eq("nom", NOM_PRODUIT_BOISSON_OFFERTE)
+      .eq("actif", true)
+      .maybeSingle();
+
+    if (erreurBoissonOfferte) {
+      return NextResponse.json({ error: "Erreur serveur (boisson offerte)." }, { status: 500 });
+    }
+    if (boissonOfferte) {
+      for (const saveur of saveursValidees) {
+        lignes.push({
+          produitId: boissonOfferte.id,
+          nom: `${boissonOfferte.nom} (offerte — commande groupée)`,
+          categorie: "boisson",
+          quantite: 1,
+          prixUnitaire: 0,
+          coutMatiereUnitaire: null, // donnée interne, jamais calculée pour une commande publique
+          viandes: [],
+          saveurs: [saveur],
+          canetteIncluse: false,
+          platIndex: null,
+        });
+      }
+    }
   }
 
   // Offre du jour : une canette offerte par tranche de 10 € d'achats sur le montant réellement payé (après points de fidélité / remise), pour les commandes servies le jour de l'offre — site uniquement, cf. offre-canette.ts.

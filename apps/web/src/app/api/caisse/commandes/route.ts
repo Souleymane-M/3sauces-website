@@ -127,7 +127,9 @@ async function validerLignesCommande(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
   lignesBrutes: unknown,
   boissonOfferteSaveursBrut: unknown,
-  lignesExistantes?: { produitId?: string; quantite?: number }[]
+  lignesExistantes?: { produitId?: string; quantite?: number }[],
+  /** Points de fidélité (10 € chacun) que le client veut utiliser : la boisson 2 L offerte se calcule sur ce qu'il PAIE vraiment. */
+  nbTamponsDemandes = 0
 ): Promise<LignesValidees> {
   if (!Array.isArray(lignesBrutes) || lignesBrutes.length === 0) {
     throw new ErreurValidation("Requête invalide : au moins une ligne de commande est requise.");
@@ -465,10 +467,13 @@ async function validerLignesCommande(
   // Offre "commande groupée" : même règle que le site public (/api/commande)
   // — calculée une seule fois ici, sur le montant brut. Nombre de plats
   // distinct de `nbPlats` (nb_plats stocké) : voir `compterPlatsPourPalier`.
+  // Demande du patron (2026-11-20) : calculée sur le montant que le client paie réellement, après ses points de fidélité.
   const nbPlatsPalier = compterPlatsPourPalier(lignes);
-  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantBrut);
+  const montantPourOffres =
+    Math.round((montantBrut - Math.min(Math.max(0, nbTamponsDemandes), Math.floor(montantBrut / MONTANT_RECOMPENSE)) * MONTANT_RECOMPENSE) * 100) / 100;
+  const palierGroupe = palierGroupeActif(nbPlatsPalier, montantPourOffres);
   if (palierGroupe === "GROUPE_4") {
-    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantBrut);
+    const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantPourOffres);
     const saveursBrutes = Array.isArray(boissonOfferteSaveursBrut) ? boissonOfferteSaveursBrut : [];
     const saveursValidees = saveursBrutes.filter(
       (s: unknown): s is string => typeof s === "string" && nomsParfums2lValides.has(s)
@@ -673,7 +678,13 @@ export async function POST(request: Request) {
 
   let validation;
   try {
-    validation = await validerLignesCommande(supabase, body.lignes, body.boissonOfferteSaveurs);
+    validation = await validerLignesCommande(
+      supabase,
+      body.lignes,
+      body.boissonOfferteSaveurs,
+      undefined,
+      typeof body.nbTampons === "number" ? Math.floor(body.nbTampons) : 0
+    );
   } catch (e) {
     if (e instanceof ErreurValidation) {
       return NextResponse.json({ error: e.message }, { status: 400 });

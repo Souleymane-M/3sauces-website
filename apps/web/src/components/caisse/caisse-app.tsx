@@ -923,10 +923,15 @@ export function CaisseApp({
   // les paliers ci-dessous. Voir `compterPlatsPourPalier` côté serveur.
   const nbArticles = panierActuel.reduce((acc, l) => acc + l.quantite, 0);
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
-  const palierGroupeReel = palierGroupeActif(nbArticles, total);
+  // Boisson 2 L offerte : calculée sur ce que le client PAIE RÉELLEMENT, après ses points de fidélité (demande du patron, 2026-11-20).
+  const montantNetPourOffres = Math.max(
+    0,
+    total - Math.min(nbTamponsAUtiliser, Math.min(clientInfo?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE))) * MONTANT_RECOMPENSE
+  );
+  const palierGroupeReel = palierGroupeActif(nbArticles, montantNetPourOffres);
   // Panier suffisant en quantité/montant mais avantage bloqué par l'heure
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
-  const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
+  const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, montantNetPourOffres);
   // Boissons 2L offertes dont le parfum n'est pas encore choisi : bloque
   // "Encaisser" tant que > 0 — rendu très visible (bandeau, bouton, barre du
   // bas) car un simple message se noyait dans le panier (4 pilaou poulpe,
@@ -962,7 +967,7 @@ export function CaisseApp({
   const reliquatFidelite = clientInfo?.existe ? (clientInfo.montantCumule ?? 0) : 0;
   const montantAPayerFidelite = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayerFidelite) % MONTANT_RECOMPENSE);
-  const resteProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (total % SEUIL_GROUPE_4_MONTANT);
+  const resteProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (montantAPayerFidelite % SEUIL_GROUPE_4_MONTANT);
   const viseBoisson2L = resteProchaineBoisson < resteProchainPoint;
   const pointsGagnesCommande =
     Math.floor((reliquatFidelite + montantAPayerFidelite) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
