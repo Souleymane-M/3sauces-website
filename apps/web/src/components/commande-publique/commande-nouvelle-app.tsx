@@ -44,7 +44,7 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
-import { nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
+import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MessageErreur } from "@/components/message-erreur";
@@ -442,6 +442,7 @@ export function CommandeNouvelleApp({
   const nbCanettesOffertes = nombreCanettesOffertes(montantAPayer, dateCommande);
   // Offre du jour : 3 ailes + frites + 2 sauces offertes dès 20 € payés (commandes servies le jour de l'offre).
   const offreCadeauJour = offreCadeauActive(dateCommande);
+  const offreCanetteJour = offreCanetteActive(dateCommande);
   const nbBox = nombreBoxOffertes(montantAPayer, dateCommande);
   const cadeauAcquis = nbBox > 0;
   const resteAvantCadeau = SEUIL_OFFRE_CADEAU - (montantAPayer % SEUIL_OFFRE_CADEAU);
@@ -1280,6 +1281,41 @@ export function CommandeNouvelleApp({
       </section>
   ) : null;
 
+  // Choix du parfum de la canette offerte : affiché dès le panier et rappelé à la validation.
+  const blocChoixCanette = nbCanettesOffertes > 0 ? (
+      <section
+        id="canette-offerte"
+        className={`rounded-xl border-2 p-4 ${canettesOffertesAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
+      >
+        <p className="text-base font-extrabold text-gray-900">
+          🎁 Offre du jour : choisis {nbCanettesOffertes > 1 ? `tes ${nbCanettesOffertes} canettes OFFERTES` : "ta canette OFFERTE"}
+        </p>
+        {Array.from({ length: nbCanettesOffertes }, (_, index) => (
+          <div key={index} className="mt-2">
+            {nbCanettesOffertes > 1 && <p className="text-sm font-semibold text-gray-900">Canette offerte n°{index + 1}</p>}
+            <div className="mt-1 flex flex-wrap gap-2">
+              {saveurs.map((sv) => (
+                <button
+                  key={sv.id}
+                  type="button"
+                  onClick={() =>
+                    setCanetteOfferteSaveurs((prev) =>
+                      Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sv.nom : prev[i]))
+                    )
+                  }
+                  className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
+                    canetteOfferteSaveurs[index] === sv.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
+                  }`}
+                >
+                  {sv.nom}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
+  ) : null;
+
   // « Et avec ça ? » : frites, ailes de poulet, brochettes de bœuf, croupion et salade (la canette est dans le même bloc), ils restent affichés (avec la quantité) pour pouvoir en ajouter d'autres.
   const SUGGESTIONS_ET_AVEC_CA = ["Frites", "Ailes de poulet", "Brochettes bœuf", "Croupion", "Salade"];
   const accompagnementsSuggeres = SUGGESTIONS_ET_AVEC_CA.map((debut) =>
@@ -1336,9 +1372,12 @@ export function CommandeNouvelleApp({
 
   return (
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
-      {/* Bandeau fidélité : toujours visible */}
-      <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: VERT }}>
-        10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
+      {/* Promos toujours bien visibles : fidélité, boisson 2 L offerte dès 40 €, offre du jour. */}
+      <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: VERT }}>
+        🎁 10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
+      </div>
+      <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#C2540C" }}>
+        🥤 Dès 40 € payés : 1 boisson 2 L OFFERTE (80 € = 2 boissons…)
       </div>
       {pointsDoublesPossibles(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
@@ -1351,8 +1390,8 @@ export function CommandeNouvelleApp({
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (
-        <div className="px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement : 1 canette offerte par tranche de 10 € payés (commandes du jour)
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
         </div>
       )}
 
@@ -1564,6 +1603,7 @@ export function CommandeNouvelleApp({
           )}
 
           {blocChoixSauces}
+          {blocChoixCanette}
 
           {nbArticles > 0 && (accompagnementsSuggeres.length > 0 || (produitCanetteRapide && saveurs.length > 0)) && (
             <div className="rounded-xl border-4 border-[#8B2020] bg-[#FFF1E0] p-4" id="et-avec-ca">
@@ -1719,6 +1759,13 @@ export function CommandeNouvelleApp({
               {palierGroupeReel === "GROUPE_4" && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
                   Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
+                </p>
+              )}
+              {offreCanetteJour && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: nbCanettesOffertes > 0 ? VERT : "#1F3A5F" }}>
+                  {nbCanettesOffertes > 0
+                    ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande ! Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.`
+                    : `Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} : 1 canette OFFERTE`}
                 </p>
               )}
               {offreCadeauJour && (
@@ -2049,40 +2096,7 @@ export function CommandeNouvelleApp({
 
           {blocChoixSauces}
 
-          {/* Canette offerte (offre du jour) */}
-          {nbCanettesOffertes > 0 && (
-            <section
-              id="canette-offerte"
-              className={`rounded-xl border-2 p-4 ${canettesOffertesAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}
-            >
-              <p className="text-base font-extrabold text-gray-900">
-                🎁 Offre du jour : choisis {nbCanettesOffertes > 1 ? `tes ${nbCanettesOffertes} canettes OFFERTES` : "ta canette OFFERTE"}
-              </p>
-              {Array.from({ length: nbCanettesOffertes }, (_, index) => (
-                <div key={index} className="mt-2">
-                  {nbCanettesOffertes > 1 && <p className="text-sm font-semibold text-gray-900">Canette offerte n°{index + 1}</p>}
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {saveurs.map((sv) => (
-                      <button
-                        key={sv.id}
-                        type="button"
-                        onClick={() =>
-                          setCanetteOfferteSaveurs((prev) =>
-                            Array.from({ length: Math.max(prev.length, index + 1) }, (_, i) => (i === index ? sv.nom : prev[i]))
-                          )
-                        }
-                        className={`rounded-full border-2 px-4 py-2 text-sm font-bold ${
-                          canetteOfferteSaveurs[index] === sv.nom ? "border-[#8B2020] bg-[#8B2020] text-white" : "border-gray-400 bg-white text-gray-900"
-                        }`}
-                      >
-                        {sv.nom}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </section>
-          )}
+          {blocChoixCanette}
 
           {/* 4. Paiement */}
           <section className="space-y-2 rounded-xl border border-gray-300 bg-white p-4">

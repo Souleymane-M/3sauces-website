@@ -4,7 +4,7 @@
  * Calculée sur le montant réellement payé (après points de fidélité ou remise : pas de cumul d'offres), et
  * seulement pour les commandes SERVIES un jour de l'offre (pas celles passées ce jour-là pour un autre jour).
  */
-export const JOURS_OFFRE_CANETTE: readonly string[] = ["2026-11-13"];
+export const JOURS_OFFRE_CANETTE: readonly string[] = ["2026-11-13", "2026-11-23"];
 export const MONTANT_PAR_CANETTE_OFFERTE = 10;
 
 export function offreCanetteActive(dateService: string): boolean {
