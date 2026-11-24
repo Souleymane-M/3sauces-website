@@ -8,7 +8,7 @@ import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
-
+import { offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 /**
  * Construction du XML ePOS-Print d'Epson pour les deux tickets (reçu
  * client + bon de cuisine). Depuis 2026-10-13, l'impression ne dépend plus
@@ -539,6 +539,11 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
   const reste = commande.resteAvantProchainPoint;
   if (!commande.clientNouveau && typeof reste === "number" && reste > 0 && reste <= 3) {
     return `Plus que ${euros(reste)} pour ton prochain point de fidélité${prenom ? `, ${prenom}` : ""}. Commande sur 3sauces.fr : chaque commande est comptée.`;
+  }
+  // Opération « affiche au restaurant » : tant que l'offre canette est active, c'est le message principal.
+  const aujourdhui = new Intl.DateTimeFormat("fr-CA", { timeZone: "Indian/Mayotte" }).format(new Date());
+  if (offreCanetteActive(aujourdhui)) {
+    return `${salutation} ! Prochaine fois : 1 canette offerte par tranche de 10 € sur 3sauces.fr (jusqu'au 12 décembre). Scanne le QR !`;
   }
   if (commande.clientNouveau) {
     return `${salutation} ! Commande sur 3sauces.fr : tu gagnes 1 point de fidélité par 10 € dépensés et ton plat est prêt à ton arrivée.`;

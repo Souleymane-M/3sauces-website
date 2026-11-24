@@ -1391,7 +1391,7 @@ export function CommandeNouvelleApp({
       )}
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
+          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
         </div>
       )}
 
