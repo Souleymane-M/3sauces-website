@@ -1391,7 +1391,7 @@ export function CommandeNouvelleApp({
       )}
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
+          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés (dès 40 € payés : boisson 2 L offerte à la place)
         </div>
       )}
 
@@ -1761,10 +1761,10 @@ export function CommandeNouvelleApp({
                   Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
                 </p>
               )}
-              {offreCanetteJour && (
+              {offreCanetteJour && montantAPayer < SEUIL_GROUPE_4_MONTANT && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: nbCanettesOffertes > 0 ? VERT : "#1F3A5F" }}>
                   {nbCanettesOffertes > 0
-                    ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande ! Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.`
+                    ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande !${montantAPayer < SEUIL_GROUPE_4_MONTANT - MONTANT_PAR_CANETTE_OFFERTE ? ` Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.` : ` Plus que ${euros(SEUIL_GROUPE_4_MONTANT - montantAPayer)} : une boisson 2 L offerte à la place.`}`
                     : `Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} : 1 canette OFFERTE`}
                 </p>
               )}
