@@ -7,15 +7,15 @@ import { ActiviteAppareil } from "@/components/auth/activite-appareil";
 import { CaisseApp } from "@/components/caisse/caisse-app";
 import { RappelFondsCaisse } from "@/components/caisse/rappel-fonds-caisse";
 import {
-  listerProduitsActifs,
-  listerViandesActives,
-  listerSaucesActives,
-  listerSaveursActives,
-  listerParfums2lActifs,
-} from "@/lib/caisse/produits";
-import { chargerParametresLivraisonPublics } from "@/lib/commande-publique/parametres";
-import { listerLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
-import { listerCommandesActives } from "@/lib/cuisine/commandes";
+  produitsCaisse,
+  viandesCaisse,
+  saucesCaisse,
+  saveursCaisse,
+  parfums2lCaisse,
+  parametresCaisse,
+} from "@/lib/caisse/catalogue-cache";
+import { compterLivraisonsAEncaisser } from "@/lib/encaissements-livraison";
+import { compterCommandesActives } from "@/lib/cuisine/commandes";
 import { chargerCommandePourModification } from "@/lib/caisse/modification";
 
 export const metadata: Metadata = {
@@ -39,16 +39,16 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
 
   const { modifier } = await searchParams;
 
-  const [produits, viandes, sauces, saveurs, parfums2l, parametres, livraisonsAEncaisser, commandesActives, modification] =
+  const [produits, viandes, sauces, saveurs, parfums2l, parametres, nbLivraisonsAEncaisser, nbCommandesActives, modification] =
     await Promise.all([
-      listerProduitsActifs(),
-      listerViandesActives(),
-      listerSaucesActives(),
-      listerSaveursActives(),
-      listerParfums2lActifs(),
-      chargerParametresLivraisonPublics(),
-      listerLivraisonsAEncaisser(),
-      listerCommandesActives(),
+      produitsCaisse(),
+      viandesCaisse(),
+      saucesCaisse(),
+      saveursCaisse(),
+      parfums2lCaisse(),
+      parametresCaisse(),
+      compterLivraisonsAEncaisser(),
+      compterCommandesActives(),
       modifier ? chargerCommandePourModification(modifier) : Promise.resolve(null),
     ]);
 
@@ -79,9 +79,9 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
             className="flex items-center gap-2 rounded bg-[#2D5A27] px-4 py-2 text-sm font-semibold text-white shadow-sm"
           >
             Commandes en cuisine
-            {commandesActives.length > 0 && (
+            {nbCommandesActives > 0 && (
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[#2D5A27]">
-                {commandesActives.length}
+                {nbCommandesActives}
               </span>
             )}
           </Link>
@@ -96,9 +96,9 @@ export default async function CaissePage({ searchParams }: CaissePageProps) {
             className="flex items-center gap-2 rounded bg-[#8B2020] px-4 py-2 text-sm font-semibold text-white shadow-sm"
           >
             Encaissements
-            {livraisonsAEncaisser.length > 0 && (
+            {nbLivraisonsAEncaisser > 0 && (
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[#8B2020]">
-                {livraisonsAEncaisser.length}
+                {nbLivraisonsAEncaisser}
               </span>
             )}
           </Link>

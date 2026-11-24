@@ -116,6 +116,23 @@ export async function listerCommandesActives(): Promise<CommandeCuisine[]> {
 }
 
 /**
+ * Nombre de commandes actives (mêmes filtres que `listerCommandesActives`), sans rapatrier leur contenu :
+ * sert au badge de la caisse, qui n'a besoin que du chiffre (la page se charge bien plus vite).
+ */
+export async function compterCommandesActives(): Promise<number> {
+  const supabase = createServiceSupabaseClient();
+  const { fin } = plageJourMayotteUtc(dateMayotteIso());
+  const { count, error } = await supabase
+    .from("commandes")
+    .select("id", { count: "exact", head: true })
+    .not("statut", "in", `(${STATUTS_TERMINAUX.join(",")})`)
+    .or("mode_paiement.neq.stripe,paiement_statut.eq.paye")
+    .lt("heure_souhaitee", fin.toISOString());
+  if (error) throw new Error(`Impossible de compter les commandes : ${error.message}`);
+  return count ?? 0;
+}
+
+/**
  * Livraisons déjà prises en charge par un livreur, pour la colonne "En
  * cours de livraison" de l'écran cuisine — demande explicite du patron,
  * 2026-10-16 : une livraison signalée "impossible à livrer" depuis le scan

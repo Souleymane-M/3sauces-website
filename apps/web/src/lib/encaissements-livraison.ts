@@ -6,6 +6,19 @@ import { changerStatutCommande } from "@/lib/cuisine/commandes";
 import { notifierPaiementConfirme } from "@/lib/notifications/paiement";
 import type { EncaissementsJour, LivraisonAEncaisser } from "./encaissements-livraison-types";
 
+/** Nombre de commandes à encaisser (mêmes filtres que `listerLivraisonsAEncaisser`), pour le badge de la caisse. */
+export async function compterLivraisonsAEncaisser(): Promise<number> {
+  const supabase = createServiceSupabaseClient();
+  const { count, error } = await supabase
+    .from("commandes")
+    .select("id", { count: "exact", head: true })
+    .neq("paiement_statut", "paye")
+    .neq("statut", "annulee")
+    .neq("mode_paiement", "stripe");
+  if (error) throw new Error(`Impossible de compter les encaissements : ${error.message}`);
+  return count ?? 0;
+}
+
 /**
  * Une livraison prise au téléphone par la caisse est enregistrée
  * "non_paye" (cf. /api/caisse/commandes) : le client paie le livreur à la
