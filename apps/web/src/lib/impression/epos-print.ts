@@ -3,6 +3,7 @@ import { fourchetteLivraison } from "@/lib/commande-publique/lieux-livraison";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
+import { libellePayeeTicket } from "@/lib/libelle-paiement";
 import type { LigneCommande } from "@/lib/caisse/types";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE } from "@/lib/fidelite/regles";
@@ -722,7 +723,7 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   b.ligne(`Commandé le ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: true, taille: 1 });
 
   if (commande.dejaPayee) {
-    b.ligne("DÉJÀ PAYÉE EN LIGNE", { align: "center", gras: true, taille: 1 });
+    b.ligne(libellePayeeTicket(commande.modePaiement), { align: "center", gras: true, taille: 1 });
   } else if (commande.modePaiement === "stripe") {
     b.ligne("PAIEMENT EN LIGNE NON CONFIRMÉ", { align: "center", gras: true, taille: 1 });
   }
