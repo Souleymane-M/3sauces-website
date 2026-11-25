@@ -3,8 +3,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { compterTamponsDisponibles } from "./tampons";
 import { progressionTampons } from "./regles";
 import { normaliserTelephone } from "@/lib/telephone";
-
-const TEXTE_CONSENTEMENT_FIDELITE = "Je souhaite recevoir les offres et actualités de 3 Sauces par email. (page « Mes points de fidélité »)";
+import { demanderConfirmationEmail } from "./email-confirme";
 
 /**
  * Page "voir mes tampons" atteinte après livraison (redirection du scan QR
@@ -20,7 +19,10 @@ const TEXTE_CONSENTEMENT_FIDELITE = "Je souhaite recevoir les offres et actualit
  */
 export interface ActivationFidelite {
   prenom: string | null;
+  /** Vrai seulement si l'email est CONFIRMÉ (lien cliqué) : sinon le compte n'est pas activé et rien n'est affiché. */
   emailConnu: boolean;
+  /** Un email de confirmation vient d'être envoyé (jamais le contenu de la fiche). */
+  confirmationEnvoyee?: boolean;
   tamponsAffiches: number;
   recompenseDisponible: boolean;
 }
@@ -30,13 +32,18 @@ async function chargerDetails(telephone: string): Promise<ActivationFidelite> {
   const supabase = createServiceSupabaseClient();
   const { data: client } = await supabase
     .from("clients")
-    .select("email, prenom, montant_cumule")
+    .select("email, email_confirme_le, prenom, montant_cumule")
     .eq("telephone", telephone)
     .maybeSingle();
+  const confirme = !!client?.email && !!client.email_confirme_le;
+  // Tant que le compte n'est pas activé, aucun solde n'est révélé, même à qui détient le ticket et connaît le numéro.
+  if (!confirme) {
+    return { prenom: client?.prenom ?? null, emailConnu: false, tamponsAffiches: 0, recompenseDisponible: false };
+  }
   const solde = await compterTamponsDisponibles(supabase, telephone);
   return {
     prenom: client?.prenom ?? null,
-    emailConnu: !!client?.email,
+    emailConnu: true,
     tamponsAffiches: progressionTampons(client?.montant_cumule ?? 0, solde.nombre),
     recompenseDisponible: solde.nombre > 0,
   };
@@ -71,10 +78,9 @@ export async function verifierTelephoneParQrLivraison(qrCode: string, telephoneS
 }
 
 /**
- * Enregistre l'email saisi — revérifie le téléphone ici aussi (jamais de
+ * Envoie le lien de confirmation de l'email saisi — revérifie le téléphone ici aussi (jamais de
  * confiance dans un appel direct à cette route sans repasser par l'étape
- * précédente), et uniquement s'il n'y a pas déjà un email (jamais
- * d'écrasement).
+ * précédente), et jamais pour un compte déjà activé.
  */
 export async function activerEmailParQrLivraison(
   qrCode: string,
@@ -87,34 +93,11 @@ export async function activerEmailParQrLivraison(
   const telephoneNormalise = normaliserTelephone(telephoneSaisi);
   if (!telephoneNormalise || telephoneNormalise !== telephoneAttendu) throw new Error("Numéro incorrect.");
 
-  const supabase = createServiceSupabaseClient();
-  const { data: client } = await supabase.from("clients").select("email").eq("telephone", telephoneNormalise).maybeSingle();
-  if (client?.email) throw new Error("Un email est déjà enregistré pour ce numéro.");
+  // Jamais d'écriture directe de l'email ici : on envoie un lien de confirmation, et l'email n'est enregistré
+  // (compte activé) que quand le client clique dessus — preuve qu'il possède bien cette boîte mail.
+  const envoi = await demanderConfirmationEmail(telephoneNormalise, email, accepteOffres);
+  if (!envoi.ok) throw new Error(envoi.erreur ?? "Impossible d'envoyer l'email.");
 
-  const { error } = await supabase.from("clients").update({ email }).eq("telephone", telephoneNormalise);
-  if (error) {
-    throw new Error(`Impossible d'enregistrer l'email : ${error.message}`);
-  }
+  return { ...(await chargerDetails(telephoneNormalise)), confirmationEnvoyee: true };
 
-  // Case « offres et actualités » cochée librement sur la page : consentement daté et conservé, comme à l'inscription du site fermé.
-  if (accepteOffres) {
-    const maintenant = new Date().toISOString();
-    const { data: existant } = await supabase.from("inscriptions_information").select("id").eq("email", email).maybeSingle();
-    if (existant) {
-      await supabase
-        .from("inscriptions_information")
-        .update({ accepte_offres: true, consentement_le: maintenant, texte_consentement: TEXTE_CONSENTEMENT_FIDELITE, desinscrit_le: null })
-        .eq("id", existant.id);
-    } else {
-      await supabase.from("inscriptions_information").insert({
-        email,
-        accepte_offres: true,
-        consentement_le: maintenant,
-        texte_consentement: TEXTE_CONSENTEMENT_FIDELITE,
-        source: "fidelite_voir",
-      });
-    }
-  }
-
-  return chargerDetails(telephoneNormalise);
 }

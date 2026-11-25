@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
 import { normaliserEmail } from "@/lib/email";
+import { demanderConfirmationEmail, poserEmailNonConfirme } from "@/lib/fidelite/email-confirme";
 import {
   construireHeureSouhaiteeUtc,
   creneauDansPlage,
@@ -773,7 +774,7 @@ export async function POST(request: Request) {
 
     const { data: client, error: erreurClient } = await supabase
       .from("clients")
-      .select("email")
+      .select("email, email_confirme_le")
       .eq("telephone", telephone)
       .maybeSingle();
     if (erreurClient) {
@@ -784,6 +785,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }
+      );
+    }
+    // Compte non activé : les récompenses restent verrouillées tant que l'email n'est pas confirmé (lien reçu par email).
+    if (!client.email_confirme_le) {
+      return NextResponse.json(
+        { error: "Confirme d'abord ton email (lien reçu par email) pour utiliser tes points de fidélité." },
+        { status: 403 }
       );
     }
 
@@ -999,10 +1007,18 @@ export async function POST(request: Request) {
   // qui restent exclusivement écrites par le trigger de paiement. L'email
   // n'est inclus que s'il a été resaisi : un champ laissé vide par un
   // client déjà connu ne doit jamais effacer l'email déjà enregistré.
-  await supabase
-    .from("clients")
-    .update({ nom, prenom, ...(email ? { email } : {}) })
-    .eq("telephone", telephone);
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", telephone);
+  // Email : posé seulement si la fiche n'en a aucun ET que ce numéro n'a jamais commandé avant (jamais d'écrasement, et
+  // jamais de rattachement sur le compte d'un client existant sans preuve). Il reste NON confirmé : un lien lui est envoyé.
+  if (email) {
+    const { count: commandesAvant } = await supabase
+      .from("commandes")
+      .select("id", { count: "exact", head: true })
+      .eq("client_telephone", telephone);
+    if ((commandesAvant ?? 0) === 0 && (await poserEmailNonConfirme(supabase, telephone, email))) {
+      await demanderConfirmationEmail(telephone, email, false);
+    }
+  }
 
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.

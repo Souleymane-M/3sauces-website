@@ -8,7 +8,7 @@ interface VoirTamponsAppProps {
   code: string;
 }
 
-type Etape = "telephone" | "email" | "tampons";
+type Etape = "telephone" | "email" | "confirmation" | "tampons";
 
 /** Tampons pleins/vides sur la base de 10 — ex: 13 tampons → ●●●●●●●●●● (+3), même rendu que le ticket imprimé. */
 function rendreTampons(nombre: number): string {
@@ -74,7 +74,8 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
         return;
       }
       setActivation(data);
-      setEtape("tampons");
+      // L'email n'est pas encore enregistré : le client doit cliquer sur le lien reçu pour activer son compte.
+      setEtape(data.confirmationEnvoyee ? "confirmation" : "tampons");
     } finally {
       setEnCours(false);
     }
@@ -84,7 +85,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
     <div className="mx-auto w-full max-w-sm space-y-4 text-center">
       <p className="text-4xl">🎁</p>
       <h1 className="text-xl font-bold text-black">
-        {etape === "tampons" || etape === "email"
+        {etape === "tampons" || etape === "email" || etape === "confirmation"
           ? `Tes points de fidélité${activation?.prenom ? `, ${activation.prenom}` : ""}`
           : "Tes points de fidélité"}
       </h1>
@@ -120,7 +121,7 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
       {etape === "email" && (
         <div className="space-y-3 rounded-lg border border-gray-200 bg-[#FFF8F0] p-4 text-left">
           <p className="text-sm font-semibold text-gray-900">
-            Entre ton email pour débloquer l&apos;accès à tes points de fidélité.
+            Entre ton email pour activer ton compte : tu recevras un lien de confirmation, et tes récompenses seront débloquées.
           </p>
           <input
             value={email}
@@ -145,9 +146,18 @@ export function VoirTamponsApp({ code }: VoirTamponsAppProps) {
             disabled={enCours || !email.trim()}
             className="w-full rounded bg-[#8B2020] py-2 text-sm font-bold text-white disabled:opacity-40"
           >
-            {enCours ? "…" : "Voir mes points de fidélité"}
+            {enCours ? "…" : "Recevoir mon lien de confirmation"}
           </button>
           <p className="text-xs text-gray-700">Ton e-mail sert à te prévenir quand une récompense est prête. Tu peux te désinscrire à tout moment.</p>
+        </div>
+      )}
+
+      {etape === "confirmation" && (
+        <div className="space-y-2 rounded-lg border-2 border-[#2D5A27] bg-[#2D5A27]/10 p-4">
+          <p className="text-base font-extrabold text-[#2D5A27]">📬 Regarde ta boîte mail</p>
+          <p className="text-sm text-gray-900">
+            On vient de t&apos;envoyer un email à <strong>{email}</strong>. Clique sur « Confirmer mon email » : ton compte sera activé et tes récompenses débloquées. Pense à regarder dans les courriers indésirables.
+          </p>
         </div>
       )}
 

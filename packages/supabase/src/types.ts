@@ -234,6 +234,8 @@ export interface Database {
           /** Reliquat (< 10€) pas encore converti en tampon — plus le cumul total. Voir `fidelite_tampons`. */
           montant_cumule: number;
           email: string | null;
+          /** Date à laquelle le client a cliqué sur le lien de confirmation reçu par email — null = compte non activé (récompenses verrouillées). */
+          email_confirme_le: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -243,6 +245,7 @@ export interface Database {
           prenom?: string | null;
           montant_cumule?: number;
           email?: string | null;
+          email_confirme_le?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>;
         Relationships: [];
@@ -566,6 +569,31 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["campagnes_auto"]["Insert"]>;
+        Relationships: [];
+      };
+
+      confirmations_email: {
+        Row: {
+          id: string;
+          telephone: string;
+          email: string;
+          jeton_hash: string;
+          accepte_offres: boolean;
+          expire_le: string;
+          utilise_le: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          telephone: string;
+          email: string;
+          jeton_hash: string;
+          accepte_offres?: boolean;
+          expire_le: string;
+          utilise_le?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["confirmations_email"]["Insert"]>;
         Relationships: [];
       };
 

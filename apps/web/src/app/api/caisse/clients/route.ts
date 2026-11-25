@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data: client, error } = await supabase
     .from("clients")
-    .select("telephone, nom, prenom, email, montant_cumule")
+    .select("telephone, nom, prenom, email, email_confirme_le, montant_cumule")
     .eq("telephone", telephoneNormalise)
     .maybeSingle();
 
@@ -41,12 +41,19 @@ export async function GET(request: Request) {
 
   const profil = await lireProfilEnregistre(supabase, telephoneNormalise);
 
+  // Compte non activé (email absent ou jamais confirmé) : la récompense existe mais reste verrouillée, jamais proposée en caisse.
+  const emailConfirme = !!client.email && !!client.email_confirme_le;
+  const { email_confirme_le: _confirmeLe, ...clientSansConfirmation } = client;
+  void _confirmeLe;
+
   return NextResponse.json({
     existe: true,
-    ...client,
+    ...clientSansConfirmation,
+    emailConfirme,
+    tamponsBloques: emailConfirme ? 0 : tampons.nombre,
     profil,
     montantCumule: client.montant_cumule,
-    tamponsDisponibles: tampons.nombre,
+    tamponsDisponibles: emailConfirme ? tampons.nombre : 0,
     prochaineExpiration: tampons.prochaineExpiration,
   });
 }

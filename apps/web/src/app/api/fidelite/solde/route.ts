@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("email, montant_cumule, nom, prenom")
+    .select("email, email_confirme_le, montant_cumule, nom, prenom")
     .eq("telephone", telephone)
     .maybeSingle();
 
@@ -56,6 +56,11 @@ export async function POST(request: Request) {
   // plutôt que de prétendre qu'il n'y a pas de compte.
   if (!data.email) {
     return NextResponse.json({ error: "Email pas encore associé à ce numéro.", raison: "email_manquant" }, { status: 404 });
+  }
+
+  // Email présent mais jamais confirmé (lien non cliqué) : ni solde, ni nom, ni adresse — compte non activé.
+  if (!data.email_confirme_le) {
+    return NextResponse.json({ error: "Compte pas encore activé.", raison: "email_non_confirme" }, { status: 404 });
   }
 
   const tampons = await compterTamponsDisponibles(supabase, telephone);

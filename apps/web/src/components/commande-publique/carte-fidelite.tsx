@@ -74,7 +74,6 @@ export function CarteFidelite({
   const emailSaisi = champsExternes ? emailExterne : emailInterne;
   const [solde, setSolde] = useState<SoldeTampons | null>(null);
   const [enCours, setEnCours] = useState(false);
-  const [enCoursLiaison, setEnCoursLiaison] = useState(false);
   const derniereIdentiteVerifiee = useRef<string | null>(null);
   const [memorise, setMemorise] = useState(false);
 
@@ -155,30 +154,6 @@ export function CarteFidelite({
     [onSoldeVerifie, onPrefillIdentite]
   );
 
-  // Un numéro doit toujours être lié à un email pour voir/utiliser ses
-  // tampons (demande explicite du patron, 2026-10-21) : un numéro déjà
-  // connu mais sans email associé (commande en caisse, email facultatif)
-  // n'est jamais traité comme "nouveau client" — on propose de lier
-  // l'email tapé ici à ce numéro.
-  async function lierEmail() {
-    const telephone = normaliserTelephone(telephoneSaisi);
-    const email = normaliserEmail(emailSaisi);
-    if (!telephone || !email) return;
-    setEnCoursLiaison(true);
-    try {
-      const reponse = await fetch("/api/fidelite/lier-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telephone, email }),
-      });
-      const data = await reponse.json();
-      if (!reponse.ok) return;
-      appliquerSucces(data, telephone, email);
-    } finally {
-      setEnCoursLiaison(false);
-    }
-  }
-
   // Vérification automatique dès que les deux champs sont valides — jamais
   // besoin de cliquer sur un bouton pour voir ses tampons. Re-déclenche si
   // le client change l'un des deux champs après une première vérification
@@ -212,7 +187,7 @@ export function CarteFidelite({
           // explicitement pour proposer de le lier plutôt que de prétendre
           // qu'il n'y a pas de compte.
           setSolde(null);
-          setEtape(data.raison === "email_manquant" ? "email_manquant" : "nouveau_client");
+          setEtape(data.raison === "email_manquant" || data.raison === "email_non_confirme" ? "email_manquant" : "nouveau_client");
           onSoldeVerifie(false);
           return;
         }
@@ -296,18 +271,11 @@ export function CarteFidelite({
 
       {etape === "email_manquant" && (
         <div className="mt-2 rounded border border-[#8B2020]/30 bg-white p-2">
-          <p className="text-xs text-gray-700">
-            On connaît ce numéro, mais aucun email n&apos;y est encore associé — nécessaire pour voir et utiliser tes
-            points de fidélité.
+          <p className="text-xs text-gray-800">
+            Ton compte fidélité n&apos;est pas encore activé : tes points de fidélité s&apos;accumulent, mais tes récompenses restent verrouillées
+            tant que ton email n&apos;est pas confirmé. Scanne le QR de ton dernier ticket du restaurant pour recevoir ton lien de
+            confirmation, ou clique sur le lien déjà reçu par email. Tu peux commander normalement en attendant.
           </p>
-          <button
-            type="button"
-            onClick={lierEmail}
-            disabled={enCoursLiaison}
-            className="mt-2 rounded bg-[#8B2020] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            {enCoursLiaison ? "…" : `Associer ${emailSaisi.trim()} à ce numéro`}
-          </button>
         </div>
       )}
 

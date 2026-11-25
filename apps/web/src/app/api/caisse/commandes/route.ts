@@ -5,6 +5,7 @@ import { normaliserTelephone } from "@/lib/telephone";
 import { lireProfilClient } from "@/lib/profil-client";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { normaliserEmail } from "@/lib/email";
+import { demanderConfirmationEmail, emailEstConfirme, poserEmailNonConfirme } from "@/lib/fidelite/email-confirme";
 import { notifierPaiementConfirme, notifierCommandeRecue, notifierCommandeModifiee } from "@/lib/notifications/paiement";
 import {
   NOM_PRODUIT_VIANDE_SUPPLEMENTAIRE,
@@ -715,6 +716,13 @@ export async function POST(request: Request) {
 
   const nbTamponsDemandes = typeof body.nbTampons === "number" ? Math.floor(body.nbTampons) : 0;
   if (nbTamponsDemandes > 0) {
+    // Récompense verrouillée tant que le client n'a pas confirmé son email (compte non activé).
+    if (!(await emailEstConfirme(supabase, clientTelephone))) {
+      return NextResponse.json(
+        { error: "Compte fidélité non activé : le client doit d'abord confirmer son email (QR du ticket) pour utiliser sa récompense." },
+        { status: 403 }
+      );
+    }
     const { nombre: tamponsDisponibles } = await compterTamponsDisponibles(supabase, clientTelephone);
     const maxUtilisable = Math.min(tamponsDisponibles, Math.floor(montantBrut / MONTANT_RECOMPENSE));
     if (nbTamponsDemandes > maxUtilisable) {
@@ -755,10 +763,11 @@ export async function POST(request: Request) {
   // Identité (nom/prénom) toujours rafraîchie avec la commande la plus
   // récente — distinct des colonnes fidélité (montant_cumule, tampons...)
   // qui restent exclusivement écrites par le trigger de paiement.
-  await supabase
-    .from("clients")
-    .update({ nom, prenom, ...(email ? { email } : {}) })
-    .eq("telephone", clientTelephone);
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
+  // Email saisi en caisse : posé seulement si la fiche n'en a aucun (jamais d'écrasement), NON confirmé ; le client reçoit un lien.
+  if (email && (await poserEmailNonConfirme(supabase, clientTelephone, email))) {
+    await demanderConfirmationEmail(clientTelephone, email, false);
+  }
 
   // Décrément atomique du stock du jour (plats du jour) — dernier garde-fou
   // contre la concurrence, en plus du pré-check informatif ci-dessus.
@@ -1184,10 +1193,11 @@ export async function PATCH(request: Request) {
     console.error("[/api/caisse/commandes PATCH] échec upsert client :", erreurUpsertClient.message);
     return NextResponse.json({ error: "Erreur serveur, réessaie." }, { status: 500 });
   }
-  await supabase
-    .from("clients")
-    .update({ nom, prenom, ...(email ? { email } : {}) })
-    .eq("telephone", clientTelephone);
+  await supabase.from("clients").update({ nom, prenom }).eq("telephone", clientTelephone);
+  // Email saisi en caisse : posé seulement si la fiche n'en a aucun (jamais d'écrasement), NON confirmé ; le client reçoit un lien.
+  if (email && (await poserEmailNonConfirme(supabase, clientTelephone, email))) {
+    await demanderConfirmationEmail(clientTelephone, email, false);
+  }
 
   // Ajustement atomique du stock du jour : restitue les anciennes quantités
   // (contenu avant modification, déjà extraites plus haut) puis décompte

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { normaliserEmail } from "@/lib/email";
+import { normaliserTelephone } from "@/lib/telephone";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import { activerEmailParQrLivraison } from "@/lib/fidelite/activation";
 
@@ -18,6 +19,11 @@ export async function POST(request: Request) {
   const email = normaliserEmail(body?.email ?? "");
   if (!code || !telephone || !email) {
     return NextResponse.json({ error: "Email invalide." }, { status: 400 });
+  }
+
+  const tel = normaliserTelephone(telephone);
+  if (tel && limiterDebit(`fidelite-activer-tel:${tel}`, 3, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Trop de demandes pour ce numéro, réessaie dans une heure." }, { status: 429 });
   }
 
   try {

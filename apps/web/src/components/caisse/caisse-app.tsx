@@ -181,6 +181,9 @@ interface ClientInfo {
   prenom?: string | null;
   email?: string | null;
   tamponsDisponibles?: number;
+  /** Points de fidélité du client verrouillés car son email n'est pas confirmé (compte non activé). */
+  tamponsBloques?: number;
+  emailConfirme?: boolean;
   prochaineExpiration?: string | null;
   montantCumule?: number;
   profil?: string | null;
@@ -2445,10 +2448,15 @@ export function CaisseApp({
                     <>
                       <p className="font-semibold">
                         {messageSoldeFidelite(clientInfo.montantCumule ?? 0, {
-                          nombre: clientInfo.tamponsDisponibles ?? 0,
+                          nombre: (clientInfo.tamponsDisponibles ?? 0) + (clientInfo.tamponsBloques ?? 0),
                           prochaineExpiration: clientInfo.prochaineExpiration ?? null,
                         })}
                       </p>
+                      {(clientInfo.tamponsBloques ?? 0) > 0 && (
+                        <div className="mt-2 rounded border border-orange-300 bg-orange-50 p-2 text-sm font-bold text-orange-800">
+                          🔒 Récompense verrouillée : compte non activé. Le client scanne le QR de son ticket pour confirmer son email, puis la récompense se débloque (pas besoin de le faire au comptoir).
+                        </div>
+                      )}
                       {(clientInfo.tamponsDisponibles ?? 0) > 0 && (
                         <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-700">
                           <p>

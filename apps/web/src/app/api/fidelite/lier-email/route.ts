@@ -1,27 +1,10 @@
 import { NextResponse } from "next/server";
-import { normaliserTelephone } from "@/lib/telephone";
-import { normaliserEmail } from "@/lib/email";
-import { limiterDebit } from "@/lib/auth/rate-limit";
-import { lierEmailAuTelephone } from "@/lib/fidelite/liaison";
 
-/** Associe un email à un numéro qui n'en a pas encore (cf. `/api/fidelite/solde`, raison "email_manquant"). */
-export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { telephone?: string; email?: string } | null;
-  const telephone = normaliserTelephone(body?.telephone ?? "");
-  const email = normaliserEmail(body?.email ?? "");
-  if (!telephone || !email) {
-    return NextResponse.json({ error: "Numéro de téléphone ou email invalide." }, { status: 400 });
-  }
-
-  if (limiterDebit(`fidelite-lier:${telephone}`, 10, 5 * 60 * 1000)) {
-    return NextResponse.json({ error: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
-  }
-
-  try {
-    const solde = await lierEmailAuTelephone(telephone, email);
-    return NextResponse.json(solde);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Erreur inconnue.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+/**
+ * FERMÉE le 2026-11-25 : cette route attachait n'importe quel email à un numéro sans email, sans aucune preuve — donc
+ * n'importe qui pouvait « s'approprier » le compte fidélité d'un autre client. Un compte s'active désormais en confirmant
+ * son email (lien reçu par email, cf. `/api/fidelite/activer` et `/fidelite/confirmer`).
+ */
+export async function POST() {
+  return NextResponse.json({ error: "Cette page n'existe plus : scanne le QR de ton ticket pour activer ton compte." }, { status: 410 });
 }
