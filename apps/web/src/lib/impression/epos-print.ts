@@ -1,8 +1,6 @@
 import type { CommandePourImpression } from "./types";
 import { fourchetteLivraison } from "@/lib/commande-publique/lieux-livraison";
-import { libellePayeeTicket } from "@/lib/libelle-paiement";
 import { libelleBoissonLigne, libelleSupplementsLigne } from "@/lib/libelle-ligne";
-import { SEUIL_COMMANDE_PRIORITAIRE } from "@/lib/plats";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import type { LigneCommande } from "@/lib/caisse/types";
@@ -154,7 +152,7 @@ function nomOuNumeroAffiche(commande: CommandePourImpression): string {
   return commande.nom.trim() || `Commande ${formaterNumeroTicket(commande.numero)}`;
 }
 
-const MENTION_LEGALE = "3 Sauces — Auto-entrepreneur — SIRET 532 276 581 00040 — TVA non applicable, art. 293 B du CGI";
+const MENTION_LEGALE = "SIRET 532 276 581 00040 - TVA non applicable, art. 293 B du CGI";
 const CONTACT_RESTAURANT = "3sauces.fr — 06 39 63 81 78";
 
 function formaterDateHeure(iso: string): string {
@@ -262,10 +260,6 @@ function attributsCuisine(l: LigneCommande): AttributCuisine[] {
       valeur: `${l.quantite > 1 ? `${l.quantite}x ` : ""}${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`,
     });
   return attributs;
-}
-
-function estPrioritaire(commande: CommandePourImpression): boolean {
-  return commande.canal === "livraison" && commande.nbPlats >= SEUIL_COMMANDE_PRIORITAIRE;
 }
 
 /** Clé d'égalité pour fusionner deux lignes identiques sur le bon de cuisine — jamais à travers deux plats/convives différents d'une commande groupée. */
@@ -471,29 +465,17 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
 }
 
 function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpression): void {
-  separateur(b);
-  b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 1 });
-  b.ligne("10€ dépensés = 1 point de fidélité", { align: "center", gras: false, taille: 1 });
-  b.ligne("10 points de fidélité = 10€ offerts", { align: "center", gras: false, taille: 1 });
-
-  if (commande.clientTelephone && commande.tamponsAffiches !== null) {
-    if (commande.tamponsUtilises > 0) {
-      const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
-      b.ligne(`${remise.toFixed(2)} € de points de fidélité utilisés sur cette commande`, {
-        align: "center",
-        gras: true,
-        taille: 1,
-      });
-    }
-    // `tamponsAffiches` exclut déjà tout tampon réservé par cette commande
-    // (cf. `compterTamponsDisponibles`, `reserver_tampons_fidelite`) — ne
-    // jamais soustraire une seconde fois ici, ce serait compter la remise
-    // deux fois.
-    const tampon = commande.tamponsAffiches > 1 ? "points" : "point";
-    b.ligne(`Tu as ${commande.tamponsAffiches} ${tampon} de fidélité`, { align: "center", gras: true, taille: 2 });
-    if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
-      b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
-    }
+  if (!commande.clientTelephone || commande.tamponsAffiches === null) return;
+  if (commande.tamponsUtilises > 0) {
+    const remise = commande.tamponsUtilises * MONTANT_RECOMPENSE;
+    b.ligne(`${remise.toFixed(2)} € de points de fidélité utilisés`, { align: "center", gras: true, taille: 1 });
+  }
+  // `tamponsAffiches` exclut déjà tout tampon réservé par cette commande (cf. `compterTamponsDisponibles`,
+  // `reserver_tampons_fidelite`) — ne jamais soustraire une seconde fois ici, ce serait compter la remise deux fois.
+  const tampon = commande.tamponsAffiches > 1 ? "points" : "point";
+  b.ligne(`${commande.tamponsAffiches} ${tampon} de fidélité`, { align: "center", gras: true, taille: 1 });
+  if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
+    b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
   }
 }
 
@@ -587,27 +569,23 @@ function construireContenuTicketClient(
     b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
   }
 
-  b.ligne("3 Sauces", { align: "center", gras: true, taille: 2 });
-  b.ligne(formaterNumeroTicket(commande.numero), { align: "center", gras: true, taille: 2 });
-  // Distingue une commande saisie en caisse d'une commande passée par le
-  // client sur le site — demande explicite du patron, 2026-10-20 : à la
-  // pile de tickets du comptoir, impossible sinon de savoir d'où elle vient.
-  b.ligne(commande.origineCaisse ? "CAISSE" : "SITE INTERNET", { align: "center", gras: true, taille: 1 });
-  b.ligne(formaterDateHeure(commande.creeLe), { align: "center", gras: false, taille: 1 });
+  // Ticket compact (demande du patron, 25/11/2026) : chaque information n'est imprimée qu'une fois.
+  b.ligne(`3 Sauces ${formaterNumeroTicket(commande.numero)}`, { align: "center", gras: true, taille: 2 });
+  // Distingue une commande saisie en caisse d'une commande passée par le client sur le site (demande du patron, 2026-10-20).
+  b.ligne(`${commande.origineCaisse ? "CAISSE" : "SITE INTERNET"} - ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: false, taille: 1 });
 
   if (commande.dejaPayee) {
-    b.ligne(`*** ${libellePayeeTicket(commande.modePaiement)} ***`, { align: "center", gras: true, taille: 2 });
-    b.ligne("NE PAS FAIRE PAYER", { align: "center", gras: true, taille: 2 });
+    b.ligne("DÉJÀ PAYÉE", { align: "center", gras: true, taille: 2 });
   } else if (commande.modePaiement === "stripe") {
-    // Paiement en ligne choisi mais jamais confirmé (abandon de checkout) —
-    // ne devrait normalement jamais être imprimé (filtré en amont tant que
-    // non payé), mais jamais annoncer "déjà payé" sur la seule foi du mode
-    // choisi. Bug réel constaté le 2026-10-21, commande #455.
-    b.ligne("*** PAIEMENT EN LIGNE NON CONFIRME ***", { align: "center", gras: true, taille: 2 });
-    b.ligne("VERIFIER / ENCAISSER", { align: "center", gras: true, taille: 2 });
+    // Paiement en ligne choisi mais jamais confirmé (abandon de checkout) : ne jamais annoncer « déjà payé » sur la seule
+    // foi du mode choisi. Bug réel constaté le 2026-10-21, commande #455.
+    b.ligne("PAIEMENT EN LIGNE NON CONFIRMÉ", { align: "center", gras: true, taille: 1 });
   }
 
-  b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
+  // Livraison : le nom figure dans le bloc encadré plus bas. Sinon, le numéro est déjà en en-tête : nom seulement s'il existe.
+  if (commande.canal !== "livraison" && commande.nom.trim()) {
+    b.ligne(commande.nom.trim(), { align: "left", gras: true, taille: 2 });
+  }
   separateur(b);
 
   imprimerBoxOfferte(b, commande.lignes);
@@ -625,18 +603,21 @@ function construireContenuTicketClient(
     b.ligne(`Points de fidélité utilisés : -${remise.toFixed(2)} €`, { gras: true, taille: 1 });
   }
   b.ligne(`TOTAL : ${commande.montant.toFixed(2)} €`, { gras: true, taille: 2 });
-  b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: commande.dejaPayee, taille: 1 });
-  if (commande.dejaPayee) {
-    b.ligne("*** DEJA PAYEE — NE RIEN DEMANDER ***", { align: "center", gras: true, taille: 2 });
+  if (!commande.dejaPayee) {
+    b.ligne(`Paiement : ${libelleModePaiement(commande.modePaiement)}`, { gras: false, taille: 1 });
   }
 
-  imprimerBlocClient(b, commande);
+  if (commande.canal === "livraison") {
+    imprimerBlocClient(b, commande);
+  } else if (commande.heureSouhaitee) {
+    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
+  }
+  imprimerBlocFidelite(b, commande);
   if (commande.canal !== "livraison") {
     // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
     // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
     // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.
-    b.brut(`<feed line="1"/>`);
-    b.ligne("Scanne pour voir tes points de fidélité et commander en un clic", { align: "center", gras: true, taille: 1 });
+    b.ligne("Scanne pour voir tes points de fidélité", { align: "center", gras: true, taille: 1 });
     b.brut(styleTexte({ align: "center" }));
     b.brut(
       `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}&src=${commande.origineCaisse ? "ticket-caisse" : "ticket-site"}`)}</symbol>`
@@ -654,7 +635,6 @@ function construireContenuTicketClient(
     );
   }
 
-  imprimerBlocFidelite(b, commande);
   imprimerBlocCommunication(b, commande);
 
   separateur(b);
@@ -682,10 +662,6 @@ export function construireTicketClientXmlBrut(
 
 function construireContenuBonCuisine(commande: CommandePourImpression): string {
   const b = creerConstructeurTicket();
-
-  if (estPrioritaire(commande)) {
-    b.ligne("★ PRIORITAIRE ★", { align: "center", gras: true, taille: 2 });
-  }
 
   // Heure (et lieu pour une livraison) tout en haut et en gros, pour tous les canaux : la cuisine range les tickets
   // papier par heure, puis par lieu (demande du patron, 2026-11-11).

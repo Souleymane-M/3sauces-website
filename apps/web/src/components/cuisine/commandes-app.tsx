@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import type { CommandeCuisine, LivraisonEnCours } from "@/lib/cuisine/types";
 import { LIBELLES_STATUT, RECUL_STATUT, TRANSITIONS_PAR_CANAL } from "@/lib/cuisine/types";
 import { jouerAlerteSonore } from "@/lib/impression/alerte-sonore";
-import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import { formaterTelephoneAffichage } from "@/lib/telephone";
@@ -110,10 +109,6 @@ function detailLigne(l: CommandeCuisine["lignes"][number]): string[] {
     details.push(`Accompagnement : ${l.accompagnementsInclus.map(nomSansMultiplicateur).join(" + ")}`);
   if (l.pourQui) details.push(`Pour ${l.pourQui}`);
   return details;
-}
-
-function estPrioritaire(commande: CommandeCuisine): boolean {
-  return commande.palierGroupe !== null;
 }
 
 function jourMayotte(iso: string): string {
@@ -230,7 +225,6 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
   // plus de bouton d'action en cuisine, juste un statut d'attente.
   const enAttenteScanLivreur = commande.canal === "livraison" && commande.statut === "pret";
 
-  const prioritaire = estPrioritaire(commande);
   const ancienne = estAncienne(commande.creeLe, commande.heureSouhaitee);
   const minutesDansEtape = minutesDepuis(commande.statutChangeLe ?? commande.creeLe);
   const enRetard =
@@ -251,9 +245,7 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
           ? "border-red-600"
           : enRetard
             ? "bordure-urgence-clignotante border-red-600"
-            : prioritaire
-              ? "border-orange-500"
-              : "border-gray-200"
+            : "border-gray-200"
       }`}
     >
       {ancienne && (
@@ -264,11 +256,6 @@ function CarteCommande({ commande, demanderChangement, demanderAnnulation }: Car
       {!ancienne && enRetard && (
         <div className="bandeau-urgence-clignotant mb-2 rounded px-2 py-1 text-base font-bold text-white">
           🚨 Depuis {minutesDansEtape} min dans cette étape — à traiter
-        </div>
-      )}
-      {prioritaire && (
-        <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-base font-bold text-white">
-          {libellePalierGroupe(commande.palierGroupe)} 🚀
         </div>
       )}
       <button type="button" onClick={() => setDetailOuvert((v) => !v)} className="w-full text-left">

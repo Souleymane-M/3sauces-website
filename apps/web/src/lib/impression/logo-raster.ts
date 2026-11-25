@@ -38,7 +38,7 @@ export function obtenirLogoRasterMemo(): Promise<LogoRaster | null> {
 function rasteriser(image: HTMLImageElement): LogoRaster | null {
   // Largeur cible raisonnable pour un ticket 80mm ; doit être un multiple de
   // 8 (empaquetage 8 pixels/octet du format <image>).
-  const LARGEUR_CIBLE = 384;
+  const LARGEUR_CIBLE = 240;
   const largeur = Math.ceil(LARGEUR_CIBLE / 8) * 8;
   const hauteur = Math.round((image.height / image.width) * largeur);
 

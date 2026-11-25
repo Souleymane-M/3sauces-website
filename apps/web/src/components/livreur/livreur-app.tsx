@@ -8,7 +8,6 @@ import { FormulairePaiementPartiel } from "./formulaire-paiement-partiel";
 import { useEffect, useState } from "react";
 import type { ModePaiement } from "@3sauces/supabase";
 import type { LivraisonAssignee, LivraisonDisponible } from "@/lib/livreur/types";
-import { libellePalierGroupe } from "@/lib/commande-publique/groupe-priorite";
 import { piecesParPaquet, nomSansMultiplicateur } from "@/lib/pieces-produit";
 import { regrouperLignesParCategorie } from "@/lib/caisse/regroupement-lignes";
 import { formaterTelephoneAffichage, formaterTelephonePourAppel } from "@/lib/telephone";
@@ -370,7 +369,6 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
 
       {(onglet === "livraison" ? livraisonsFiltrees : []).map((livraison) => {
         const declaration = declarationsOuvertes[livraison.id];
-        const prioritaire = livraison.palierGroupe !== null;
         // Remise éventuelle (lancement et/ou récompense fidélité) : déduite
         // de l'écart entre la somme des lignes et le montant réellement dû —
         // pour que le livreur sache que le client a eu une réduction, pas
@@ -381,13 +379,8 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
         return (
           <div
             key={livraison.id}
-            className={`rounded-xl border-2 p-4 ${prioritaire ? "border-orange-500" : "border-gray-200"}`}
+            className="rounded-xl border-2 border-gray-200 p-4"
           >
-            {prioritaire && (
-              <div className="mb-2 inline-block rounded bg-orange-500 px-2 py-1 text-lg font-bold text-white">
-                {libellePalierGroupe(livraison.palierGroupe)} 🚀
-              </div>
-            )}
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-bold text-gray-900">Commande #{livraison.numero}</span>
               <span className="text-xl text-gray-900">{formaterHeure(livraison.heureSouhaitee, livraison.adresse)}</span>

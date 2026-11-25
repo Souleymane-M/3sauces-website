@@ -1477,7 +1477,7 @@ export function CommandePubliqueApp({
                   {panierSimple.length === 0 && <p className="text-sm text-gray-600">Vide.</p>}
                   <ul className="space-y-2">{panierSimple.map(ligneJsx)}</ul>
                   {/* Beaucoup de clients commandent à plusieurs en "Commande simple" sans jamais
-                      découvrir les avantages du mode groupé (livraison prioritaire, boisson offerte) —
+                      découvrir le mode groupé —
                       repéré le 2026-10-07 sur une commande à ~60€ passée en simple. Le nudge
                       apparaît tôt (dès 2 articles) pour que le changement de mode, qui vide le
                       panier, coûte le moins possible si le client décide de basculer. */}
@@ -1485,7 +1485,7 @@ export function CommandePubliqueApp({
                     <div className="rounded-lg border border-[#2D5A27] bg-[#2D5A27]/5 p-3 text-sm">
                       <p className="font-semibold text-[#2D5A27]">
                         🚀 Vous commandez pour plusieurs personnes ? Passez en <strong>Commande groupée</strong> (dès
-                        2 plats) pour débloquer la livraison prioritaire dès 3 plats/30€.
+                        2 plats) pour choisir les plats de chaque convive.
                       </p>
                       <button
                         type="button"
