@@ -465,7 +465,7 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
     b.ligne(formaterTelephoneAffichage(commande.clientTelephone), { align: "left", gras: true, taille: 2 });
   }
   b.brut(`<feed line="1"/>`);
-  const libelleMontant = commande.dejaPayee ? "DEJA PAYE" : "A PAYER";
+  const libelleMontant = commande.dejaPayee ? "DÉJÀ PAYÉ" : "À PAYER";
   b.ligne(`${libelleMontant} : ${commande.montant.toFixed(2)} €`, { align: "left", gras: true, taille: 2 });
   b.ligne(BORDURE_BLOC_CLIENT, { align: "center", gras: true, taille: 1 });
 }
@@ -481,7 +481,7 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
   const tampon = commande.tamponsAffiches > 1 ? "points" : "point";
   b.ligne(`${commande.tamponsAffiches} ${tampon} de fidélité`, { align: "center", gras: true, taille: 1 });
   if (commande.recompenseDisponible && commande.tamponsUtilises === 0) {
-    b.ligne("RÉCOMPENSE DISPONIBLE — 10€ offerts", { align: "center", gras: true, taille: 1 });
+    b.ligne("RÉCOMPENSE DISPONIBLE — 10 € offerts", { align: "center", gras: true, taille: 1 });
   }
 }
 
@@ -506,10 +506,10 @@ function determinerMessageFidelite(commande: CommandePourImpression): string | n
   if (commande.canal === "livraison") {
     if (commande.tamponsAffiches === null) return null;
     if (commande.recompenseDisponible) {
-      return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE}€ offerts à utiliser`;
+      return `${salutation} pour ta confiance et ta fidélité. Tu as ${MONTANT_RECOMPENSE} € offerts à utiliser`;
     }
     const reste = NB_TAMPONS_RECOMPENSE - commande.tamponsAffiches;
-    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} de fidélité pour bénéficier de ${MONTANT_RECOMPENSE}€ offerts`;
+    return `${salutation} pour ta confiance et ta fidélité. Plus que ${reste} point${reste > 1 ? "s" : ""} de fidélité pour bénéficier de ${MONTANT_RECOMPENSE} € offerts`;
   }
 
   // Commande passée sur le site (sur place / à emporter) : un simple remerciement.
@@ -697,9 +697,9 @@ function construireContenuBonCuisine(commande: CommandePourImpression): string {
   b.ligne(`Commandé le ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: true, taille: 1 });
 
   if (commande.dejaPayee) {
-    b.ligne("DEJA PAYEE EN LIGNE", { align: "center", gras: true, taille: 1 });
+    b.ligne("DÉJÀ PAYÉE EN LIGNE", { align: "center", gras: true, taille: 1 });
   } else if (commande.modePaiement === "stripe") {
-    b.ligne("PAIEMENT EN LIGNE NON CONFIRME", { align: "center", gras: true, taille: 1 });
+    b.ligne("PAIEMENT EN LIGNE NON CONFIRMÉ", { align: "center", gras: true, taille: 1 });
   }
   b.ligne(nomOuNumeroAffiche(commande), { align: "center", gras: true, taille: 2 });
   if (commande.clientTelephone) {
