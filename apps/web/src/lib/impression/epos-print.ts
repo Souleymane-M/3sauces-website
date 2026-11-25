@@ -187,6 +187,12 @@ function estAujourdhuiMayotte(iso: string): boolean {
  * une commande à l'avance — sans ça, un ticket imprimé plusieurs jours avant
  * la date de retrait ne montrerait qu'une heure, sans dire de quel jour.
  */
+/** Version courte pour le ticket client : « 24/11 - 13:30 » (jamais « POUR LE MARDI… »). */
+function libelleDateHeureCourte(iso: string, adresse?: string | null): string {
+  const date = new Intl.DateTimeFormat("fr-FR", { timeZone: "Indian/Mayotte", day: "2-digit", month: "2-digit" }).format(new Date(iso));
+  return `${date} - ${fourchetteLivraison(adresse, iso) ?? formaterHeure(iso)}`;
+}
+
 function libelleHeureSouhaitee(iso: string, adresse?: string | null): string {
   const fourchette = fourchetteLivraison(adresse, iso);
   if (estAujourdhuiMayotte(iso)) return fourchette ?? formaterHeure(iso);
@@ -448,7 +454,7 @@ function imprimerBlocClient(b: ConstructeurTicket, commande: CommandePourImpress
   b.ligne(nomOuNumeroAffiche(commande), { align: "left", gras: true, taille: 2 });
   if (commande.heureSouhaitee) {
     b.brut(`<feed line="1"/>`);
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 2 });
+    b.ligne(libelleDateHeureCourte(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 2 });
   }
   if (commande.adresse) {
     b.brut(`<feed line="1"/>`);
@@ -571,7 +577,7 @@ function construireContenuTicketClient(
   }
 
   // Ticket compact (demande du patron, 25/11/2026) : chaque information n'est imprimée qu'une fois.
-  b.ligne(`3 Sauces ${formaterNumeroTicket(commande.numero)}`, { align: "center", gras: true, taille: 2 });
+  b.ligne(formaterNumeroTicket(commande.numero), { align: "center", gras: true, taille: 2 });
   // Distingue une commande saisie en caisse d'une commande passée par le client sur le site (demande du patron, 2026-10-20).
   b.ligne(`${commande.origineCaisse ? "CAISSE" : "SITE INTERNET"} - ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: false, taille: 1 });
 
@@ -616,7 +622,7 @@ function construireContenuTicketClient(
   if (commande.canal === "livraison") {
     imprimerBlocClient(b, commande);
   } else if (commande.heureSouhaitee) {
-    b.ligne(libelleHeureSouhaitee(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
+    b.ligne(libelleDateHeureCourte(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
   }
   imprimerBlocFidelite(b, commande);
   if (commande.canal !== "livraison") {
