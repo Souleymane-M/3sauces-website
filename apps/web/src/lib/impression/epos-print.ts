@@ -575,6 +575,11 @@ function construireContenuTicketClient(
   // Distingue une commande saisie en caisse d'une commande passée par le client sur le site (demande du patron, 2026-10-20).
   b.ligne(`${commande.origineCaisse ? "CAISSE" : "SITE INTERNET"} - ${formaterDateHeure(commande.creeLe)}`, { align: "center", gras: false, taille: 1 });
 
+  // Mode de retrait toujours visible en haut (livraison : déjà dans le bloc encadré plus bas).
+  if (commande.canal !== "livraison") {
+    b.ligne(libelleCanal(commande.canal).toUpperCase(), { align: "center", gras: true, taille: 2 });
+  }
+
   if (commande.dejaPayee) {
     b.ligne("DÉJÀ PAYÉE", { align: "center", gras: true, taille: 2 });
   } else if (commande.modePaiement === "stripe") {
