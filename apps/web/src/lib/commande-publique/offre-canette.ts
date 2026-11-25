@@ -1,5 +1,3 @@
-import { SEUIL_GROUPE_4_MONTANT } from "./groupe-priorite";
-
 /** Tous les jours de `debut` à `fin` inclus (AAAA-MM-JJ), sans dépendre du fuseau horaire. */
 function joursEntre(debut: string, fin: string): string[] {
   const jours: string[] = [];
@@ -27,7 +25,5 @@ export function offreCanetteActive(dateService: string): boolean {
 /** Une canette par tranche de 10 € complète : 10 € → 1, 19,90 € → 1, 20 € → 2. */
 export function nombreCanettesOffertes(montantPaye: number, dateService: string): number {
   if (!offreCanetteActive(dateService)) return 0;
-  // Non cumulable avec la boisson 2 L offerte (dès 40 € payés) : à partir de ce palier, c'est la boisson 2 L qui s'applique (décision du patron, 24/11).
-  if (montantPaye >= SEUIL_GROUPE_4_MONTANT) return 0;
   return Math.floor(montantPaye / MONTANT_PAR_CANETTE_OFFERTE);
 }

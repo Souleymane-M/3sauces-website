@@ -943,7 +943,7 @@ export function CaisseApp({
   // bas) car un simple message se noyait dans le panier (4 pilaou poulpe,
   // 2026-10-27 : la caissière ne comprenait pas pourquoi elle ne pouvait pas valider).
   const boissonsOffertesAChoisir =
-    palierGroupeReel === "GROUPE_4"
+    nbBoissonsOffertes > 0
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
   // Saisie en cours : le verrouillage automatique de l'appareil (45 s sans
@@ -974,7 +974,7 @@ export function CaisseApp({
   const montantAPayerFidelite = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
   const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayerFidelite) % MONTANT_RECOMPENSE);
   const resteProchaineBoisson = SEUIL_GROUPE_4_MONTANT - (montantAPayerFidelite % SEUIL_GROUPE_4_MONTANT);
-  const viseBoisson2L = resteProchaineBoisson < resteProchainPoint;
+  const viseBoisson2L = nbBoissonsOffertes > 0 && resteProchaineBoisson < resteProchainPoint;
   const pointsGagnesCommande =
     Math.floor((reliquatFidelite + montantAPayerFidelite) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
   // Nom jamais requis en caisse. Prénom requis seulement en livraison (le
@@ -1023,7 +1023,7 @@ export function CaisseApp({
                     ? "choisis si le client veut son ticket (Oui ou Non)."
                     : enModeGroupe && nbPlatsValides < SEUIL_MINIMUM_GROUPE
                       ? "une commande groupée doit contenir au moins 2 plats."
-                      : palierGroupeReel === "GROUPE_4" &&
+                      : nbBoissonsOffertes > 0 &&
                           boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes
                         ? "choisis le parfum de la boisson 2L offerte."
                         : null;
@@ -1704,7 +1704,7 @@ export function CaisseApp({
           paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
           nbTampons: nbTamponsEffectif,
-          boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          boissonOfferteSaveurs: nbBoissonsOffertes > 0 ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           date: dateCommande,
           encaisserMaintenant: encaisserEffectif,
           creneauHeure,
@@ -1790,7 +1790,7 @@ export function CaisseApp({
           modePaiement,
           paiements: paiementsMixte,
           clientTelephone: telephoneComplet,
-          boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          boissonOfferteSaveurs: nbBoissonsOffertes > 0 ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           date: dateCommande,
           creneauHeure,
           nom: nom.trim(),
@@ -2142,10 +2142,6 @@ export function CaisseApp({
             <div>
               <h3 className="font-semibold text-gray-900">Panier</h3>
 
-              <div className="mt-2 rounded-lg p-2 text-white" style={{ backgroundColor: "#2D5A27" }}>
-                <p className="text-sm font-bold">🎁 Boisson 2L offerte tous les {SEUIL_GROUPE_4_MONTANT}€</p>
-              </div>
-
               {!enModeGroupe ? (
                 <>
                   {panierSimple.length === 0 && <p className="mt-2 text-sm text-gray-600">Vide.</p>}
@@ -2223,7 +2219,7 @@ export function CaisseApp({
                   depuis le 2026-10-14 (avant, invisible en mode simple même à montant
                   largement suffisant, ex: 90€ de grillades jamais reconnues). */}
               {nbArticles > 0 &&
-                (palierGroupeReel === "GROUPE_4" ? (
+                (nbBoissonsOffertes > 0 ? (
                   <p className="mt-2 text-sm font-bold text-[#2D5A27]">
                     🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
                     {nbBoissonsOffertes > 1 ? "s" : ""} activée{nbBoissonsOffertes > 1 ? "s" : ""} !
@@ -2233,7 +2229,7 @@ export function CaisseApp({
                 <div className="mt-2 rounded-lg border-2 border-[#2D5A27] bg-white p-2">
                   <p className="text-sm font-extrabold text-gray-900">
                     {viseBoisson2L
-                      ? `Plus que ${resteProchaineBoisson.toFixed(2).replace(".", ",")} € : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte`
+                      ? `Plus que ${resteProchaineBoisson.toFixed(2).replace(".", ",")} € : ${nbBoissonsOffertes > 0 ? "une autre" : "une"} boisson 2 L offerte`
                       : `Ajoute encore ${resteProchainPoint.toFixed(2).replace(".", ",")} € : +1 point de fidélité`}
                   </p>
                   {pointsGagnesCommande > 0 && (
@@ -2322,7 +2318,7 @@ export function CaisseApp({
                   </div>)}
                 </div>
               )}
-              {palierGroupeReel === "GROUPE_4" && (
+              {nbBoissonsOffertes > 0 && (
                 <div
                   id="boisson-offerte"
                   className={`mt-2 rounded-lg border-2 p-3 ${

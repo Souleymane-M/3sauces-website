@@ -56,7 +56,11 @@ export function compterPlatsPourPalier<T extends { quantite: number }>(lignes: T
  * le palier GROUPE_4 (4 plats et 40€) est atteint — 40€→1, 80€→2, 90€→2,
  * 120€→3... Jamais de boisson sous ce palier.
  */
+/** Offre « boisson 2 L offerte dès 40 € » SUSPENDUE sur demande du patron (25/11/2026) : remettre à true pour la réactiver partout (site, caisse, ticket). */
+export const BOISSON_2L_OFFERTE_ACTIVE = false;
+
 export function nombreBoissonsOffertes(_nbPlats: number, montantBrut: number): number {
+  if (!BOISSON_2L_OFFERTE_ACTIVE) return 0;
   if (montantBrut < SEUIL_GROUPE_4_MONTANT) return 0;
   return Math.floor(montantBrut / SEUIL_GROUPE_4_MONTANT);
 }

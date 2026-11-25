@@ -435,7 +435,7 @@ export function CommandeNouvelleApp({
   const palierGroupeReel = palierGroupeActif(nbArticles, montantAPayer);
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, montantAPayer);
   const boissonsOffertesAChoisir =
-    palierGroupeReel === "GROUPE_4"
+    nbBoissonsOffertes > 0
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
   // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
@@ -462,7 +462,7 @@ export function CommandeNouvelleApp({
   // On pousse toujours vers l'objectif le plus proche : prochain point de fidélité ou prochaine boisson 2 L offerte.
   const platEtAvecCaValide = enGroupe ? (platEtAvecCa !== null && platEtAvecCa < nomsPlats.length ? platEtAvecCa : null) : platCourant;
   const etAvecCaBloque = enGroupe && platEtAvecCaValide === null;
-  const viseBoisson2L = resteAvantProchaineBoisson < resteProchainPoint;
+  const viseBoisson2L = false; // offre boisson 2 L suspendue (BOISSON_2L_OFFERTE_ACTIVE)
   const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
   const pourcentageProchaineBoisson = viseBoisson2L
     ? Math.round(((montantAPayer % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
@@ -714,7 +714,7 @@ export function CommandeNouvelleApp({
       setErreur("Ton panier est vide.");
       return;
     }
-    if (palierGroupeReel === "GROUPE_4" && boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes) {
+    if (nbBoissonsOffertes > 0 && boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes) {
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
       return;
     }
@@ -854,7 +854,7 @@ export function CommandeNouvelleApp({
           fideliteTelephone: nbTamponsEffectif > 0 ? fideliteVerifiee?.telephone : undefined,
           fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
           nbTampons: nbTamponsEffectif,
-          boissonOfferteSaveurs: palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          boissonOfferteSaveurs: nbBoissonsOffertes > 0 ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
           profil: !profilDejaConnu && profil ? profil : undefined,
           cadeauSauces: cadeauAcquis ? cadeauSauces.slice(0, nbSaucesCadeau) : undefined,
@@ -1753,15 +1753,15 @@ export function CommandeNouvelleApp({
 
           {nbArticles > 0 && (
             <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
-              {palierGroupeReel === "GROUPE_4" && (
+              {nbBoissonsOffertes > 0 && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
                   Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
                 </p>
               )}
-              {offreCanetteJour && montantAPayer < SEUIL_GROUPE_4_MONTANT && (
+              {offreCanetteJour && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: nbCanettesOffertes > 0 ? VERT : "#1F3A5F" }}>
                   {nbCanettesOffertes > 0
-                    ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande !${montantAPayer < SEUIL_GROUPE_4_MONTANT - MONTANT_PAR_CANETTE_OFFERTE ? ` Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.` : ` Plus que ${euros(SEUIL_GROUPE_4_MONTANT - montantAPayer)} : une boisson 2 L offerte à la place.`}`
+                    ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande ! Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.`
                     : `Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} : 1 canette OFFERTE`}
                 </p>
               )}
@@ -1776,7 +1776,7 @@ export function CommandeNouvelleApp({
               )}
               <p className="text-sm font-extrabold text-gray-900">
                 {viseBoisson2L
-                  ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${palierGroupeReel === "GROUPE_4" ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
+                  ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${nbBoissonsOffertes > 0 ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
                   : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande`}
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
@@ -2057,7 +2057,7 @@ export function CommandeNouvelleApp({
           </section>
 
           {/* Boisson offerte */}
-          {palierGroupeReel === "GROUPE_4" && (
+          {nbBoissonsOffertes > 0 && (
             <section
               id="boisson-offerte"
               className={`rounded-xl border-2 p-4 ${boissonsOffertesAChoisir > 0 ? "border-red-700 bg-red-50" : "border-[#2D5A27] bg-green-50"}`}

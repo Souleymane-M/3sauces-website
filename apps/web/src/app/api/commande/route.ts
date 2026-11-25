@@ -817,7 +817,7 @@ export async function POST(request: Request) {
   // `compterPlatsPourPalier`.
   const nbPlatsPalier = compterPlatsPourPalier(lignes);
   const palierGroupe = palierGroupeActif(nbPlatsPalier, montantFinal);
-  if (palierGroupe === "GROUPE_4") {
+  if (palierGroupe === "GROUPE_4" && nombreBoissonsOffertes(nbPlatsPalier, montantFinal) > 0) {
     const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantFinal);
     const saveursBrutes = Array.isArray(body.boissonOfferteSaveurs) ? body.boissonOfferteSaveurs : [];
     const saveursValidees = saveursBrutes.filter(

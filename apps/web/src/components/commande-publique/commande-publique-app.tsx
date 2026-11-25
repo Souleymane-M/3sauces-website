@@ -34,7 +34,6 @@ import { SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT } from "@/lib/plats";
 import {
   NOM_PRODUIT_BOISSON_OFFERTE,
   palierGroupeActif,
-  messageProgressionBoissonOfferte,
   nombreBoissonsOffertes,
   type PalierGroupe,
 } from "@/lib/commande-publique/groupe-priorite";
@@ -155,7 +154,7 @@ function BlocProgressionGroupe({
   nbBoissonsOffertes: number;
 }) {
   if (nbArticles === 0) return null;
-  if (palierGroupeReel === "GROUPE_4") {
+  if (nbBoissonsOffertes > 0) {
     return (
       <p className="text-sm font-bold text-[#2D5A27]">
         🎁 {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2L offerte
@@ -163,7 +162,7 @@ function BlocProgressionGroupe({
       </p>
     );
   }
-  return <p className="text-sm font-semibold text-[#2D5A27]">{messageProgressionBoissonOfferte(nbArticles, total)}</p>;
+  return null; // offre boisson 2 L suspendue
 }
 
 export function CommandePubliqueApp({
@@ -478,7 +477,7 @@ export function CommandePubliqueApp({
   // (après 11h) — message dédié, distinct de "il manque des plats/€".
   const nbBoissonsOffertes = nombreBoissonsOffertes(nbArticles, total);
   const boissonsOffertesAChoisir =
-    palierGroupeReel === "GROUPE_4"
+    nbBoissonsOffertes > 0
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
 
@@ -984,7 +983,7 @@ export function CommandePubliqueApp({
       return;
     }
     if (
-      palierGroupeReel === "GROUPE_4" &&
+      nbBoissonsOffertes > 0 &&
       boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length < nbBoissonsOffertes
     ) {
       setErreur("Choisis le parfum de ta boisson 2L offerte avant de valider.");
@@ -1132,7 +1131,7 @@ export function CommandePubliqueApp({
           fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs:
-            palierGroupeReel === "GROUPE_4" ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+            nbBoissonsOffertes > 0 ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
           sourceCampagne: lireSourceCampagne(),
         }),
@@ -1486,8 +1485,7 @@ export function CommandePubliqueApp({
                     <div className="rounded-lg border border-[#2D5A27] bg-[#2D5A27]/5 p-3 text-sm">
                       <p className="font-semibold text-[#2D5A27]">
                         🚀 Vous commandez pour plusieurs personnes ? Passez en <strong>Commande groupée</strong> (dès
-                        2 plats) pour débloquer livraison prioritaire dès 3 plats/30€, et une boisson 2L offerte dès
-                        4 plats/40€.
+                        2 plats) pour débloquer la livraison prioritaire dès 3 plats/30€.
                       </p>
                       <button
                         type="button"
@@ -1731,7 +1729,7 @@ export function CommandePubliqueApp({
                 )}
               </div>
 
-              {palierGroupeReel === "GROUPE_4" && (
+              {nbBoissonsOffertes > 0 && (
                 <div
                   id="boisson-offerte"
                   className={`rounded-lg border-2 p-3 ${

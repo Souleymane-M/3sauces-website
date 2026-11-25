@@ -472,7 +472,7 @@ async function validerLignesCommande(
   const montantPourOffres =
     Math.round((montantBrut - Math.min(Math.max(0, nbTamponsDemandes), Math.floor(montantBrut / MONTANT_RECOMPENSE)) * MONTANT_RECOMPENSE) * 100) / 100;
   const palierGroupe = palierGroupeActif(nbPlatsPalier, montantPourOffres);
-  if (palierGroupe === "GROUPE_4") {
+  if (palierGroupe === "GROUPE_4" && nombreBoissonsOffertes(nbPlatsPalier, montantPourOffres) > 0) {
     const nbOffertes = nombreBoissonsOffertes(nbPlatsPalier, montantPourOffres);
     const saveursBrutes = Array.isArray(boissonOfferteSaveursBrut) ? boissonOfferteSaveursBrut : [];
     const saveursValidees = saveursBrutes.filter(
