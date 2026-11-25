@@ -138,6 +138,8 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
   // le livreur a déjà flashées et prises en main ("En livraison"), et celles
   // pas encore scannées ("À récupérer"), qui le noyaient au milieu.
   const [onglet, setOnglet] = useState<"livraison" | "attente">("livraison");
+  // Détail (articles, téléphone, montant) déplié sur les livraisons « À récupérer » : le livreur peut voir ce qu'il va prendre avant de flasher le QR.
+  const [detailsAttenteOuverts, setDetailsAttenteOuverts] = useState<Set<string>>(new Set());
   const rechercheNormalisee = recherche.trim().toLowerCase();
   const livraisonsFiltrees = rechercheNormalisee
     ? livraisons.filter((l) =>
@@ -342,6 +344,56 @@ export function LivreurApp({ livraisonsInitiales, enAttenteInitiales }: LivreurA
               <p className="text-base text-gray-700">{livraison.adresse}</p>
               {livraison.pasEncorePrete && (
                 <p className="mt-1 text-sm font-semibold text-orange-600">⏳ Pas encore annoncée prête en cuisine</p>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setDetailsAttenteOuverts((prec) => {
+                    const suivant = new Set(prec);
+                    if (suivant.has(livraison.id)) suivant.delete(livraison.id);
+                    else suivant.add(livraison.id);
+                    return suivant;
+                  })
+                }
+                className="mt-2 w-full rounded-lg border border-gray-300 py-2 text-sm font-bold text-gray-800"
+              >
+                {detailsAttenteOuverts.has(livraison.id) ? "Masquer le détail ▾" : "Voir le détail ▸"}
+              </button>
+              {detailsAttenteOuverts.has(livraison.id) && (
+                <div className="mt-2 space-y-2 border-t border-gray-200 pt-2">
+                  {livraison.clientTelephone && (
+                    <a
+                      href={`tel:${formaterTelephonePourAppel(livraison.clientTelephone)}`}
+                      className="block text-base font-semibold text-[#8B2020] underline"
+                    >
+                      📞 {formaterTelephoneAffichage(livraison.clientTelephone)}
+                    </a>
+                  )}
+                  {regrouperLignesParCategorie(livraison.lignes).map((groupe) => (
+                    <div key={groupe.categorie}>
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{groupe.titre}</p>
+                      <ul className="mt-0.5 space-y-1">
+                        {groupe.lignes.map((l, i) => (
+                          <li key={i} className="text-base text-gray-900">
+                            <span className="font-semibold">
+                              {l.quantite * piecesParPaquet(l.nom)}x {nomSansMultiplicateur(l.nom)}
+                            </span>
+                            {detailLigne(l).map((detail, j) => (
+                              <div key={j} className="text-sm text-gray-600">
+                                {detail}
+                              </div>
+                            ))}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  {livraison.dejaPayee ? (
+                    <p className="text-base font-extrabold text-[#2D5A27]">✅ {libellePayee(livraison.modePaiement)} — rien à récupérer</p>
+                  ) : (
+                    <p className="text-xl font-bold text-gray-900">{livraison.montant.toFixed(2)} € à récupérer</p>
+                  )}
+                </div>
               )}
               {livraison.exclu ? (
                 <p className="mt-2 text-sm text-gray-500">Tu viens de la relâcher — un collègue doit la reprendre.</p>
