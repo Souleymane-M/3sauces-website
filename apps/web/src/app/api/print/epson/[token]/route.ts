@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { construireTicketClientXmlBrut, construireBonCuisineXmlBrut } from "@/lib/impression/epos-print";
+import { LOGO_TICKET } from "@/lib/impression/logo-ticket";
 import { analyserResultats } from "@/lib/impression/epos-response";
 import { marquerTicketRemis, marquerDernierTicketRemisImprime, listerCommandesDuJourAImprimer } from "@/lib/caisse/nouvelles-commandes";
 import { trouverImprimantePourJetonDirectPrint } from "@/lib/patron/imprimantes";
@@ -89,9 +90,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     // au moment de l'encaissement (demande explicite du patron).
     // À la remise de la commande (sur place / à emporter), le bon de cuisine est déjà sorti : seul le ticket client part.
     const jobs = commande.ticketClientSeul
-      ? construireJob(construireTicketClientXmlBrut(commande, null))
+      ? construireJob(construireTicketClientXmlBrut(commande, LOGO_TICKET))
       : [
-          ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, null))] : []),
+          ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, LOGO_TICKET))] : []),
           construireJob(construireBonCuisineXmlBrut(commande)),
         ].join("");
 

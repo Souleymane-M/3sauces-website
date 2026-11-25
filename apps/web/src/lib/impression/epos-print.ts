@@ -566,6 +566,7 @@ function construireContenuTicketClient(
   const b = creerConstructeurTicket();
 
   if (logo) {
+    b.brut(styleTexte({ align: "center" }));
     b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
   }
 
