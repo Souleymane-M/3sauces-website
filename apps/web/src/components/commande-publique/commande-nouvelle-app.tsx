@@ -1372,12 +1372,9 @@ export function CommandeNouvelleApp({
 
   return (
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
-      {/* Promos toujours bien visibles : fidélité, boisson 2 L offerte dès 40 €, offre du jour. */}
+      {/* Promos toujours bien visibles : fidélité, offre du jour. */}
       <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: VERT }}>
         🎁 10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
-      </div>
-      <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#C2540C" }}>
-        🥤 Dès 40 € payés : 1 boisson 2 L OFFERTE (80 € = 2 boissons…)
       </div>
       {pointsDoublesPossibles(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
@@ -1391,7 +1388,7 @@ export function CommandeNouvelleApp({
       )}
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés (dès 40 € payés : boisson 2 L offerte à la place)
+          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
         </div>
       )}
 
