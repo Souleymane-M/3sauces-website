@@ -325,6 +325,26 @@ function imprimerBoxOfferte(b: ConstructeurTicket, lignes: LigneCommande[]): voi
   b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
 }
 
+/** Boissons offertes (canette du jour, 2 L) : lignes créées par la commande avec « (offerte — … ) » dans leur nom. */
+function estBoissonOfferte(l: LigneCommande): boolean {
+  return l.categorie === "boisson" && /\(offerte\b/i.test(l.nom);
+}
+
+/** Bloc bien visible « BOISSON OFFERTE » sur le ticket client (sur place / à emporter) : le client voit ce qui lui est offert. */
+function imprimerBoissonsOffertes(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+  const offertes = lignes.filter(estBoissonOfferte);
+  if (offertes.length === 0) return;
+  const total = offertes.reduce((t, l) => t + l.quantite, 0);
+  b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+  b.ligne(` *** BOISSON${total > 1 ? "S" : ""} OFFERTE${total > 1 ? "S" : ""} *** `, { align: "center", gras: true, taille: 2, surligne: true });
+  for (const l of offertes) {
+    const nom = l.nom.replace(/\s*\(offerte[^)]*\)\s*/i, "").trim();
+    const saveur = l.saveurs && l.saveurs.length > 0 ? ` - ${l.saveurs.join(", ")}` : "";
+    b.ligne(` ${l.quantite}x ${nom.toUpperCase()}${saveur.toUpperCase()} `, { align: "left", gras: true, taille: 2, surligne: true });
+  }
+  b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+}
+
 function imprimerGroupeCategorieCuisine(b: ConstructeurTicket, lignes: LigneCommande[]): void {
   const groupes = regrouperLignesParCategorie(fusionnerLignesIdentiques(lignes));
   groupes.forEach((groupe, index) => {
@@ -601,7 +621,12 @@ function construireContenuTicketClient(
   separateur(b);
 
   imprimerBoxOfferte(b, commande.lignes);
-  imprimerArticlesClient(b, commande.lignes.filter((l) => !estLigneBox(l)));
+  const afficherBoissonsOffertes = commande.canal !== "livraison";
+  if (afficherBoissonsOffertes) imprimerBoissonsOffertes(b, commande.lignes);
+  imprimerArticlesClient(
+    b,
+    commande.lignes.filter((l) => !estLigneBox(l) && !(afficherBoissonsOffertes && estBoissonOfferte(l)))
+  );
 
   separateur(b);
   // Détail explicite dès qu'une récompense est utilisée — sinon le TOTAL
