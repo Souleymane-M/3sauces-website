@@ -44,7 +44,7 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
-import { MENUS_POUR_UN_OFFERT, nombreMenusOfferts, offreMenuEtudiantOuverte } from "@/lib/commande-publique/offre-menu-etudiant";
+import { MENUS_POUR_UN_OFFERT, REDUCTION_MENU_OFFERT, nombreMenusOfferts, offreMenuEtudiantOuverte } from "@/lib/commande-publique/offre-menu-etudiant";
 import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
@@ -435,7 +435,7 @@ export function CommandeNouvelleApp({
     .sort((x, y) => x - y);
   const nbMenusEtudiant = prixMenusEtudiant.length;
   const nbMenusOfferts = offreMenuOuverte && nbTamponsEffectif === 0 ? nombreMenusOfferts(nbMenusEtudiant) : 0;
-  const remiseMenusOfferts = prixMenusEtudiant.slice(0, nbMenusOfferts).reduce((t, p) => t + p, 0);
+  const remiseMenusOfferts = prixMenusEtudiant.slice(0, nbMenusOfferts).reduce((t, p) => t + Math.min(p, REDUCTION_MENU_OFFERT), 0);
   const total = totalBrut - remiseMenusOfferts;
   const choixRecompenseRequis = maxTamponsUtilisables > 0 && !choixRecompenseFait;
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;

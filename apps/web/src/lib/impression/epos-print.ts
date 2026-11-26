@@ -333,7 +333,7 @@ function estBoissonOfferte(l: LigneCommande): boolean {
 
 /** Menu offert par une offre spéciale (ex : Menu Étudiant offert) : ligne marquée `offert`. */
 function estMenuOffert(l: LigneCommande): boolean {
-  return l.offert === true && l.categorie !== "boisson";
+  return l.offert === true && l.categorie !== "boisson" && l.prixUnitaire === 0;
 }
 
 /** Bloc bien visible « OFFERT » sur le ticket client (sur place / à emporter) : le client voit ce qui lui est offert. */

@@ -12,6 +12,8 @@ import { NOM_PRODUIT_MENU_ETUDIANT } from "./types";
 export const JOURS_OFFRE_MENU_ETUDIANT: readonly string[] = ["2026-11-27"];
 export const HEURE_LIMITE_MENU_ETUDIANT = 12;
 export const MENUS_POUR_UN_OFFERT = 4;
+/** Réduction fixe accordée par menu offert (prix du Menu Étudiant) : 8 € par groupe de 4 menus, jamais plus. */
+export const REDUCTION_MENU_OFFERT = 8;
 
 /** Vrai si l'offre est ouverte MAINTENANT (jour concerné à Mayotte, avant l'heure limite). */
 export function offreMenuEtudiantOuverte(): boolean {
@@ -24,8 +26,8 @@ export function nombreMenusOfferts(nbMenus: number): number {
 }
 
 /**
- * Applique l'offre aux lignes d'une commande : les menus les MOINS chers (un par groupe de 4) passent à 0 € et sont marqués
- * `offert` ; ils restent des lignes à part entière pour que la cuisine prépare bien tous les menus.
+ * Applique l'offre aux lignes d'une commande : les menus les MOINS chers (un par groupe de 4) perdent 8 € (donc 0 € pour un menu simple) et sont marqués
+ * `offert` (réduction fixe de 8 €) ; ils restent des lignes à part entière pour que la cuisine prépare bien tous les menus.
  */
 export function offrirMenusEtudiant(lignes: LigneCommande[]): { lignes: LigneCommande[]; nbOfferts: number } {
   const resultat = lignes.map((l) => ({ ...l }));
@@ -39,11 +41,12 @@ export function offrirMenusEtudiant(lignes: LigneCommande[]): { lignes: LigneCom
     });
     if (indexMoinsCher === -1) break;
     const ligne = resultat[indexMoinsCher];
+    const prixApresReduction = Math.round(Math.max(0, ligne.prixUnitaire - REDUCTION_MENU_OFFERT) * 100) / 100;
     if (ligne.quantite === 1) {
-      resultat[indexMoinsCher] = { ...ligne, prixUnitaire: 0, offert: true };
+      resultat[indexMoinsCher] = { ...ligne, prixUnitaire: prixApresReduction, offert: true };
     } else {
       ligne.quantite -= 1;
-      resultat.splice(indexMoinsCher + 1, 0, { ...ligne, quantite: 1, prixUnitaire: 0, offert: true });
+      resultat.splice(indexMoinsCher + 1, 0, { ...ligne, quantite: 1, prixUnitaire: prixApresReduction, offert: true });
     }
   }
   return { lignes: resultat, nbOfferts };
