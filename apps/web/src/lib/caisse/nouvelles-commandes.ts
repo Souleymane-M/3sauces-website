@@ -124,7 +124,8 @@ export async function construireCommandesPourImpression(
       tamponsUtilises: c.tampons_utilises ?? 0,
       imprimerTicketClient: c.imprimer_ticket_client,
       ticketClientSeul: c.ticket_client_seul,
-      activationAImprimer: c.canal !== "livraison" && c.paiement_statut === "paye" && !!c.client_telephone && compteAActiverParTelephone.get(c.client_telephone) === true,
+      // Seulement si aucun ticket client complet ne sort (il porte déjà le QR).
+      activationAImprimer: c.canal !== "livraison" && c.paiement_statut === "paye" && !c.imprimer_ticket_client && !c.ticket_client_seul && !!c.client_telephone && compteAActiverParTelephone.get(c.client_telephone) === true,
     };
   });
 }

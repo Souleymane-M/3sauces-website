@@ -538,7 +538,7 @@ export function CaisseApp({
   // s'imprime maintenant ; le ticket client sort à la remise, avec le vrai mode de paiement (demande du patron, 2026-11-15).
   const ticketClientALaRemise = !encaisserEffectif && canal !== null && canal !== "livraison";
   // Client avec des points de fidélité dont le compte n'est pas activé : un petit ticket d'activation (QR) s'imprime
-  // automatiquement, quel que soit le choix du ticket client (demande du patron, 26/11/2026).
+  // automatiquement quand aucun ticket client complet n'est imprimé (le ticket complet porte déjà le QR).
   const compteAActiver =
     !!clientInfo?.existe && clientInfo.emailConfirme !== true && ((clientInfo.montantCumule ?? 0) >= MONTANT_RECOMPENSE || (clientInfo.tamponsBloques ?? 0) > 0);
   const impressionTicketObligatoire = !encaisserEffectif && !ticketClientALaRemise;
@@ -2846,7 +2846,7 @@ export function CaisseApp({
                     <p className="text-sm font-semibold text-gray-700">Imprimer le ticket client ?</p>
                     {compteAActiver && (
                       <p className="text-xs text-gray-600">
-                        🔑 Ce client a des points de fidélité et son compte n&apos;est pas activé : un petit ticket d&apos;activation (QR) sort automatiquement, quel que soit ton choix.
+                        🔑 Ce client a des points de fidélité et son compte n&apos;est pas activé : si tu choisis « Non », un petit ticket d&apos;activation (QR) sort automatiquement. Avec « Oui », le QR est sur le ticket complet.
                       </p>
                     )}
                     <div className="mt-1 grid grid-cols-2 gap-2">

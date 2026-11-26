@@ -89,11 +89,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     // sauté si l'employé a décoché "Imprimer le ticket client" en caisse
     // au moment de l'encaissement (demande explicite du patron).
     // À la remise de la commande (sur place / à emporter), le bon de cuisine est déjà sorti : seul le ticket client part.
-    // Petit ticket d'activation (QR) : automatique pour un client avec points de fidélité et compte non activé, quel que soit
-    // le choix du ticket client en caisse — il remplace le QR du ticket complet.
+    // Petit ticket d'activation (QR) : automatique pour un client avec points de fidélité et compte non activé quand aucun
+    // ticket client complet ne sort (le ticket complet porte déjà le QR).
     const ticketActivation = commande.activationAImprimer ? [construireJob(construireTicketActivationXmlBrut(commande, LOGO_TICKET))] : [];
     const jobs = commande.ticketClientSeul
-      ? [construireJob(construireTicketClientXmlBrut(commande, LOGO_TICKET)), ...ticketActivation].join("")
+      ? construireJob(construireTicketClientXmlBrut(commande, LOGO_TICKET))
       : [
           ...(commande.imprimerTicketClient ? [construireJob(construireTicketClientXmlBrut(commande, LOGO_TICKET))] : []),
           ...ticketActivation,

@@ -667,8 +667,7 @@ function construireContenuTicketClient(
     b.ligne(libelleDateHeureCourte(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
   }
   imprimerBlocFidelite(b, commande);
-  // Si le petit ticket d'activation sort aussi (compte non activé), il porte le QR : pas de second QR sur ce ticket.
-  if (commande.canal !== "livraison" && !commande.activationAImprimer) {
+  if (commande.canal !== "livraison") {
     // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
     // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
     // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.

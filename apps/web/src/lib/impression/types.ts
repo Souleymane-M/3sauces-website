@@ -48,7 +48,8 @@ export interface CommandePourImpression {
   ticketClientSeul: boolean;
   /**
    * Client avec des points de fidélité dont le compte n'est pas activé (email absent ou non confirmé), commande payée, hors
-   * livraison : un petit ticket d'activation (QR) est imprimé automatiquement, sans choix de la caissière ni du client.
+   * livraison, SANS ticket client complet : un petit ticket d'activation (QR) est imprimé automatiquement, sans choix de la
+   * caissière ni du client. Quand le ticket complet sort, c'est lui qui porte le QR.
    */
   activationAImprimer: boolean;
 }
