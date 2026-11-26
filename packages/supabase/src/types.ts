@@ -343,6 +343,8 @@ export interface Database {
           nb_canettes_offertes: number;
           /** Vrai = offre spéciale : cette commande ne rapporte aucun point de fidélité (migration 20261126090000). */
           sans_points: boolean;
+          /** Part du montant payé qui compte pour les points de fidélité (1 = normal, 0,5 = offre canette) — migration 20261127110000. */
+          taux_points: number;
           mode_prise: string | null;
           bonus_fidelite: number;
         };
@@ -385,6 +387,7 @@ export interface Database {
           offres_appliquees?: string[];
           nb_canettes_offertes?: number;
           sans_points?: boolean;
+          taux_points?: number;
           mode_prise?: string | null;
           bonus_fidelite?: number;
         };

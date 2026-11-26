@@ -45,7 +45,7 @@ import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MENUS_POUR_UN_OFFERT, REDUCTION_MENU_OFFERT, nombreMenusOfferts, offreMenuEtudiantOuverte } from "@/lib/commande-publique/offre-menu-etudiant";
-import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
+import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive, TAUX_POINTS_AVEC_CANETTE } from "@/lib/commande-publique/offre-canette";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
 import { MessageErreur } from "@/components/message-erreur";
@@ -450,7 +450,9 @@ export function CommandeNouvelleApp({
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
   // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
-  const nbCanettesOffertes = nbMenusOfferts > 0 ? 0 : nombreCanettesOffertes(montantAPayer, dateCommande);
+  const nbCanettesOffertes = nbMenusOfferts > 0 || nbTamponsEffectif > 0 ? 0 : nombreCanettesOffertes(montantAPayer, dateCommande);
+  // Avec une canette offerte, 20 € payés = 1 point de fidélité (la moitié du montant compte, comme sur le serveur).
+  const tauxPoints = nbCanettesOffertes > 0 ? TAUX_POINTS_AVEC_CANETTE : 1;
   // Offre du jour : 3 ailes + frites + 2 sauces offertes dès 20 € payés (commandes servies le jour de l'offre).
   const offreCadeauJour = offreCadeauActive(dateCommande);
   const offreCanetteJour = offreCanetteActive(dateCommande);
@@ -467,8 +469,8 @@ export function CommandeNouvelleApp({
   // Points de fidélité (10 € payés = 1 point), en tenant compte de ce que le client a déjà cumulé s'il est reconnu.
   const reliquatFidelite = fideliteVerifiee?.montantCumule ?? 0;
   const pointsGagnesPour = (montant: number) =>
-    Math.floor((reliquatFidelite + montant) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
-  const resteProchainPoint = MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE);
+    Math.floor((reliquatFidelite + montant * tauxPoints) / MONTANT_RECOMPENSE) - Math.floor(reliquatFidelite / MONTANT_RECOMPENSE);
+  const resteProchainPoint = (MONTANT_RECOMPENSE - ((reliquatFidelite + montantAPayer * tauxPoints) % MONTANT_RECOMPENSE)) / tauxPoints;
   const pointsProchainPoint = pointsGagnesPour(montantAPayer) + 1;
   // On pousse toujours vers l'objectif le plus proche : prochain point de fidélité ou prochaine boisson 2 L offerte.
   const platEtAvecCaValide = enGroupe ? (platEtAvecCa !== null && platEtAvecCa < nomsPlats.length ? platEtAvecCa : null) : platCourant;
@@ -477,7 +479,7 @@ export function CommandeNouvelleApp({
   const pointsAuProchainPalier = pointsGagnesPour(montantAPayer + resteAvantProchaineBoisson);
   const pourcentageProchaineBoisson = viseBoisson2L
     ? Math.round(((montantAPayer % SEUIL_GROUPE_4_MONTANT) / SEUIL_GROUPE_4_MONTANT) * 100)
-    : Math.round((((reliquatFidelite + montantAPayer) % MONTANT_RECOMPENSE) / MONTANT_RECOMPENSE) * 100);
+    : Math.round((((reliquatFidelite + montantAPayer * tauxPoints) % MONTANT_RECOMPENSE) / MONTANT_RECOMPENSE) * 100);
 
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   function declencherPulse() {
@@ -1417,7 +1419,7 @@ export function CommandeNouvelleApp({
       )}
       {offreCanetteActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
+          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés (1 point de fidélité tous les 20 € sur ces commandes, non cumulable avec l&apos;utilisation de tes points)
         </div>
       )}
 
@@ -1746,6 +1748,7 @@ export function CommandeNouvelleApp({
               ) : (
                 <>
                   <p className="mt-1 text-base font-extrabold text-gray-900">Veux-tu l&apos;utiliser sur cette commande ?</p>
+                  {offreCanetteJour && <p className="mt-1 text-sm font-bold text-[#8B2020]">Si tu l&apos;utilises, tu n&apos;as pas la canette offerte (offres non cumulables).</p>}
                   <div className="mt-2 space-y-2">
                     {Array.from({ length: maxTamponsUtilisables }, (_, i) => maxTamponsUtilisables - i).map((k) => (
                       <button
@@ -1788,7 +1791,12 @@ export function CommandeNouvelleApp({
                   Bravo : {nbBoissonsOffertes} boisson{nbBoissonsOffertes > 1 ? "s" : ""} 2 L offerte{nbBoissonsOffertes > 1 ? "s" : ""} !
                 </p>
               )}
-              {offreCanetteJour && (
+              {offreCanetteJour && nbTamponsEffectif > 0 && (
+                <p className="mb-1 text-sm font-extrabold" style={{ color: "#8B2020" }}>
+                  Tu utilises tes points de fidélité : pas de canette offerte sur cette commande (offres non cumulables).
+                </p>
+              )}
+              {offreCanetteJour && nbTamponsEffectif === 0 && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: nbCanettesOffertes > 0 ? VERT : "#1F3A5F" }}>
                   {nbCanettesOffertes > 0
                     ? `🎁 Bravo : ${nbCanettesOffertes > 1 ? `${nbCanettesOffertes} canettes OFFERTES` : "1 canette OFFERTE"} avec cette commande ! Plus que ${euros(MONTANT_PAR_CANETTE_OFFERTE - (montantAPayer % MONTANT_PAR_CANETTE_OFFERTE))} pour la suivante.`
@@ -1807,7 +1815,7 @@ export function CommandeNouvelleApp({
               <p className="text-sm font-extrabold text-gray-900">
                 {viseBoisson2L
                   ? `Plus que ${euros(resteAvantProchaineBoisson)} : ${nbBoissonsOffertes > 0 ? "une autre" : "une"} boisson 2 L offerte et ${pointsAuProchainPalier} point${pointsAuProchainPalier > 1 ? "s" : ""} de fidélité avec cette commande`
-                  : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande`}
+                  : `Ajoute encore ${euros(resteProchainPoint)} : tu gagnes ${pointsProchainPoint} point${pointsProchainPoint > 1 ? "s" : ""} de fidélité avec cette commande${tauxPoints < 1 ? " (avec la canette offerte : 1 point tous les 20 €)" : ""}`}
               </p>
               <div className="mt-2 h-3 overflow-hidden rounded-full bg-gray-200">
                 <div className="h-full rounded-full" style={{ width: `${pourcentageProchaineBoisson}%`, backgroundColor: VERT }} />
@@ -1824,7 +1832,7 @@ export function CommandeNouvelleApp({
               ) : null}
               <p className="mt-1 text-sm font-semibold text-gray-800">
                 {texteProgressionCommande(
-                  calculerProgressionCommande(total, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
+                  calculerProgressionCommande(total * tauxPoints, fideliteVerifiee?.montantCumule ?? 0, fideliteVerifiee?.tamponsDisponibles ?? 0, nbTamponsEffectif)
                 )}
               </p>
             </div>

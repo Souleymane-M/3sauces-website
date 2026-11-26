@@ -17,6 +17,8 @@ export const FIN_OFFRE_CANETTE = "2026-12-12";
  */
 export const JOURS_OFFRE_CANETTE: readonly string[] = ["2026-11-13", "2026-11-23", ...joursEntre("2026-11-25", FIN_OFFRE_CANETTE)];
 export const MONTANT_PAR_CANETTE_OFFERTE = 10;
+/** Une commande avec canette offerte compte la moitié de son montant pour les points de fidélité : 20 € payés = 1 point (le patron, 2026-11-26). */
+export const TAUX_POINTS_AVEC_CANETTE = 0.5;
 
 export function offreCanetteActive(dateService: string): boolean {
   return JOURS_OFFRE_CANETTE.includes(dateService);

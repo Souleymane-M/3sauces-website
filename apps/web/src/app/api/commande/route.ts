@@ -34,7 +34,7 @@ import type { LigneCommande } from "@/lib/caisse/types";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
-import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
+import { nombreCanettesOffertes, TAUX_POINTS_AVEC_CANETTE } from "@/lib/commande-publique/offre-canette";
 import { lireProfilClient } from "@/lib/profil-client";
 import { pointsDoublesApplicables } from "@/lib/fidelite/points-doubles";
 import { offreMenuEtudiantOuverte, offrirMenusEtudiant } from "@/lib/commande-publique/offre-menu-etudiant";
@@ -895,8 +895,8 @@ export async function POST(request: Request) {
   }
 
   // Offre du jour : une canette offerte par tranche de 10 € d'achats sur le montant réellement payé (après points de fidélité / remise), pour les commandes servies le jour de l'offre — site uniquement, cf. offre-canette.ts.
-  // Menu étudiant offert : aucune autre offre sur la commande.
-  const nbCanettesOffertes = nbMenusOfferts > 0 ? 0 : nombreCanettesOffertes(montantFinal, dateCommande);
+  // Menu étudiant offert ou points de fidélité utilisés : pas de canette offerte (les offres ne se cumulent pas).
+  const nbCanettesOffertes = nbMenusOfferts > 0 || tamponsUtilises > 0 ? 0 : nombreCanettesOffertes(montantFinal, dateCommande);
   if (nbCanettesOffertes > 0) {
     const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
     const saveursValidees = saveursBrutes.filter(
@@ -1067,7 +1067,7 @@ export async function POST(request: Request) {
 
   // Points doublés (clients actifs, jours d'opération) : jamais bloquant.
   const suiviOffres = suiviOffresCommande(lignes, dateCommande);
-  const pointsDoubles = nbMenusOfferts > 0 ? false : await pointsDoublesApplicables(supabase, telephone, dateCommande);
+  const pointsDoubles = nbMenusOfferts > 0 || nbCanettesOffertes > 0 ? false : await pointsDoublesApplicables(supabase, telephone, dateCommande);
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
@@ -1080,6 +1080,8 @@ export async function POST(request: Request) {
       nb_canettes_offertes: suiviOffres.nbCanettesOffertes,
       // Offre spéciale : cette commande ne rapporte aucun point de fidélité (cf. migration 20261126090000).
       ...(nbMenusOfferts > 0 ? { sans_points: true } : {}),
+      // Canette offerte : 20 € payés = 1 point de fidélité (la moitié du montant compte, cf. migration 20261127110000).
+      ...(nbCanettesOffertes > 0 && nbMenusOfferts === 0 ? { taux_points: TAUX_POINTS_AVEC_CANETTE } : {}),
       montant: montantFinal,
       // "non_paye" à l'insertion dans tous les cas (espèces/CB payés en
       // personne plus tard, ou Stripe confirmé par le webhook) — le trigger
