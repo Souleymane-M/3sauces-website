@@ -667,7 +667,8 @@ function construireContenuTicketClient(
     b.ligne(libelleDateHeureCourte(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
   }
   imprimerBlocFidelite(b, commande);
-  if (commande.canal !== "livraison") {
+  // Si le petit ticket d'activation sort aussi (compte non activé), il porte le QR : pas de second QR sur ce ticket.
+  if (commande.canal !== "livraison" && !commande.activationAImprimer) {
     // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
     // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
     // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.
@@ -704,6 +705,47 @@ export function construireTicketClientXml(
   logo: { base64: string; largeur: number; hauteur: number } | null
 ): string {
   return enveloppeEposPrint(construireContenuTicketClient(commande, logo));
+}
+
+/**
+ * Petit ticket d'activation du compte fidélité : un QR et trois consignes, imprimé automatiquement pour un client qui a des
+ * points de fidélité mais dont le compte n'est pas activé (demande du patron, 26/11/2026). Même lien que le QR du ticket client.
+ */
+function construireContenuTicketActivation(
+  commande: CommandePourImpression,
+  logo: { base64: string; largeur: number; hauteur: number } | null
+): string {
+  const b = creerConstructeurTicket();
+  if (logo) {
+    b.brut(styleTexte({ align: "center" }));
+    b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
+  }
+  b.ligne("ACTIVE TON COMPTE", { align: "center", gras: true, taille: 2 });
+  b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 2 });
+  b.brut(`<feed line="1"/>`);
+  const points = commande.tamponsAffiches ?? 0;
+  if (points > 0) b.ligne(`Tu as ${points} point${points > 1 ? "s" : ""} de fidélité.`, { align: "center", gras: true, taille: 1 });
+  b.ligne("Valide ton email pour les utiliser :", { align: "center", gras: false, taille: 1 });
+  b.brut(`<feed line="1"/>`);
+  b.ligne("1. Scanne le QR code", { align: "left", gras: true, taille: 1 });
+  b.ligne("2. Confirme ton numéro", { align: "left", gras: true, taille: 1 });
+  b.ligne("3. Clique sur le lien reçu par email", { align: "left", gras: true, taille: 1 });
+  b.brut(`<feed line="1"/>`);
+  b.brut(styleTexte({ align: "center" }));
+  b.brut(
+    `<symbol type="qrcode_model_2" level="level_m" width="6">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}&src=${commande.origineCaisse ? "ticket-caisse" : "ticket-site"}`)}</symbol>`
+  );
+  b.brut(`<feed line="1"/>`);
+  b.ligne(CONTACT_RESTAURANT, { align: "center", gras: true, taille: 1 });
+  b.brut(`<feed line="2"/><cut type="feed"/>`);
+  return b.xml();
+}
+
+export function construireTicketActivationXmlBrut(
+  commande: CommandePourImpression,
+  logo: { base64: string; largeur: number; hauteur: number } | null
+): string {
+  return eposPrintSeul(construireContenuTicketActivation(commande, logo));
 }
 
 /** Pour Server Direct Print (`<PrintData>`) — jamais d'enveloppe SOAP, cf. `eposPrintSeul`. */

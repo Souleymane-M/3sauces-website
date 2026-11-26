@@ -46,4 +46,9 @@ export interface CommandePourImpression {
   imprimerTicketClient: boolean;
   /** Le bon de cuisine est déjà sorti : n'imprimer que le ticket client (remise de la commande). */
   ticketClientSeul: boolean;
+  /**
+   * Client avec des points de fidélité dont le compte n'est pas activé (email absent ou non confirmé), commande payée, hors
+   * livraison : un petit ticket d'activation (QR) est imprimé automatiquement, sans choix de la caissière ni du client.
+   */
+  activationAImprimer: boolean;
 }
