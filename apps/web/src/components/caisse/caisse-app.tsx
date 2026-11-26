@@ -539,8 +539,8 @@ export function CaisseApp({
   const ticketClientALaRemise = !encaisserEffectif && canal !== null && canal !== "livraison";
   // Client avec des points de fidélité dont le compte n'est pas activé : un petit ticket d'activation (QR) s'imprime
   // automatiquement quand aucun ticket client complet n'est imprimé (le ticket complet porte déjà le QR).
-  const compteAActiver =
-    !!clientInfo?.existe && clientInfo.emailConfirme !== true && ((clientInfo.montantCumule ?? 0) >= MONTANT_RECOMPENSE || (clientInfo.tamponsBloques ?? 0) > 0);
+  // Tout client dont le compte n'est pas activé (avec ou sans points de fidélité, nouveau client compris).
+  const compteAActiver = clientInfo !== null && clientInfo.emailConfirme !== true;
   const impressionTicketObligatoire = !encaisserEffectif && !ticketClientALaRemise;
   const [choixImpressionTicket, setChoixImpressionTicket] = useState<boolean | null>(null);
   const imprimerTicketClient = ticketClientALaRemise ? false : impressionTicketObligatoire ? true : choixImpressionTicket;
@@ -2846,7 +2846,7 @@ export function CaisseApp({
                     <p className="text-sm font-semibold text-gray-700">Imprimer le ticket client ?</p>
                     {compteAActiver && (
                       <p className="text-xs text-gray-600">
-                        🔑 Ce client a des points de fidélité et son compte n&apos;est pas activé : si tu choisis « Non », un petit ticket d&apos;activation (QR) sort automatiquement. Avec « Oui », le QR est sur le ticket complet.
+                        🔑 Compte fidélité pas encore activé : si tu choisis « Non », un petit ticket d&apos;activation (QR) sort automatiquement. Avec « Oui », le QR est sur le ticket complet.
                       </p>
                     )}
                     <div className="mt-1 grid grid-cols-2 gap-2">

@@ -1,4 +1,4 @@
-import { compteAActiverAvecPoints } from "@/lib/fidelite/email-confirme";
+import { compteNonActive } from "@/lib/fidelite/email-confirme";
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
@@ -76,7 +76,7 @@ export async function construireCommandesPourImpression(
     telephones.map(async (tel) => {
       const [solde, aActiver, { data: premiere }] = await Promise.all([
         calculerTamponsPourTicket(supabase, tel),
-        compteAActiverAvecPoints(supabase, tel).catch(() => false),
+        compteNonActive(supabase, tel).catch(() => false),
         supabase
           .from("commandes")
           .select("created_at")
@@ -124,8 +124,15 @@ export async function construireCommandesPourImpression(
       tamponsUtilises: c.tampons_utilises ?? 0,
       imprimerTicketClient: c.imprimer_ticket_client,
       ticketClientSeul: c.ticket_client_seul,
-      // Seulement si aucun ticket client complet ne sort (il porte déjà le QR).
-      activationAImprimer: c.canal !== "livraison" && c.paiement_statut === "paye" && !c.imprimer_ticket_client && !c.ticket_client_seul && !!c.client_telephone && compteAActiverParTelephone.get(c.client_telephone) === true,
+      compteNonActive: !!c.client_telephone && compteAActiverParTelephone.get(c.client_telephone) === true,
+      // Petit ticket d'activation : seulement si aucun ticket client complet ne sort (il porte déjà le message et le QR).
+      activationAImprimer:
+        c.canal !== "livraison" &&
+        c.paiement_statut === "paye" &&
+        !c.imprimer_ticket_client &&
+        !c.ticket_client_seul &&
+        !!c.client_telephone &&
+        compteAActiverParTelephone.get(c.client_telephone) === true,
     };
   });
 }

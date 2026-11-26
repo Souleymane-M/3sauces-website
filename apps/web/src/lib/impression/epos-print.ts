@@ -523,6 +523,21 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
 }
 
 /**
+ * Message d'activation du compte fidélité, encadré et en texte inversé pour qu'il soit impossible de le rater : imprimé sur tout
+ * ticket client dont le compte n'est pas activé, livraison comprise (le QR du ticket de livraison mène, une fois la commande
+ * livrée, à la page d'activation — demande du patron, 27/11/2026).
+ */
+function imprimerBlocActivation(b: ConstructeurTicket, livraison: boolean): void {
+  b.brut(`<feed line="1"/>`);
+  b.ligne("=".repeat(32), { align: "center", gras: true, taille: 1 });
+  b.ligne(" ACTIVE TON COMPTE ", { align: "center", gras: true, taille: 2, surligne: true });
+  b.ligne(" FIDÉLITÉ ", { align: "center", gras: true, taille: 2, surligne: true });
+  b.ligne("Valide ton email pour profiter de tes points de fidélité", { align: "center", gras: true, taille: 1 });
+  b.ligne(livraison ? "Après ta livraison, scanne le QR code ci-dessous" : "Scanne le QR code ci-dessous", { align: "center", gras: true, taille: 1 });
+  b.ligne("=".repeat(32), { align: "center", gras: true, taille: 1 });
+}
+
+/**
  * Message de fidélité personnalisé, trois variantes selon canal/origine/
  * historique du client (demande explicite du patron, 2026-10-22) :
  * - Livraison (caisse ou site, nouveau ou déjà connu) : progression vers
@@ -667,11 +682,15 @@ function construireContenuTicketClient(
     b.ligne(libelleDateHeureCourte(commande.heureSouhaitee, commande.adresse), { align: "left", gras: true, taille: 1 });
   }
   imprimerBlocFidelite(b, commande);
+  // Compte pas encore activé : message d'activation bien visible (encadré, texte inversé) sur TOUS les tickets clients.
+  if (commande.compteNonActive && (commande.canal !== "livraison" || commande.qrCode)) {
+    imprimerBlocActivation(b, commande.canal === "livraison");
+  }
   if (commande.canal !== "livraison") {
     // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
     // donne son e-mail s'il n'est pas encore enregistré). `commande.id` sert de code : jamais devinable, et la page
     // exige le numéro de téléphone de la commande avant d'afficher quoi que ce soit.
-    b.ligne("Scanne pour voir tes points de fidélité", { align: "center", gras: true, taille: 1 });
+    if (!commande.compteNonActive) b.ligne("Scanne pour voir tes points de fidélité", { align: "center", gras: true, taille: 1 });
     b.brut(styleTexte({ align: "center" }));
     b.brut(
       `<symbol type="qrcode_model_2" level="level_m" width="4">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}&src=${commande.origineCaisse ? "ticket-caisse" : "ticket-site"}`)}</symbol>`
@@ -723,8 +742,13 @@ function construireContenuTicketActivation(
   b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 2 });
   b.brut(`<feed line="1"/>`);
   const points = commande.tamponsAffiches ?? 0;
-  if (points > 0) b.ligne(`Tu as ${points} point${points > 1 ? "s" : ""} de fidélité.`, { align: "center", gras: true, taille: 1 });
-  b.ligne("Valide ton email pour les utiliser :", { align: "center", gras: false, taille: 1 });
+  if (points > 0) {
+    b.ligne(`Tu as ${points} point${points > 1 ? "s" : ""} de fidélité.`, { align: "center", gras: true, taille: 1 });
+    b.ligne("Valide ton email pour les utiliser :", { align: "center", gras: false, taille: 1 });
+  } else {
+    b.ligne("Chaque commande te rapporte des points de fidélité.", { align: "center", gras: true, taille: 1 });
+    b.ligne("Valide ton email pour en profiter :", { align: "center", gras: false, taille: 1 });
+  }
   b.brut(`<feed line="1"/>`);
   b.ligne("1. Scanne le QR code", { align: "left", gras: true, taille: 1 });
   b.ligne("2. Confirme ton numéro", { align: "left", gras: true, taille: 1 });
