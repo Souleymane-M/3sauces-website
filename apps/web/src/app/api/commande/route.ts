@@ -38,6 +38,7 @@ import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
 import { lireProfilClient } from "@/lib/profil-client";
 import { pointsDoublesApplicables } from "@/lib/fidelite/points-doubles";
 import { offreMenuEtudiantOuverte, offrirMenusEtudiant } from "@/lib/commande-publique/offre-menu-etudiant";
+import { suiviOffresCommande } from "@/lib/commande-publique/offres-commande";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { normaliserSourceCampagne } from "@/lib/campagne";
@@ -1065,6 +1066,7 @@ export async function POST(request: Request) {
   }
 
   // Points doublés (clients actifs, jours d'opération) : jamais bloquant.
+  const suiviOffres = suiviOffresCommande(lignes, dateCommande);
   const pointsDoubles = nbMenusOfferts > 0 ? false : await pointsDoublesApplicables(supabase, telephone, dateCommande);
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
@@ -1072,6 +1074,10 @@ export async function POST(request: Request) {
       canal: body.canal,
       contenu: lignes,
       ...(pointsDoubles ? { points_doubles: true } : {}),
+      // Suivi des offres (mesure de leur effet) : disponibles, déclenchées, canettes offertes.
+      offres_disponibles: suiviOffres.disponibles,
+      offres_appliquees: suiviOffres.appliquees,
+      nb_canettes_offertes: suiviOffres.nbCanettesOffertes,
       // Offre spéciale : cette commande ne rapporte aucun point de fidélité (cf. migration 20261126090000).
       ...(nbMenusOfferts > 0 ? { sans_points: true } : {}),
       montant: montantFinal,
