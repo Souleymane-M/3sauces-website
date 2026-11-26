@@ -1781,7 +1781,7 @@ export function CommandeNouvelleApp({
             </div>
           )}
 
-          {nbArticles > 0 && (
+          {nbArticles > 0 && nbMenusOfferts === 0 && (
             <div className="rounded-lg border-2 border-[#2D5A27] bg-white p-3">
               {nbBoissonsOffertes > 0 && (
                 <p className="mb-1 text-sm font-extrabold" style={{ color: VERT }}>
