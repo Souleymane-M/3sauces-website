@@ -4,7 +4,7 @@ import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
 import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { normaliserEmail } from "@/lib/email";
-import { demanderConfirmationEmail, poserEmailNonConfirme } from "@/lib/fidelite/email-confirme";
+import { poserEmailConfirmeParCommandeSite } from "@/lib/fidelite/email-confirme";
 import {
   construireHeureSouhaiteeUtc,
   creneauDansPlage,
@@ -1032,14 +1032,14 @@ export async function POST(request: Request) {
   // client déjà connu ne doit jamais effacer l'email déjà enregistré.
   await supabase.from("clients").update({ nom, prenom }).eq("telephone", telephone);
   // Email : posé seulement si la fiche n'en a aucun ET que ce numéro n'a jamais commandé avant (jamais d'écrasement, et
-  // jamais de rattachement sur le compte d'un client existant sans preuve). Il reste NON confirmé : un lien lui est envoyé.
+  // jamais de rattachement sur le compte d'un client existant sans preuve). Saisi par le client pour SA commande : il est confirmé d'office.
   if (email) {
     const { count: commandesAvant } = await supabase
       .from("commandes")
       .select("id", { count: "exact", head: true })
       .eq("client_telephone", telephone);
-    if ((commandesAvant ?? 0) === 0 && (await poserEmailNonConfirme(supabase, telephone, email))) {
-      await demanderConfirmationEmail(telephone, email, false);
+    if ((commandesAvant ?? 0) === 0) {
+      await poserEmailConfirmeParCommandeSite(supabase, telephone, email);
     }
   }
 

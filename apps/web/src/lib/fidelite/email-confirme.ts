@@ -175,7 +175,22 @@ export async function confirmerEmailParJeton(jeton: string): Promise<ResultatCon
 }
 
 /**
- * Pour les commandes (site, caisse) : enregistre un email NON confirmé seulement si la fiche n'en a aucun — jamais
+ * Commande passée par le client lui-même sur le site, avec un numéro encore inconnu : l'email qu'il a saisi pour valider SA
+ * commande est enregistré ET considéré comme confirmé (règle du patron, 27/11/2026) — aucun lien de confirmation à envoyer.
+ * Jamais d'écrasement d'un email existant. Renvoie vrai si l'email vient d'être posé.
+ */
+export async function poserEmailConfirmeParCommandeSite(supabase: SupabaseClient, telephone: string, email: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("clients")
+    .update({ email, email_confirme_le: new Date().toISOString() })
+    .eq("telephone", telephone)
+    .is("email", null)
+    .select("telephone");
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Pour les commandes saisies en caisse : enregistre un email NON confirmé seulement si la fiche n'en a aucun — jamais
  * d'écrasement. Renvoie vrai si l'email vient d'être posé (le lien de confirmation peut alors lui être envoyé).
  */
 export async function poserEmailNonConfirme(supabase: SupabaseClient, telephone: string, email: string): Promise<boolean> {
