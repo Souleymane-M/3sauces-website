@@ -29,6 +29,7 @@ import type { CreerCommandePayload, LigneCommande, LigneCommandePayload, Modifie
 import { STATUTS_MODIFIABLES } from "@/lib/caisse/modification";
 import { compterPlatsGroupes, SEUIL_MINIMUM_GROUPE, SEUIL_MINIMUM_PLAT, totauxParPlat } from "@/lib/plats";
 import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { compteAActiverAvecPoints } from "@/lib/fidelite/email-confirme";
 import { compterTamponsDisponibles, calculerTamponsPourTicket } from "@/lib/fidelite/tampons";
 import { chargerMessageDuMoment } from "@/lib/patron/parametres";
 import { MONTANT_REMISE_LANCEMENT, SEUIL_REMISE_LANCEMENT, remiseLancementActive } from "@/lib/commande-publique/remise-lancement";
@@ -847,7 +848,10 @@ export async function POST(request: Request) {
       heure_souhaitee: heureSouhaitee.toISOString(),
       nb_plats: nbPlats,
       palier_groupe: palierGroupe,
-      imprimer_ticket_client: imprimerTicketClient,
+      // Client avec des points de fidélité et un compte non activé : le ticket client (QR d'activation) est imprimé quoi
+      // qu'ait choisi la caissière, dès que la commande est encaissée maintenant.
+      imprimer_ticket_client:
+        imprimerTicketClient || (paiementStatut === "paye" && (await compteAActiverAvecPoints(supabase, clientTelephone))),
     })
     .select("id, numero")
     .single();

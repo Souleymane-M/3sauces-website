@@ -537,7 +537,11 @@ export function CaisseApp({
   // Sur place / à emporter encaissé plus tard (réservation téléphonique, commande à l'avance) : seul le bon de cuisine
   // s'imprime maintenant ; le ticket client sort à la remise, avec le vrai mode de paiement (demande du patron, 2026-11-15).
   const ticketClientALaRemise = !encaisserEffectif && canal !== null && canal !== "livraison";
-  const impressionTicketObligatoire = !encaisserEffectif && !ticketClientALaRemise;
+  // Client avec des points de fidélité dont le compte n'est pas activé : le ticket client (QR d'activation) est imprimé
+  // obligatoirement, la caissière n'a pas le choix (demande du patron, 26/11/2026).
+  const compteAActiver =
+    !!clientInfo?.existe && clientInfo.emailConfirme !== true && ((clientInfo.montantCumule ?? 0) >= MONTANT_RECOMPENSE || (clientInfo.tamponsBloques ?? 0) > 0);
+  const impressionTicketObligatoire = (!encaisserEffectif && !ticketClientALaRemise) || (compteAActiver && !ticketClientALaRemise);
   const [choixImpressionTicket, setChoixImpressionTicket] = useState<boolean | null>(null);
   const imprimerTicketClient = ticketClientALaRemise ? false : impressionTicketObligatoire ? true : choixImpressionTicket;
 
@@ -2835,7 +2839,9 @@ export function CaisseApp({
                   </p>
                 ) : impressionTicketObligatoire ? (
                   <p className="text-sm text-gray-700">
-                    🖨️ Ticket client imprimé automatiquement pour cette commande (bon de cuisine toujours imprimé).
+                    {compteAActiver && encaisserEffectif
+                      ? "🖨️ Ticket client obligatoire : ce client a des points de fidélité et son compte n'est pas activé (le QR du ticket lui permet de l'activer). Bon de cuisine toujours imprimé."
+                      : "🖨️ Ticket client imprimé automatiquement pour cette commande (bon de cuisine toujours imprimé)."}
                   </p>
                 ) : (
                   <>

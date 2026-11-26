@@ -1,3 +1,5 @@
+import { MONTANT_RECOMPENSE } from "@/lib/fidelite/regles";
+import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import "server-only";
 import { createHash, randomBytes } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -17,6 +19,18 @@ const TEXTE_CONSENTEMENT = "Je souhaite recevoir les offres et actualités de 3 
 
 function empreinte(jeton: string): string {
   return createHash("sha256").update(jeton).digest("hex");
+}
+
+/**
+ * Client qui a des points de fidélité (1 point = 10 € payés, ou une récompense déjà gagnée) mais dont le compte n'est pas
+ * activé (email absent ou non confirmé) : le ticket client, avec son QR d'activation, doit lui être remis.
+ */
+export async function compteAActiverAvecPoints(supabase: SupabaseClient, telephone: string): Promise<boolean> {
+  const { data } = await supabase.from("clients").select("email, email_confirme_le, montant_cumule").eq("telephone", telephone).maybeSingle();
+  if (!data || (data.email && data.email_confirme_le)) return false;
+  if (Number(data.montant_cumule) >= MONTANT_RECOMPENSE) return true;
+  const { nombre } = await compterTamponsDisponibles(supabase, telephone);
+  return nombre > 0;
 }
 
 /** Vrai si le client a un email confirmé — condition pour utiliser une récompense. */
