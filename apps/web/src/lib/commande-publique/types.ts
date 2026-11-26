@@ -198,6 +198,8 @@ export interface CreerCommandePubliquePayload {
   boissonOfferteSaveurs?: string[];
   /** Un parfum par canette offerte (offre du jour, une par tranche de 10 €) — longueur revérifiée côté serveur. */
   canetteOfferteSaveurs?: string[];
+  /** Le panier affiché au client comptait un menu étudiant offert : le serveur répond 409 si l'offre n'est plus applicable (après 12 h, points de fidélité utilisés). */
+  menuEtudiantOffert?: boolean;
   /** Profil déclaré par le client (étudiant, lycéen, enseignant, salarié, autre) — voir lib/profil-client.ts. */
   profil?: string;
   /** Les 2 sauces choisies pour le cadeau « ailes + frites » (offre du jour dès 20 €) — revérifiées côté serveur. */

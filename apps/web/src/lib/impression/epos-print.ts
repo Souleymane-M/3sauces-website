@@ -331,8 +331,24 @@ function estBoissonOfferte(l: LigneCommande): boolean {
   return l.categorie === "boisson" && /\(offerte\b/i.test(l.nom);
 }
 
-/** Bloc bien visible « BOISSON OFFERTE » sur le ticket client (sur place / à emporter) : le client voit ce qui lui est offert. */
-function imprimerBoissonsOffertes(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+/** Menu offert par une offre spéciale (ex : Menu Étudiant offert) : ligne marquée `offert`. */
+function estMenuOffert(l: LigneCommande): boolean {
+  return l.offert === true && l.categorie !== "boisson";
+}
+
+/** Bloc bien visible « OFFERT » sur le ticket client (sur place / à emporter) : le client voit ce qui lui est offert. */
+function imprimerOffertsClient(b: ConstructeurTicket, lignes: LigneCommande[]): void {
+  const menus = lignes.filter(estMenuOffert);
+  if (menus.length > 0) {
+    const total = menus.reduce((t, l) => t + l.quantite, 0);
+    b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+    b.ligne(` *** ${nomSansMultiplicateur(menus[0].nom).toUpperCase()}${total > 1 ? "S" : ""} OFFERT${total > 1 ? "S" : ""} *** `, { align: "center", gras: true, taille: 2, surligne: true });
+    for (const l of menus) {
+      b.ligne(` ${l.quantite}x ${nomSansMultiplicateur(l.nom).toUpperCase()} `, { align: "left", gras: true, taille: 2, surligne: true });
+      for (const detail of detailLigne(l)) b.ligne(` ${detail.texte.toUpperCase()} `, { align: "left", gras: true, taille: 1, surligne: true }, "  ");
+    }
+    b.ligne("=".repeat(32), { align: "left", gras: false, taille: 1 });
+  }
   const offertes = lignes.filter(estBoissonOfferte);
   if (offertes.length === 0) return;
   const total = offertes.reduce((t, l) => t + l.quantite, 0);
@@ -623,10 +639,10 @@ function construireContenuTicketClient(
 
   imprimerBoxOfferte(b, commande.lignes);
   const afficherBoissonsOffertes = commande.canal !== "livraison";
-  if (afficherBoissonsOffertes) imprimerBoissonsOffertes(b, commande.lignes);
+  if (afficherBoissonsOffertes) imprimerOffertsClient(b, commande.lignes);
   imprimerArticlesClient(
     b,
-    commande.lignes.filter((l) => !estLigneBox(l) && !(afficherBoissonsOffertes && estBoissonOfferte(l)))
+    commande.lignes.filter((l) => !estLigneBox(l) && !(afficherBoissonsOffertes && (estBoissonOfferte(l) || estMenuOffert(l))))
   );
 
   separateur(b);

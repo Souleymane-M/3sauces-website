@@ -36,6 +36,7 @@ import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 import { nombreCanettesOffertes } from "@/lib/commande-publique/offre-canette";
 import { lireProfilClient } from "@/lib/profil-client";
 import { pointsDoublesApplicables } from "@/lib/fidelite/points-doubles";
+import { offreMenuEtudiantOuverte, offrirMenusEtudiant } from "@/lib/commande-publique/offre-menu-etudiant";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, NOM_AILES_CADEAU, NOM_FRITES_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { normaliserSourceCampagne } from "@/lib/campagne";
@@ -683,6 +684,22 @@ export async function POST(request: Request) {
     });
   }
 
+  // Offre « menu étudiant offert » (site public, vendredi avant 12 h) : un menu offert par groupe de 4, sauf si le client utilise ses
+  // points de fidélité sur cette commande (il choisit l'un ou l'autre). Décidée ici, jamais par le navigateur.
+  const veutUtiliserPoints = typeof body.nbTampons === "number" && Math.floor(body.nbTampons) > 0;
+  let nbMenusOfferts = 0;
+  if (offreMenuEtudiantOuverte() && !veutUtiliserPoints) {
+    const offre = offrirMenusEtudiant(lignes);
+    nbMenusOfferts = offre.nbOfferts;
+    lignes.splice(0, lignes.length, ...offre.lignes);
+  }
+  if (body.menuEtudiantOffert === true && nbMenusOfferts === 0) {
+    return NextResponse.json(
+      { error: "L'offre « menu étudiant offert » n'est plus disponible (elle s'arrête à 12 h, ou tes points de fidélité sont utilisés). Ton panier est recalculé." },
+      { status: 409 }
+    );
+  }
+
   const montant = Math.round(lignes.reduce((t, l) => t + l.prixUnitaire * l.quantite, 0) * 100) / 100;
   // Jamais de confiance dans un nombre de plats envoyé par le client :
   // recalculé ici à partir des `platIndex` déjà validés (type uniquement,
@@ -807,6 +824,7 @@ export async function POST(request: Request) {
     tamponsUtilises = nbTamponsDemandes;
     montantFinal = Math.round((montant - tamponsUtilises * MONTANT_RECOMPENSE) * 100) / 100;
   } else if (
+    nbMenusOfferts === 0 &&
     remiseLancementActive(parametres.remise_lancement_debut, parametres.remise_lancement_fin, dateMayotteIso()) &&
     montant >= SEUIL_REMISE_LANCEMENT
   ) {
@@ -872,7 +890,8 @@ export async function POST(request: Request) {
   }
 
   // Offre du jour : une canette offerte par tranche de 10 € d'achats sur le montant réellement payé (après points de fidélité / remise), pour les commandes servies le jour de l'offre — site uniquement, cf. offre-canette.ts.
-  const nbCanettesOffertes = nombreCanettesOffertes(montantFinal, dateCommande);
+  // Menu étudiant offert : aucune autre offre sur la commande.
+  const nbCanettesOffertes = nbMenusOfferts > 0 ? 0 : nombreCanettesOffertes(montantFinal, dateCommande);
   if (nbCanettesOffertes > 0) {
     const saveursBrutes = Array.isArray(body.canetteOfferteSaveurs) ? body.canetteOfferteSaveurs : [];
     const saveursValidees = saveursBrutes.filter(
@@ -921,7 +940,7 @@ export async function POST(request: Request) {
   }
 
   // Offre du jour : une box OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de 20 € payés (site uniquement, cf. offre-cadeau.ts).
-  const nbBox = nombreBoxOffertes(montantFinal, dateCommande);
+  const nbBox = nbMenusOfferts > 0 ? 0 : nombreBoxOffertes(montantFinal, dateCommande);
   if (nbBox > 0) {
     const saucesCadeau = (Array.isArray(body.cadeauSauces) ? body.cadeauSauces : []).filter(
       (s: unknown): s is string => typeof s === "string" && nomsSaucesValides.has(s)
@@ -1042,13 +1061,15 @@ export async function POST(request: Request) {
   }
 
   // Points doublés (clients actifs, jours d'opération) : jamais bloquant.
-  const pointsDoubles = await pointsDoublesApplicables(supabase, telephone, dateCommande);
+  const pointsDoubles = nbMenusOfferts > 0 ? false : await pointsDoublesApplicables(supabase, telephone, dateCommande);
   const { data: commande, error: erreurCommande } = await supabase
     .from("commandes")
     .insert({
       canal: body.canal,
       contenu: lignes,
       ...(pointsDoubles ? { points_doubles: true } : {}),
+      // Offre spéciale : cette commande ne rapporte aucun point de fidélité (cf. migration 20261126090000).
+      ...(nbMenusOfferts > 0 ? { sans_points: true } : {}),
       montant: montantFinal,
       // "non_paye" à l'insertion dans tous les cas (espèces/CB payés en
       // personne plus tard, ou Stripe confirmé par le webhook) — le trigger

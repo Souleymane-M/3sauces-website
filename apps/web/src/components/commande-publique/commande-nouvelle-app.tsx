@@ -44,6 +44,7 @@ import { CreneauPicker } from "./creneau-picker";
 import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
+import { MENUS_POUR_UN_OFFERT, nombreMenusOfferts, offreMenuEtudiantOuverte } from "@/lib/commande-publique/offre-menu-etudiant";
 import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive } from "@/lib/commande-publique/offre-canette";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
@@ -415,7 +416,7 @@ export function CommandeNouvelleApp({
     l.saucesSupp.length * (produitSauceSupplementaire?.prix ?? 0) +
     (l.oignonsFrits ? MONTANT_OIGNONS_FRITS : 0);
 
-  const total = panier.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
+  const totalBrut = panier.reduce((acc, l) => acc + prixLigne(l) * l.quantite, 0);
   const nbArticles = panier.reduce((acc, l) => acc + l.quantite, 0);
   const enGroupe = mode === "groupee";
   const platCourant = enGroupe ? platActif : 0;
@@ -424,8 +425,18 @@ export function CommandeNouvelleApp({
   const nbPlatsRemplis = nomsPlats.filter((_, i) => panier.some((l) => l.plat === i)).length;
   const totalPlatActif = totalDuPlat(platCourant);
   const resteAuPlatActif = Math.max(0, SEUIL_MINIMUM_PLAT - totalPlatActif);
-  const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(total / MONTANT_RECOMPENSE));
+  const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(totalBrut / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
+  // Offre « menu étudiant offert » (vendredi avant 12 h) : le moins cher des menus par groupe de 4 ; refusée si le client utilise ses points de fidélité.
+  const offreMenuOuverte = offreMenuEtudiantOuverte();
+  const prixMenusEtudiant = panier
+    .filter((l) => l.produit.nom === NOM_PRODUIT_MENU_ETUDIANT)
+    .flatMap((l) => Array.from({ length: l.quantite }, () => prixLigne(l)))
+    .sort((x, y) => x - y);
+  const nbMenusEtudiant = prixMenusEtudiant.length;
+  const nbMenusOfferts = offreMenuOuverte && nbTamponsEffectif === 0 ? nombreMenusOfferts(nbMenusEtudiant) : 0;
+  const remiseMenusOfferts = prixMenusEtudiant.slice(0, nbMenusOfferts).reduce((t, p) => t + p, 0);
+  const total = totalBrut - remiseMenusOfferts;
   const choixRecompenseRequis = maxTamponsUtilisables > 0 && !choixRecompenseFait;
   const livraisonPossible = parametres.livraisonActive && parametres.zonesActives.length > 0;
   const totalApresTampons = Math.max(0, total - nbTamponsEffectif * MONTANT_RECOMPENSE);
@@ -439,11 +450,11 @@ export function CommandeNouvelleApp({
       ? Math.max(0, nbBoissonsOffertes - boissonOfferteSaveurs.slice(0, nbBoissonsOffertes).filter(Boolean).length)
       : 0;
   // Offre du jour : 1 canette offerte par tranche de 10 € PAYÉS (après points de fidélité), commandes servies le jour de l'offre.
-  const nbCanettesOffertes = nombreCanettesOffertes(montantAPayer, dateCommande);
+  const nbCanettesOffertes = nbMenusOfferts > 0 ? 0 : nombreCanettesOffertes(montantAPayer, dateCommande);
   // Offre du jour : 3 ailes + frites + 2 sauces offertes dès 20 € payés (commandes servies le jour de l'offre).
   const offreCadeauJour = offreCadeauActive(dateCommande);
   const offreCanetteJour = offreCanetteActive(dateCommande);
-  const nbBox = nombreBoxOffertes(montantAPayer, dateCommande);
+  const nbBox = nbMenusOfferts > 0 ? 0 : nombreBoxOffertes(montantAPayer, dateCommande);
   const cadeauAcquis = nbBox > 0;
   const resteAvantCadeau = SEUIL_OFFRE_CADEAU - (montantAPayer % SEUIL_OFFRE_CADEAU);
   const nbSaucesCadeau = nbBox * NB_SAUCES_CADEAU;
@@ -855,6 +866,7 @@ export function CommandeNouvelleApp({
           fideliteEmail: nbTamponsEffectif > 0 ? fideliteVerifiee?.email : undefined,
           nbTampons: nbTamponsEffectif,
           boissonOfferteSaveurs: nbBoissonsOffertes > 0 ? boissonOfferteSaveurs.slice(0, nbBoissonsOffertes) : undefined,
+          menuEtudiantOffert: nbMenusOfferts > 0 ? true : undefined,
           canetteOfferteSaveurs: nbCanettesOffertes > 0 ? canetteOfferteSaveurs.slice(0, nbCanettesOffertes) : undefined,
           profil: !profilDejaConnu && profil ? profil : undefined,
           cadeauSauces: cadeauAcquis ? cadeauSauces.slice(0, nbSaucesCadeau) : undefined,
@@ -1324,7 +1336,19 @@ export function CommandeNouvelleApp({
   const messageTotalApayer =
     nbTamponsEffectif > 0
       ? `${nbTamponsEffectif * NB_TAMPONS_RECOMPENSE} points de fidélité : −${euros(nbTamponsEffectif * MONTANT_RECOMPENSE)}`
-      : null;
+      : nbMenusOfferts > 0
+        ? `${nbMenusOfferts > 1 ? `${nbMenusOfferts} Menus Étudiants offerts` : "1 Menu Étudiant offert"} : −${euros(remiseMenusOfferts)}`
+        : null;
+  // Message d'encouragement / d'explication de l'offre du vendredi (avant 12 h, Menu Étudiant).
+  const messageOffreMenuEtudiant = !offreMenuOuverte
+    ? null
+    : nbTamponsEffectif > 0 && nbMenusEtudiant >= MENUS_POUR_UN_OFFERT
+      ? "🎁 Menu Étudiant offert : non cumulable avec tes points de fidélité. Décoche tes points de fidélité pour en profiter."
+      : nbMenusOfferts > 0
+        ? "🎁 Ton Menu Étudiant est offert ! Offre non cumulable : pas de canette offerte ni de points de fidélité sur cette commande."
+        : nbMenusEtudiant > 0
+          ? `🎁 Plus que ${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT)} Menu${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} Étudiant${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} pour en avoir un OFFERT (jusqu'à 12 h)`
+          : null;
 
   // Reconnaissance du client (points de fidélité) : mêmes propriétés pour la carte de l'accueil et celle du formulaire.
   const proprietesCarteFidelite: ComponentProps<typeof CarteFidelite> = {
@@ -1384,6 +1408,11 @@ export function CommandeNouvelleApp({
       {offreCadeauActive(aujourdHui) && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
           🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
+        </div>
+      )}
+      {offreMenuOuverte && (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#8B2020" }}>
+          🎁 Ce vendredi avant 12 h, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (
@@ -1694,8 +1723,9 @@ export function CommandeNouvelleApp({
           <div className="rounded-lg bg-white p-4 text-gray-900">
             <div className="flex items-baseline justify-between">
               <span className="text-lg font-bold">Total</span>
-              <span className="text-2xl font-extrabold">{euros(total)}</span>
+              <span className="text-2xl font-extrabold">{euros(total + remiseMenusOfferts)}</span>
             </div>
+            {messageOffreMenuEtudiant && <p className="mt-1 text-sm font-extrabold text-[#8B2020]">{messageOffreMenuEtudiant}</p>}
             {messageTotalApayer && (
               <p className="mt-1 text-sm font-bold text-[#2D5A27]">
                 {messageTotalApayer} · Total à payer : {euros(montantAPayer)}

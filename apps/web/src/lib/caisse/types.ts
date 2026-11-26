@@ -35,6 +35,8 @@ export interface LigneCommande {
   /** Nombre d'unités ajoutées depuis le bloc « Et avec ça ? » du panier (suivi des ventes complémentaires), 0 ou absent sinon. */
   quantiteSuggeree?: number;
   canetteIncluse: boolean;
+  /** Article offert par une offre spéciale (ex : menu étudiant offert) : prix à 0 €, mis en avant sur le ticket client. */
+  offert?: boolean;
   /** Choix explicite "garder la salade" sur un produit à salade incluse obligatoire (ex: Barquette), null si sans objet. */
   saladeIncluse?: boolean | null;
   /** Accompagnements gratuits choisis parmi la liste (ex: Plat du jour), tableau vide si sans objet. */
