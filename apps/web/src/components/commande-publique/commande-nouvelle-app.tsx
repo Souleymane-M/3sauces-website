@@ -427,7 +427,7 @@ export function CommandeNouvelleApp({
   const resteAuPlatActif = Math.max(0, SEUIL_MINIMUM_PLAT - totalPlatActif);
   const maxTamponsUtilisables = Math.min(fideliteVerifiee?.tamponsDisponibles ?? 0, Math.floor(totalBrut / MONTANT_RECOMPENSE));
   const nbTamponsEffectif = Math.min(nbTampons, maxTamponsUtilisables);
-  // Offre « menu étudiant offert » (vendredi avant 12 h) : le moins cher des menus par groupe de 4 ; refusée si le client utilise ses points de fidélité.
+  // Offre « menu étudiant offert » (jeudi dès 16 h et vendredi) : le moins cher des menus par groupe de 4 ; refusée si le client utilise ses points de fidélité.
   const offreMenuOuverte = offreMenuEtudiantOuverte();
   const prixMenusEtudiant = panier
     .filter((l) => l.produit.nom === NOM_PRODUIT_MENU_ETUDIANT)
@@ -1347,7 +1347,7 @@ export function CommandeNouvelleApp({
       : nbMenusOfferts > 0
         ? "🎁 Ton Menu Étudiant est offert ! Offre non cumulable : pas de canette offerte ni de points de fidélité sur cette commande."
         : nbMenusEtudiant > 0
-          ? `🎁 Plus que ${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT)} Menu${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} Étudiant${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} pour en avoir un OFFERT (jusqu'à 12 h)`
+          ? `🎁 Plus que ${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT)} Menu${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} Étudiant${MENUS_POUR_UN_OFFERT - (nbMenusEtudiant % MENUS_POUR_UN_OFFERT) > 1 ? "s" : ""} pour en avoir un OFFERT`
           : null;
 
   // Reconnaissance du client (points de fidélité) : mêmes propriétés pour la carte de l'accueil et celle du formulaire.
@@ -1412,7 +1412,7 @@ export function CommandeNouvelleApp({
       )}
       {offreMenuOuverte && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#8B2020" }}>
-          🎁 Ce vendredi avant 12 h, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
+          🎁 Jeudi dès 16 h et vendredi, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (

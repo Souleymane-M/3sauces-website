@@ -3,21 +3,25 @@ import { dateMayotteIso, heureActuelleMayotteMinutes } from "./creneau";
 import { NOM_PRODUIT_MENU_ETUDIANT } from "./types";
 
 /**
- * Offre « 3 Menus Étudiants achetés = 1 offert » (4 menus dans le panier, le moins cher est offert), site public uniquement,
- * le vendredi 27/11/2026 pour toute commande passée AVANT 12 h (heure de Mayotte) — demande du patron, 25/11/2026.
- * Aucune base de données : on ajoute les jours concernés à `JOURS_OFFRE_MENU_ETUDIANT`.
+ * Offre « 3 Menus Étudiants achetés = 1 offert » (4 menus dans le panier, réduction de 8 € par groupe de 4), site public
+ * uniquement, pour toute commande passée du jeudi 26/11/2026 dès 16 h au vendredi 27/11/2026 inclus (heure de Mayotte) —
+ * demande du patron, 26/11/2026. Aucune base de données : on ajoute les plages à `PLAGES_OFFRE_MENU_ETUDIANT`.
  * Règles : aucune autre offre sur la commande (ni canette offerte, ni points de fidélité utilisés ou gagnés) ; l'offre est
  * refusée si le client utilise ses points de fidélité sur la commande (il choisit l'un ou l'autre).
  */
-export const JOURS_OFFRE_MENU_ETUDIANT: readonly string[] = ["2026-11-27"];
-export const HEURE_LIMITE_MENU_ETUDIANT = 12;
+export const PLAGES_OFFRE_MENU_ETUDIANT: readonly { jour: string; debutHeure: number; finHeure: number }[] = [
+  { jour: "2026-11-26", debutHeure: 16, finHeure: 24 },
+  { jour: "2026-11-27", debutHeure: 0, finHeure: 24 },
+];
 export const MENUS_POUR_UN_OFFERT = 4;
 /** Réduction fixe accordée par menu offert (prix du Menu Étudiant) : 8 € par groupe de 4 menus, jamais plus. */
 export const REDUCTION_MENU_OFFERT = 8;
 
-/** Vrai si l'offre est ouverte MAINTENANT (jour concerné à Mayotte, avant l'heure limite). */
+/** Vrai si l'offre est ouverte MAINTENANT (heure de Mayotte). */
 export function offreMenuEtudiantOuverte(): boolean {
-  return JOURS_OFFRE_MENU_ETUDIANT.includes(dateMayotteIso()) && heureActuelleMayotteMinutes() < HEURE_LIMITE_MENU_ETUDIANT * 60;
+  const jour = dateMayotteIso();
+  const minutes = heureActuelleMayotteMinutes();
+  return PLAGES_OFFRE_MENU_ETUDIANT.some((p) => p.jour === jour && minutes >= p.debutHeure * 60 && minutes < p.finHeure * 60);
 }
 
 /** Un menu offert par groupe de 4 menus dans le panier : 4 → 1, 7 → 1, 8 → 2. */

@@ -684,7 +684,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // Offre « menu étudiant offert » (site public, vendredi avant 12 h) : un menu offert par groupe de 4, sauf si le client utilise ses
+  // Offre « menu étudiant offert » (site public, jeudi 26/11 dès 16 h et vendredi 27/11) : un menu offert par groupe de 4, sauf si le client utilise ses
   // points de fidélité sur cette commande (il choisit l'un ou l'autre). Décidée ici, jamais par le navigateur.
   const veutUtiliserPoints = typeof body.nbTampons === "number" && Math.floor(body.nbTampons) > 0;
   let nbMenusOfferts = 0;
@@ -695,7 +695,7 @@ export async function POST(request: Request) {
   }
   if (body.menuEtudiantOffert === true && nbMenusOfferts === 0) {
     return NextResponse.json(
-      { error: "L'offre « menu étudiant offert » n'est plus disponible (elle s'arrête à 12 h, ou tes points de fidélité sont utilisés). Ton panier est recalculé." },
+      { error: "L'offre « menu étudiant offert » n'est plus disponible (offre terminée, ou tes points de fidélité sont utilisés). Ton panier est recalculé." },
       { status: 409 }
     );
   }
