@@ -336,6 +336,8 @@ export interface Database {
           /** Vrai = la prochaine impression ne sort que le ticket client (voir migration 20261116090000). */
           ticket_client_seul: boolean;
           points_doubles: boolean;
+          /** Vrai = offre spéciale : cette commande ne rapporte aucun point de fidélité (migration 20261126090000). */
+          sans_points: boolean;
           mode_prise: string | null;
           bonus_fidelite: number;
         };
@@ -374,6 +376,7 @@ export interface Database {
           imprimer_ticket_client?: boolean;
           ticket_client_seul?: boolean;
           points_doubles?: boolean;
+          sans_points?: boolean;
           mode_prise?: string | null;
           bonus_fidelite?: number;
         };
