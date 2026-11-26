@@ -1,4 +1,4 @@
-import { compteNonActive } from "@/lib/fidelite/email-confirme";
+import { etatActivation, type EtatActivation } from "@/lib/fidelite/email-confirme";
 import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import type { LigneCommande } from "@/lib/caisse/types";
@@ -71,12 +71,12 @@ export async function construireCommandesPourImpression(
   // epos-print.ts). Comparée telle quelle à `created_at` de chaque
   // commande du lot : si elles coïncident, c'est la toute première.
   const premiereCommandeParTelephone = new Map<string, string>();
-  const compteAActiverParTelephone = new Map<string, boolean>();
+  const etatActivationParTelephone = new Map<string, EtatActivation>();
   await Promise.all(
     telephones.map(async (tel) => {
       const [solde, aActiver, { data: premiere }] = await Promise.all([
         calculerTamponsPourTicket(supabase, tel),
-        compteNonActive(supabase, tel).catch(() => false),
+        etatActivation(supabase, tel).catch((): EtatActivation => "active"),
         supabase
           .from("commandes")
           .select("created_at")
@@ -86,7 +86,7 @@ export async function construireCommandesPourImpression(
           .maybeSingle(),
       ]);
       soldeParTelephone.set(tel, solde);
-      compteAActiverParTelephone.set(tel, aActiver);
+      etatActivationParTelephone.set(tel, aActiver);
       if (premiere) premiereCommandeParTelephone.set(tel, premiere.created_at);
     })
   );
@@ -124,7 +124,8 @@ export async function construireCommandesPourImpression(
       tamponsUtilises: c.tampons_utilises ?? 0,
       imprimerTicketClient: c.imprimer_ticket_client,
       ticketClientSeul: c.ticket_client_seul,
-      compteNonActive: !!c.client_telephone && compteAActiverParTelephone.get(c.client_telephone) === true,
+      compteNonActive: !!c.client_telephone && (etatActivationParTelephone.get(c.client_telephone) ?? "active") !== "active",
+      emailEnAttente: !!c.client_telephone && etatActivationParTelephone.get(c.client_telephone) === "email_en_attente",
       // Petit ticket d'activation : seulement si aucun ticket client complet ne sort (il porte déjà le message et le QR).
       activationAImprimer:
         c.canal !== "livraison" &&
@@ -132,7 +133,7 @@ export async function construireCommandesPourImpression(
         !c.imprimer_ticket_client &&
         !c.ticket_client_seul &&
         !!c.client_telephone &&
-        compteAActiverParTelephone.get(c.client_telephone) === true,
+        (etatActivationParTelephone.get(c.client_telephone) ?? "active") !== "active",
     };
   });
 }

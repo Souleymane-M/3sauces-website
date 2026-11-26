@@ -585,6 +585,9 @@ export interface Database {
           expire_le: string;
           utilise_le: string | null;
           created_at: string;
+          /** Date d'envoi réussi de l'email (null = pas encore parti : renvoyé automatiquement) — migration 20261127090000. */
+          envoye_le: string | null;
+          derniere_erreur: string | null;
         };
         Insert: {
           id?: string;
@@ -595,6 +598,8 @@ export interface Database {
           expire_le: string;
           utilise_le?: string | null;
           created_at?: string;
+          envoye_le?: string | null;
+          derniere_erreur?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["confirmations_email"]["Insert"]>;
         Relationships: [];

@@ -54,4 +54,6 @@ export interface CommandePourImpression {
   activationAImprimer: boolean;
   /** Compte fidélité pas encore activé (email absent ou non confirmé, ou toute première commande) : le message d'activation doit figurer bien visible sur le ticket, livraison comprise. */
   compteNonActive: boolean;
+  /** Compte non activé mais email déjà enregistré (un lien de confirmation lui a été envoyé) : le message demande de cliquer sur ce lien. */
+  emailEnAttente: boolean;
 }

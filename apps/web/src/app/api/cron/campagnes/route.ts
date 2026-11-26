@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { executerCampagneDuJour } from "@/lib/patron/campagnes-auto";
+import { renvoyerConfirmationsEnAttente } from "@/lib/fidelite/email-confirme";
 
 /** Marge de temps pour envoyer à tous les clients (un e-mail à la fois). */
 export const maxDuration = 300;
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
   try {
-    return NextResponse.json(await executerCampagneDuJour());
+    // Chaque matin : renvoie d'abord les emails de confirmation restés bloqués (quota d'envoi atteint la veille), avant la campagne.
+    const confirmations = await renvoyerConfirmationsEnAttente().catch(() => null);
+    return NextResponse.json({ ...(await executerCampagneDuJour()), confirmations });
   } catch (e) {
     console.error("[cron/campagnes] échec :", e);
     return NextResponse.json({ error: "Échec de l'exécution." }, { status: 500 });

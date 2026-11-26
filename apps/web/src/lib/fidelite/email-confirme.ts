@@ -19,14 +19,17 @@ function empreinte(jeton: string): string {
   return createHash("sha256").update(jeton).digest("hex");
 }
 
+export type EtatActivation = "active" | "email_en_attente" | "sans_email";
+
 /**
- * Compte fidélité pas encore activé : email absent ou jamais confirmé (c'est aussi le cas d'un client à sa toute première
- * commande). Le message d'activation et le QR doivent figurer sur son ticket, avec ou sans points de fidélité
- * (demande du patron, 27/11/2026).
+ * État du compte fidélité d'un client : activé (email confirmé), email enregistré mais pas encore confirmé (un lien lui a été
+ * envoyé), ou sans email. Tout client non activé — dont celui à sa toute première commande — voit le message d'activation sur
+ * son ticket, avec ou sans points de fidélité (demande du patron, 27/11/2026).
  */
-export async function compteNonActive(supabase: SupabaseClient, telephone: string): Promise<boolean> {
+export async function etatActivation(supabase: SupabaseClient, telephone: string): Promise<EtatActivation> {
   const { data } = await supabase.from("clients").select("email, email_confirme_le").eq("telephone", telephone).maybeSingle();
-  return !(data?.email && data.email_confirme_le);
+  if (data?.email && data.email_confirme_le) return "active";
+  return data?.email ? "email_en_attente" : "sans_email";
 }
 
 /** Vrai si le client a un email confirmé — condition pour utiliser une récompense. */
@@ -35,30 +38,10 @@ export async function emailEstConfirme(supabase: SupabaseClient, telephone: stri
   return !!data?.email && !!data.email_confirme_le;
 }
 
-/**
- * Envoie (ou renvoie) le lien de confirmation. Refuse si le client a déjà un email CONFIRMÉ : un compte activé ne change
- * jamais d'email par ce chemin. Un lien précédent encore valable pour ce numéro est simplement remplacé.
- */
-export async function demanderConfirmationEmail(telephone: string, email: string, accepteOffres = false): Promise<{ ok: boolean; erreur?: string }> {
-  const supabase = createServiceSupabaseClient();
-  const { data: client } = await supabase.from("clients").select("email, email_confirme_le").eq("telephone", telephone).maybeSingle();
-  if (!client) return { ok: false, erreur: "Numéro introuvable." };
-  if (client.email && client.email_confirme_le) return { ok: false, erreur: "Ce compte est déjà activé." };
-
-  const jeton = randomBytes(32).toString("base64url");
-  // Un seul lien valable à la fois par numéro.
-  await supabase.from("confirmations_email").update({ utilise_le: new Date().toISOString() }).eq("telephone", telephone).is("utilise_le", null);
-  const { error } = await supabase.from("confirmations_email").insert({
-    telephone,
-    email,
-    jeton_hash: empreinte(jeton),
-    accepte_offres: accepteOffres,
-    expire_le: new Date(Date.now() + VALIDITE_MS).toISOString(),
-  });
-  if (error) return { ok: false, erreur: "Impossible de préparer l'email, réessaie." };
-
+/** Corps de l'email de confirmation (même texte pour l'envoi initial et le renvoi automatique). */
+async function envoyerLienConfirmation(email: string, jeton: string): Promise<{ ok: boolean; erreur?: string }> {
   const lien = `${URL_SITE}/fidelite/confirmer?jeton=${jeton}`;
-  const envoi = await envoyerEmail(
+  return envoyerEmail(
     email,
     "Confirme ton email pour activer ton compte 3 Sauces",
     construireEmailClientHtml(
@@ -69,8 +52,86 @@ export async function demanderConfirmationEmail(telephone: string, email: string
       lien
     )
   );
+}
+
+/**
+ * Envoie (ou renvoie) le lien de confirmation. Refuse si le client a déjà un email CONFIRMÉ : un compte activé ne change
+ * jamais d'email par ce chemin. Un lien précédent encore valable pour ce numéro est simplement remplacé.
+ * Le résultat de l'envoi est conservé (`envoye_le` / `derniere_erreur`) : un envoi raté (quota, panne) est renvoyé
+ * automatiquement par `renvoyerConfirmationsEnAttente`.
+ */
+export async function demanderConfirmationEmail(telephone: string, email: string, accepteOffres = false): Promise<{ ok: boolean; erreur?: string }> {
+  const supabase = createServiceSupabaseClient();
+  const { data: client } = await supabase.from("clients").select("email, email_confirme_le").eq("telephone", telephone).maybeSingle();
+  if (!client) return { ok: false, erreur: "Numéro introuvable." };
+  if (client.email && client.email_confirme_le) return { ok: false, erreur: "Ce compte est déjà activé." };
+
+  const jeton = randomBytes(32).toString("base64url");
+  // Un seul lien valable à la fois par numéro.
+  await supabase.from("confirmations_email").update({ utilise_le: new Date().toISOString() }).eq("telephone", telephone).is("utilise_le", null);
+  const { data: demande, error } = await supabase
+    .from("confirmations_email")
+    .insert({
+      telephone,
+      email,
+      jeton_hash: empreinte(jeton),
+      accepte_offres: accepteOffres,
+      expire_le: new Date(Date.now() + VALIDITE_MS).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error || !demande) return { ok: false, erreur: "Impossible de préparer l'email, réessaie." };
+
+  const envoi = await envoyerLienConfirmation(email, jeton);
+  await supabase
+    .from("confirmations_email")
+    .update(envoi.ok ? { envoye_le: new Date().toISOString(), derniere_erreur: null } : { derniere_erreur: envoi.erreur ?? "erreur inconnue" })
+    .eq("id", demande.id);
   if (!envoi.ok) return { ok: false, erreur: "L'email n'a pas pu être envoyé, réessaie dans quelques minutes." };
   return { ok: true };
+}
+
+/**
+ * Renvoie les liens de confirmation qui ne sont jamais partis (quota d'envoi atteint, panne du service d'email) : demandes non
+ * utilisées, non expirées, dont le client n'a toujours pas confirmé. Un nouveau lien remplace l'ancien (seul son empreinte est
+ * conservée, il ne peut pas être renvoyé tel quel). S'arrête au premier refus pour quota. Appelé chaque matin par le cron.
+ */
+export async function renvoyerConfirmationsEnAttente(max = 50): Promise<{ renvoyes: number; echecs: number; restants: number }> {
+  const supabase = createServiceSupabaseClient();
+  const { data: enAttente } = await supabase
+    .from("confirmations_email")
+    .select("id, telephone, email")
+    .is("envoye_le", null)
+    .is("utilise_le", null)
+    .gt("expire_le", new Date().toISOString())
+    .order("created_at", { ascending: true })
+    .limit(max);
+  let renvoyes = 0;
+  let echecs = 0;
+  const liste = enAttente ?? [];
+  for (let i = 0; i < liste.length; i++) {
+    const d = liste[i];
+    const { data: client } = await supabase.from("clients").select("email_confirme_le").eq("telephone", d.telephone).maybeSingle();
+    if (!client || client.email_confirme_le) {
+      await supabase.from("confirmations_email").update({ utilise_le: new Date().toISOString() }).eq("id", d.id);
+      continue;
+    }
+    const jeton = randomBytes(32).toString("base64url");
+    await supabase
+      .from("confirmations_email")
+      .update({ jeton_hash: empreinte(jeton), expire_le: new Date(Date.now() + VALIDITE_MS).toISOString() })
+      .eq("id", d.id);
+    const envoi = await envoyerLienConfirmation(d.email, jeton);
+    if (envoi.ok) {
+      renvoyes++;
+      await supabase.from("confirmations_email").update({ envoye_le: new Date().toISOString(), derniere_erreur: null }).eq("id", d.id);
+    } else {
+      echecs++;
+      await supabase.from("confirmations_email").update({ derniere_erreur: envoi.erreur ?? "erreur inconnue" }).eq("id", d.id);
+      if ((envoi.erreur ?? "").includes("429")) return { renvoyes, echecs, restants: liste.length - i - 1 };
+    }
+  }
+  return { renvoyes, echecs, restants: 0 };
 }
 
 export type ResultatConfirmation = "ok" | "invalide" | "expire" | "deja_active";

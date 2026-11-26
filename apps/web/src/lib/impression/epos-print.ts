@@ -527,13 +527,21 @@ function imprimerBlocFidelite(b: ConstructeurTicket, commande: CommandePourImpre
  * ticket client dont le compte n'est pas activé, livraison comprise (le QR du ticket de livraison mène, une fois la commande
  * livrée, à la page d'activation — demande du patron, 27/11/2026).
  */
-function imprimerBlocActivation(b: ConstructeurTicket, livraison: boolean): void {
+function imprimerBlocActivation(b: ConstructeurTicket, livraison: boolean, emailEnAttente: boolean): void {
   b.brut(`<feed line="1"/>`);
   b.ligne("=".repeat(32), { align: "center", gras: true, taille: 1 });
-  b.ligne(" ACTIVE TON COMPTE ", { align: "center", gras: true, taille: 2, surligne: true });
-  b.ligne(" FIDÉLITÉ ", { align: "center", gras: true, taille: 2, surligne: true });
-  b.ligne("Valide ton email pour profiter de tes points de fidélité", { align: "center", gras: true, taille: 1 });
-  b.ligne(livraison ? "Après ta livraison, scanne le QR code ci-dessous" : "Scanne le QR code ci-dessous", { align: "center", gras: true, taille: 1 });
+  if (emailEnAttente) {
+    // Email déjà saisi (commande sur le site) mais pas encore confirmé : le lien est déjà dans sa boîte mail.
+    b.ligne(" CONFIRME TON EMAIL ", { align: "center", gras: true, taille: 2, surligne: true });
+    b.ligne("Clique sur le lien reçu par email pour activer ton compte fidélité et profiter de tes points de fidélité", { align: "center", gras: true, taille: 1 });
+    b.ligne("(regarde aussi dans tes spams)", { align: "center", gras: false, taille: 1 });
+    b.ligne(livraison ? "Pas reçu ? Après ta livraison, scanne le QR code ci-dessous" : "Pas reçu ? Scanne le QR code ci-dessous", { align: "center", gras: true, taille: 1 });
+  } else {
+    b.ligne(" ACTIVE TON COMPTE ", { align: "center", gras: true, taille: 2, surligne: true });
+    b.ligne(" FIDÉLITÉ ", { align: "center", gras: true, taille: 2, surligne: true });
+    b.ligne("Valide ton email pour profiter de tes points de fidélité", { align: "center", gras: true, taille: 1 });
+    b.ligne(livraison ? "Après ta livraison, scanne le QR code ci-dessous" : "Scanne le QR code ci-dessous", { align: "center", gras: true, taille: 1 });
+  }
   b.ligne("=".repeat(32), { align: "center", gras: true, taille: 1 });
 }
 
@@ -684,7 +692,7 @@ function construireContenuTicketClient(
   imprimerBlocFidelite(b, commande);
   // Compte pas encore activé : message d'activation bien visible (encadré, texte inversé) sur TOUS les tickets clients.
   if (commande.compteNonActive && (commande.canal !== "livraison" || commande.qrCode)) {
-    imprimerBlocActivation(b, commande.canal === "livraison");
+    imprimerBlocActivation(b, commande.canal === "livraison", commande.emailEnAttente);
   }
   if (commande.canal !== "livraison") {
     // Sur place / à emporter : un QR vers la page « Mes points de fidélité » (le client y confirme son numéro puis
@@ -737,6 +745,21 @@ function construireContenuTicketActivation(
   if (logo) {
     b.brut(styleTexte({ align: "center" }));
     b.brut(`<image width="${logo.largeur}" height="${logo.hauteur}" color="color_1" mode="mono">${logo.base64}</image>`);
+  }
+  if (commande.emailEnAttente) {
+    b.ligne("CONFIRME TON EMAIL", { align: "center", gras: true, taille: 2 });
+    b.brut(`<feed line="1"/>`);
+    b.ligne("Clique sur le lien reçu par email", { align: "center", gras: true, taille: 1 });
+    b.ligne("(regarde aussi dans tes spams)", { align: "center", gras: false, taille: 1 });
+    b.ligne("Pas reçu ? Scanne le QR code :", { align: "center", gras: false, taille: 1 });
+    b.brut(styleTexte({ align: "center" }));
+    b.brut(
+      `<symbol type="qrcode_model_2" level="level_m" width="6">${echapperXml(`${URL_SITE}/fidelite/voir?code=${commande.id}&src=${commande.origineCaisse ? "ticket-caisse" : "ticket-site"}`)}</symbol>`
+    );
+    b.brut(`<feed line="1"/>`);
+    b.ligne(CONTACT_RESTAURANT, { align: "center", gras: true, taille: 1 });
+    b.brut(`<feed line="2"/><cut type="feed"/>`);
+    return b.xml();
   }
   b.ligne("ACTIVE TON COMPTE", { align: "center", gras: true, taille: 2 });
   b.ligne("FIDÉLITÉ", { align: "center", gras: true, taille: 2 });
