@@ -1412,7 +1412,7 @@ export function CommandeNouvelleApp({
       )}
       {offreMenuOuverte && (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#8B2020" }}>
-          🎁 Jeudi dès 16 h et vendredi, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
+          🎁 Jusqu'à vendredi soir, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
         </div>
       )}
       {offreCanetteActive(aujourdHui) && (
