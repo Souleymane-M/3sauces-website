@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { compterTamponsDisponibles } from "./tampons";
 import { progressionTampons } from "./regles";
-import { normaliserTelephone } from "@/lib/telephone";
+import { memeTelephone, normaliserTelephone } from "@/lib/telephone";
 import { demanderConfirmationEmail } from "./email-confirme";
 
 /**
@@ -73,8 +73,9 @@ export async function verifierTelephoneParQrLivraison(qrCode: string, telephoneS
   const telephoneAttendu = await trouverTelephoneAttendu(qrCode);
   if (!telephoneAttendu) return null;
   const telephoneNormalise = normaliserTelephone(telephoneSaisi);
-  if (!telephoneNormalise || telephoneNormalise !== telephoneAttendu) return null;
-  return chargerDetails(telephoneNormalise);
+  // Même numéro écrit en +262 ou en +33 : accepté, la fiche de la commande fait foi.
+  if (!telephoneNormalise || !memeTelephone(telephoneNormalise, telephoneAttendu)) return null;
+  return chargerDetails(telephoneAttendu);
 }
 
 /**
@@ -91,13 +92,13 @@ export async function activerEmailParQrLivraison(
   const telephoneAttendu = await trouverTelephoneAttendu(qrCode);
   if (!telephoneAttendu) throw new Error("Lien invalide.");
   const telephoneNormalise = normaliserTelephone(telephoneSaisi);
-  if (!telephoneNormalise || telephoneNormalise !== telephoneAttendu) throw new Error("Numéro incorrect.");
+  if (!telephoneNormalise || !memeTelephone(telephoneNormalise, telephoneAttendu)) throw new Error("Numéro incorrect.");
 
   // Jamais d'écriture directe de l'email ici : on envoie un lien de confirmation, et l'email n'est enregistré
   // (compte activé) que quand le client clique dessus — preuve qu'il possède bien cette boîte mail.
-  const envoi = await demanderConfirmationEmail(telephoneNormalise, email, accepteOffres);
+  const envoi = await demanderConfirmationEmail(telephoneAttendu, email, accepteOffres);
   if (!envoi.ok) throw new Error(envoi.erreur ?? "Impossible d'envoyer l'email.");
 
-  return { ...(await chargerDetails(telephoneNormalise)), confirmationEnvoyee: true };
+  return { ...(await chargerDetails(telephoneAttendu)), confirmationEnvoyee: true };
 
 }

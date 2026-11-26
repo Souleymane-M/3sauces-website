@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
+import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import { lireProfilEnregistre } from "@/lib/profil-client-serveur";
 
@@ -22,12 +23,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Trop de requêtes, réessaie dans quelques minutes." }, { status: 429 });
   }
 
-  const telephone = normaliserTelephone(new URL(request.url).searchParams.get("telephone") ?? "");
-  if (!telephone) {
+  const telephoneSaisi = normaliserTelephone(new URL(request.url).searchParams.get("telephone") ?? "");
+  if (!telephoneSaisi) {
     return NextResponse.json({ emailConnu: false });
   }
 
   const supabase = createServiceSupabaseClient();
+  const telephone = await resoudreTelephoneClient(supabase, telephoneSaisi);
   const { data } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
 
   // Oui/non seulement, comme pour l'email : jamais la valeur du profil.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
+import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { normaliserEmail } from "@/lib/email";
 import { limiterDebit } from "@/lib/auth/rate-limit";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
@@ -19,17 +20,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
   }
 
-  const telephone = normaliserTelephone(body.telephone ?? "");
+  const telephoneSaisi = normaliserTelephone(body.telephone ?? "");
   const email = normaliserEmail(body.email ?? "");
-  if (!telephone || !email) {
+  if (!telephoneSaisi || !email) {
     return NextResponse.json({ error: "Numéro de téléphone ou email invalide." }, { status: 400 });
   }
 
-  if (limiterDebit(`fidelite-solde:${telephone}`, 10, 5 * 60 * 1000)) {
+  if (limiterDebit(`fidelite-solde:${telephoneSaisi}`, 10, 5 * 60 * 1000)) {
     return NextResponse.json({ error: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
 
   const supabase = createServiceSupabaseClient();
+  const telephone = await resoudreTelephoneClient(supabase, telephoneSaisi);
   const { data, error } = await supabase
     .from("clients")
     .select("email, email_confirme_le, montant_cumule, nom, prenom")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
+import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { lireProfilClient } from "@/lib/profil-client";
 import { enregistrerProfilClient } from "@/lib/profil-client-serveur";
 import { normaliserEmail } from "@/lib/email";
@@ -595,8 +596,8 @@ export async function POST(request: Request) {
   if (body.canal === "livraison" && !prenom) {
     return NextResponse.json({ error: "Le prénom est requis pour une livraison." }, { status: 400 });
   }
-  const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
-  if (!clientTelephone) {
+  const clientTelephoneSaisi = normaliserTelephone(body.clientTelephone ?? "");
+  if (!clientTelephoneSaisi) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
@@ -614,6 +615,8 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
+  // Même numéro écrit en +262 ou en +33 : on retrouve la fiche client existante.
+  const clientTelephone = await resoudreTelephoneClient(supabase, clientTelephoneSaisi);
 
   // --- Paramètres de livraison (mêmes règles que le site public, cf.
   // /api/commande) : une livraison prise au téléphone par la caisse a
@@ -993,8 +996,8 @@ export async function PATCH(request: Request) {
   // connu (il peut changer via cette modification).
   const nom = (body.nom ?? "").trim();
   const prenom = (body.prenom ?? "").trim();
-  const clientTelephone = normaliserTelephone(body.clientTelephone ?? "");
-  if (!clientTelephone) {
+  const clientTelephoneSaisi = normaliserTelephone(body.clientTelephone ?? "");
+  if (!clientTelephoneSaisi) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
@@ -1009,6 +1012,8 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
+  // Même numéro écrit en +262 ou en +33 : on retrouve la fiche client existante.
+  const clientTelephone = await resoudreTelephoneClient(supabase, clientTelephoneSaisi);
 
   const { data: commandeExistante, error: erreurExistante } = await supabase
     .from("commandes")

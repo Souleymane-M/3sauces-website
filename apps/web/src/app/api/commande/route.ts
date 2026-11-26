@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { normaliserTelephone } from "@/lib/telephone";
+import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { normaliserEmail } from "@/lib/email";
 import { demanderConfirmationEmail, poserEmailNonConfirme } from "@/lib/fidelite/email-confirme";
 import {
@@ -122,8 +123,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Le prénom est requis." }, { status: 400 });
   }
 
-  const telephone = normaliserTelephone(body.telephone ?? "");
-  if (!telephone) {
+  const telephoneSaisi = normaliserTelephone(body.telephone ?? "");
+  if (!telephoneSaisi) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
@@ -155,6 +156,8 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
+  // Même numéro écrit en +262 ou en +33 : la commande va sur la fiche client existante (jamais de doublon, points de fidélité conservés).
+  const telephone = await resoudreTelephoneClient(supabase, telephoneSaisi);
 
   if (!email) {
     const { data: clientExistant } = await supabase.from("clients").select("email").eq("telephone", telephone).maybeSingle();
@@ -781,8 +784,9 @@ export async function POST(request: Request) {
     // commande (ex: client déjà connu qui a laissé ce champ vide).
     const fideliteTelephone =
       typeof body.fideliteTelephone === "string" ? normaliserTelephone(body.fideliteTelephone) : null;
+    const fideliteTelephoneResolu = fideliteTelephone ? await resoudreTelephoneClient(supabase, fideliteTelephone) : null;
     const fideliteEmail = typeof body.fideliteEmail === "string" ? normaliserEmail(body.fideliteEmail) : null;
-    if (!fideliteTelephone || !fideliteEmail || fideliteTelephone !== telephone) {
+    if (!fideliteTelephoneResolu || !fideliteEmail || fideliteTelephoneResolu !== telephone) {
       return NextResponse.json(
         { error: "Revérifie ton solde fidélité pour utiliser tes points de fidélité." },
         { status: 401 }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { requireRole } from "@/lib/auth/get-session";
 import { normaliserTelephone } from "@/lib/telephone";
+import { resoudreTelephoneClient } from "@/lib/telephone-client";
 import { compterTamponsDisponibles } from "@/lib/fidelite/tampons";
 
 /**
@@ -17,12 +18,14 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const telephoneNormalise = normaliserTelephone(searchParams.get("telephone") ?? "");
-  if (!telephoneNormalise) {
+  const telephoneSaisi = normaliserTelephone(searchParams.get("telephone") ?? "");
+  if (!telephoneSaisi) {
     return NextResponse.json({ error: "Numéro de téléphone invalide — vérifie que tu l'as bien saisi (ex: 0639123456)." }, { status: 400 });
   }
 
   const supabase = createServiceSupabaseClient();
+  // Même numéro écrit en +262 ou en +33 : on retrouve la fiche existante.
+  const telephoneNormalise = await resoudreTelephoneClient(supabase, telephoneSaisi);
   const { data: client, error } = await supabase
     .from("clients")
     .select("telephone, nom, prenom, email, email_confirme_le, montant_cumule")
