@@ -17,7 +17,7 @@
  * valide. Le client doit alors ressaisir son numéro exact.
  */
 /** Trois premiers chiffres (après le 0) des numéros de Mayotte et de La Réunion (indicatif +262). */
-export const PREFIXES_LOCAUX_262: readonly string[] = ["639", "638", "692", "693", "262", "263", "269"];
+export const PREFIXES_LOCAUX_262: readonly string[] = ["639", "692", "693", "262", "263", "269"];
 
 /** Les deux écritures possibles d'un même numéro à 9 chiffres (+262… ou +33…), numéro d'origine en premier. Un autre indicatif : lui seul. */
 export function variantesTelephone(telephone: string): string[] {
@@ -60,7 +60,7 @@ export function normaliserTelephone(saisie: string): string | null {
 
   // Numéro local à 10 chiffres commençant par 0 : Mayotte et La Réunion partagent l'indicatif +262, la métropole +33, et
   // le format local est identique. On distingue par le PRÉFIXE : seuls les préfixes attribués à Mayotte / La Réunion
-  // (06 39, 06 38, 06 92, 06 93 pour les mobiles ; 02 62, 02 63, 02 69 pour les fixes) donnent +262, tout le reste
+  // (06 39 pour Mayotte, 06 92 et 06 93 pour La Réunion, côté mobiles ; 02 62, 02 63, 02 69 pour les fixes) donnent +262, tout le reste
   // (06 58, 06 95, 07…, 01, 03…) est un numéro métropolitain → +33. Les fiches clients déjà créées avec l'ancienne
   // règle (tout en +262) sont retrouvées par `resoudreTelephoneClient` (même numéro, deux écritures).
   if (/^0\d{9}$/.test(nettoye)) {
