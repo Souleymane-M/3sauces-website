@@ -42,6 +42,7 @@ import { listerClientsAdmin } from "@/lib/patron/clients";
 import { listerHistoriqueTiroir } from "@/lib/caisse/tiroir";
 import { CompteurCreneaux } from "@/components/caisse/compteur-creneaux";
 import { EnDirectApp } from "@/components/patron/en-direct-app";
+import { AudienceSiteApp } from "@/components/patron/audience-site-app";
 import { TiroirCaissePatronApp } from "@/components/patron/tiroir-caisse-patron-app";
 import { InscriptionsApp } from "@/components/patron/inscriptions-app";
 import { RelanceApp } from "@/components/patron/relance-app";
@@ -164,6 +165,11 @@ export default async function PatronPage() {
                 <EnDirectApp />
               </div>
             ),
+          },
+          {
+            id: "audience",
+            label: "Audience du site",
+            contenu: <AudienceSiteApp />,
           },
           {
             id: "caisse",
