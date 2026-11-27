@@ -332,6 +332,20 @@ export function CommandeNouvelleApp({
 
   // Suivi anonyme (voir lib/suivi) : jamais de donnée personnelle, jamais d'effet sur la commande.
   const etapeSuivie: EtapeVisiteur = envoiEnCours ? "validation" : panier.length > 0 ? "panier" : "menu";
+  // Lien direct `?offre=menu-etudiant` (WhatsApp, email) : ouvre tout de suite la composition du Menu Étudiant, tant que l'offre est ouverte.
+  const lienDirectTraiteRef = useRef(false);
+  useEffect(() => {
+    if (lienDirectTraiteRef.current || produits.length === 0) return;
+    lienDirectTraiteRef.current = true;
+    try {
+      if (new URLSearchParams(window.location.search).get("offre") === "menu-etudiant" && offreMenuEtudiantOuverte()) {
+        ouvrirMenusDepuisVisuel();
+      }
+    } catch {
+      /* lien non lisible : on reste sur l'accueil */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produits]);
   const etapeSuivieRef = useRef(etapeSuivie);
   const lignesConnuesSuivi = useRef<Set<string> | null>(null);
   useEffect(() => {
