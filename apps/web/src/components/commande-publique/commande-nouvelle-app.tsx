@@ -45,6 +45,7 @@ import { DatePicker } from "./date-picker";
 import { CarteFidelite } from "./carte-fidelite";
 import { MONTANT_RECOMPENSE, NB_TAMPONS_RECOMPENSE, calculerProgressionCommande, progressionTampons, texteProgressionCommande } from "@/lib/fidelite/regles";
 import { MENUS_POUR_UN_OFFERT, REDUCTION_MENU_OFFERT, nombreMenusOfferts, offreMenuEtudiantOuverte } from "@/lib/commande-publique/offre-menu-etudiant";
+import { visuelOffreDuJour } from "@/lib/commande-publique/visuels-offres";
 import { MONTANT_PAR_CANETTE_OFFERTE, nombreCanettesOffertes, offreCanetteActive, TAUX_POINTS_AVEC_CANETTE } from "@/lib/commande-publique/offre-canette";
 import { nombreBoxOffertes, NB_SAUCES_CADEAU, offreCadeauActive, SEUIL_OFFRE_CADEAU } from "@/lib/commande-publique/offre-cadeau";
 import { CLE_SOURCE_CAMPAGNE, DUREE_SOURCE_CAMPAGNE_MS, normaliserSourceCampagne } from "@/lib/campagne";
@@ -184,6 +185,7 @@ export function CommandeNouvelleApp({
   const router = useRouter();
 
   const aujourdHui = useMemo(() => dateMayotteIso(), []);
+  const visuelDuJour = visuelOffreDuJour(aujourdHui);
   const datesOuvertes = useMemo(
     () => prochainesDatesOuvertes(parametres.joursFermeture, parametres.heureDebut, parametres.heureFin),
     [parametres.joursFermeture, parametres.heureDebut, parametres.heureFin]
@@ -1398,8 +1400,18 @@ export function CommandeNouvelleApp({
 
   return (
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
+      {visuelDuJour && vue === "menu" && mode === null ? (
+        <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
+          <picture>
+            <source media="(min-width: 640px)" srcSet={visuelDuJour.paysage} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={visuelDuJour.carre} alt={visuelDuJour.alt} className="h-auto w-full max-w-[360px] rounded-xl shadow-md sm:max-w-[880px]" />
+          </picture>
+        </div>
+      ) : null}
+
       {/* Un seul bandeau à la fois (moins de distraction) : l'offre du jour la plus forte, sinon la canette, sinon la fidélité. */}
-      {offreMenuOuverte ? (
+      {visuelDuJour && vue === "menu" && mode === null ? null : offreMenuOuverte ? (
         <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#0F8B9B" }}>
           🎁 AUJOURD&apos;HUI SEULEMENT : 3 Menus Étudiants achetés = le 4ᵉ OFFERT !
         </div>
