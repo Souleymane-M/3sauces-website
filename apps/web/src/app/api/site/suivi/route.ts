@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@3sauces/supabase";
 import { dateMayotteIso } from "@/lib/commande-publique/creneau";
+import { categoriserAppareil, nettoyerReferent } from "@/lib/suivi/appareil";
+import { normaliserSourceCampagne } from "@/lib/campagne";
 import { ETAPES, TYPES_EVENEMENT, type EtapeVisiteur, type TypeEvenement } from "@/lib/suivi/types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function POST(request: Request) {
   const texte = await request.text();
   if (texte.length > 1000) return new NextResponse(null, { status: 204 });
-  let body: { visiteur?: unknown; type?: unknown; etape?: unknown; produit?: unknown };
+  let body: { visiteur?: unknown; type?: unknown; etape?: unknown; produit?: unknown; cible?: unknown; duree_ms?: unknown; source?: unknown; referent?: unknown; page?: unknown; tactile?: unknown };
   try {
     body = JSON.parse(texte);
   } catch {
@@ -35,8 +37,43 @@ export async function POST(request: Request) {
           .delete()
           .lt("derniere_activite", new Date(Date.now() - 2 * 24 * 3600_000).toISOString());
       }
+    } else if (body.type === "visite_detail") {
+      // Une ligne par visite : provenance + catégorie d'appareil (jamais l'identifiant brut du navigateur).
+      const { systeme, appareil, navigateur } = categoriserAppareil(request.headers.get("user-agent") ?? "", body.tactile === true);
+      const page = typeof body.page === "string" && /^\/[a-z0-9/_-]{0,78}$/i.test(body.page) ? body.page : null;
+      await supabase.from("visites_site").upsert(
+        {
+          visiteur: body.visiteur,
+          date_jour: dateMayotteIso(),
+          source: normaliserSourceCampagne(body.source),
+          referent: nettoyerReferent(body.referent),
+          page_arrivee: page,
+          appareil,
+          systeme,
+          navigateur,
+        },
+        { onConflict: "visiteur", ignoreDuplicates: true }
+      );
+    } else if (body.type === "clic" || body.type === "produit_vu" || body.type === "temps_etape" || body.type === "temps_produit") {
+      const cible = typeof body.cible === "string" ? body.cible.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80) : "";
+      if (!cible) return new NextResponse(null, { status: 204 });
+      const duree = typeof body.duree_ms === "number" && Number.isFinite(body.duree_ms) ? Math.round(body.duree_ms) : null;
+      if ((body.type === "temps_etape" || body.type === "temps_produit") && (duree === null || duree < 0 || duree > 1_800_000)) {
+        return new NextResponse(null, { status: 204 });
+      }
+      // Plafond par visite (anti-abus) : 400 lignes.
+      const { count } = await supabase.from("clics_site").select("id", { count: "exact", head: true }).eq("visiteur", body.visiteur);
+      if ((count ?? 0) >= 400) return new NextResponse(null, { status: 204 });
+      await supabase.from("clics_site").insert({
+        visiteur: body.visiteur,
+        date_jour: dateMayotteIso(),
+        type: body.type,
+        cible,
+        duree_ms: body.type === "temps_etape" || body.type === "temps_produit" ? duree : null,
+      });
     } else if (typeof body.type === "string" && (TYPES_EVENEMENT as readonly string[]).includes(body.type)) {
       const produit = typeof body.produit === "string" ? body.produit.trim().slice(0, 80) : "";
+      if (body.type === "commande_validee") await supabase.from("visites_site").update({ a_commande: true }).eq("visiteur", body.visiteur);
       await supabase
         .from("evenements_site")
         .upsert(

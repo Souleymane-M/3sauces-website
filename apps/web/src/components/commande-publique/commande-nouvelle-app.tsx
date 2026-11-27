@@ -2,7 +2,7 @@
 
 import { FAMILLES_BOISSON } from "@/lib/boissons";
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { suivreEvenement, suivrePresence } from "@/lib/suivi/client";
+import { suivreClic, suivreEvenement, suivrePresence, suivreProduitVu, suivreTemps, suivreVisiteDetaillee } from "@/lib/suivi/client";
 import type { EtapeVisiteur } from "@/lib/suivi/types";
 import { useRouter } from "next/navigation";
 import type { ModePaiement } from "@3sauces/supabase";
@@ -346,10 +346,37 @@ export function CommandeNouvelleApp({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produits]);
+  // Temps passé par étape (accueil, menu, panier, validation) : envoyé au changement d'étape ou quand l'onglet est masqué.
+  const etapeTempsCle = vue === "menu" ? (mode === null ? "accueil" : "menu") : vue;
+  useEffect(() => {
+    let debut = Date.now();
+    const vider = () => {
+      suivreTemps("temps_etape", etapeTempsCle, Date.now() - debut);
+      debut = Date.now();
+    };
+    const surVisibilite = () => {
+      if (document.visibilityState === "hidden") vider();
+      else debut = Date.now();
+    };
+    document.addEventListener("visibilitychange", surVisibilite);
+    return () => {
+      document.removeEventListener("visibilitychange", surVisibilite);
+      if (document.visibilityState === "visible") vider();
+    };
+  }, [etapeTempsCle]);
+  // Produit ouvert (fiche de composition) : compté comme « vu » et chronométré, même s'il n'est pas ajouté au panier.
+  const nomProduitOuvert = produitEnSelection?.nom ?? null;
+  useEffect(() => {
+    if (!nomProduitOuvert) return;
+    suivreProduitVu(nomProduitOuvert);
+    const debut = Date.now();
+    return () => suivreTemps("temps_produit", nomProduitOuvert, Date.now() - debut);
+  }, [nomProduitOuvert]);
   const etapeSuivieRef = useRef(etapeSuivie);
   const lignesConnuesSuivi = useRef<Set<string> | null>(null);
   useEffect(() => {
     suivreEvenement("visite");
+    suivreVisiteDetaillee();
     const minuteur = setInterval(() => {
       if (document.visibilityState === "visible") suivrePresence(etapeSuivieRef.current);
     }, 20_000);
@@ -740,6 +767,7 @@ export function CommandeNouvelleApp({
   }
 
   function aller(nouvelleVue: Vue) {
+    suivreClic(`aller-${nouvelleVue}`);
     setErreur(null);
     setVue(nouvelleVue);
     window.scrollTo({ top: 0 });
@@ -1426,7 +1454,7 @@ export function CommandeNouvelleApp({
       {visuelDuJour && vue === "menu" && mode === null ? (
         <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
           {/* Un clic sur le visuel ouvre directement la composition du Menu Étudiant. */}
-          <button type="button" onClick={ouvrirMenusDepuisVisuel} aria-label="Commander le Menu Étudiant" className="block w-full max-w-[360px] active:scale-[0.99] sm:max-w-[880px]">
+          <button type="button" onClick={() => { suivreClic("visuel-offre"); ouvrirMenusDepuisVisuel(); }} aria-label="Commander le Menu Étudiant" className="block w-full max-w-[360px] active:scale-[0.99] sm:max-w-[880px]">
             <picture>
               <source media="(min-width: 640px)" srcSet={visuelDuJour.paysage} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1439,7 +1467,10 @@ export function CommandeNouvelleApp({
         <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
           <button
             type="button"
-            onClick={ouvrirMenusDepuisVisuel}
+            onClick={() => {
+              suivreClic("bouton-clique-ici");
+              ouvrirMenusDepuisVisuel();
+            }}
             className="flex w-full max-w-[360px] items-center justify-center gap-3 rounded-xl px-4 py-3.5 text-lg font-extrabold text-white shadow-md active:scale-[0.99] sm:max-w-[880px]"
             style={{ backgroundColor: ROUGE }}
           >
@@ -1593,6 +1624,7 @@ export function CommandeNouvelleApp({
                   key={o.cle}
                   type="button"
                   onClick={() => {
+                    suivreClic(`onglet-${o.cle}`);
                     setOnglet(o.cle);
                     setAutresBoissonsOuvert(false);
                   }}

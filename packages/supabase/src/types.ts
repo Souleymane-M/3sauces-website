@@ -682,6 +682,56 @@ export interface Database {
         Relationships: [];
       };
 
+      visites_site: {
+        Row: {
+          visiteur: string;
+          date_jour: string;
+          premiere_vue: string;
+          source: string | null;
+          referent: string | null;
+          page_arrivee: string | null;
+          appareil: "telephone" | "tablette" | "ordinateur" | null;
+          systeme: "android" | "ios" | "windows" | "macos" | "linux" | "autre" | null;
+          navigateur: "chrome" | "safari" | "firefox" | "edge" | "samsung" | "instagram" | "facebook" | "tiktok" | "autre" | null;
+          a_commande: boolean;
+        };
+        Insert: {
+          visiteur: string;
+          date_jour: string;
+          premiere_vue?: string;
+          source?: string | null;
+          referent?: string | null;
+          page_arrivee?: string | null;
+          appareil?: "telephone" | "tablette" | "ordinateur" | null;
+          systeme?: "android" | "ios" | "windows" | "macos" | "linux" | "autre" | null;
+          navigateur?: "chrome" | "safari" | "firefox" | "edge" | "samsung" | "instagram" | "facebook" | "tiktok" | "autre" | null;
+          a_commande?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["visites_site"]["Insert"]>;
+        Relationships: [];
+      };
+
+      clics_site: {
+        Row: {
+          id: number;
+          visiteur: string;
+          date_jour: string;
+          created_at: string;
+          type: "clic" | "produit_vu" | "temps_etape" | "temps_produit";
+          cible: string;
+          duree_ms: number | null;
+        };
+        Insert: {
+          visiteur: string;
+          date_jour: string;
+          type: "clic" | "produit_vu" | "temps_etape" | "temps_produit";
+          cible: string;
+          duree_ms?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["clics_site"]["Insert"]>;
+        Relationships: [];
+      };
+
       corrections_paiement: {
         Row: {
           id: string;

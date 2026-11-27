@@ -70,10 +70,13 @@ export default function ConfidentialitePage() {
       <section className="space-y-1">
         <h2 className="font-semibold text-gray-900">Mesure d&apos;audience anonyme</h2>
         <p>
-          Pour améliorer le site, nous comptons de façon anonyme les visites et les étapes de la
-          commande (par exemple : plat ajouté au panier). Aucun cookie n&apos;est déposé, aucune donnée
-          personnelle ni adresse IP n&apos;est enregistrée : seul un identifiant aléatoire, propre à
-          votre onglet et effacé à sa fermeture, est utilisé.
+          Pour améliorer le site, nous mesurons de façon anonyme son utilisation : les visites, les
+          étapes de la commande (par exemple : plat ajouté au panier), les boutons et produits
+          consultés, le temps passé sur chaque page ou produit, la provenance de la visite (lien reçu
+          par email ou WhatsApp, affiche, site d&apos;origine) et le type d&apos;appareil utilisé (téléphone,
+          ordinateur, Android, iOS, navigateur). Aucun cookie n&apos;est déposé, aucune donnée personnelle
+          ni adresse IP n&apos;est enregistrée : seul un identifiant aléatoire, propre à votre onglet et
+          effacé à sa fermeture, est utilisé. Ces mesures sont supprimées automatiquement après 90 jours.
         </p>
       </section>
 
