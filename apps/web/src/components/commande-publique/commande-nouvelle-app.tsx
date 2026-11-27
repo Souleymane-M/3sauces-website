@@ -1398,28 +1398,26 @@ export function CommandeNouvelleApp({
 
   return (
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
-      {/* Promos toujours bien visibles : fidélité, offre du jour. */}
-      <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: VERT }}>
-        🎁 10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
-      </div>
-      {pointsDoublesPossibles(aujourdHui) && (
-        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : points de fidélité DOUBLÉS pour tous nos clients
+      {/* Un seul bandeau à la fois (moins de distraction) : l'offre du jour la plus forte, sinon la canette, sinon la fidélité. */}
+      {offreMenuOuverte ? (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#EE6352" }}>
+          🎁 AUJOURD&apos;HUI SEULEMENT : 3 Menus Étudiants achetés = le 4ᵉ OFFERT !
         </div>
-      )}
-      {offreCadeauActive(aujourdHui) && (
-        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
+      ) : offreCadeauActive(aujourdHui) ? (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#EE6352" }}>
           🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : une BOX OFFERTE (3 ailes grillées + frites + 2 sauces au choix) par tranche de {SEUIL_OFFRE_CADEAU} € d&apos;achats
         </div>
-      )}
-      {offreMenuOuverte && (
-        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#8B2020" }}>
-          🎁 Jusqu'à vendredi soir, sur 3sauces.fr : 3 Menus Étudiants achetés = 1 OFFERT (pas de canette offerte ni de points de fidélité sur cette offre)
+      ) : pointsDoublesPossibles(aujourdHui) ? (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#EE6352" }}>
+          🎁 Aujourd&apos;hui seulement, sur 3sauces.fr : points de fidélité DOUBLÉS pour tous nos clients
         </div>
-      )}
-      {offreCanetteActive(aujourdHui) && (
-        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#1F3A5F" }}>
-          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés (1 point de fidélité tous les 20 € sur ces commandes, non cumulable avec l&apos;utilisation de tes points)
+      ) : offreCanetteActive(aujourdHui) ? (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: "#EE6352" }}>
+          🎁 Jusqu&apos;au 12 décembre, sur 3sauces.fr : 1 CANETTE OFFERTE par tranche de 10 € payés
+        </div>
+      ) : (
+        <div className="px-4 py-2 text-center text-sm font-extrabold text-white" style={{ backgroundColor: VERT }}>
+          🎁 10 € dépensés = 1 point de fidélité · 10 points de fidélité = 10 € offerts
         </div>
       )}
 
