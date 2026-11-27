@@ -647,6 +647,9 @@ export function CommandeNouvelleApp({
   function ouvrirMenusDepuisVisuel() {
     choisirMode("simple");
     setOnglet("tacos");
+    // Ouvre directement la composition du Menu Étudiant (sauces, boisson…), comme un clic sur « Ajouter ».
+    const menuEtudiant = produits.find((p) => p.nom === NOM_PRODUIT_MENU_ETUDIANT);
+    if (menuEtudiant) setProduitEnSelection(menuEtudiant);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }
 
@@ -1408,7 +1411,7 @@ export function CommandeNouvelleApp({
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
       {visuelDuJour && vue === "menu" && mode === null ? (
         <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
-          {/* Un clic sur le visuel mène directement aux Menus (dont le Menu Étudiant), onglet « Tacos & Menu étudiant ». */}
+          {/* Un clic sur le visuel ouvre directement la composition du Menu Étudiant. */}
           <button type="button" onClick={ouvrirMenusDepuisVisuel} aria-label="Commander le Menu Étudiant" className="block w-full max-w-[360px] active:scale-[0.99] sm:max-w-[880px]">
             <picture>
               <source media="(min-width: 640px)" srcSet={visuelDuJour.paysage} />
