@@ -644,6 +644,12 @@ export function CommandeNouvelleApp({
     suivreEvenement("mode_choisi");
   }
 
+  function ouvrirMenusDepuisVisuel() {
+    choisirMode("simple");
+    setOnglet("tacos");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  }
+
   function changerMode() {
     if (nbArticles > 0 && !window.confirm("Changer de mode videra le panier en cours. Continuer ?")) return;
     setPanier([]);
@@ -1402,11 +1408,14 @@ export function CommandeNouvelleApp({
     <div className={`min-h-screen ${enGroupe ? "pb-48" : "pb-28"}`} style={{ backgroundColor: FOND_PAGE }}>
       {visuelDuJour && vue === "menu" && mode === null ? (
         <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
-          <picture>
-            <source media="(min-width: 640px)" srcSet={visuelDuJour.paysage} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={visuelDuJour.carre} alt={visuelDuJour.alt} className="h-auto w-full max-w-[360px] rounded-xl shadow-md sm:max-w-[880px]" />
-          </picture>
+          {/* Un clic sur le visuel mène directement aux Menus (dont le Menu Étudiant), onglet « Tacos & Menu étudiant ». */}
+          <button type="button" onClick={ouvrirMenusDepuisVisuel} aria-label="Commander le Menu Étudiant" className="block w-full max-w-[360px] active:scale-[0.99] sm:max-w-[880px]">
+            <picture>
+              <source media="(min-width: 640px)" srcSet={visuelDuJour.paysage} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={visuelDuJour.carre} alt={visuelDuJour.alt} className="h-auto w-full rounded-xl shadow-md" />
+            </picture>
+          </button>
         </div>
       ) : null}
 
