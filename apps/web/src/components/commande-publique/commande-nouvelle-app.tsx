@@ -1418,6 +1418,19 @@ export function CommandeNouvelleApp({
           </button>
         </div>
       ) : null}
+      {visuelDuJour && vue === "menu" && mode === null ? (
+        <div className="mx-auto flex max-w-3xl justify-center px-4 pt-3">
+          <button
+            type="button"
+            onClick={ouvrirMenusDepuisVisuel}
+            className="flex w-full max-w-[360px] items-center justify-center gap-3 rounded-xl px-4 py-3.5 text-lg font-extrabold text-white shadow-md active:scale-[0.99] sm:max-w-[880px]"
+            style={{ backgroundColor: ROUGE }}
+          >
+            <span aria-hidden="true" className="animate-bounce text-2xl">👉</span>
+            Clique ici pour commander !
+          </button>
+        </div>
+      ) : null}
 
       {/* Un seul bandeau à la fois (moins de distraction) : l'offre du jour la plus forte, sinon la canette, sinon la fidélité. */}
       {visuelDuJour && vue === "menu" && mode === null ? null : offreMenuOuverte ? (
