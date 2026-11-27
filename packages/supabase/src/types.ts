@@ -925,6 +925,10 @@ export interface Database {
       };
     };
     Functions: {
+      purger_suivi_site: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
       decrementer_stocks_produits: {
         Args: { items: { produitId: string; quantite: number }[] };
         Returns: void;
