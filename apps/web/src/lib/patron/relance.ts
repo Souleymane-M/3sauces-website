@@ -208,12 +208,12 @@ export async function jetonDesinscription(email: string): Promise<string | null>
 const echapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Corps HTML d'un e-mail de campagne : message, pied de page avec lien de désinscription, bouton étiqueté `?src=email-…`. */
-export function construireHtmlCampagne(message: string, jeton: string, campagne: string | null): string {
+export function construireHtmlCampagne(message: string, jeton: string, campagne: string | null, offre?: string): string {
   const corps = echapper(message).replace(/\n/g, "<br>");
   const lien = `https://3sauces.fr/desinscription?jeton=${jeton}`;
   return construireEmailClientHtml(
     `<p>${corps}</p><p style="margin-top:24px;font-size:12px;color:#777777;">Vous recevez cet email car vous avez déjà commandé chez 3 Sauces et disposez d'un compte fidélité.<br><a href="${lien}" style="color:#8B2020;">Me désinscrire</a></p>`,
     "Commander",
-    campagne ? `https://3sauces.fr/?src=email-${campagne}` : undefined
+    campagne ? `https://3sauces.fr/?src=email-${campagne}${offre ? `&offre=${offre}` : ""}` : undefined
   );
 }
